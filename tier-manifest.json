@@ -1,0 +1,25 @@
+{
+  "$comment": [
+    "Single source of truth for which folders/files belong to which sellable edition.",
+    "4 buckets: shared (infra, always included, must never import UP into core/pro/premium),",
+    "core ⊂ pro ⊂ premium (each tier export includes shared + itself + everything below it).",
+    "Consumed by eslint.tier-boundaries.mjs (import-boundary lint) and scripts/export-tier.ts,",
+    "mirroring the pattern proven in the sibling `ims` project.",
+    "",
+    "This is a skeleton: almost no application code exists yet, so most buckets are empty.",
+    "As features land, file/folder paths get added to the bucket matching PRD §6's phase they",
+    "belong to (MVP Core SIS + Finance -> core; Comms/LMS -> pro; Operations -> premium).",
+    "",
+    "DEPLOYMENT_MODE (solo|saas, PRD §7) is an orthogonal axis, not a bucket here — a Solo",
+    "customer can buy any tier (core/pro/premium); this manifest only governs which FEATURES",
+    "ship, not which deployment mode they run under."
+  ],
+  "shared": [
+    "src/app/layout.tsx",
+    "src/app/page.tsx",
+    "src/app/globals.css"
+  ],
+  "core": [],
+  "pro": [],
+  "premium": []
+}

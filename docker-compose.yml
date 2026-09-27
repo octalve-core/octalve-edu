@@ -1,0 +1,35 @@
+# Local development only — exposes Postgres/Redis on localhost with fixed
+# credentials. The Solo installer (self-hosted edition) ships a separate,
+# hardened compose file (generated secrets, Caddy reverse proxy, no exposed
+# DB port) per PRD §7 — this is not that file.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: octalve
+      POSTGRES_PASSWORD: octalve
+      POSTGRES_DB: octalve_edu
+    ports:
+      # Host 5433, not 5432 — this machine already has something bound to 5432.
+      - "5433:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U octalve -d octalve_edu"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      # Host 6380, not 6379 — this machine already has something bound to 6379.
+      - "6380:6379"
+    volumes:
+      - redis-data:/data
+
+volumes:
+  db-data:
+  redis-data:
