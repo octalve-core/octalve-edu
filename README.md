@@ -14,6 +14,10 @@ The actual build plan lives in [`docs/development-history/`](docs/development-hi
   built and verified right now, checked against the real repo.
 - [`phases/`](docs/development-history/phases/) — one completion record per finished phase.
 
+[`branches-and-environments.md`](docs/branches-and-environments.md) — the `dev`/`main`/`prod`
+convention (Integration/Staging/Production), and how far the repo actually is from having it (not
+far yet — one branch, no CI, no deploy target).
+
 ## Stack
 
 Next.js (App Router) + TypeScript + Tailwind + Prisma/PostgreSQL, multi-tenancy via Postgres
@@ -35,8 +39,11 @@ pnpm dev
 
 **Phase 0 (Foundation) is done** — see
 [`docs/development-history/phases/phase-0-foundation.md`](docs/development-history/phases/phase-0-foundation.md).
-Everything from Phase 0.5 onward (auth, RLS, API routes, every domain feature) is planned but not
-yet built — see the progress tracker linked above for the current, honest state.
+**Phase 0.5.0 (first-run superadmin setup wizard, Solo only) is also done** — see
+[`docs/development-history/phases/phase-0.5.0-setup-wizard.md`](docs/development-history/phases/phase-0.5.0-setup-wizard.md).
+Everything else from Phase 0.5 onward (Auth.js wiring, RLS, the tenant-trust-boundary resolver,
+every domain feature) is planned but not yet built — see the progress tracker linked above for the
+current, honest state.
 
 ## Repo layout
 

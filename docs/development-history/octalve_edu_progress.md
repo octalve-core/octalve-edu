@@ -25,12 +25,15 @@ against the real repo, not what a plan says should exist.
   `HTTP 200`. See `docs/development-history/phases/phase-0-foundation.md` for the full record,
   including the one real judgment call (Prisma 8 rc → 6.19.3 downgrade, matching the sibling `ims`
   project).
-- **Phase 0.5 — Auth, RLS & Shared API Infrastructure**: **0% — not started.** Auth.js wiring
-  (database sessions, TOTP MFA), the tenant-trust-boundary implementation (`resolve-tenant.ts` +
-  `forTenant()`), and the shared API envelope/pagination/rate-limiting helpers are all still just
-  the plan in `docs/development-history/domain-implementation-plan.md` §Phase 0.5. Nothing in
-  Phase 1 should start before this phase's own verification gate (negative-test suite for
-  cross-tenant/IDOR access) passes in CI.
+- **Phase 0.5 — Auth, RLS & Shared API Infrastructure**: **Partially started.** §0.5.0 (first-run
+  superadmin setup wizard, Solo only) is **done and verified live** — see
+  `docs/development-history/phases/phase-0.5.0-setup-wizard.md`. Everything else in this phase
+  (Auth.js wiring, database sessions, TOTP MFA, the tenant-trust-boundary implementation
+  (`resolve-tenant.ts` + `forTenant()`), and the shared API pagination/rate-limiting helpers beyond
+  the response envelope) is still just the plan in
+  `docs/development-history/domain-implementation-plan.md` §Phase 0.5. Nothing in Phase 1 should
+  start before this phase's own verification gate (negative-test suite for cross-tenant/IDOR access)
+  passes in CI.
 - **Phase 1 — MVP: Core SIS + Finance**: **0% — not started.** Full schema designed
   (`sis.prisma`/`finance.prisma` in the plan doc, with every model's reasoning traced to a PRD
   section or a specific security-audit finding) but no migration written, no API routes, no UI.
@@ -51,15 +54,19 @@ This section exists specifically to prevent the trap `TheNiche`'s own plan names
 that "sounds right" getting treated as done because it's written down somewhere. As of this
 update:
 
-- **Nothing beyond Phase 0 has a migration.** Every model in Phase 0.5 onward is Prisma syntax
-  inside a markdown file, not a `.prisma` file Prisma has ever validated against a real database.
+- **One route exists beyond Phase 0, and it has a migration.** `20260927223904_add_setup_wizard`
+  added `User.passwordHash`, `SystemSettings`, and `AuditLog`, applied against the real local
+  Postgres. Everything else in Phase 0.5 onward is still Prisma syntax inside a markdown file, not
+  validated against a real database.
 - **No RLS policy exists yet**, including on the Phase 0 tables (`Campus`, `TenantMembership`)
   that already exist — Phase 0's own completion doc says this explicitly, so it doesn't get lost.
 - **No authentication flow works end-to-end.** Auth.js is installed nowhere yet; the `User`/
-  `Account`/`Session` tables exist in the schema but nothing reads or writes them.
+  `Account`/`Session` tables exist in the schema but nothing reads or writes them (the setup
+  wizard writes `User.passwordHash` directly with Prisma — it doesn't go through Auth.js).
 
 ## Next action
 
-Phase 0.5, in the order its own section of the implementation plan lays out: Auth.js wiring first
-(§0.5.1), then the tenant-trust-boundary resolver and `forTenant()` (§0.5.2), then the shared API
+The rest of Phase 0.5, in the order its own section of the implementation plan lays out: Auth.js
+wiring (§0.5.1, now just wiring the credentials provider to the `passwordHash` column that already
+exists), then the tenant-trust-boundary resolver and `forTenant()` (§0.5.2), then the shared API
 helpers (§0.5.3), then that phase's negative-test verification gate before Phase 1 begins.

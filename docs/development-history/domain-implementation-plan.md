@@ -44,11 +44,65 @@ findings from the security audit that are architectural, not feature-level: the 
 boundary and session revocability. Both are infrastructure, not "a school feature," which is why
 they're their own phase rather than folded into Phase 1.
 
+### 0.5.0 — First-run superadmin setup wizard (Solo only) — **Done**, built ahead of the rest of
+this phase
+
+PRD §4's onboarding table names this for Solo installs ("Run installer, one-time setup wizard") but
+never specifies it — built now, out of sequence relative to 0.5.1–0.5.3 below, because it needed
+almost none of that infrastructure (no Auth.js session, no tenant-trust-boundary resolver — it's the
+one route that runs *before* either exists) and unblocks manually testing everything after it
+without a `prisma db seed` script standing in for a real admin account. Adapted from `proplity`'s
+own first-run-setup-wizard implementation (`docs/development-history/phases/first-run-setup-wizard.md`
+in that repo), which solves the identical problem — a fresh production database has no admin user —
+for a single-tenant app; the adaptation here is entirely about Octalve Edu having a `Tenant` model
+that `proplity` doesn't.
+
+- **Solo-only, not a SaaS concept.** SaaS tenants get their own self-serve signup flow later (not
+  built yet); this wizard bootstraps the *one* tenant a Solo install ever has. `GET`/`POST
+  /api/v1/setup` and the `/setup` page both hard-404 outside `DEPLOYMENT_MODE=solo` — not just a
+  UI-level redirect, since the route doing anything at all in SaaS mode would be a bug, not a choice.
+- **Schema** (retrofit into Phase 0's `schema.prisma`, this migration
+  `20260927223904_add_setup_wizard`): `User.passwordHash String?` (the same field 0.5.1 below
+  already planned to add — done here instead since this route needed it first); a `SystemSettings`
+  singleton (`id = "global"`, `setupComplete Boolean`) — proplity's exact pattern, since Octalve
+  Edu's own `Tenant` table can't answer "is setup done" by itself without a race (two concurrent
+  requests both seeing zero tenants); `AuditLog` brought forward from Phase 1's design (§1.5 below)
+  because this wizard needed a real audit trail same as everything after it will.
+- **API** (`src/app/api/v1/setup/route.ts`): `GET` returns `{ setupComplete, requiresToken }`;
+  `POST` guarded by CSRF (`lib/auth/csrf.ts`), IP rate limiting (`lib/auth/rate-limit.ts` —
+  in-memory, deliberately not the real `LoginAttempt`-backed limiter 0.5.1 will build for login,
+  since Solo always runs as one long-lived process, never serverless), Zod validation, an optional
+  `SETUP_TOKEN` compared with `crypto.timingSafeEqual`, and the same atomic-conditional-update
+  transaction as `proplity` (`systemSettings.updateMany({ where: { setupComplete: false }, ... })` —
+  `count === 0` means someone else's request already won the race). On success, creates the `Tenant`
+  (code auto-derived from the school name via `lib/tenant/validate-code.ts`'s slugify + reserved-word
+  check — Solo installs never see or choose a code, per PRD §7), the admin `User`, its
+  `TenantMembership` (`role: ADMIN`), and an `AuditLog` row, all in one transaction. Every response
+  uses PRD §7's mandatory `{ data, meta, error }` envelope (`lib/api/envelope.ts`) — the first route
+  in the repo to need it, so that's where the shared helper was born.
+- **Frontend** (`src/app/setup/`): `page.tsx` is a Server Component, 404s outside Solo, redirects to
+  `/login` if `setupComplete` is already true (fails open on a DB error, same reasoning as
+  `proplity`'s version — a transient blip shouldn't lock a deployer out of their own bootstrap
+  step), otherwise renders `SetupWizardForm.tsx` (school name, admin name/email, password ×2 with a
+  live checklist, optional setup-token field). No design-system dependency added for this — Octalve
+  Edu has no component library yet, so it's plain Tailwind, not a port of `proplity`'s (which uses
+  `lucide-react` icons and `sonner` toasts it already had installed).
+- **Verified live, not just built**: `pnpm prisma migrate dev` applied against the real local
+  Postgres; `pnpm build` clean; `DEPLOYMENT_MODE=solo pnpm dev` + a real `POST` created a tenant +
+  admin + membership + audit row (confirmed via the response body), a second `POST` correctly got
+  `409 ALREADY_COMPLETE`, and `GET` reflected `setupComplete: true` afterward; separately,
+  `DEPLOYMENT_MODE=saas pnpm dev` confirmed both `/api/v1/setup` and `/setup` return `404`. Test data
+  truncated from the local dev database afterward so it starts clean again.
+- **Explicitly out of scope**: no email to the new admin (no delivery provider wired up yet, same
+  gap `proplity` documents); no Campus/branch creation in the wizard (a Solo school can add
+  campuses later via Settings, once that exists); a SaaS-side "platform operator" superadmin concept
+  is not built and not requested — this is only ever a single school's first admin.
+
 ### 0.5.1 — Auth.js wiring
 
 - Credentials provider (email + password) against `User.email`, backed by a `passwordHash` column
-  — **retrofit into Phase 0's `User` model**: add `passwordHash String?` (nullable — an
-  OAuth-only or not-yet-activated user has none).
+  — the field already exists (`User.passwordHash String?`, added by §0.5.0's migration since the
+  setup wizard needed it first); this step is just wiring Auth.js's credentials provider to read it.
 - **Database session strategy, not JWT** (PRD §7 stack table decision) — Auth.js's Prisma adapter
   already has the `Session` table from Phase 0; configure `session.strategy = "database"`
   explicitly, since Auth.js v5 defaults to JWT and this is easy to leave on the wrong default
@@ -703,6 +757,38 @@ enforced by Postgres itself, not by "we don't call `.update()` on these in the c
 negative-test suite from Phase 0.5 extended to cover every new route; a live end-to-end walk of
 enroll → mark attendance → enter result → approve → publish → parent views it; a live Paystack/
 Flutterwave sandbox payment, including a deliberately forged webhook attempt that must fail.
+
+### 1.7 — Lightweight permissions (shared design with AlEemaan)
+
+A deliberately small addition on top of Phase 0's `Role` enum, not a full RBAC engine — scoped down
+specifically so MVP doesn't grow a custom-role builder or a per-resource ACL matrix it doesn't need
+yet. Same design ships in the AlEemaan PRD's §4 (Users, Roles & Lightweight Permissions), so both
+projects stay in sync rather than drifting into two different permission models.
+
+```prisma
+enum Permission {
+  CAN_APPROVE_RESULTS
+  CAN_MANAGE_FINANCE
+  CAN_PUBLISH_CONTENT
+  CAN_MANAGE_USERS
+}
+
+model TenantMembership {
+  // ...existing fields from Phase 0 (userId, tenantId, campusId?, role)
+  permissions Permission[] @default([])
+}
+```
+
+- `ADMIN` implicitly has every `Permission` — the enum only exists so a *non-admin* membership can
+  be granted one extra capability (a bursar who's `NON_TEACHING_STAFF` getting
+  `CAN_MANAGE_FINANCE`; a senior teacher getting `CAN_APPROVE_RESULTS` without being made `ADMIN`),
+  closing the gap where the only way to do more than your base role today is to become an admin.
+- `withAuth(handler, { roles, permissions })` (§0.5.3's auth helper) checks `role` OR an entry in
+  `permissions` — a route can require either, not both, unless it explicitly asks for both.
+- **Explicit non-goals, so this doesn't become full RBAC by accretion:** no UI for a school to
+  invent new permissions, no per-resource/per-record ACLs, no permission inheritance hierarchy, no
+  custom roles. If a school needs more granularity than these four permissions later, that's a
+  deliberate future phase, not a Phase 1 scope-creep.
 
 ---
 
