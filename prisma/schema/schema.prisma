@@ -1,0 +1,27 @@
+// Octalve Edu — Prisma schema, split across prisma/schema/*.prisma (Prisma's
+// multi-file "schema folder" mode, stable since Prisma 6.7 — no
+// previewFeatures flag needed on the installed 6.19.3). This file holds only
+// the generator/datasource; every model lives in a domain-named sibling file.
+// Prisma merges all *.prisma files in this folder as if concatenated — models
+// in different files can reference each other freely (e.g. TenantMembership
+// in tenancy.prisma referencing User in auth.prisma). Same convention as the
+// sibling `ims` and `AlEemaan` projects.
+//
+// M0 scope (PRD §12): Auth.js's required tables, Tenant/Campus (PRD §7
+// multi-campus), and TenantMembership — the verified membership table the
+// tenant-trust-boundary check (PRD §7) queries before any
+// `SET LOCAL app.tenant_id` is ever run. Business-domain models (students,
+// staff records, results, invoices, etc.) are added once PRD §5's field
+// lists are finalized — deliberately not invented here (data-minimization,
+// PRD §9).
+//
+// Run: pnpm prisma generate (after schema changes).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

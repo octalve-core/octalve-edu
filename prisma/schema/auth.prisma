@@ -1,0 +1,66 @@
+// --- Auth.js (NextAuth v5) required models, database session strategy ---
+// per PRD §7: database sessions (not JWT) so a session can be revoked by
+// deleting its row — closes the security audit's session-revocation finding.
+//
+// NOTE for whoever wires §0.5.1 (Auth.js Credentials provider): AlEemaan hit
+// a real Auth.js v5 constraint building the identical thing —
+// `Credentials` + `session.strategy: "database"` throws `UnsupportedStrategy`
+// on every request, not just sign-in. AlEemaan's fix (see its
+// domain-implementation-plan.md §0.5.1.1): keep database sessions, drop the
+// Credentials provider entirely, hand-roll login/logout against this same
+// Session table instead. Confirm this still applies (Auth.js version pinned
+// here is also 6.19.3-era next-auth@beta) before wiring §0.5.1 the way this
+// file's original comment described — don't rediscover the same wall.
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  /// Nullable: an OAuth-only or not-yet-activated user has none (Phase 0.5 plan).
+  passwordHash  String?
+
+  accounts    Account[]
+  sessions    Session[]
+  memberships TenantMembership[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}

@@ -1,0 +1,57 @@
+// --- Tenancy (PRD §7) ---
+
+model Tenant {
+  id        String   @id @default(cuid())
+  /// URL slug (PRD §7 "Tenant code selection") — unique, reserved-word-checked
+  /// and format-validated at the application layer before insert, fixed at
+  /// creation for MVP (support-mediated changes only).
+  code      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+
+  campuses    Campus[]
+  memberships TenantMembership[]
+}
+
+/// A branch/campus under one tenant (PRD §7) — distinct from multi-tenancy:
+/// same school, same fee structure/oversight, narrower scope inside one
+/// tenant rather than a second tenant.
+model Campus {
+  id       String @id @default(cuid())
+  tenantId String
+  name     String
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memberships TenantMembership[]
+
+  @@index([tenantId])
+}
+
+enum Role {
+  ADMIN
+  TEACHING_STAFF
+  NON_TEACHING_STAFF
+  STUDENT
+  PARENT
+}
+
+/// The verified membership table PRD §7's tenant-trust-boundary check reads:
+/// "authenticated user -> verified tenant membership -> SET LOCAL
+/// app.tenant_id -> RLS". The URL's tenant code is only ever a hint; this
+/// table is the actual authorization source.
+model TenantMembership {
+  id       String  @id @default(cuid())
+  userId   String
+  tenantId String
+  campusId String?
+  role     Role
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus Campus? @relation(fields: [campusId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+}
