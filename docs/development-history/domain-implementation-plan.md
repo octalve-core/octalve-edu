@@ -100,6 +100,19 @@ that `proplity` doesn't.
 
 ### 0.5.1 — Auth.js wiring
 
+> **Heads-up before this step gets built (2026-09-28):** the two bullets immediately below — a
+> `Credentials` provider *combined with* `session.strategy: "database"` — are not compatible in
+> Auth.js v5. AlEemaan (sibling project, identical stack) hit this live: `UnsupportedStrategy:
+> Signing in with credentials only supported if JWT strategy is enabled`, thrown by Auth.js's own
+> `assertConfig` on every request under `/api/auth/*`, not just sign-in. It's a hard constraint in
+> Auth.js itself. AlEemaan's fix (full record in its own `domain-implementation-plan.md` §0.5.1.1,
+> keeping database sessions since that's the deliberate PRD §7 decision here too): drop the
+> `Credentials` provider entirely (`providers: []`), and hand-roll login/logout as plain API routes
+> that write/delete rows in the same `Session` table Auth.js's `PrismaAdapter` reads, with an
+> explicit `cookies.sessionToken.name` so both sides agree on the cookie. Expect to do the same
+> here rather than wiring the two bullets below as literally written — confirm against the installed
+> `next-auth` version first in case a later release changes this, but don't assume it's fixed.
+
 - Credentials provider (email + password) against `User.email`, backed by a `passwordHash` column
   — the field already exists (`User.passwordHash String?`, added by §0.5.0's migration since the
   setup wizard needed it first); this step is just wiring Auth.js's credentials provider to read it.

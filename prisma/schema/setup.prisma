@@ -1,0 +1,33 @@
+// --- First-run setup wizard (Solo installs only — PRD §4 onboarding row) ---
+
+/// Singleton row (id is always "global") guarding the one-time Solo bootstrap:
+/// creates the single Tenant + its first ADMIN. Never read/written in SaaS
+/// mode (SaaS tenants are created via the future self-serve signup flow, not
+/// this). The same atomic-conditional-update pattern used elsewhere in the
+/// plan for "only one concurrent writer wins" races.
+model SystemSettings {
+  id            String  @id @default("global")
+  setupComplete Boolean @default(false)
+}
+
+/// Brought forward from Phase 1's design (domain-implementation-plan.md
+/// §1.5) because the setup wizard needs a real audit trail for who
+/// bootstrapped an instance, same as every other sensitive action will.
+/// Migration-level `REVOKE UPDATE, DELETE` applies here too once Phase 1's
+/// migration runs (closes Audit #19/#31) — append-only from day one.
+model AuditLog {
+  id            String   @id @default(cuid())
+  tenantId      String
+  actorUserId   String
+  action        String
+  targetType    String
+  targetId      String
+  beforeValue   Json?
+  afterValue    Json?
+  reason        String?
+  correlationId String?
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId, targetType, targetId])
+  @@index([tenantId, createdAt])
+}

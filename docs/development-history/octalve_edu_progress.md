@@ -1,6 +1,6 @@
 # Octalve Edu — Development Progress Tracker
 
-Last Updated: 2026-09-27
+Last Updated: 2026-09-28
 
 Companion to `docs/development-history/domain-implementation-plan.md` (the step-by-step build
 plan), `docs/development-history/phases/*.md` (one detailed doc per completed phase), and
@@ -64,9 +64,27 @@ update:
   `Account`/`Session` tables exist in the schema but nothing reads or writes them (the setup
   wizard writes `User.passwordHash` directly with Prisma — it doesn't go through Auth.js).
 
+## Recent changes (2026-09-28)
+
+- **Prisma schema is now multi-file**: `prisma/schema.prisma` split into
+  `prisma/schema/{schema,auth,tenancy,setup}.prisma` (Prisma's "schema folder" mode, stable since
+  6.7, no preview flag needed on the installed 6.19.3), with a new `prisma.config.ts` pointing the
+  CLI at the folder — same convention already used by the sibling `ims` and `AlEemaan` projects.
+  `pnpm prisma validate`, `pnpm prisma generate`, and `pnpm build` all verified clean against the
+  split. Every future phase's models get their own file (`sis.prisma`, `finance.prisma`,
+  `comms.prisma`, `lms.prisma` — already named in the plan doc's schema sketches) rather than one
+  file growing indefinitely.
+- **Cross-project finding folded into §0.5.1's design**: AlEemaan (sibling project, same stack)
+  discovered building its own identical Phase 0.5.1 that Auth.js v5 refuses a `Credentials` provider
+  combined with `session.strategy: "database"` outright — exactly the combination
+  `domain-implementation-plan.md`'s §0.5.1 currently describes wiring. A warning citing AlEemaan's
+  fix (hand-rolled login/logout against the `Session` table instead of Auth.js's own Credentials
+  flow) is now inline in that section, so this doesn't get rediscovered live the same way.
+
 ## Next action
 
 The rest of Phase 0.5, in the order its own section of the implementation plan lays out: Auth.js
-wiring (§0.5.1, now just wiring the credentials provider to the `passwordHash` column that already
-exists), then the tenant-trust-boundary resolver and `forTenant()` (§0.5.2), then the shared API
+wiring (§0.5.1 — **read its inline warning above before wiring the Credentials provider as
+originally written**; it will need the same database-sessions-without-Credentials fix AlEemaan already
+made), then the tenant-trust-boundary resolver and `forTenant()` (§0.5.2), then the shared API
 helpers (§0.5.3), then that phase's negative-test verification gate before Phase 1 begins.
