@@ -146,6 +146,10 @@ one-off pattern sources, referenced once for a specific technique and then done:
    an inline script — the nonce-based CSP (plan §0.5.B) depends on there being none. New UI must pass
    axe in **both** themes, be ≥ 44 px on phones, and be added to `responsive-and-a11y.spec.ts`. Design
    and numbers: plan §0.5.A; work log: `docs/development-history/phases/phase-0.5.A-design-language.md`.
+   **Porting to/from AlEemaan: product-specific constants are not shared** — the cookie names in
+   `session.ts`, the brand files, the membership model's name. Copying a "shared" file wholesale once
+   carried this repo's cookie name into AlEemaan (58 tests failed at once — on its live school it would have
+   signed everyone out), and the normalised drift comparison had hidden it. After a port, read the *raw* diff.
 
 ## Current state, as of 2026-09-30 (verify against `octalve_edu_progress.md` — it may have moved since)
 

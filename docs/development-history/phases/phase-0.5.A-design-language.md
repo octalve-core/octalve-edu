@@ -181,6 +181,17 @@ and 390×844, dark and light, and read the screenshots. What was checked and wha
   arrives with §0.5.2 (see "Explicitly not done").
 - No page errors in the console beyond the 401 from the deliberately wrong password.
 
+## Cross-repo: AlEemaan
+
+Built and verified there too, on branch `claude/design-tokens-shell` of `roji-tech/AlEemaan` (stacked on its
+sync branch; its `phases/phase-0.5.A-design-language.md`): its own sea-green brand on these shared
+components, **plus the app shell** and three pages (Overview, Branches with a working "New branch" form,
+Account) — 367 tests pass, 20 injected bugs all caught. **Kept different on purpose:** the brand files and
+`brand.spec.ts`, the cookie names, the shell and its pages (Octalve Edu adopts the shell with §0.5.2),
+`page-session.ts`. Back-ported here from that work: `useSignOut()`, `Button`'s `ref`, the shell icons, the
+`signOut()` test helper, and the two a11y-scan waits. One lesson crossed over: a wholesale copy of `session.ts`
+carried *this* repo's cookie name into AlEemaan (58 failures) — see `CLAUDE.md`.
+
 ## Explicitly not done in this phase
 The app shell (arrives with §0.5.2 here; already built in AlEemaan); a "Forgot password?" link (added with
 0.5.C, when there is a page behind it — a dead link would be a lie); the artifact's search box and

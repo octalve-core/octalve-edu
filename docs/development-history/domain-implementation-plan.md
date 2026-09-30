@@ -696,6 +696,181 @@ refined or departed from the design above, and why:
   and for the page `<title>` before an axe scan (two flakes, both test races); `test.skip(fn)` only at
   `describe` level; sign-in helpers take `remember` explicitly.
 
+#### 0.5.B — Nonce-based script CSP (designed 2026-09-30, before any code)
+
+**Why.** The baseline headers (0.5.1) stop framing, sniffing and referrer leaks but say nothing about *script*:
+if an XSS bug ever ships, injected inline script runs with the session. A strict CSP makes that class of bug
+inert — the browser refuses any script that doesn't carry this response's secret nonce. Same design in both
+repos; both are already prepared for it (no inline `<script>`, theme via cookie, every page dynamic).
+
+**Mechanism** (Next.js 16: `proxy.ts`, the renamed middleware).
+1. A `proxy.ts` runs on every request except static assets (`/_next/static`, `/_next/image`, `favicon.ico`),
+   mints a **128-bit random nonce** (`crypto.getRandomValues`, base64), builds the policy, and sets it on
+   the **request** headers (so Next applies the nonce to its own bootstrap scripts) and on the **response**.
+   Prefetch requests are skipped, as Next's guide does.
+2. Policy (production):
+   `default-src 'self'; script-src 'self' 'nonce-<n>' 'strict-dynamic'; style-src 'self' 'nonce-<n>';
+   img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self';
+   form-action 'self'; frame-ancestors 'none'` — and `upgrade-insecure-requests` **only when `APP_URL` is
+   https** (on a plain-HTTP LAN install it would break every request). `'strict-dynamic'` lets the nonced
+   bootstrap load Next's chunks without a host allow-list. **No `'unsafe-inline'`, no `'unsafe-eval'`** in
+   `script-src`; development alone adds `'unsafe-eval'` (React's dev tooling needs it).
+3. `frame-ancestors 'none'` moves from `next.config.ts` into the proxy so the policy has a single source;
+   `X-Frame-Options`, `nosniff`, `Referrer-Policy` stay where they are. HSTS stays the reverse proxy's job.
+4. **Rollout valve for a live school:** `CSP_REPORT_ONLY=true` sends the same policy as
+   `Content-Security-Policy-Report-Only` (violations show in the browser console, nothing is blocked). The
+   default is enforcing; the flag exists so an unforeseen violation in production can be diagnosed without
+   an outage. There is deliberately **no report-collection endpoint** (extra unauthenticated surface).
+5. **Styles.** Start strict (`style-src 'self' 'nonce-<n>'`, and no `style=""` attributes in our own markup —
+   audited by grep and by the zero-violation test below). If Next's own output turns out to need inline style
+   *attributes*, the fallback is `style-src-attr 'unsafe-inline'` alone (an attribute can't execute script) —
+   recorded in the as-built note with the reason, never a blanket `'unsafe-inline'` on `style-src`.
+
+**Verification.**
+- *Shape:* every page and API response carries the policy; the directive set is exactly the above; the nonce
+  is 128-bit base64, **different on every request**, present in the header and on every inline `<script>` in
+  the HTML (and every inline script *has* it); no `unsafe-inline`/`unsafe-eval` in `script-src`;
+  `upgrade-insecure-requests` present on the https deployment and absent on http; `frame-ancestors 'none'`
+  survives; `CSP_REPORT_ONLY` flips the header name and nothing else.
+- *It actually blocks:* in real Chromium, an injected inline `<script>` and an injected `onclick=` attribute
+  do **not** run and raise a `securitypolicyviolation`; the page's own scripts do.
+- *Zero violations everywhere:* the shared `page` fixture records `securitypolicyviolation` events and fails
+  **any** test in which one occurred — so every existing flow (sign-in, setup, theme toggle, shell, …) is a
+  CSP test for free, in both themes and on the https deployment.
+- *Mutations (each must go red):* nonce dropped from the policy; `'unsafe-inline'` added; a constant nonce;
+  nonce not forwarded on the request headers (Next's own scripts blocked); `upgrade-insecure-requests`
+  unconditional; the https-only rule inverted.
+
+**Not in scope:** a CSP report endpoint, Trusted Types, SRI (no third-party scripts exist), and the public
+marketing sites (Phase 5 decides their own policy).
+
+#### 0.5.C — Password reset and change (designed 2026-09-30, before any code)
+
+**Scope.** Forgotten-password recovery by email, and change-password for a signed-in person. Built in both
+repos, same design. Nothing here can weaken 0.5.1: no new way to obtain a session, and every path that sets a
+password uses the one 72-byte policy.
+
+**Email transport** (`lib/email/`): one interface, three implementations chosen by `EMAIL_TRANSPORT` —
+`resend` (uses `RESEND_API_KEY`, already in `.env.example`; `EMAIL_FROM` names the sender), `console` (prints the
+message, link included, to the server log — development), and `file` (appends JSON lines to a path — what the
+tests read as "the inbox"). Default: `resend` when a key is set, otherwise `console` **with a loud
+production warning**. A send failure is logged, never shown to the requester (it would be an oracle).
+Messages are plain text (accessible, nothing to track), branded from `lib/brand.ts`.
+
+**Tokens.** 256-bit random, URL-safe; only the **SHA-256 hash** is stored (`PasswordResetToken`: `id`,
+`userId` cascade, `tokenHash` unique, `createdAt`, `expiresAt` = 30 minutes, `usedAt`). One live token per
+person: requesting a new one deletes the previous unused ones. Expired rows are removed on the next request
+for that person and by the same purge that clears sessions (bounded growth). Additive migration only.
+
+**Flow.**
+1. `POST /api/v1/auth/forgot-password` `{ email }` — CSRF; rate-limited **per IP and per email, counting every
+   request** (each can send mail — unlike login, success is not refunded); answers **200 with the same body
+   whether or not the account exists**. To leave no timing oracle the lookup, token insert and email send run
+   in Next's `after()` — the response is sent first, so its time doesn't depend on the account.
+2. The email links to `/reset-password#token=…`. The token is in the **URL fragment**: never sent to the
+   server, so it isn't in access logs or a `Referer`. The page (client) reads it, **removes it from the
+   address bar** (`history.replaceState`), and asks for the new password (live policy feedback, as in setup).
+3. `POST /api/v1/auth/reset-password` `{ token, password }` — CSRF; per-IP limit on failures; policy check;
+   then **one transaction**: an `updateMany where usedAt is null and expiresAt > now` on the token's hash
+   (count must be 1 — so the token is single-use even under concurrent requests), set the new hash, delete
+   **every session** of that user (`revokeUserSessions`), delete their other reset tokens, write an audit row.
+   Any invalid / expired / already-used token gets the same 400 message ("This link is invalid or has expired").
+   Success does **not** sign the person in — they sign in with the new password (and, once 0.5.D exists,
+   their second factor: a reset never bypasses or disables MFA). A "your password was changed" notice is emailed.
+4. **Change password** — `POST /api/v1/auth/change-password` behind `withAuth`: `{ currentPassword,
+   newPassword }`; the current password is verified in constant time and its failures are rate-limited per
+   account; the new one must pass the policy and differ from the old; then the hash is replaced, **every
+   other session is revoked (this one kept)**, an audit row is written and the notice emailed. UI: a
+   "Password" card on the account page. The sign-in screen's "Forgot password?" link (drawn in the artifact,
+   deliberately absent until now) appears with `/forgot-password`.
+
+**Shared code.** The password rules currently inline in the setup route move to `lib/auth/password-policy.ts`
+(`checkNewPassword`) so setup, reset and change cannot drift; screens use the shared `AuthShell` and
+components, in both themes.
+
+**Verification.** Unit: token generation/hash, policy. Integration: create/consume — only the hash stored,
+expiry, single use, **20 concurrent consumes → exactly one wins**, sessions revoked, other tokens dropped. API:
+identical response and status for known/unknown emails, the mail sent only for a known one (read from the
+`file` transport), every rate limit, CSRF, the reset outcomes (success, bad/expired/used/replayed token, weak
+or over-72-byte password with the reason), old password stops working and the new one works, change-password's
+wrong-current / same-password / other-sessions-revoked-this-one-kept, statistical timing parity of
+`forgot-password`. Browser: the whole journey (forgot → "inbox" → link → new password → sign in), the token
+gone from the address bar, keyboard use, axe in both themes for the three new screens and their error states,
+phone tap targets. **Mutations (each must go red):** store the raw token; drop the single-use condition; drop
+the expiry check; don't revoke sessions; respond differently for unknown emails; drop each rate limit; put the
+token in the query string; let change-password skip the current-password check.
+
+**Not in scope:** SMS or security-question recovery (weaker than email), admin-initiated resets (with
+Users/Settings), breached-password checking, and "active devices" (needs its own page).
+
+#### 0.5.D — TOTP two-step verification (designed 2026-09-30, before any code)
+
+**Scope.** Optional per person for now: enrol an authenticator app, be challenged at sign-in, use recovery
+codes, disable. (Requiring it for administrators, and step-up re-verification before sensitive Settings edits,
+are policy layers that build on this and arrive with the Settings work.) Same design in both repos. Nothing
+in `withAuth` changes — the second factor is enforced **at sign-in**, so a request either carries a full
+session or none.
+
+**The algorithm is implemented here, not imported:** RFC 6238 TOTP over HMAC-SHA1 (`node:crypto`), 6 digits,
+30 s step, accepting the current step ±1 for clock drift, constant-time comparison, base32 (RFC 4648) secrets
+of 160 bits — checked against the RFC's own published test vectors. (Security code is worth the ~60 lines to
+own; the QR image is not — see below.)
+
+**Storage.**
+- `MfaCredential { userId (unique, cascade), secretEnc, confirmedAt?, lastUsedStep?, createdAt }`. The secret
+  must be recoverable (unlike a password), so it is **AES-256-GCM encrypted at rest** with `MFA_ENCRYPTION_KEY`
+  (32 bytes, base64) — a database leak alone yields no usable secrets. Enrolment **fails closed (503)** in
+  production when the key is missing. An unconfirmed credential is not an active factor.
+- `MfaRecoveryCode { userId, codeHash, usedAt }` — ten single-use codes (`xxxxx-xxxxx`, 50 random bits each
+  from an unambiguous alphabet), stored as SHA-256 hashes, shown **once** at generation.
+- `MfaChallenge { tokenHash, userId, remember, expiresAt, attempts }` — the *pending-MFA state* promised since
+  §0.5.1. It is **not a session**: no cookie, invisible to `withAuth`. A 256-bit random token is returned in the
+  JSON of sign-in step 1 (held in memory by the sign-in page only), stored hashed, valid 5 minutes, five
+  attempts, single-use.
+
+**Sign-in.** Step 1 (`POST /api/v1/auth/login`) is unchanged up to "password verified"; for a person with a
+confirmed credential it then creates **no session** and returns `{ mfaRequired: true, challenge }` (the same
+generic 401 as ever for a wrong password — MFA status is only revealed after the password is proven). Step 2
+(`POST /api/v1/auth/login/mfa` `{ challenge, code }` or `{ challenge, recoveryCode }`): CSRF, rate limits (per
+IP, per account, per challenge), verify, then — and only then — the shared "complete sign-in" routine used by
+both steps rotates any presented session and creates the session **with the `remember` choice made in step 1**
+(carried in the challenge; see 0.5.A), setting the cookie. **Replay protection:** a code for a step ≤
+`lastUsedStep` is refused, and the step is recorded with a conditional `updateMany` so two simultaneous
+submissions of the same code can't both win.
+
+**Enrolment** (account page, "Two-step verification" card; every action needs a fresh password, and none needs
+a second factor until one exists): `POST …/mfa/enroll` `{ password }` → generates and stores an unconfirmed
+secret and returns the `otpauth://` URL plus the base32 key for manual entry; the page renders a **QR code
+in the browser** (the `qrcode` package, dynamically imported, pinned — **never an online QR service; the secret
+never leaves the device**) beside the manual key; `POST …/mfa/confirm` `{ code }` marks it confirmed, issues the
+recovery codes, revokes the person's *other* sessions and emails a notice. `POST …/mfa/disable` `{ password,
+code | recoveryCode }` removes everything, revokes other sessions, emails a notice. `POST …/mfa/recovery-codes`
+`{ code }` replaces all recovery codes. The UI warns when two or fewer remain.
+
+**Interplay.** Password reset (0.5.C) never touches MFA — after a reset the person still needs their second
+factor. A person who has lost both authenticator and recovery codes is recovered by an operator: `pnpm
+mfa:reset -- <email>` (a small, tested script; an admin UI comes with Users), which also writes an audit row.
+
+**Screens.** Step 2 appears in place on the sign-in card: a numeric, `autocomplete="one-time-code"` field, a
+"Use a recovery code instead" toggle, "Back", the same error/pause treatment as step 1. Enrolment and
+management states on the account page. All in both themes, ≥ 44 px targets.
+
+**Verification.** Unit: the RFC 6238 vectors, base32, ±1 window edges, encryption round-trip and tamper
+detection (GCM auth failure), recovery-code format. Integration: challenge lifecycle (expiry, five attempts
+then dead, single use, **no session exists until step 2 succeeds**), replay under concurrency, recovery-code
+single use, disable. API: the two-step sign-in end to end (no `Set-Cookie` after step 1; wrong / reused / stale
+codes; lock-out; `remember` honoured through the challenge; MFA users can't sidestep by presenting an old
+cookie), enrol/confirm/disable/regenerate and their re-auth requirements, 503 without the key. Browser: enrol
+with a code computed by the test, sign in with it, sign in with a recovery code, disable; axe in both themes
+for every new state; keyboard use. **Mutations (each must go red):** accept ± several steps; skip the replay
+check; store the secret in plaintext; create the session at step 1; let a challenge be reused or attempted
+without limit; let a recovery code be reused; disable without the password; let password reset clear MFA; drop
+the per-IP limit on step 2.
+
+**Not in scope:** WebAuthn/passkeys and SMS codes (a later, separate design), trusted-device "remember for 30
+days" (it would quietly weaken the factor), mandatory-MFA policy and step-up (Settings work), an active-devices
+page.
+
 ---
 
 ## Phase 1 — MVP: Core SIS + Finance
