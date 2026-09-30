@@ -25,12 +25,17 @@ against the real repo, not what a plan says should exist.
   `HTTP 200`. See `docs/development-history/phases/phase-0-foundation.md` for the full record,
   including the one real judgment call (Prisma 8 rc → 6.19.3 downgrade, matching the sibling `ims`
   project).
-- **Phase 0.5 — Auth, RLS & Shared API Infrastructure**: **Partially started, design complete for
-  §0.5.1.** §0.5.0 (first-run superadmin setup wizard, Solo only) is **done and verified live** — see
+- **Phase 0.5 — Auth, RLS & Shared API Infrastructure**: **In progress.** §0.5.0 (first-run
+  superadmin setup wizard, Solo only) is **done and verified live** — see
   `docs/development-history/phases/phase-0.5.0-setup-wizard.md`. §0.5.1 (auth) went through a full
   two-AI security review, a hardening pass, and a Better-Auth-vs-hand-roll spike (resolved: hand-roll,
-  adapting AlEemaan's already-built implementation) — **fully designed, zero code written yet**, no
-  open questions left blocking it. §0.5.2 (tenant-trust boundary: `resolve-tenant.ts` + `forTenant()`
+  adapting AlEemaan's already-built implementation), and **as of 2026-09-30 is being built** (branch
+  `claude/auth-0.5.1-port`, maintainer's fork — see "Auth build in progress" below and the live work
+  log in `docs/development-history/phases/phase-0.5.1-auth.md`): schema migration applied, session/
+  password/rate-limit/`withAuth` modules, login/logout/`me` routes and the `/login`, `/dashboard`,
+  `/setup` UI are written, type-check and production build clean, and an end-to-end API smoke test
+  passes against a real Postgres — **the automated verification suites (unit, API, browser, real-HTTPS
+  cookie test) are not finished, so §0.5.1 is not yet "done"**. §0.5.2 (tenant-trust boundary: `resolve-tenant.ts` + `forTenant()`
   + explicit RLS role setup) and §0.5.3 (shared API pagination/rate-limiting helpers beyond the
   response envelope) are designed, not built, both depending on §0.5.1 landing first. Nothing in
   Phase 1 should start before this phase's own verification gate (negative-test suite for
@@ -55,15 +60,18 @@ This section exists specifically to prevent the trap `TheNiche`'s own plan names
 that "sounds right" getting treated as done because it's written down somewhere. As of this
 update:
 
-- **One route exists beyond Phase 0, and it has a migration.** `20260927223904_add_setup_wizard`
-  added `User.passwordHash`, `SystemSettings`, and `AuditLog`, applied against the real local
-  Postgres. Everything else in Phase 0.5 onward is still Prisma syntax inside a markdown file, not
-  validated against a real database.
+- **Two migrations beyond Phase 0 exist, both applied against a real local Postgres.**
+  `20260927223904_add_setup_wizard` (`User.passwordHash`, `SystemSettings`, `AuditLog`) and — on the
+  in-progress auth branch, 2026-09-30 — `20260930121043_rebuild_auth_hashed_sessions` (hashed
+  `Session.tokenHash`, two-level expiry, dropped `Account`, DB-level lowercase-email `CHECK`, the
+  latter verified by a live negative insert). Everything in Phase 0.5.2 onward is still Prisma syntax
+  inside a markdown file, not validated against a real database.
 - **No RLS policy exists yet**, including on the Phase 0 tables (`Campus`, `TenantMembership`)
   that already exist — Phase 0's own completion doc says this explicitly, so it doesn't get lost.
-- **No authentication flow works end-to-end.** Auth.js is installed nowhere yet; the `User`/
-  `Account`/`Session` tables exist in the schema but nothing reads or writes them (the setup
-  wizard writes `User.passwordHash` directly with Prisma — it doesn't go through Auth.js).
+- **Authentication now works end-to-end on the in-progress branch (not yet merged/verified to the
+  phase's bar):** sign-in, session, `GET /api/v1/auth/me`, sign-out and stale-cookie rejection were
+  exercised live with curl on 2026-09-30. On `master` (what `octalve-core/octalve-edu` shows today)
+  it still does not exist. Auth.js is not used anywhere and is not a dependency.
 
 ## Recent changes (2026-09-28)
 
@@ -137,12 +145,30 @@ updated with the full reasoning and the explicit "port AlEemaan's code, adapted 
 TenantMembership/Campus" instruction. This closes the last open design question blocking §0.5.1 —
 nothing left to decide before writing code.
 
+## Auth build in progress (2026-09-30)
+
+Full design decisions: `domain-implementation-plan.md` §0.5.1 → "Build design for the port" (including
+"Decisions made during implementation"). Live work log and verification status:
+`docs/development-history/phases/phase-0.5.1-auth.md`. Branch `claude/auth-0.5.1-port` on the
+maintainer's fork `roji-tech/octalve-edu-fork` (the Claude GitHub App is not installed on
+`octalve-core`, so the maintainer merges by PR).
+
+Written and compiling (`tsc` clean, `pnpm build` clean): the schema migration; `lib/auth/{session,
+password,rate-limit,with-auth,memberships}.ts`; `POST /api/v1/auth/{login,logout}` and
+`GET /api/v1/auth/me`; the setup route migrated onto the new helpers; the `/login`, `/dashboard` and
+`/` screens plus the retrofitted `/setup` wizard on shared, accessible UI primitives. Smoke-tested live
+(curl, real Postgres). **Not yet done:** the repeatable test suites and their runs, the real-HTTPS
+cookie test, docs finalization.
+
 ## Next action
 
-**Build §0.5.1** — no remaining open design questions. Port AlEemaan's `session.ts`/`password.ts`/
-`rate-limit.ts`, adapted for `TenantMembership`/`Campus` (`requireAdmin()` → `withAuth()`,
-`Membership.branchId` → `TenantMembership.campusId`). Then the tenant-trust-boundary resolver and
-`forTenant()` with its now-explicit RLS role setup (§0.5.2) — this needs a real `app_user` Postgres
-role created first, not just the Prisma migration owner. Then the shared API helpers (§0.5.3). Then
-that phase's negative-test verification gate — **run as the `app_user` role, not the migration
-owner** — before Phase 1 begins.
+**Finish §0.5.1's verification, then close it** — build the repeatable test infrastructure (unit + API
++ Playwright browser flows + a local TLS proxy so Chromium enforces the real `__Host-` cookie rules on
+login *and logout*), run it, fix what it finds, finalize `phase-0.5.1-auth.md`, and open the PR from
+the fork. Then, in order: back-port the shared-naming and hardening deltas to AlEemaan (its own plan
+doc tracks them); the tenant-trust-boundary resolver and `forTenant()` with its explicit RLS role setup
+(§0.5.2 — needs a real `app_user` Postgres role created first, and `withAuth`'s `roles`/`permissions`
+options arrive here); TOTP MFA (must precede Phase 1's Settings UI); the shared API helpers (§0.5.3, and
+the Redis-backed rate limiter before any multi-instance SaaS deployment). Then that phase's
+negative-test verification gate — **run as the `app_user` role, not the migration owner** — before
+Phase 1 begins.

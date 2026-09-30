@@ -132,11 +132,16 @@ one-off pattern sources, referenced once for a specific technique and then done:
 ## Current state, as of 2026-09-30 (verify against `octalve_edu_progress.md` — it may have moved since)
 
 - Phase 0 (scaffold) and Phase 0.5.0 (setup wizard, Solo-only) are done and verified live.
-- **Phase 0.5.1 (auth) is fully designed but has zero code built** — the design went through a full
-  two-AI security review (`docs/auth-review-2026-09-29.md`) and a second hardening pass, and now
-  explicitly **defers to AlEemaan's already-built, already-verified implementation as the reference**
-  for the shared hand-rolled-session mechanism (a spike into adopting Better Auth instead was run and
-  rejected — see "Known open items," now resolved, below).
+- **Phase 0.5.1 (auth) is IN PROGRESS** on branch `claude/auth-0.5.1-port` of the maintainer's fork
+  `roji-tech/octalve-edu-fork` (the Claude GitHub App isn't installed on `octalve-core`, so it reaches
+  `master` by the maintainer's PR — `master` itself still has no auth code). The design went through a
+  full two-AI security review (`docs/auth-review-2026-09-29.md`) and a second hardening pass, and is
+  being built by porting **AlEemaan's already-verified implementation** (a spike into adopting Better
+  Auth instead was run and rejected — see "Known open items," resolved, below), with the deliberate
+  divergences recorded in the plan doc's §0.5.1 "Build design for the port". **Read
+  `docs/development-history/phases/phase-0.5.1-auth.md` first** — it is the live work log and says exactly
+  what is written, what is verified, and what isn't. Shared file/function names with AlEemaan are
+  intentional (table in the plan doc); keep them in sync.
 - Phase 0.5.2 (tenant-trust boundary) and 0.5.3 (shared API infra) are designed, not built, and both
   depend on 0.5.1 landing first.
 - Phase 1 onward (Core SIS + Finance, Communication, LMS, Operations, Expansion) have schema sketches

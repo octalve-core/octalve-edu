@@ -1,12 +1,12 @@
 import { NextRequest } from "next/server";
 import crypto from "crypto";
-import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { ok, fail } from "@/lib/api/envelope";
 import { validateCSRF } from "@/lib/auth/csrf";
-import { checkRateLimit, recordAttempt, getClientIp } from "@/lib/auth/rate-limit";
+import { reserveAttempt, refundAttempt, getClientIp } from "@/lib/auth/rate-limit";
+import { hashPassword, PASSWORD_MAX_LENGTH } from "@/lib/auth/password";
 import { slugifyTenantCode, isValidTenantCode } from "@/lib/tenant/validate-code";
 
 // Solo-only (PRD §4's "one-time setup wizard" onboarding row). SaaS tenants
@@ -23,6 +23,7 @@ const setupSchema = z.object({
   password: z
     .string()
     .min(8, "Password must be at least 8 characters long")
+    .max(PASSWORD_MAX_LENGTH, `Password must be at most ${PASSWORD_MAX_LENGTH} characters long`)
     .regex(/[a-zA-Z]/, "Password must contain at least one letter")
     .regex(/\d/, "Password must contain at least one number"),
   setupToken: z.string().optional(),
@@ -74,8 +75,11 @@ export async function POST(req: NextRequest) {
     return fail("Cross-origin request blocked", 403, "CSRF");
   }
 
+  // Reserve-then-refund: the slot is taken now, before any slow work, and
+  // handed back only on success (so failed attempts are what count).
   const clientIp = getClientIp(req);
-  if (!checkRateLimit(`setup:${clientIp}`)) {
+  const limitKey = `setup:${clientIp}`;
+  if (!(await reserveAttempt(limitKey))) {
     return fail(
       "Too many setup attempts from this IP. Please try again later.",
       429,
@@ -108,7 +112,6 @@ export async function POST(req: NextRequest) {
       crypto.timingSafeEqual(expectedBuf, providedBuf);
 
     if (!isValidToken) {
-      recordAttempt(`setup:${clientIp}`);
       return fail(
         "Invalid or missing setup token. Check your server environment settings.",
         401,
@@ -127,11 +130,10 @@ export async function POST(req: NextRequest) {
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      recordAttempt(`setup:${clientIp}`);
       return fail("An account with this email address already exists", 409, "DUPLICATE_EMAIL");
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await hashPassword(password);
     const userAgent = req.headers.get("user-agent") || "unknown";
 
     let tenantCode = slugifyTenantCode(schoolName);
@@ -184,6 +186,8 @@ export async function POST(req: NextRequest) {
     console.log(
       `[FIRST_RUN_SETUP] Tenant "${result.tenant.name}" (${result.tenant.code}) administrator created: ${result.admin.email} from IP ${clientIp}`,
     );
+
+    await refundAttempt(limitKey);
 
     return ok(
       {

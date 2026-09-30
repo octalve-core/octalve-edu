@@ -176,9 +176,12 @@ access" would be a cross-tenant privilege escalation here: an `ADMIN` of School 
 check on School B's routes. In a multi-tenant schema a role is only meaningful *against a specific,
 verified tenant's membership*, and that verified tenant doesn't exist until `resolve-tenant.ts`
 (§0.5.2) does. So `withAuth(handler, { roles, permissions })` keeps the shared call shape, but until
-§0.5.2 lands, passing `roles`/`permissions` fails closed (500 misconfiguration) instead of guessing a
-tenant. The "ADMIN crosses every `Campus`" rule stays exactly as §0.5.2 states it — scoped to *that
-tenant's* campuses.
+§0.5.2 lands, passing `roles`/`permissions` fails closed instead of guessing a tenant — **implemented
+as a compile error (the options are typed `never`) plus a throw at module load if the types are
+bypassed**, so `next build` fails rather than shipping an unguarded route. (The first draft of this
+note said "500 misconfiguration" at request time; catching it at build time is strictly earlier, so
+that is what was built.) The "ADMIN crosses every `Campus`" rule stays exactly as §0.5.2 states it —
+scoped to *that tenant's* campuses.
 
 **Deliberate divergence #2 — rate-limiter backend.** This pass ports AlEemaan's in-memory
 reserve-then-refund limiter (trusted `X-Real-IP` only, size-capped, all three keys: per-IP, per-`ip+email`
@@ -209,6 +212,47 @@ expensive path). Tracked for back-porting to AlEemaan in the cross-repo sync tas
 - **`Cache-Control: no-store`** on every auth response (new additive `noStore()` helper in
   `lib/api/envelope.ts`).
 - **Password max length (128)** on the setup wizard's schema too, not just login.
+
+**Decisions made during implementation (2026-09-30), recorded as they were made** — each is either a
+refinement of the design above or something the design left open. The first three differ from
+AlEemaan's shipped code and are tracked for back-porting (cross-repo sync task):
+1. **Per-IP login limit is 30 per 5 minutes; per-`ip+email` stays 5.** AlEemaan gates all three
+   layers at 5. A hard 5-per-IP gate lets one person's typos lock out everyone sharing that IP — and
+   shared IPs are the norm here (mobile-carrier NAT, a school's single egress address). The per-IP
+   layer is a coarse anti-spraying gate; the per-`ip+email` layer is what stops grinding one account.
+2. **Client IP is configurable, not hard-wired to `X-Real-IP`:** `CLIENT_IP_HEADER` (default
+   `x-real-ip`) or `x-forwarded-for` read from the *right* (`TRUSTED_PROXY_HOPS`, default 1). Needed
+   because the Solo installer's reverse proxy is Caddy, which appends to `X-Forwarded-For` but does not
+   set `X-Real-IP` unless told to. With no usable header the limiter falls back to one shared bucket
+   and **warns once in production**, since that turns the per-IP limit into a school-wide one.
+3. **True LRU eviction in the limiter.** AlEemaan's sweep evicts oldest-*inserted* keys (a `Map` keeps
+   first-insertion order on overwrite), so an attacker flooding new keys could evict a hot legitimate
+   key; here every write re-inserts the key so eviction is oldest-*touched*.
+4. **Limiter functions are `async` from day one** (their bodies must stay synchronous — an async
+   function runs synchronously to its first `await`, which is what keeps each reservation atomic).
+   Callers `await`, so the Redis backend is a drop-in. Documented as an invariant in the file.
+5. **`GET /api/v1/auth/me` added** — session introspection (user + memberships) for any client, and
+   the first route on `withAuth`, which is what makes the guard verifiable over HTTP.
+6. **Cache headers:** `noStore()` on every auth response; `withAuth` adds `private, no-store` to every
+   authenticated response.
+7. **Cookie lifetime = absolute expiry**; idle expiry is enforced server-side only (so the cookie is
+   never refreshed and Server Components, which can't set cookies, still slide the idle window).
+8. **Setup wizard migrated and retrofitted:** onto the reserve/refund limiter and `hashPassword()`, with
+   a 128-char password cap; on the shared UI primitives with real `<label>` associations,
+   `autocomplete` hints, and the design's "served over plain HTTP in production" warning; the 3.5 s
+   auto-redirect after success was replaced by an explicit "Continue to sign in" button (an unrequested
+   timed context change fails WCAG 2.2.1).
+9. **UI shipped with the phase** (not just API): `/login`, `/dashboard`, `/` (pure router), shared
+   `ui/` primitives and `AuthShell`. Two behaviours worth naming because a server-rendered page can't
+   notice them itself: **cross-tab sign-out** (BroadcastChannel) and **`pageshow` revalidation** so the
+   browser's back/forward cache can't resurrect a signed-out user's dashboard on a shared computer.
+   New modules: `lib/setup/status.ts`, `lib/auth/memberships.ts`, `lib/roles.ts`.
+10. **The migration was authored with `prisma migrate diff` + hand-written SQL**, not `migrate dev`:
+    `migrate dev` refuses to run non-interactively when it must confirm a destructive column drop
+    (`Session.sessionToken`). Recorded so the next migration author doesn't lose time to it.
+11. **Where the work lives:** `octalve-core/octalve-edu` has no Claude GitHub App installed, so this
+    phase is developed on `claude/auth-0.5.1-port` in the maintainer's fork
+    (`roji-tech/octalve-edu-fork`) and merged by PR into `octalve-core/octalve-edu` by the maintainer.
 
 **Explicitly out of scope for this pass, tracked, not forgotten:** TOTP MFA and its pending-state
 token (design above stands; must land **before Phase 1's Settings UI**, which needs step-up MFA and
