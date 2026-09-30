@@ -592,6 +592,110 @@ where "the code compiles" is not sufficient evidence of done; per Audit finding 
 RLS-looking-correct and RLS-being-correct are different claims until a real cross-tenant test fails
 when it should.
 
+### Phase 0.5 addenda (2026-09-30, after the auth build)
+
+Four pieces of work that sit between "auth works" and "Phase 1 can start", each designed here first
+and built in **both** repos (AlEemaan's plan has the same sections): **A** the shared UI design
+language, **B** a nonce-based script CSP, **C** password reset and change, **D** TOTP MFA. (Named A–D
+rather than numbered, because §0.5.3 already means something different in each repo.)
+
+#### 0.5.A — Shared UI design language (from the design artifact)
+
+Source: the private design canvas "Octalve Edu & AlEemaan — UI Design"
+(`https://claude.ai/artifact/8wGBA2trirEDaTQq1sUf74`) — its own framing is *"Admin app — same shell,
+one brand tweak"* and *"Public marketing sites — bespoke per brand"*. This section covers the first;
+the marketing sites are Phase 5.
+
+**What the artifact fixes.** Octalve Edu is **indigo** (`#4F46E5`, deep `#3730a3`, light `#a5b4fc`,
+tint `#1e1b4b`); AlEemaan is **sea green** (`#2E8B57`, deep `#0b3d24`, light `#6ee7b7`, tint
+`#052e22`). Both share: a dark theme by default with a **light theme toggle**; the login split layout
+(46 % brand panel in the deep colour with a faint dot/cross pattern, headline, blurb, three check-mark
+points, and the form on the right with uppercase 12 px labels, a "Forgot password?" link and a "Keep me
+signed in on this device" checkbox); the admin shell (248 px sidebar with brand mark, nav, user card;
+60 px top bar with breadcrumb, theme toggle and profile menu); and on phones a floating **bottom tab
+bar** with a "More" sheet in place of a hamburger drawer. Dark tokens `#020617` canvas / `#0f172a`
+surface / `#1e293b` line / `#f8fafc` text; light tokens `#f8fafc` / `#ffffff` / `#e2e8f0` / `#0f172a`.
+
+**Mechanism — the shared components stay code-identical; only two per-repo files differ.**
+1. *Semantic tokens, not palette classes.* `globals.css` defines CSS variables for both themes
+   (`--canvas --surface --surface-2 --line --fg --fg-2 --fg-muted`, status colours) and exposes them to
+   Tailwind through `@theme inline` (`bg-canvas`, `bg-surface`, `text-fg`, `text-fg-muted`,
+   `border-line`, `bg-brand`, `text-brand-fg`, …). No component names a colour any more, so re-skinning
+   is a token change, and a theme switch is one attribute.
+2. *Per-repo brand.* `app/brand.css` (colour tokens) and `lib/brand.ts` (strings: name, login
+   headline/blurb/points, what a `Campus`/`Branch` is called) are the **only** brand-specific files.
+3. *Theme without an inline script.* The choice lives in a `theme` cookie (`dark` | `light`, default
+   `dark` per the artifact). The root layout reads it (`cookies()`) and renders `<html data-theme=…>`, so
+   the first paint is already correct — no flash, and **no inline `<script>`**, which is what makes the
+   nonce-based CSP (0.5.B) possible. The toggle sets the cookie and the attribute.
+
+**Deliberate deviations from the artifact, each for a stated reason** (all checked numerically):
+- **Filled-button green is `#2A7F4F`, not `#2E8B57`.** White on `#2E8B57` is **4.25 : 1** — below the
+  4.5 : 1 that WCAG AA requires for 14 px text. `#2A7F4F` is 4.94 : 1 (hover `#267349`, 5.78 : 1).
+  `#2E8B57` stays for the logo mark and other non-text accents (3 : 1 is enough there). Octalve's
+  `#4F46E5` is 6.29 : 1 and needs no change.
+- **Muted text is `#94a3b8` in dark and `#5b6b82` in light**, not the artifact's `#64748b` — which is
+  3.75 : 1 on the dark surface and 4.34 : 1 on the light input background. (The same class of defect the
+  0.5.1 verification found in the first build's `slate-500`.)
+- **Dead controls are omitted, not drawn.** The artifact's top-bar search box and notification bell
+  (with a hard-coded "3" badge) have nothing behind them; shipping them would be a lie. They arrive
+  with the features that back them. "Users" and "Settings" show as *soon* until they exist.
+- **"Keep me signed in" is real.** Unchecked → a browser-session cookie and a 12-hour absolute lifetime;
+  checked → the existing 30-day idle / 90-day absolute policy (7 days for admins). (Shorter by default
+  than the first build — the right default for a shared school computer.)
+- The artifact's "First time on this instance? Run the setup wizard at /setup" line is omitted: the
+  wizard disables itself, and `/login` already redirects to it while it is still needed.
+- Typeface stays Geist (self-hosted via `next/font`); the artifact's system-font stack is the canvas
+  tool's default, not a brand decision. Arabic/RTL UI is out of scope until the school asks for it.
+
+**Scope by repo.** Tokens, theme, brand files and the re-skinned sign-in / setup / dashboard land in
+both. The **app shell** (sidebar, top bar, mobile tab bar, More sheet) lands in AlEemaan now — it has
+real admin pages (branches) to put in it — and in Octalve Edu with §0.5.2, when tenant routing gives it a
+`/schools/[code]/…` to wrap. Octalve Edu's `Campus` is what the artifact draws as "Branches".
+
+**Verification.** axe-core WCAG 2.2 AA on every screen and state **in both themes**; theme persistence
+across reloads (cookie, no flash); toggle keyboard/aria; tap targets; no horizontal scroll; and
+screenshots of the real flow at desktop and phone sizes, read by a human.
+
+**"Keep me signed in on this device" — exact semantics** (designed before it is built).
+- *Wire.* `POST /api/v1/auth/login` takes an optional `remember` — a strict boolean, **default `false`**
+  (the least-privilege default for API callers too). Any other type fails validation and gets the same
+  401 as every other malformed body, so the validation rules stay unprobeable.
+- *Not remembered* (`false`): the cookie carries **no `Expires`/`Max-Age`** (a browser-session cookie) **and**
+  the server caps the session at **12 hours** (`SESSION_ONLY_MAX_AGE_SECONDS`), idle and absolute alike.
+  The server cap is the real bound: browsers that "continue where you left off" restore session cookies
+  across restarts, so "closing the browser" alone can't be relied on to end a session.
+- *Remembered* (`true`): exactly today's policy — 30-day sliding idle, 90-day absolute, 7-day absolute for
+  anyone holding an ADMIN membership — and a persistent cookie expiring at the absolute cap.
+- *Admin rule composes.* The applicable absolute cap is `min(mode cap, 7 days if ADMIN)`, so an admin who
+  doesn't tick the box still gets 12 hours.
+- *No schema change.* `Session.expires` / `absoluteExpires` already differ per row; sliding the idle
+  expiry is already clamped to `absoluteExpires`, so a 12-hour session can never be extended past 12 hours.
+- *UI.* An unchecked-by-default native checkbox with a visible label (as drawn), keyboard-operable, ≥ 44 px
+  hit area; the value is sent as `remember` and nothing about it is persisted client-side.
+- *Tests.* Unit/integration on `createSession` (each mode × admin/non-admin, sliding is clamped);
+  API on `Set-Cookie` attributes per mode and on the strict boolean; browser test that ticking the box
+  yields a persistent cookie (`expires > now`) and not ticking yields a session cookie (`expires === -1`);
+  the same pair over real HTTPS for the `__Host-` cookie; and mutation checks (ignore `remember`, flip the
+  default, keep the cookie session-only but leave a 90-day row) — each must fail the suite.
+
+**As built (2026-09-30)** — the full record is `phases/phase-0.5.A-design-language.md`. Where the build
+refined or departed from the design above, and why:
+- *The checkbox is drawn, not native.* A native one is a 13–16 px target (the repo's own ≥ 44 px phone rule
+  measures the `<input>`) and unbranded, so `CheckboxField` keeps a real `<input>` in a real `<label>` and
+  draws the box, with measured contrast (outline 6.96 : 1 dark / 5.43 : 1 light; checked fill 8.96 : 1 /
+  7.90 : 1; tick 10.1 : 1 / 7.55 : 1) and an invisible 44 × 44 px input over it.
+- *`remember` defaults to false at **both** layers* — the API and `createSession()` — so a future caller
+  (password-reset sign-in, MFA step 2) that forgets to say gets the short session, never the 90-day one.
+  MFA's pending-challenge must carry the user's choice from step 1 to step 2 (0.5.D).
+- *Every page is now dynamic* (the theme cookie is read in the root layout) — noted for 0.5.B, which needs
+  exactly that.
+- *`useSignOut()`* (a hook) now backs every sign-out control, so the header button, AlEemaan's account menu
+  and its phone "More" sheet share one routine and one failure message.
+- *Test-suite rules learned* (in `tests/README.md`): both themes on every screen; wait for CSS transitions
+  and for the page `<title>` before an axe scan (two flakes, both test races); `test.skip(fn)` only at
+  `describe` level; sign-in helpers take `remember` explicitly.
+
 ---
 
 ## Phase 1 — MVP: Core SIS + Finance
