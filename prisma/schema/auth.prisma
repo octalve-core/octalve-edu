@@ -1,16 +1,20 @@
-// --- Auth.js (NextAuth v5) required models, database session strategy ---
-// per PRD §7: database sessions (not JWT) so a session can be revoked by
-// deleting its row — closes the security audit's session-revocation finding.
+// --- Auth: hand-rolled login/logout against hashed database sessions ---
+// (domain-implementation-plan.md §0.5.1, rebuilt 2026-09-30.)
 //
-// NOTE for whoever wires §0.5.1 (Auth.js Credentials provider): AlEemaan hit
-// a real Auth.js v5 constraint building the identical thing —
-// `Credentials` + `session.strategy: "database"` throws `UnsupportedStrategy`
-// on every request, not just sign-in. AlEemaan's fix (see its
-// domain-implementation-plan.md §0.5.1.1): keep database sessions, drop the
-// Credentials provider entirely, hand-roll login/logout against this same
-// Session table instead. Confirm this still applies (Auth.js version pinned
-// here is also 6.19.3-era next-auth@beta) before wiring §0.5.1 the way this
-// file's original comment described — don't rediscover the same wall.
+// Auth.js is not used at all. Database sessions were a deliberate PRD §7
+// decision (a session is revocable by deleting its row), and the hardened
+// design requires storing only a HASH of the session token while the client's
+// cookie holds the plaintext — Auth.js's Prisma adapter looks sessions up by
+// the raw cookie value, so it can never find a hashed row. Same conclusion
+// AlEemaan reached and shipped first; see that repo's
+// docs/development-history/phases/phase-0.5.1.5-auth-rebuild.md.
+//
+// No `Account` model: it only existed for Auth.js's OAuth flow, never used.
+//
+// NOT expressible in Prisma's schema language, applied in the migration SQL
+// instead: CHECK ("email" = lower("email")) on User — email case-insensitivity
+// enforced in Postgres itself, so a seed script or direct SQL import can't
+// bypass the app-layer normalization.
 
 model User {
   id            String    @id @default(cuid())
@@ -18,10 +22,9 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
-  /// Nullable: an OAuth-only or not-yet-activated user has none (Phase 0.5 plan).
+  /// Nullable: an invited-but-not-yet-activated user has none (Phase 0.5 plan).
   passwordHash  String?
 
-  accounts    Account[]
   sessions    Session[]
   memberships TenantMembership[]
 
@@ -29,34 +32,36 @@ model User {
   updatedAt DateTime @updatedAt
 }
 
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
+/// tokenHash, never the plaintext token: the client's cookie holds a 256-bit
+/// random value; only its SHA-256 hash is ever written here, so a leaked
+/// database (backup, a read-only SQL injection elsewhere) yields no
+/// directly-replayable session.
+///
+/// Two expiries, deliberately: `expires` is the IDLE expiry (slides forward on
+/// use, throttled), `absoluteExpires` is a hard cap set at login and never
+/// extended (shorter for ADMIN) — so a stolen-but-kept-alive session still
+/// dies. createdAt/lastUsedAt/userAgent are what the eventual "active devices"
+/// page needs; added now because retrofitting columns onto real rows is the
+/// more expensive path.
 model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
+  id              String   @id @default(cuid())
+  tokenHash       String   @unique
+  userId          String
+  expires         DateTime
+  absoluteExpires DateTime
+
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+  userAgent  String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
+/// Unused so far — reserved for the future password-reset / invite flows. Its
+/// `token` will need to be stored hashed (single-use, short-lived) when those
+/// are designed; revisit this shape then rather than guessing now.
 model VerificationToken {
   identifier String
   token      String   @unique

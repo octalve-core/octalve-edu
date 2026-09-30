@@ -145,6 +145,98 @@ now point new projects at Better Auth.** Auth.js's role in this plan was already
 `Session` rows via an adapter" even before this decision — and per the resolution above, that role is
 now dropped to zero: no Auth.js dependency at all, same as AlEemaan.
 
+#### Build design for the port (added 2026-09-30, immediately before implementation)
+
+Written before any code, per this repo's design-before-code rule. It records what the port keeps,
+what it deliberately does *not* copy from AlEemaan, and what is built beyond AlEemaan's current
+state — each with the reasoning, so none of it has to be re-derived later.
+
+**Shared names — identical in both repos, on purpose.** File names, exported function names, route
+paths and error codes match AlEemaan's already-built versions exactly, so a fix or review finding in
+one repo maps 1:1 onto the other:
+
+| Concern | Name (both repos) |
+| :--- | :--- |
+| Session helpers | `lib/auth/session.ts` — `createSession`, `getSession`, `getSessionFromRequest`, `deleteSessionByToken`, `revokeUserSessions`, `setSessionCookie`, `clearSessionCookie`, `SESSION_COOKIE_NAME` |
+| Passwords | `lib/auth/password.ts` — `hashPassword`, `verifyPassword`, `BCRYPT_COST` |
+| Rate limiting | `lib/auth/rate-limit.ts` — `reserveAttempt`, `refundAttempt`, `checkRateLimit`, `getClientIp` |
+| Route guard | `lib/auth/with-auth.ts` — `withAuth(handler, options)` (replaces AlEemaan's `requireAdmin()`; AlEemaan migrates too — see its own plan) |
+| CSRF / envelope / db | `lib/auth/csrf.ts`, `lib/api/envelope.ts`, `lib/db.ts` (already identical) |
+| Routes | `POST /api/v1/auth/login`, `POST /api/v1/auth/logout` |
+| Error codes | `INVALID_CREDENTIALS`, `RATE_LIMITED`, `CSRF`, `INVALID_BODY` |
+
+Deliberately **not** synced (different concepts, not naming drift): the models `Campus`/`Branch` and
+`TenantMembership`/`Membership` (this repo has a `Tenant` above `Campus`; AlEemaan has no tenant and
+"branch" is the school's own word), and the cookie's product prefix (`octalve.session-token` /
+`__Host-octalve.session-token` here, `aleemaan.…` there — two products must never share a cookie name).
+
+**Deliberate divergence #1 — `withAuth` ships session + CSRF only in this pass; role/permission
+gating arrives with §0.5.2.** A straight port of AlEemaan's "any `ADMIN` membership row grants
+access" would be a cross-tenant privilege escalation here: an `ADMIN` of School A would pass the
+check on School B's routes. In a multi-tenant schema a role is only meaningful *against a specific,
+verified tenant's membership*, and that verified tenant doesn't exist until `resolve-tenant.ts`
+(§0.5.2) does. So `withAuth(handler, { roles, permissions })` keeps the shared call shape, but until
+§0.5.2 lands, passing `roles`/`permissions` fails closed (500 misconfiguration) instead of guessing a
+tenant. The "ADMIN crosses every `Campus`" rule stays exactly as §0.5.2 states it — scoped to *that
+tenant's* campuses.
+
+**Deliberate divergence #2 — rate-limiter backend.** This pass ports AlEemaan's in-memory
+reserve-then-refund limiter (trusted `X-Real-IP` only, size-capped, all three keys: per-IP, per-`ip+email`
+hard gates and a soft per-account signal). That is correct for Solo and for a single-instance SaaS
+deployment. It is **not** sufficient for multi-instance SaaS, where a different instance means a
+different `Map`; that needs the Redis-backed version (§0.5.3, client library still to be chosen —
+`@upstash/ratelimit` does not fit the plain Redis container `docker-compose.yml` provisions). Callers
+`await` the limiter from day one so swapping in an async Redis backend later changes no call site.
+This limitation is a known, tracked condition — **it must be closed before any multi-instance SaaS
+production deployment**, and the setup wizard's own use of the limiter moves to the same API here
+(the old `checkRateLimit`/`recordAttempt` pair, which trusted raw `X-Forwarded-For` and had the
+check-then-record race, is removed entirely).
+
+**Built beyond AlEemaan's current state** (AlEemaan deferred these; this repo's plan already lists
+them as part of the hardened design, and retrofitting schema columns after data exists is the more
+expensive path). Tracked for back-porting to AlEemaan in the cross-repo sync task:
+- **Two-level session expiry.** `Session.expires` is the *idle* expiry (30 days, the one shared
+  `SESSION_MAX_AGE_SECONDS`, slid forward on use — throttled to at most one write per 5 minutes per
+  session); new `Session.absoluteExpires` is a hard cap set at login and never extended: **90 days
+  normally, 7 days for a user holding any `ADMIN` membership.** The cookie's own expiry is set to the
+  absolute expiry (the server is authoritative on idle expiry, so the cookie never needs refreshing).
+  These numbers are policy defaults — the PRD specifies none — and live as named constants.
+- **Bounded growth.** `createSession` also deletes that user's already-expired rows in the same
+  transaction; `purgeExpiredSessions()` is exported for the scheduled nightly purge (the job runner
+  arrives with BullMQ infrastructure later — the function exists and is verified now).
+- **Email case-insensitivity enforced in Postgres**, not only in code: a `CHECK (email = lower(email))`
+  constraint added in the migration's SQL (Prisma's schema language can't express it).
+- **`Cache-Control: no-store`** on every auth response (new additive `noStore()` helper in
+  `lib/api/envelope.ts`).
+- **Password max length (128)** on the setup wizard's schema too, not just login.
+
+**Explicitly out of scope for this pass, tracked, not forgotten:** TOTP MFA and its pending-state
+token (design above stands; must land **before Phase 1's Settings UI**, which needs step-up MFA and
+`mfaRequiredForTeaching`), password reset, breached-password check, the active-devices page. The login
+route is structured so the pending-MFA step slots between "password verified" and "session created"
+without restructuring.
+
+**UI in this pass** (the setup wizard already redirects to `/login`, which did not exist — an auth API
+with no way to sign in is not a finished phase): a `/login` page in the wizard's visual language
+(properly associated labels, `aria-live` errors, show/hide password, correct `autocomplete`
+attributes, enumeration-safe copy, a clear rate-limited state), a minimal `/dashboard` (who is signed
+in, which schools they belong to, sign out) that becomes the §0.5.2 front-door router, and `/` as a
+pure router (session → `/dashboard`; Solo with setup incomplete → `/setup`; otherwise `/login`),
+replacing the create-next-app placeholder. No `?next=` redirect parameter yet — when one is added it
+must accept only same-origin relative paths (open-redirect defense).
+
+**Verification for this pass** — the standard AlEemaan's rebuild set, made repeatable rather than
+hand-run: (1) scripted API checks against a real Postgres, including direct `psql` inspection that
+`Session.tokenHash` never equals the cookie value and that the email `CHECK` rejects mixed case;
+(2) timing comparison of the no-such-user and wrong-password paths; (3) rate-limit trip test with
+spoofed `X-Forwarded-For` proving it is ignored while `X-Real-IP` is honored; (4) `Set-Cookie`
+attribute assertions for both cookie shapes, plus a **real-browser HTTPS run** (self-signed local TLS
+proxy, Chromium enforcing the actual `__Host-` rules) proving login sets and logout *actually clears*
+the cookie — the open item the two-AI review flagged as unverified (P0 #4); (5) Playwright flow tests
+for the UI: sign-in success, wrong password, rate-limited state, keyboard-only use, session persisting
+across reload, sign-out then back-button, direct navigation to `/dashboard` when signed out, and the
+setup → login hand-off.
+
 #### Login/logout route design
 
 Guard order, same as every other mutating route in this codebase: `validateCSRF(req)` (the helper
