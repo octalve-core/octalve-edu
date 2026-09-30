@@ -1,0 +1,154 @@
+import AxeBuilder from "@axe-core/playwright";
+import type { Page } from "@playwright/test";
+import { test, expect } from "../support/fixtures";
+import { Role, createUser, resetDatabase, seedInstance } from "./../support/db";
+import { alerts, fillCredentials, passwordField, signInButton, signInThroughUi } from "./helpers";
+
+// Runs on the desktop AND the phone project (see playwright.config.ts).
+//  - axe-core, WCAG 2.2 A/AA rules, on every screen and on the STATES that
+//    change the DOM (errors, paused, revealed password) — not just first paint.
+//  - No horizontal scrolling at any size we test.
+//  - On phones, every control is a comfortable tap target (>= 44 CSS px).
+
+const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
+
+async function expectAccessible(page: Page, what: string) {
+  const results = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+  const report = results.violations.map(
+    (v) =>
+      `${v.id} [${v.impact}] ${v.help}\n      ` +
+      v.nodes
+        .slice(0, 4)
+        .map((n) => `${n.target.join(" ")} :: ${(n.failureSummary ?? "").split("\n")[1] ?? ""}`)
+        .join("\n      "),
+  );
+  expect(report, `accessibility violations on ${what}`).toEqual([]);
+}
+
+async function expectNoHorizontalScroll(page: Page, what: string) {
+  const { scrollWidth, innerWidth } = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    innerWidth: window.innerWidth,
+  }));
+  expect(scrollWidth, `horizontal overflow on ${what}`).toBeLessThanOrEqual(innerWidth);
+}
+
+async function expectComfortableTapTargets(page: Page, what: string, isMobile: boolean) {
+  if (!isMobile) return;
+  const tooSmall = await page.evaluate(() => {
+    const visible = (el: Element) => {
+      const r = el.getBoundingClientRect();
+      const style = getComputedStyle(el);
+      return r.width > 0 && r.height > 0 && style.visibility !== "hidden" && !el.closest(".sr-only");
+    };
+    return Array.from(document.querySelectorAll("button, a[href], input:not([type=hidden]), select, textarea"))
+      .filter(visible)
+      .map((el) => {
+        const r = el.getBoundingClientRect();
+        return { el: `${el.tagName.toLowerCase()}[${el.getAttribute("aria-label") ?? el.getAttribute("name") ?? el.textContent?.trim().slice(0, 20)}]`, w: Math.round(r.width), h: Math.round(r.height) };
+      })
+      .filter((t) => t.w < 44 || t.h < 44);
+  });
+  expect(tooSmall, `controls smaller than 44x44 CSS px on ${what}`).toEqual([]);
+}
+
+async function checkScreen(page: Page, what: string, isMobile: boolean) {
+  await expectAccessible(page, what);
+  await expectNoHorizontalScroll(page, what);
+  await expectComfortableTapTargets(page, what, isMobile);
+}
+
+test.describe("sign-in screen", () => {
+  test.beforeAll(async () => {
+    await seedInstance();
+  });
+
+  test("idle, with validation errors, with a server error, with the password revealed", async ({ page, isMobile }) => {
+    const user = await createUser({ role: Role.ADMIN });
+    await page.goto("/login");
+    await checkScreen(page, "/login (idle)", isMobile);
+
+    await signInButton(page).click();
+    await expect(page.getByText("Enter your email address.")).toBeVisible();
+    await checkScreen(page, "/login (validation errors)", isMobile);
+
+    await fillCredentials(page, user.email, "not-the-password-1");
+    await page.getByRole("button", { name: "Show password" }).click();
+    await checkScreen(page, "/login (password revealed)", isMobile);
+    await page.getByRole("button", { name: "Hide password" }).click();
+
+    await signInButton(page).click();
+    await expect(alerts(page)).toContainText("incorrect");
+    await checkScreen(page, "/login (wrong-password alert)", isMobile);
+  });
+
+  test("the paused state", async ({ page, isMobile }) => {
+    test.setTimeout(120_000);
+    const user = await createUser({ role: Role.ADMIN });
+    await page.goto("/login");
+    for (let i = 0; i < 6; i++) {
+      await fillCredentials(page, user.email, `wrong-password-${i}`);
+      await signInButton(page).click();
+      if (i < 5) await expect(alerts(page)).toContainText("incorrect");
+    }
+    await expect(alerts(page)).toContainText("Sign-in is paused for a moment");
+    await expect(passwordField(page)).toBeVisible();
+    await checkScreen(page, "/login (paused)", isMobile);
+  });
+});
+
+test.describe("dashboard", () => {
+  test.beforeAll(async () => {
+    await seedInstance();
+  });
+
+  test("with a school, and with none", async ({ page, isMobile }) => {
+    const withSchool = await createUser({ role: Role.ADMIN });
+    await signInThroughUi(page, withSchool);
+    await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible();
+    await checkScreen(page, "/dashboard (with a school)", isMobile);
+  });
+
+  test("a member of no school sees an honest empty state", async ({ page, isMobile }) => {
+    const loner = await createUser({ name: "Chidi Okafor" });
+    await signInThroughUi(page, loner);
+    await expect(page.getByText("You're signed in, but you aren't a member of any school yet.")).toBeVisible();
+    await expect(page.getByText("Ask your school administrator to invite you.")).toBeVisible();
+    await checkScreen(page, "/dashboard (no school)", isMobile);
+  });
+
+  test("a long name and school name don't break the layout", async ({ page, isMobile }) => {
+    const user = await createUser({ role: Role.ADMIN, name: "Oluwatobiloba Adebayo-Ogunleye-Nwosu-Abdulrahman" });
+    await signInThroughUi(page, user);
+    await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible();
+    await expectNoHorizontalScroll(page, "/dashboard (long name)");
+    await checkScreen(page, "/dashboard (long name)", isMobile);
+  });
+});
+
+test.describe("setup wizard screens", () => {
+  test.describe.configure({ mode: "serial" });
+  test.beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  test("idle, invalid input, and the success screen", async ({ page, isMobile }) => {
+    await page.goto("/setup");
+    await expect(page.getByRole("heading", { name: "Initialize this instance" })).toBeVisible();
+    await checkScreen(page, "/setup (idle)", isMobile);
+
+    await page.getByLabel("School name").fill("Bright Future Academy");
+    await page.getByLabel("Administrator name").fill("Amina Yusuf");
+    await page.getByLabel("Administrator email").fill("amina@brightfuture.test");
+    await page.getByLabel("Password", { exact: true }).fill("short");
+    await page.getByLabel("Confirm password", { exact: true }).fill("shor");
+    await expect(page.getByText("Passwords don't match.")).toBeVisible();
+    await checkScreen(page, "/setup (invalid input)", isMobile);
+
+    await page.getByLabel("Password", { exact: true }).fill("correct-horse-battery-9");
+    await page.getByLabel("Confirm password", { exact: true }).fill("correct-horse-battery-9");
+    await page.getByRole("button", { name: "Complete setup" }).click();
+    await expect(page.getByRole("heading", { name: "Setup complete" })).toBeVisible();
+    await checkScreen(page, "/setup (complete)", isMobile);
+  });
+});

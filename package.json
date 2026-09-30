@@ -12,7 +12,14 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
-    "db:migrate:deploy": "prisma migrate deploy"
+    "db:migrate:deploy": "prisma migrate deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "pnpm build && playwright test",
+    "test:fast": "playwright test",
+    "test:unit": "playwright test --project=unit",
+    "test:api": "playwright test --project=api",
+    "test:e2e": "playwright test --project=e2e-desktop --project=e2e-mobile",
+    "test:https": "playwright test --project=https"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -30,6 +37,8 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "1.56.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

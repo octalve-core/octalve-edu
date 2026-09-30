@@ -1,13 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { AuthShell } from "@/components/auth/AuthShell";
+import { Alert } from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
+import { PasswordField } from "@/components/ui/PasswordField";
+import { TextField } from "@/components/ui/TextField";
+import { CheckCircleIcon } from "@/components/ui/icons";
+import { PASSWORD_MAX_BYTES, passwordByteLength } from "@/lib/auth/password-policy";
 
 interface SetupWizardFormProps {
   requiresToken: boolean;
+  /// A production build configured for plain HTTP (see setup/page.tsx).
+  insecureBaseUrl: boolean;
 }
 
-export function SetupWizardForm({ requiresToken }: SetupWizardFormProps) {
+export function SetupWizardForm({ requiresToken, insecureBaseUrl }: SetupWizardFormProps) {
   const router = useRouter();
 
   const [schoolName, setSchoolName] = useState("");
@@ -19,23 +28,30 @@ export function SetupWizardForm({ requiresToken }: SetupWizardFormProps) {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isCompleted, setIsCompleted] = useState(false);
-  const [createdAdminEmail, setCreatedAdminEmail] = useState("");
+  const [createdAdminEmail, setCreatedAdminEmail] = useState<string | null>(null);
+
+  const errorRef = useRef<HTMLDivElement>(null);
 
   const hasMinLength = password.length >= 8;
   const hasLetter = /[a-zA-Z]/.test(password);
   const hasNumber = /\d/.test(password);
   const passwordsMatch = password.length > 0 && password === confirmPassword;
+  // bcrypt ignores everything after byte 72, so the server refuses longer
+  // passwords rather than truncating. Say so as they type, in bytes-aware terms
+  // (emoji / non-Latin letters take 2-4 bytes each).
+  const tooLong = passwordByteLength(password) > PASSWORD_MAX_BYTES;
   const canSubmit =
     schoolName.trim().length > 0 &&
     name.trim().length > 0 &&
+    email.trim().length > 0 &&
     hasMinLength &&
     hasLetter &&
     hasNumber &&
+    !tooLong &&
     passwordsMatch &&
     (!requiresToken || setupToken.trim().length > 0);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -62,189 +78,181 @@ export function SetupWizardForm({ requiresToken }: SetupWizardFormProps) {
         }),
       });
 
-      const body = await res.json();
+      const body = await res.json().catch(() => null);
 
       if (!res.ok) {
-        throw new Error(body.error?.message ?? "Failed to complete setup");
+        throw new Error(body?.error?.message ?? "Failed to complete setup");
       }
 
-      setIsCompleted(true);
       setCreatedAdminEmail(email.trim().toLowerCase());
-
-      setTimeout(() => {
-        router.push("/login");
-      }, 3500);
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "An unexpected error occurred.");
+      // Bring the error into view for keyboard and screen-reader users.
+      requestAnimationFrame(() => errorRef.current?.scrollIntoView({ block: "nearest" }));
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (isCompleted) {
+  if (createdAdminEmail) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4">
-        <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-8 text-center shadow-2xl">
-          <h1 className="mb-2 text-2xl font-bold text-white">Setup complete</h1>
-          <p className="mb-6 text-sm leading-relaxed text-slate-400">
+      <AuthShell>
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-center shadow-2xl shadow-black/30 sm:p-8">
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
+            <CheckCircleIcon className="h-7 w-7" />
+          </span>
+          <h1 className="mt-5 text-2xl font-bold tracking-tight text-white">Setup complete</h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-400">
             The administrator account for{" "}
             <span className="font-medium text-white">{createdAdminEmail}</span> has been created.
             This setup wizard is now permanently disabled.
           </p>
-          <button
-            onClick={() => router.push("/login")}
-            className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-medium text-white transition-colors hover:bg-emerald-500"
-          >
-            Proceed to login
-          </button>
+          <Button className="mt-6 w-full" onClick={() => router.push("/login")} autoFocus>
+            Continue to sign in
+          </Button>
         </div>
-      </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4 py-12">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-8 shadow-2xl sm:p-10">
-        <div className="mb-8 border-b border-slate-800 pb-6">
-          <span className="text-lg font-bold tracking-tight text-white">Octalve Edu</span>
-          <p className="text-xs text-slate-400">First-run setup</p>
+    <AuthShell>
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-2xl shadow-black/30 backdrop-blur sm:p-8">
+        <p className="text-xs font-semibold tracking-wider text-blue-400 uppercase">
+          First-run setup
+        </p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">
+          Initialize this instance
+        </h1>
+        <p className="mt-1.5 text-sm leading-relaxed text-slate-400">
+          This runs once, on a fresh install. It creates your school and its first administrator
+          account, then disables itself.
+        </p>
+
+        <div className="mt-6 space-y-4 empty:mt-0">
+          {insecureBaseUrl && (
+            <Alert variant="warning" title="This instance isn't served over HTTPS">
+              Sign-in will work on a trusted local network, but sessions aren&apos;t protected in
+              transit. Put this behind HTTPS (and set <code className="font-mono">APP_URL</code> to
+              your <strong className="font-semibold">https</strong> address) before exposing it to
+              the internet.
+            </Alert>
+          )}
+          {errorMessage && (
+            <div ref={errorRef}>
+              <Alert variant="error">{errorMessage}</Alert>
+            </div>
+          )}
         </div>
 
-        <div className="mb-8">
-          <h1 className="mb-2 text-2xl font-bold tracking-tight text-white">
-            Initialize this instance
-          </h1>
-          <p className="text-sm leading-relaxed text-slate-400">
-            This runs once, on a fresh install. It creates your school and its first
-            administrator account, then disables itself.
-          </p>
-        </div>
+        {/* method="post": a native submit (no JS / before hydration) must never put the password in the URL. */}
+        <form method="post" onSubmit={handleSubmit} className="mt-6 space-y-5">
+          <TextField
+            label="School name"
+            name="schoolName"
+            value={schoolName}
+            onChange={(e) => setSchoolName(e.target.value)}
+            placeholder="e.g. Bright Future Academy"
+            autoComplete="organization"
+            disabled={isSubmitting}
+            required
+            autoFocus
+          />
 
-        {errorMessage && (
-          <div className="mb-6 rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-400">
-            {errorMessage}
-          </div>
-        )}
+          <TextField
+            label="Administrator name"
+            name="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Amina Yusuf"
+            autoComplete="name"
+            disabled={isSubmitting}
+            required
+          />
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="mb-1.5 block text-xs font-medium tracking-wider text-slate-300 uppercase">
-              School name
-            </label>
-            <input
-              type="text"
-              value={schoolName}
-              onChange={(e) => setSchoolName(e.target.value)}
-              placeholder="e.g. Bright Future Academy"
-              disabled={isSubmitting}
-              required
-              className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none disabled:opacity-60"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-xs font-medium tracking-wider text-slate-300 uppercase">
-              Administrator name
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Amina Yusuf"
-              disabled={isSubmitting}
-              required
-              className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none disabled:opacity-60"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-xs font-medium tracking-wider text-slate-300 uppercase">
-              Administrator email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@yourschool.com"
-              disabled={isSubmitting}
-              required
-              className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none disabled:opacity-60"
-            />
-          </div>
+          <TextField
+            label="Administrator email"
+            name="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="admin@yourschool.com"
+            autoComplete="email"
+            inputMode="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            disabled={isSubmitting}
+            required
+          />
 
           {requiresToken && (
             <div className="rounded-xl border border-amber-500/20 bg-slate-950/70 p-4">
-              <label className="mb-2 block text-xs font-semibold tracking-wider text-amber-300 uppercase">
-                Deployment setup token
-              </label>
-              <input
-                type="password"
+              <PasswordField
+                label="Deployment setup token"
+                name="setupToken"
                 value={setupToken}
                 onChange={(e) => setSetupToken(e.target.value)}
                 placeholder="Enter SETUP_TOKEN from your environment"
+                hint="Matches the SETUP_TOKEN environment variable on this server."
+                autoComplete="off"
                 disabled={isSubmitting}
                 required
-                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3.5 py-2.5 font-mono text-sm text-white placeholder:text-slate-600 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none disabled:opacity-60"
               />
-              <p className="mt-1.5 text-xs text-slate-400">
-                Matches the <code className="text-amber-400">SETUP_TOKEN</code> environment
-                variable on this server.
-              </p>
             </div>
           )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-xs font-medium tracking-wider text-slate-300 uppercase">
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Min. 8 characters"
-                disabled={isSubmitting}
-                required
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none disabled:opacity-60"
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium tracking-wider text-slate-300 uppercase">
-                Confirm password
-              </label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Re-enter password"
-                disabled={isSubmitting}
-                required
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none disabled:opacity-60"
-              />
-            </div>
+            <PasswordField
+              label="Password"
+              name="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Min. 8 characters"
+              autoComplete="new-password"
+              maxLength={128}
+              error={
+                tooLong
+                  ? `Too long — at most ${PASSWORD_MAX_BYTES} bytes (about ${PASSWORD_MAX_BYTES} characters; fewer with emoji or non-Latin letters).`
+                  : null
+              }
+              disabled={isSubmitting}
+              required
+            />
+            <PasswordField
+              label="Confirm password"
+              name="confirmPassword"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Repeat password"
+              autoComplete="new-password"
+              maxLength={128}
+              error={confirmPassword.length > 0 && !passwordsMatch ? "Passwords don't match." : null}
+              disabled={isSubmitting}
+              required
+            />
           </div>
 
-          <div className="space-y-1.5 rounded-xl border border-slate-800/80 bg-slate-950/50 p-3 text-xs">
-            <div className={hasMinLength ? "text-emerald-400" : "text-slate-500"}>
-              ✓ At least 8 characters
-            </div>
-            <div className={hasLetter && hasNumber ? "text-emerald-400" : "text-slate-500"}>
-              ✓ Contains both letters and numbers
-            </div>
-            <div className={passwordsMatch ? "text-emerald-400" : "text-slate-500"}>
-              ✓ Passwords match
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isSubmitting || !canSubmit}
-            className="mt-2 w-full rounded-xl bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
+          <ul
+            aria-label="Password requirements"
+            className="space-y-1.5 rounded-xl border border-slate-800/80 bg-slate-950/50 p-3 text-xs"
           >
-            {isSubmitting ? "Setting up..." : "Complete setup"}
-          </button>
+            {[
+              { met: hasMinLength, text: "At least 8 characters" },
+              { met: hasLetter && hasNumber, text: "Contains both letters and numbers" },
+              { met: passwordsMatch, text: "Passwords match" },
+            ].map(({ met, text }) => (
+              <li key={text} className={met ? "text-emerald-400" : "text-slate-400"}>
+                <span aria-hidden="true">{met ? "✓" : "○"}</span> {text}
+                <span className="sr-only">{met ? " — met" : " — not met yet"}</span>
+              </li>
+            ))}
+          </ul>
+
+          <Button type="submit" className="w-full" loading={isSubmitting} disabled={!canSubmit}>
+            {isSubmitting ? "Setting up…" : "Complete setup"}
+          </Button>
         </form>
       </div>
-    </div>
+    </AuthShell>
   );
 }
