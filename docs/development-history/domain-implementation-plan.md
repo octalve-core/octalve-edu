@@ -323,6 +323,12 @@ for the UI: sign-in success, wrong password, rate-limited state, keyboard-only u
 across reload, sign-out then back-button, direct navigation to `/dashboard` when signed out, and the
 setup → login hand-off.
 
+**Result (2026-09-30): all five were delivered and exceeded** — see `phases/phase-0.5.1-auth.md`:
+234 tests (`pnpm test`), every security assertion mutation-checked (40 of 40 injected bugs caught), axe
+WCAG 2.2 on every screen and state, and the real-HTTPS run that closes P0 #4 (the `__Host-` cookie is
+accepted on login and actually removed on logout; a bare `cookies.delete()` makes it fail). The
+verification also found ten defects the design had not anticipated — decisions #12–#15 above.
+
 #### Login/logout route design
 
 Guard order, same as every other mutating route in this codebase: `validateCSRF(req)` (the helper

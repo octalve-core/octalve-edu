@@ -21,7 +21,7 @@ certificate).
 | `pnpm exec playwright test <file> --headed` | Watch a spec run. `PWDEBUG=1` for the inspector. |
 | `pnpm exec playwright show-report` / `show-trace <trace.zip>` | After a failure: HTML report, or the trace (DOM snapshots, network, console). |
 
-Ports 3100, 3101 and 3443 must be free (the config never reuses a running server, so a stale one
+The three ports in `tests/support/env.ts` (`HTTP_PORT`, `HTTPS_APP_PORT`, `TLS_PORT`) must be free (the config never reuses a running server, so a stale one
 can't be tested by accident).
 
 ## The database
@@ -43,7 +43,7 @@ re-checks `current_database()` and refuses to run against anything else.
 | `e2e-desktop`, `e2e-mobile` | `e2e/` | Chromium, 1280×720 and a Pixel 7 | Real user flows: sign-in ok/fail, focus management, validation, the paused state (fake clock), keyboard-only use, show/hide password, double-submit, reload persistence, sign-out + Back, cross-tab sign-out, revoked/expired sessions, credentials never in the URL, the whole setup → sign-in → dashboard journey; axe-core WCAG 2.2 A/AA on every screen **and state**; no horizontal scroll; ≥ 44 px tap targets on phones. |
 | `https` | `https/` | Chromium over TLS | The production cookie shape: `__Host-` accepted on login (Chromium only accepts it if Secure + `Path=/` + no Domain) and **actually removed on logout** — the auth review's P0 #4. |
 
-The `https` project runs the *same build* a second time with `APP_URL=https://localhost:3443`
+The `https` project runs the *same build* a second time with `APP_URL=https://localhost:<TLS_PORT>`
 behind `tests/support/tls-proxy.mjs`, a small TLS-terminating reverse proxy with a throwaway
 self-signed certificate. Like a correctly configured Caddy/nginx it overwrites `X-Real-IP` with the
 real peer address; the only test hook (`x-test-client-ip` → `X-Real-IP`) lives in the proxy, never

@@ -165,21 +165,26 @@ memberships}.ts`; `POST /api/v1/auth/{login,logout}` and `GET /api/v1/auth/me`; 
 onto the new helpers; the `/login`, `/dashboard` and `/` screens plus the retrofitted `/setup` wizard on
 shared, accessible UI primitives; baseline security headers.
 
-Verified (`pnpm test`): 232 tests pass in about four minutes — 24 unit, 36 integration, 86 API, 78 browser (desktop + phone viewports; axe WCAG 2.2 A/AA clean on every screen *and* state), 7 real-HTTPS — plus clean `tsc`, ESLint and `next build`. Ten defects were found by the verification itself —
+Verified (`pnpm test`): 234 tests pass in under four minutes — 24 unit, 36 integration, 86 API, 80 browser (desktop + phone viewports; axe WCAG 2.2 A/AA clean on every screen *and* state), 7 real-HTTPS — plus clean `tsc`, ESLint and `next build`. Ten defects were found by the verification itself —
 among them that bcrypt silently ignores everything past byte 72 (so the design's "128-character cap"
 did not do what it said), that a no-JavaScript submit of the sign-in form put the password in the URL,
-and that focus was lost after a failed sign-in — each fixed and pinned by a regression test. All 39
+and that focus was lost after a failed sign-in — each fixed and pinned by a regression test. All 40
 deliberately injected bugs (mutation testing) turned the suite red.
 
 ## Next action
 
 **Hand §0.5.1 to the maintainer for review and merge** (PR from `claude/auth-0.5.1-port` on the fork
 into `octalve-core/octalve-edu`; nothing else in this repo depends on it being merged first).
-Meanwhile, in order: back-port the shared-naming and hardening deltas to AlEemaan (its own plan doc
-tracks them — includes the newly found 72-byte password policy and `method="post"` finding); the
-tenant-trust-boundary resolver and `forTenant()` with its explicit RLS role setup (§0.5.2 — needs a
-real `app_user` Postgres role created first, and `withAuth`'s `roles`/`permissions` options arrive
-here); TOTP MFA (must precede Phase 1's Settings UI); the shared API helpers (§0.5.3, and the
-Redis-backed rate limiter before any multi-instance SaaS deployment). Then that phase's
-negative-test verification gate — **run as the `app_user` role, not the migration owner** — before
-Phase 1 begins.
+
+**The back-port to AlEemaan is done and verified** — shared names, the hardening deltas, the 72-byte
+password policy, `method="post"`, the sign-in screens it lacked, and this test suite — on branch
+`claude/octalve-auth-sync` of `roji-tech/AlEemaan` (its `phases/phase-0.5.1.6-octalve-sync.md`),
+awaiting *that* repo's maintainer review/merge. From here on a change to the shared mechanism is made
+in both repos or logged as a divergence in both plan docs (§0.5.1.6 there, the shared-names table here).
+
+Then, in order: the tenant-trust-boundary resolver and `forTenant()` with its explicit RLS role setup
+(§0.5.2 — needs a real `app_user` Postgres role created first, and `withAuth`'s `roles`/`permissions`
+options arrive here); TOTP MFA (must precede Phase 1's Settings UI — built in both repos together); the
+shared API helpers (§0.5.3, and the Redis-backed rate limiter before any multi-instance SaaS
+deployment). Then that phase's negative-test verification gate — **run as the `app_user` role, not the
+migration owner** — before Phase 1 begins.

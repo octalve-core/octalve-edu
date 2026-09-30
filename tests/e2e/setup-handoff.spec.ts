@@ -36,6 +36,13 @@ test.describe("a fresh install routes everyone to setup", () => {
     await expect(page.getByRole("heading", { name: "Initialize this instance" })).toBeVisible();
   });
 
+  test("the wizard form is method=post, so a native submit could never put the administrator's password in the URL", async ({ page }) => {
+    // (Without JavaScript the submit button is server-rendered disabled, so a native submit
+    // can't be provoked here — this pins the attribute that makes it safe if that ever changes.)
+    await page.goto("/setup");
+    await expect(page.locator("form")).toHaveAttribute("method", "post");
+  });
+
   test("on a plain-HTTP production build the wizard says so (sessions unprotected in transit)", async ({ page }) => {
     await page.goto("/setup");
     await expect(page.getByText("This instance isn't served over HTTPS")).toBeVisible();

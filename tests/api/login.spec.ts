@@ -1,4 +1,4 @@
-import "../support/env";
+import { HTTP_PORT, HTTP_URL } from "../support/env";
 import { test, expect } from "@playwright/test";
 import { Role, createUser, db, sha256Hex, uniqueEmail, uniqueIp } from "../support/db";
 import { api, cookieHeader, loginAs, parseSetCookie, sessionCookie } from "../support/http";
@@ -205,9 +205,9 @@ test.describe("POST /api/v1/auth/login — CSRF (same-origin check before anythi
 
   for (const origin of [
     "https://evil.example",
-    "http://localhost:3101", // same host, different port = different origin
-    "http://localhost:3100.evil.example", // host-suffix trick
-    "http://localhost:3100@evil.example", // userinfo trick: the real host is evil.example
+    `http://localhost:${HTTP_PORT + 1}`, // same host, different port = different origin
+    `${HTTP_URL}.evil.example`, // host-suffix trick
+    `http://localhost:${HTTP_PORT}@evil.example`, // userinfo trick: the real host is evil.example
     "null", // sandboxed iframes / file:// send the literal string "null"
   ]) {
     test(`Origin ${origin} is refused`, async () => {
@@ -224,7 +224,7 @@ test.describe("POST /api/v1/auth/login — CSRF (same-origin check before anythi
     const res = await api(LOGIN, {
       body: good(user),
       origin: null,
-      headers: { referer: "http://localhost:3100/login" },
+      headers: { referer: `${HTTP_URL}/login` },
     });
     expect(res.status).toBe(200);
   });
@@ -241,7 +241,7 @@ test.describe("POST /api/v1/auth/login — CSRF (same-origin check before anythi
 
   test("the same-origin Origin is accepted", async () => {
     const user = await createUser();
-    expect((await api(LOGIN, { body: good(user), origin: "http://localhost:3100" })).status).toBe(200);
+    expect((await api(LOGIN, { body: good(user), origin: HTTP_URL })).status).toBe(200);
   });
 });
 

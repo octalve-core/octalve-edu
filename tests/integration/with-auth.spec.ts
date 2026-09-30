@@ -1,14 +1,14 @@
-import "../support/env";
+import { HTTP_PORT, HTTP_URL } from "../support/env";
 import { NextRequest, NextResponse } from "next/server";
 import { test, expect } from "@playwright/test";
 import { withAuth } from "@/lib/auth/with-auth";
 import { SESSION_COOKIE_NAME, createSession } from "@/lib/auth/session";
 import { createUser } from "../support/db";
 
-const APP = "http://localhost:3100";
+const APP = HTTP_URL;
 
 function request(opts: { method?: string; origin?: string | null; token?: string } = {}) {
-  const headers: Record<string, string> = { "x-forwarded-host": "localhost:3100" };
+  const headers: Record<string, string> = { "x-forwarded-host": `localhost:${HTTP_PORT}` };
   if (opts.origin !== null && opts.origin !== undefined) headers.origin = opts.origin;
   if (opts.token) headers.cookie = `${SESSION_COOKIE_NAME}=${opts.token}`;
   return new NextRequest(`${APP}/api/v1/thing`, { method: opts.method ?? "GET", headers });

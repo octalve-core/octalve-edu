@@ -82,6 +82,9 @@ one-off pattern sources, referenced once for a specific technique and then done:
 6. **`docs/development-history/phases/*.md`** — one completion record per finished phase.
 7. **`docs/auth-review-2026-09-29.md`** — before touching anything auth-related. Contains the
    adjudicated findings from a two-AI security cross-review; several plan sections cite it directly.
+   Then **`docs/auth-review-2026-09-30-verification.md`** — what happened when the design was built and
+   executed: the status of each finding (P0 #4, the `__Host-` cookie, is closed — verified in real
+   Chromium over TLS) and the six new classes of defect the running suite found.
 
 ## Files that change constantly — update these every session that changes anything real
 

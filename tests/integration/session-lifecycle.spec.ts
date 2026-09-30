@@ -1,4 +1,4 @@
-import "../support/env";
+import { HTTP_URL } from "../support/env";
 import { NextRequest, NextResponse } from "next/server";
 import { test, expect } from "@playwright/test";
 import {
@@ -24,7 +24,7 @@ const within = (actual: Date, expectedMs: number, toleranceMs = 60_000) =>
   Math.abs(actual.getTime() - expectedMs) <= toleranceMs;
 
 const requestWith = (token?: string) =>
-  new NextRequest("http://localhost:3100/anything", {
+  new NextRequest(`${HTTP_URL}/anything`, {
     headers: token ? { cookie: `${SESSION_COOKIE_NAME}=${token}` } : {},
   });
 const resolve = (token?: string) => getSessionFromRequest(requestWith(token));

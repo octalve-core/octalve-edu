@@ -8,7 +8,9 @@ this folder.
 
 Design of record: `docs/development-history/domain-implementation-plan.md` §0.5.1 — in particular
 "Build design for the port" and its "Decisions made during implementation" (#1–#15). Security review
-this traces to: `docs/auth-review-2026-09-29.md`. Reference implementation ported from: AlEemaan
+this traces to: `docs/auth-review-2026-09-29.md`; the status of each of its findings after the build,
+plus the new defect classes this phase found, is consolidated in
+`docs/auth-review-2026-09-30-verification.md`. Reference implementation ported from: AlEemaan
 (`docs/development-history/phases/phase-0.5.1.5-auth-rebuild.md` in that repo). Test guide:
 `tests/README.md`.
 
@@ -100,22 +102,25 @@ Playwright, Chromium 141, Node 22, Postgres 16, one worker, no retries.
 | `unit` | rate limiter, password hashing/limits, `withAuth` refusals | 24 | pass |
 | `integration` | session lifecycle and `withAuth` against Postgres | 36 | pass |
 | `api` | login, logout, `me`, setup, all rate-limit layers, timing parity, CSRF, cookies, security headers — real HTTP against `next start` | 86 | pass |
-| `e2e-desktop` | real Chromium, 1280×720: sign-in flows, setup → sign-in → dashboard, axe WCAG 2.2 A/AA on every screen and state | 40 | pass |
-| `e2e-mobile` | the same on a Pixel 7 profile, plus ≥ 44 px tap targets and no horizontal scroll | 38 (+2 desktop-only keyboard tests skipped by design) | pass |
+| `e2e-desktop` | real Chromium, 1280×720: sign-in flows, setup → sign-in → dashboard, axe WCAG 2.2 A/AA on every screen and state | 41 | pass |
+| `e2e-mobile` | the same on a Pixel 7 profile, plus ≥ 44 px tap targets and no horizontal scroll | 39 (+2 desktop-only keyboard tests skipped by design) | pass |
 | `https` | real Chromium over real TLS: `__Host-` cookie set on login and removed on logout | 7 | pass |
-| **Total** | | **232 passed, 2 skipped, 0 failed** — 3.8 min | |
+| **Total** | | **234 passed, 2 skipped, 0 failed** — 3.7 min | |
 
 Static checks on the same tree: `tsc --noEmit` clean (including the compile-time `@ts-expect-error`
 checks on `withAuth`'s options), ESLint 0 errors / 0 warnings, `next build` clean.
 
-Two runs were needed: the first full run went 230/232 because two *new* tests (the synthetic
-`pageshow` ones) raced hydration — a test bug, not an application bug; fixed with a retrying assertion
-and re-verified, including that the corrected tests still fail when their target code is removed.
+Two runs were needed: the first full run went 230 of 232 because two *new* tests (the synthetic
+`pageshow` ones) raced hydration — a test bug, not an application bug; fixed with a retrying assertion,
+re-verified (including that the corrected tests still fail when their target code is removed), and the
+full suite then passed 232/232. The AlEemaan sync pass later added one setup-form `method=post`
+assertion per browser project (now 234) and replaced literal ports in the specs with the constants in
+`tests/support/env.ts`; the numbers above are from the final full run.
 
 ### Mutation testing — the tests were shown to be able to fail
 
 For each row a deliberate bug was injected, the named suite ran, and the file was restored. Every
-mutation was caught (39 of 39).
+mutation was caught (40 of 40).
 
 | Layer | Bug injected | Caught by |
 | :-- | :-- | :-- |
@@ -154,14 +159,22 @@ mutation was caught (39 of 39).
 | e2e | cross-tab broadcast removed | cross-tab tests |
 | e2e | `pageshow` revalidation removed | bfcache test |
 | e2e | setup wizard grows a timed redirect | timing test (WCAG 2.2.1) |
+| e2e | setup form back to a native `GET` (added in the sync pass) | the `method=post` assertion |
 
-## Cross-repo: what AlEemaan must adopt
+## Cross-repo: AlEemaan
 
-Tracked in the plan doc's "Built beyond AlEemaan" list and decisions #1–#3, #12–#14, plus the naming
-table (`requireAdmin()` → `withAuth()`, file layout). Newly found in this pass and **not yet in
-AlEemaan**: the 72-byte password policy at set paths (login stays at 128 — it has live accounts),
-`no-store` on the guard's own refusals, baseline security headers, `method="post"` on any form that
-carries a password, and the test suite itself.
+Everything this phase built or found that applies to AlEemaan has been ported there, on branch
+`claude/octalve-auth-sync` of `roji-tech/AlEemaan` (its `phases/phase-0.5.1.6-octalve-sync.md`; design in
+its plan §0.5.1.6, written first): two-level session expiry, DB-enforced lowercase emails (a migration
+verified on legacy-shaped live data), limiter parity, the 72-byte password policy at set paths (login
+stays at 128 — it has live accounts), `no-store` on the guard's own refusals, baseline security
+headers, `method="post"` on password forms, `withAuth()` replacing `requireAdmin()`, the sign-in
+screens it lacked, and this test suite (own ports and database) with its `Branch`-specific additions.
+The ported suite is green and was itself mutation-checked, including the sync→async hazard (the
+limiter functions are `async` here; an un-`await`ed `!reserveAttempt()` is `!Promise` and would silently
+disable a limit). **Kept different on purpose:** tenancy (RLS, tenant resolution — this repo only),
+`withAuth`'s `roles` (real in AlEemaan, refused here until §0.5.2), the `FORBIDDEN` code, the cookie
+prefix, the wizard's fields, and the Redis-backed limiter (this repo's multi-instance SaaS mode only).
 
 ## Explicitly not done in this phase
 TOTP MFA and the pending-MFA token (must land before Phase 1's Settings UI); password reset;
