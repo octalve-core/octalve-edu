@@ -128,20 +128,32 @@ one-off pattern sources, referenced once for a specific technique and then done:
    doc exist so a decision never has to be re-derived or re-justified from scratch.
 6. **Multi-file Prisma schema** (`prisma/schema/*.prisma`, `prisma.config.ts` points the CLI at the
    folder) — add new files per domain area, don't grow one file indefinitely.
+7. **Tests ship with the change, and a security test must be seen to fail.** Every security-relevant
+   assertion in `tests/` was mutation-checked: inject the bug it claims to catch, confirm the suite goes
+   red, restore. Do the same for any new one — a test that has never failed has not been shown to test
+   anything. Drive UI changes in a real browser and read the screenshots; the verification pass for 0.5.1
+   found ten defects (lost keyboard focus, a password leaking into the URL on a no-JS submit, bcrypt's
+   silent 72-byte truncation, low contrast, …) that reading the code had not.
 
 ## Current state, as of 2026-09-30 (verify against `octalve_edu_progress.md` — it may have moved since)
 
 - Phase 0 (scaffold) and Phase 0.5.0 (setup wizard, Solo-only) are done and verified live.
-- **Phase 0.5.1 (auth) is IN PROGRESS** on branch `claude/auth-0.5.1-port` of the maintainer's fork
-  `roji-tech/octalve-edu-fork` (the Claude GitHub App isn't installed on `octalve-core`, so it reaches
-  `master` by the maintainer's PR — `master` itself still has no auth code). The design went through a
-  full two-AI security review (`docs/auth-review-2026-09-29.md`) and a second hardening pass, and is
-  being built by porting **AlEemaan's already-verified implementation** (a spike into adopting Better
-  Auth instead was run and rejected — see "Known open items," resolved, below), with the deliberate
-  divergences recorded in the plan doc's §0.5.1 "Build design for the port". **Read
-  `docs/development-history/phases/phase-0.5.1-auth.md` first** — it is the live work log and says exactly
-  what is written, what is verified, and what isn't. Shared file/function names with AlEemaan are
-  intentional (table in the plan doc); keep them in sync.
+- **Phase 0.5.1 (auth) is BUILT AND VERIFIED, awaiting the maintainer's merge**: it lives on branch
+  `claude/auth-0.5.1-port` of the maintainer's fork `roji-tech/octalve-edu-fork` (the Claude GitHub App
+  isn't installed on `octalve-core`, so it reaches `master` by the maintainer's PR — `master` itself has
+  no auth code until then). The design went through a full two-AI security review
+  (`docs/auth-review-2026-09-29.md`) and a second hardening pass, and was built by porting
+  **AlEemaan's already-verified implementation** (a spike into adopting Better Auth instead was run and
+  rejected — see "Known open items," resolved, below), with the deliberate divergences recorded in the
+  plan doc's §0.5.1 "Build design for the port". **Read `docs/development-history/phases/phase-0.5.1-auth.md`
+  first** — it is the work log, the list of defects the verification found, and the mutation-testing
+  record. Shared file/function names with AlEemaan are intentional (table in the plan doc); keep them in
+  sync.
+- **There is a real test suite: `pnpm test`** (build + Playwright: unit, integration, API, browser at
+  desktop and phone sizes, axe accessibility, and a real-HTTPS cookie run). Read `tests/README.md`
+  before changing anything under `src/lib/auth`, `src/app/api/v1/auth`, `/login`, `/dashboard` or
+  `/setup`, and run it before opening a PR. It needs a Postgres (`docker compose up -d db`), Chromium
+  (`pnpm exec playwright install chromium`) and `openssl`.
 - Phase 0.5.2 (tenant-trust boundary) and 0.5.3 (shared API infra) are designed, not built, and both
   depend on 0.5.1 landing first.
 - Phase 1 onward (Core SIS + Finance, Communication, LMS, Operations, Expansion) have schema sketches

@@ -33,7 +33,7 @@ export function SignOutButton() {
           {error}
         </span>
       )}
-      <Button variant="secondary" className="px-3.5 py-2" loading={pending} onClick={signOut}>
+      <Button variant="secondary" loading={pending} onClick={signOut}>
         {!pending && <LogOutIcon className="h-4 w-4" />}
         Sign out
       </Button>

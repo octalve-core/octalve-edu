@@ -68,7 +68,7 @@ export default async function DashboardPage() {
                       {ROLE_LABELS[m.role]}
                       {m.campusName ? ` · ${m.campusName}` : ""}
                     </p>
-                    <p className="mt-2 font-mono text-xs text-slate-500">{m.tenantCode}</p>
+                    <p className="mt-2 font-mono text-xs text-slate-400">{m.tenantCode}</p>
                   </div>
                 </li>
               ))}

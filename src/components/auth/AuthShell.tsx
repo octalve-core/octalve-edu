@@ -10,7 +10,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-slate-950 text-slate-200 lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
       <aside
         aria-hidden="true"
-        className="relative hidden overflow-hidden border-r border-slate-800/80 bg-slate-900 lg:flex lg:flex-col lg:justify-between lg:p-12"
+        className="relative hidden overflow-hidden border-r border-slate-800/80 bg-slate-900 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:justify-between lg:self-start lg:p-12"
       >
         <div
           className="pointer-events-none absolute inset-0"

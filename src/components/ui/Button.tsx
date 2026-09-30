@@ -5,7 +5,9 @@ type Variant = "primary" | "secondary" | "ghost";
 
 const VARIANTS: Record<Variant, string> = {
   primary:
-    "bg-blue-600 text-white shadow-lg shadow-blue-950/40 hover:bg-blue-500 active:bg-blue-600 disabled:bg-slate-800 disabled:text-slate-500 disabled:shadow-none",
+    // White text must stay >= 4.5:1 in EVERY state (axe caught blue-500 on hover at 3.76:1),
+    // so the hover/active states darken instead of lightening.
+    "bg-blue-600 text-white shadow-lg shadow-blue-950/40 hover:bg-blue-700 active:bg-blue-800 disabled:bg-slate-800 disabled:text-slate-500 disabled:shadow-none",
   secondary:
     "border border-slate-700 bg-slate-900 text-slate-100 hover:border-slate-600 hover:bg-slate-800 disabled:text-slate-500",
   ghost: "text-slate-300 hover:bg-slate-800/70 hover:text-white disabled:text-slate-600",

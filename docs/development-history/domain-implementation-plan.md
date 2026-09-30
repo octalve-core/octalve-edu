@@ -158,12 +158,14 @@ one repo maps 1:1 onto the other:
 | Concern | Name (both repos) |
 | :--- | :--- |
 | Session helpers | `lib/auth/session.ts` — `createSession`, `getSession`, `getSessionFromRequest`, `deleteSessionByToken`, `revokeUserSessions`, `setSessionCookie`, `clearSessionCookie`, `SESSION_COOKIE_NAME` |
-| Passwords | `lib/auth/password.ts` — `hashPassword`, `verifyPassword`, `BCRYPT_COST` |
-| Rate limiting | `lib/auth/rate-limit.ts` — `reserveAttempt`, `refundAttempt`, `checkRateLimit`, `getClientIp` |
-| Route guard | `lib/auth/with-auth.ts` — `withAuth(handler, options)` (replaces AlEemaan's `requireAdmin()`; AlEemaan migrates too — see its own plan) |
-| CSRF / envelope / db | `lib/auth/csrf.ts`, `lib/api/envelope.ts`, `lib/db.ts` (already identical) |
-| Routes | `POST /api/v1/auth/login`, `POST /api/v1/auth/logout` |
-| Error codes | `INVALID_CREDENTIALS`, `RATE_LIMITED`, `CSRF`, `INVALID_BODY` |
+| Passwords | `lib/auth/password.ts` — `hashPassword`, `verifyPassword`, `BCRYPT_COST`; `lib/auth/password-policy.ts` — `PASSWORD_MAX_LENGTH` (128, login input bound), `PASSWORD_MAX_BYTES` (72, every set path), `passwordByteLength` |
+| Rate limiting | `lib/auth/rate-limit.ts` — `reserveAttempt`, `refundAttempt`, `checkRateLimit`, `getClientIp` (all `async`) |
+| Route guard | `lib/auth/with-auth.ts` — `withAuth(handler, options)` (replaces AlEemaan's `requireAdmin()`; AlEemaan migrates too — see its own plan, §0.5.1.6) |
+| CSRF / envelope / db | `lib/auth/csrf.ts`, `lib/api/envelope.ts` (`ok`, `fail`, `noStore`), `lib/db.ts` |
+| Routes | `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me` |
+| Error codes | `INVALID_CREDENTIALS`, `RATE_LIMITED`, `CSRF`, `INVALID_BODY`, `UNAUTHENTICATED` (AlEemaan adds `FORBIDDEN`) |
+| Screens | `/login`, `/dashboard`, `/` (pure router), `/setup`; `components/ui/*`, `components/auth/*` |
+| Tests | `tests/{setup,unit,integration,api,e2e,https}`, `playwright.config.ts`, `pnpm test` — same layout and helpers in both repos (own ports and own `*_test` database each) |
 
 Deliberately **not** synced (different concepts, not naming drift): the models `Campus`/`Branch` and
 `TenantMembership`/`Membership` (this repo has a `Tenant` above `Campus`; AlEemaan has no tenant and
@@ -247,12 +249,52 @@ AlEemaan's shipped code and are tracked for back-porting (cross-repo sync task):
    notice them itself: **cross-tab sign-out** (BroadcastChannel) and **`pageshow` revalidation** so the
    browser's back/forward cache can't resurrect a signed-out user's dashboard on a shared computer.
    New modules: `lib/setup/status.ts`, `lib/auth/memberships.ts`, `lib/roles.ts`.
+    Found by driving the real flow in a browser (not by review): after a rejected sign-in the password
+    input was still `disabled` when `focus()` was called, so focus silently fell to `<body>` — keyboard
+    and screen-reader users lost their place. Focus now returns to the (emptied) password field after
+    render; covered by a regression test.
 10. **The migration was authored with `prisma migrate diff` + hand-written SQL**, not `migrate dev`:
     `migrate dev` refuses to run non-interactively when it must confirm a destructive column drop
     (`Session.sessionToken`). Recorded so the next migration author doesn't lose time to it.
 11. **Where the work lives:** `octalve-core/octalve-edu` has no Claude GitHub App installed, so this
     phase is developed on `claude/auth-0.5.1-port` in the maintainer's fork
     (`roji-tech/octalve-edu-fork`) and merged by PR into `octalve-core/octalve-edu` by the maintainer.
+
+12. **Password limits corrected: 72 bytes at every *set* path, 128 characters at *login*.** The design
+    above (and AlEemaan's shipped code) capped passwords at 128 *characters* with the stated reason that
+    "bcrypt silently truncates at 72 bytes" — but a 128-character cap does not address truncation at all:
+    verified empirically (bcryptjs 3) that a 72-byte prefix plus anything else verifies as the same
+    password, so a 100-character passphrase is really protected by its first 72 bytes and a typo after
+    byte 72 still signs the user in. (Bytes, not characters: 25 emoji is 100 bytes.) Fix, in
+    `lib/auth/password-policy.ts` (client-safe, no Node imports): `PASSWORD_MAX_BYTES = 72` is *rejected*,
+    never truncated, wherever a password is set (setup wizard now; signup / change / reset later), with a
+    message the user can act on and live feedback in the setup form; `hashPassword()` throws as a backstop.
+    `PASSWORD_MAX_LENGTH = 128` remains, but only as the input-size bound for login — login must keep
+    accepting whatever an existing account's password was set to (bcrypt truncates identically at verify
+    time), so tightening it could lock out a real user. **Tracked for back-porting to AlEemaan** (it has
+    live accounts, so its login must stay at 128 while its set paths adopt the byte limit).
+13. **`withAuth`'s own refusals (401 `UNAUTHENTICATED`, 403 `CSRF`) are `no-store` too** — found by the
+    API suite: the first version only marked the handler's success response, so the guard's early
+    returns carried no `Cache-Control`. Every response the wrapper emits is now uncacheable.
+14. **Baseline security headers** (`next.config.ts`, all routes): `X-Frame-Options: DENY` plus
+    `Content-Security-Policy: frame-ancestors 'none'` (clickjacking — the login form was frameable),
+    `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` (tenant
+    codes and record IDs live in paths; cross-origin referrers get the origin only), and
+    `poweredByHeader: false`. **HSTS is deliberately *not* set by the app**: TLS terminates at the
+    reverse proxy, `headers()` in `next.config.ts` is fixed at build time while the scheme is a runtime
+    setting (`APP_URL`), and the header is meaningless over HTTP — so it belongs in the proxy config
+    (add `Strict-Transport-Security "max-age=15552000"` to the Solo installer's Caddyfile; no
+    `includeSubDomains`/`preload` — a school's other subdomains may not be HTTPS-ready). A full
+    nonce-based script CSP is a separate, larger piece of work tracked under §0.5.3.
+15. **Test infrastructure is part of the deliverable** (`tests/`, `playwright.config.ts`, `pnpm test`):
+    Playwright Test as the single runner — `unit` (pure logic), `integration` (modules against Postgres),
+    `api` (real HTTP against a production build), `e2e-desktop`/`e2e-mobile` (real Chromium), `https`
+    (real Chromium over real TLS via a local proxy, so the `__Host-` rules are enforced). Runs against a
+    dedicated `<db>_test` database (created and migrated with `migrate deploy` automatically; every
+    destructive helper refuses to run against any database whose name doesn't end in `_test`). Each test
+    creates its own users and its own client IP (the servers trust `X-Real-IP`, exactly as in
+    production) so tests can't exhaust each other's rate-limit buckets. Every security-relevant assertion
+    was mutation-checked (a deliberate bug is injected and the suite must fail) — see the phase record.
 
 **Explicitly out of scope for this pass, tracked, not forgotten:** TOTP MFA and its pending-state
 token (design above stands; must land **before Phase 1's Settings UI**, which needs step-up MFA and
@@ -298,6 +340,9 @@ already exists, `lib/auth/csrf.ts`, built for the setup wizard) → rate limit (
 - **Password max length: 128 characters, enforced in the Zod schema at both login and account
   creation.** bcrypt silently truncates at 72 bytes — without a cap, a long passphrase loses
   entropy with no warning, and nothing stops an oversized payload from being submitted.
+  **Corrected 2026-09-30 (see "Decisions made during implementation" #12):** a 128-character cap
+  bounds the payload but does *not* stop bcrypt's silent truncation. New passwords are limited to 72
+  *bytes* and rejected past that; 128 remains only as login's input-size bound.
 - **Fresh, server-generated, high-entropy session token on every login, never client-supplied**
   (`crypto.randomBytes(32).toString("hex")`, 256 bits) — the actual defense against session
   fixation. Stated explicitly so a future change can't "simplify" it into accepting or reusing a

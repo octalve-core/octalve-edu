@@ -21,7 +21,7 @@
 
 const WINDOW_MS = 5 * 60 * 1000;
 export const DEFAULT_MAX_ATTEMPTS = 5;
-const MAX_TRACKED_IDENTIFIERS = 10_000; // hard cap — see sweep()
+export const MAX_TRACKED_IDENTIFIERS = 10_000; // hard cap — see sweep()
 
 const attempts = new Map<string, number[]>();
 

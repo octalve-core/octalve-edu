@@ -29,15 +29,32 @@ export function LoginForm() {
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
 
+  // One tick per second while paused. State is only ever set from the timer
+  // callback (never synchronously in the effect body), and the last tick is
+  // what returns the form to "idle".
   useEffect(() => {
     if (status !== "paused") return;
-    if (secondsLeft <= 0) {
-      setStatus("idle");
-      return;
-    }
-    const timer = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
+    const timer = setTimeout(() => {
+      if (secondsLeft <= 1) {
+        setSecondsLeft(0);
+        setStatus("idle");
+      } else {
+        setSecondsLeft(secondsLeft - 1);
+      }
+    }, 1000);
     return () => clearTimeout(timer);
   }, [status, secondsLeft]);
+
+  // After a rejected attempt, put the caret back in the (now emptied) password
+  // field so keyboard and screen-reader users don't land on <body>. This has to
+  // run after render: the inputs are `disabled` while submitting, and a
+  // disabled input can't take focus, so calling focus() inside the submit
+  // handler (before React re-enables it) silently does nothing.
+  useEffect(() => {
+    if (status === "paused" || (status === "idle" && formError)) {
+      passwordRef.current?.focus();
+    }
+  }, [status, formError]);
 
   const busy = status === "submitting" || status === "success";
 
@@ -90,7 +107,6 @@ export function LoginForm() {
         setFormError(
           "The email or password you entered is incorrect. Check your details and try again.",
         );
-        passwordRef.current?.focus();
         return;
       }
       setFormError("We couldn't sign you in right now. Please try again in a moment.");
@@ -124,7 +140,10 @@ export function LoginForm() {
         )}
       </div>
 
-      <form onSubmit={handleSubmit} noValidate className="mt-6 space-y-5">
+      {/* method="post": if the form is ever submitted natively (JavaScript failed to load, or the
+          user hits Enter before hydration finishes) a default GET would put the password in the
+          URL — browser history, proxy and server access logs. POST keeps it in the body. */}
+      <form method="post" onSubmit={handleSubmit} noValidate className="mt-6 space-y-5">
         <TextField
           ref={emailRef}
           label="Email address"
@@ -177,7 +196,7 @@ export function LoginForm() {
         </Button>
       </form>
 
-      <p className="mt-6 text-center text-xs leading-relaxed text-slate-500">
+      <p className="mt-6 text-center text-xs leading-relaxed text-slate-400">
         Trouble signing in? Contact your school administrator.
       </p>
     </div>

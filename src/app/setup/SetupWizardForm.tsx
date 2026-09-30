@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { PasswordField } from "@/components/ui/PasswordField";
 import { TextField } from "@/components/ui/TextField";
 import { CheckCircleIcon } from "@/components/ui/icons";
+import { PASSWORD_MAX_BYTES, passwordByteLength } from "@/lib/auth/password-policy";
 
 interface SetupWizardFormProps {
   requiresToken: boolean;
@@ -35,6 +36,10 @@ export function SetupWizardForm({ requiresToken, insecureBaseUrl }: SetupWizardF
   const hasLetter = /[a-zA-Z]/.test(password);
   const hasNumber = /\d/.test(password);
   const passwordsMatch = password.length > 0 && password === confirmPassword;
+  // bcrypt ignores everything after byte 72, so the server refuses longer
+  // passwords rather than truncating. Say so as they type, in bytes-aware terms
+  // (emoji / non-Latin letters take 2-4 bytes each).
+  const tooLong = passwordByteLength(password) > PASSWORD_MAX_BYTES;
   const canSubmit =
     schoolName.trim().length > 0 &&
     name.trim().length > 0 &&
@@ -42,6 +47,7 @@ export function SetupWizardForm({ requiresToken, insecureBaseUrl }: SetupWizardF
     hasMinLength &&
     hasLetter &&
     hasNumber &&
+    !tooLong &&
     passwordsMatch &&
     (!requiresToken || setupToken.trim().length > 0);
 
@@ -128,8 +134,8 @@ export function SetupWizardForm({ requiresToken, insecureBaseUrl }: SetupWizardF
             <Alert variant="warning" title="This instance isn't served over HTTPS">
               Sign-in will work on a trusted local network, but sessions aren&apos;t protected in
               transit. Put this behind HTTPS (and set <code className="font-mono">APP_URL</code> to
-              an <code className="font-mono">https://</code> address) before exposing it to the
-              internet.
+              your <strong className="font-semibold">https</strong> address) before exposing it to
+              the internet.
             </Alert>
           )}
           {errorMessage && (
@@ -139,7 +145,8 @@ export function SetupWizardForm({ requiresToken, insecureBaseUrl }: SetupWizardF
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+        {/* method="post": a native submit (no JS / before hydration) must never put the password in the URL. */}
+        <form method="post" onSubmit={handleSubmit} className="mt-6 space-y-5">
           <TextField
             label="School name"
             name="schoolName"
@@ -203,6 +210,11 @@ export function SetupWizardForm({ requiresToken, insecureBaseUrl }: SetupWizardF
               placeholder="Min. 8 characters"
               autoComplete="new-password"
               maxLength={128}
+              error={
+                tooLong
+                  ? `Too long — at most ${PASSWORD_MAX_BYTES} bytes (about ${PASSWORD_MAX_BYTES} characters; fewer with emoji or non-Latin letters).`
+                  : null
+              }
               disabled={isSubmitting}
               required
             />
@@ -211,7 +223,7 @@ export function SetupWizardForm({ requiresToken, insecureBaseUrl }: SetupWizardF
               name="confirmPassword"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Re-enter password"
+              placeholder="Repeat password"
               autoComplete="new-password"
               maxLength={128}
               error={confirmPassword.length > 0 && !passwordsMatch ? "Passwords don't match." : null}
@@ -229,7 +241,7 @@ export function SetupWizardForm({ requiresToken, insecureBaseUrl }: SetupWizardF
               { met: hasLetter && hasNumber, text: "Contains both letters and numbers" },
               { met: passwordsMatch, text: "Passwords match" },
             ].map(({ met, text }) => (
-              <li key={text} className={met ? "text-emerald-400" : "text-slate-500"}>
+              <li key={text} className={met ? "text-emerald-400" : "text-slate-400"}>
                 <span aria-hidden="true">{met ? "✓" : "○"}</span> {text}
                 <span className="sr-only">{met ? " — met" : " — not met yet"}</span>
               </li>

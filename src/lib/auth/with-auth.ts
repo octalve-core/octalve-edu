@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { fail } from "@/lib/api/envelope";
+import { fail, noStore } from "@/lib/api/envelope";
 import { validateCSRF } from "@/lib/auth/csrf";
 import { getSessionFromRequest, type ResolvedSession } from "@/lib/auth/session";
 
@@ -41,13 +41,15 @@ export function withAuth<C = unknown>(
     // CSRF is enforced HERE for every state-changing method, not left as a
     // per-route opt-in call — one forgotten validateCSRF() in one route is a
     // real gap, and every school shares one origin.
+    // The refusals are uncacheable too: every response this wrapper emits is,
+    // not only the handler's success path.
     if (!SAFE_METHODS.has(req.method) && !validateCSRF(req)) {
-      return fail("Cross-origin request blocked", 403, "CSRF");
+      return noStore(fail("Cross-origin request blocked", 403, "CSRF"));
     }
 
     const session = await getSessionFromRequest(req);
     if (!session) {
-      return fail("Authentication required", 401, "UNAUTHENTICATED");
+      return noStore(fail("Authentication required", 401, "UNAUTHENTICATED"));
     }
 
     const response = await handler(req, session, routeContext);

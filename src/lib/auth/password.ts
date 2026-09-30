@@ -1,13 +1,12 @@
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
+import { PASSWORD_MAX_BYTES, passwordByteLength } from "@/lib/auth/password-policy";
+
+// The size limits live in password-policy.ts (client-safe); re-exported so
+// server code keeps a single import for "everything about passwords".
+export { PASSWORD_MAX_LENGTH, PASSWORD_MAX_BYTES } from "@/lib/auth/password-policy";
 
 export const BCRYPT_COST = 12;
-
-/// bcrypt silently truncates its input at 72 BYTES, so a longer passphrase
-/// loses entropy with no warning, and an unbounded field is an oversized-
-/// payload DoS surface. One shared cap, imported by every Zod schema that
-/// accepts a password (login, setup wizard, and future signup/reset).
-export const PASSWORD_MAX_LENGTH = 128;
 
 // A real bcrypt hash of an unguessed, never-used value, generated once at
 // module load (boot) at the real production cost factor. It makes every
@@ -19,7 +18,15 @@ export const PASSWORD_MAX_LENGTH = 128;
 // this is a genuine hash, never a hardcoded string.
 const DUMMY_HASH = bcrypt.hashSync(randomUUID(), BCRYPT_COST);
 
+/// Callers validate first (Zod schemas turn an over-long password into a normal
+/// 400 the user can act on); this is the backstop that guarantees no code path
+/// can ever store a hash of a silently-truncated password.
 export function hashPassword(password: string): Promise<string> {
+  if (passwordByteLength(password) > PASSWORD_MAX_BYTES) {
+    return Promise.reject(
+      new RangeError(`Password exceeds ${PASSWORD_MAX_BYTES} bytes; bcrypt would silently truncate it.`),
+    );
+  }
   return bcrypt.hash(password, BCRYPT_COST);
 }
 

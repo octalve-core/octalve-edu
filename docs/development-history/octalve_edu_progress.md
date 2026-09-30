@@ -29,17 +29,18 @@ against the real repo, not what a plan says should exist.
   superadmin setup wizard, Solo only) is **done and verified live** — see
   `docs/development-history/phases/phase-0.5.0-setup-wizard.md`. §0.5.1 (auth) went through a full
   two-AI security review, a hardening pass, and a Better-Auth-vs-hand-roll spike (resolved: hand-roll,
-  adapting AlEemaan's already-built implementation), and **as of 2026-09-30 is being built** (branch
-  `claude/auth-0.5.1-port`, maintainer's fork — see "Auth build in progress" below and the live work
-  log in `docs/development-history/phases/phase-0.5.1-auth.md`): schema migration applied, session/
-  password/rate-limit/`withAuth` modules, login/logout/`me` routes and the `/login`, `/dashboard`,
-  `/setup` UI are written, type-check and production build clean, and an end-to-end API smoke test
-  passes against a real Postgres — **the automated verification suites (unit, API, browser, real-HTTPS
-  cookie test) are not finished, so §0.5.1 is not yet "done"**. §0.5.2 (tenant-trust boundary: `resolve-tenant.ts` + `forTenant()`
-  + explicit RLS role setup) and §0.5.3 (shared API pagination/rate-limiting helpers beyond the
-  response envelope) are designed, not built, both depending on §0.5.1 landing first. Nothing in
-  Phase 1 should start before this phase's own verification gate (negative-test suite for
-  cross-tenant/IDOR access, run as the `app_user` role) passes in CI.
+  adapting AlEemaan's already-built implementation), and **as of 2026-09-30 is built and verified**
+  (branch `claude/auth-0.5.1-port` on the maintainer's fork, awaiting the maintainer's PR/merge into
+  `octalve-core/octalve-edu` — see "Auth build" below and the work log in
+  `docs/development-history/phases/phase-0.5.1-auth.md`): hashed-token database sessions, constant-time
+  login, layered rate limiting, `withAuth`, `/login` + `/dashboard` + a retrofitted `/setup`, and a
+  repeatable Playwright suite (`pnpm test`: unit, integration, API, browser at desktop + phone sizes,
+  axe accessibility, and a real-HTTPS run that proves the `__Host-` cookie is set *and cleared*). §0.5.2
+  (tenant-trust boundary: `resolve-tenant.ts` + `forTenant()` + explicit RLS role setup) and §0.5.3
+  (shared API pagination/rate-limiting helpers beyond the response envelope) are designed, not built,
+  both depending on §0.5.1 landing first. Nothing in Phase 1 should start before this phase's own
+  verification gate (negative-test suite for cross-tenant/IDOR access, run as the `app_user` role)
+  passes in CI.
 - **Phase 1 — MVP: Core SIS + Finance**: **0% — not started.** Full schema designed
   (`sis.prisma`/`finance.prisma` in the plan doc, with every model's reasoning traced to a PRD
   section or a specific security-audit finding) but no migration written, no API routes, no UI.
@@ -68,10 +69,16 @@ update:
   inside a markdown file, not validated against a real database.
 - **No RLS policy exists yet**, including on the Phase 0 tables (`Campus`, `TenantMembership`)
   that already exist — Phase 0's own completion doc says this explicitly, so it doesn't get lost.
-- **Authentication now works end-to-end on the in-progress branch (not yet merged/verified to the
-  phase's bar):** sign-in, session, `GET /api/v1/auth/me`, sign-out and stale-cookie rejection were
-  exercised live with curl on 2026-09-30. On `master` (what `octalve-core/octalve-edu` shows today)
-  it still does not exist. Auth.js is not used anywhere and is not a dependency.
+- **Authentication works end-to-end and is verified — on the in-progress branch, not yet on
+  `master`:** sign-in, session, `GET /api/v1/auth/me`, sign-out, stale/expired/revoked-session
+  rejection, layered rate limiting, `withAuth`, and the `/login`, `/dashboard`, `/setup` screens are
+  covered by an automated suite (see "Auth build" below). On `master` (what `octalve-core/octalve-edu`
+  shows today) none of it exists until the maintainer merges the PR. Auth.js is not used anywhere and is
+  not a dependency.
+- **A real test suite exists** (`tests/`, `playwright.config.ts`, `pnpm test`) — on the same branch.
+  Before it, the only verification in the repo was hand-run curl against a dev server.
+- **Still unbuilt and undesigned-in-code:** TOTP MFA, password reset, the tenant-trust boundary and every
+  RLS policy, the shared API helpers (§0.5.3), and all of Phase 1+.
 
 ## Recent changes (2026-09-28)
 
@@ -145,30 +152,34 @@ updated with the full reasoning and the explicit "port AlEemaan's code, adapted 
 TenantMembership/Campus" instruction. This closes the last open design question blocking §0.5.1 —
 nothing left to decide before writing code.
 
-## Auth build in progress (2026-09-30)
+## Auth build (2026-09-30) — built and verified, awaiting merge
 
 Full design decisions: `domain-implementation-plan.md` §0.5.1 → "Build design for the port" (including
-"Decisions made during implementation"). Live work log and verification status:
-`docs/development-history/phases/phase-0.5.1-auth.md`. Branch `claude/auth-0.5.1-port` on the
-maintainer's fork `roji-tech/octalve-edu-fork` (the Claude GitHub App is not installed on
-`octalve-core`, so the maintainer merges by PR).
+"Decisions made during implementation", #1–#15). Live work log, defect table and mutation record:
+`docs/development-history/phases/phase-0.5.1-auth.md`. Test guide: `tests/README.md`. Branch
+`claude/auth-0.5.1-port` on the maintainer's fork `roji-tech/octalve-edu-fork` (the Claude GitHub App
+isn't installed on `octalve-core`, so the maintainer merges by PR).
 
-Written and compiling (`tsc` clean, `pnpm build` clean): the schema migration; `lib/auth/{session,
-password,rate-limit,with-auth,memberships}.ts`; `POST /api/v1/auth/{login,logout}` and
-`GET /api/v1/auth/me`; the setup route migrated onto the new helpers; the `/login`, `/dashboard` and
-`/` screens plus the retrofitted `/setup` wizard on shared, accessible UI primitives. Smoke-tested live
-(curl, real Postgres). **Not yet done:** the repeatable test suites and their runs, the real-HTTPS
-cookie test, docs finalization.
+Built: the schema migration; `lib/auth/{session,password,password-policy,rate-limit,with-auth,
+memberships}.ts`; `POST /api/v1/auth/{login,logout}` and `GET /api/v1/auth/me`; the setup route migrated
+onto the new helpers; the `/login`, `/dashboard` and `/` screens plus the retrofitted `/setup` wizard on
+shared, accessible UI primitives; baseline security headers.
+
+Verified (`pnpm test`): 232 tests pass in about four minutes — 24 unit, 36 integration, 86 API, 78 browser (desktop + phone viewports; axe WCAG 2.2 A/AA clean on every screen *and* state), 7 real-HTTPS — plus clean `tsc`, ESLint and `next build`. Ten defects were found by the verification itself —
+among them that bcrypt silently ignores everything past byte 72 (so the design's "128-character cap"
+did not do what it said), that a no-JavaScript submit of the sign-in form put the password in the URL,
+and that focus was lost after a failed sign-in — each fixed and pinned by a regression test. All 39
+deliberately injected bugs (mutation testing) turned the suite red.
 
 ## Next action
 
-**Finish §0.5.1's verification, then close it** — build the repeatable test infrastructure (unit + API
-+ Playwright browser flows + a local TLS proxy so Chromium enforces the real `__Host-` cookie rules on
-login *and logout*), run it, fix what it finds, finalize `phase-0.5.1-auth.md`, and open the PR from
-the fork. Then, in order: back-port the shared-naming and hardening deltas to AlEemaan (its own plan
-doc tracks them); the tenant-trust-boundary resolver and `forTenant()` with its explicit RLS role setup
-(§0.5.2 — needs a real `app_user` Postgres role created first, and `withAuth`'s `roles`/`permissions`
-options arrive here); TOTP MFA (must precede Phase 1's Settings UI); the shared API helpers (§0.5.3, and
-the Redis-backed rate limiter before any multi-instance SaaS deployment). Then that phase's
+**Hand §0.5.1 to the maintainer for review and merge** (PR from `claude/auth-0.5.1-port` on the fork
+into `octalve-core/octalve-edu`; nothing else in this repo depends on it being merged first).
+Meanwhile, in order: back-port the shared-naming and hardening deltas to AlEemaan (its own plan doc
+tracks them — includes the newly found 72-byte password policy and `method="post"` finding); the
+tenant-trust-boundary resolver and `forTenant()` with its explicit RLS role setup (§0.5.2 — needs a
+real `app_user` Postgres role created first, and `withAuth`'s `roles`/`permissions` options arrive
+here); TOTP MFA (must precede Phase 1's Settings UI); the shared API helpers (§0.5.3, and the
+Redis-backed rate limiter before any multi-instance SaaS deployment). Then that phase's
 negative-test verification gate — **run as the `app_user` role, not the migration owner** — before
 Phase 1 begins.
