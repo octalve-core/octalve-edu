@@ -2,6 +2,10 @@
 
 School management platform — Solo (self-hosted) and SaaS (multi-tenant) editions from one codebase.
 
+**AI agent (or human) picking this up cold: read [`CLAUDE.md`](CLAUDE.md) first**, not this file —
+it has the actual reading order, which docs to keep updated, and the relationship to the sibling
+`AlEemaan` project (same stack, single-tenant, shares auth/schema design decisions with this repo).
+
 Full product requirements, architecture decisions, and the security/compliance audit live in the
 canonical PRD (Claude Doc): https://claude.ai/artifact/W9AmZifbHByc9XxNtHCawP — also synced into
 this repo at [`docs/PRD.md`](docs/PRD.md) (the Claude Doc is the source of truth if the two drift).
@@ -13,6 +17,10 @@ The actual build plan lives in [`docs/development-history/`](docs/development-hi
 - [`octalve_edu_progress.md`](docs/development-history/octalve_edu_progress.md) — what's actually
   built and verified right now, checked against the real repo.
 - [`phases/`](docs/development-history/phases/) — one completion record per finished phase.
+
+[`docs/auth-review-2026-09-29.md`](docs/auth-review-2026-09-29.md) — a two-AI security cross-review
+of this project's and AlEemaan's auth designs, adjudicated findings, and the reasoning behind
+§0.5.1–0.5.3's hardening. Read before any auth work.
 
 [`branches-and-environments.md`](docs/branches-and-environments.md) — the `dev`/`main`/`prod`
 convention (Integration/Staging/Production), and how far the repo actually is from having it (not

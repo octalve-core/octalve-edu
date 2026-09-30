@@ -98,35 +98,145 @@ that `proplity` doesn't.
   campuses later via Settings, once that exists); a SaaS-side "platform operator" superadmin concept
   is not built and not requested — this is only ever a single school's first admin.
 
-### 0.5.1 — Auth.js wiring
+### 0.5.1 — Auth (revised 2026-09-30, second pass)
 
-> **Heads-up before this step gets built (2026-09-28):** the two bullets immediately below — a
-> `Credentials` provider *combined with* `session.strategy: "database"` — are not compatible in
-> Auth.js v5. AlEemaan (sibling project, identical stack) hit this live: `UnsupportedStrategy:
-> Signing in with credentials only supported if JWT strategy is enabled`, thrown by Auth.js's own
-> `assertConfig` on every request under `/api/auth/*`, not just sign-in. It's a hard constraint in
-> Auth.js itself. AlEemaan's fix (full record in its own `domain-implementation-plan.md` §0.5.1.1,
-> keeping database sessions since that's the deliberate PRD §7 decision here too): drop the
-> `Credentials` provider entirely (`providers: []`), and hand-roll login/logout as plain API routes
-> that write/delete rows in the same `Session` table Auth.js's `PrismaAdapter` reads, with an
-> explicit `cookies.sessionToken.name` so both sides agree on the cookie. Expect to do the same
-> here rather than wiring the two bullets below as literally written — confirm against the installed
-> `next-auth` version first in case a later release changes this, but don't assume it's fixed.
+**Auth.js's `Credentials` provider is not used at all — this supersedes an earlier draft of this
+section that described wiring it.** Auth.js v5 refuses `Credentials` combined with
+`session.strategy: "database"` outright (`UnsupportedStrategy`, thrown by its own `assertConfig` on
+every request under `/api/auth/*`). AlEemaan (sibling project, identical stack) hit this live and
+kept database sessions — the deliberate PRD §7 decision here too — by dropping `Credentials`
+entirely (`providers: []`) and hand-rolling login/logout against the same `Session` table Auth.js's
+`PrismaAdapter` reads. Same approach here. Auth.js is kept only for its adapter/session-reading
+machinery (the exported `auth()` helper) — a materially smaller role than originally planned, worth
+noting given the section below on whether to keep it at all.
 
-- Credentials provider (email + password) against `User.email`, backed by a `passwordHash` column
-  — the field already exists (`User.passwordHash String?`, added by §0.5.0's migration since the
-  setup wizard needed it first); this step is just wiring Auth.js's credentials provider to read it.
-- **Database session strategy, not JWT** (PRD §7 stack table decision) — Auth.js's Prisma adapter
-  already has the `Session` table from Phase 0; configure `session.strategy = "database"`
-  explicitly, since Auth.js v5 defaults to JWT and this is easy to leave on the wrong default
-  silently.
-- `otplib`-based TOTP for MFA. Retrofit into `User`: `mfaSecret String?` (encrypted at rest —
-  PRD §10), `mfaEnabled Boolean @default(false)`. `SchoolSettings.mfaRequiredForTeaching` (Phase 1)
-  is what makes MFA mandatory for a given role rather than optional; Phase 0.5 only builds the
-  mechanism.
-- Session revocation surface: a "your active devices" page reading `Session` rows for the current
-  user, with a delete action per row (Audit #23's server-revocable-sessions fix) — trivial to build
-  now specifically *because* database sessions were chosen over JWT in Phase 0.
+**Resolved 2026-09-30: hand-roll, mirroring AlEemaan — do not adopt Better Auth.** A research spike
+(prompted by the fact below) checked Better Auth against this plan's actual non-negotiable
+requirements. Verdict, point by point: database sessions with row-delete revocation fit well
+(Better Auth's default, not an opt-in); TOTP MFA fits well (a real first-party `twoFactor` plugin,
+worth using as a *reference implementation* later even without adopting the framework); session
+listing/revocation fits well. But the one requirement that's actually non-negotiable —
+**hashed-session-tokens-at-rest** — is **not shipped**: Better Auth stores the raw token value today,
+and a `storeTokenHash` option exists only as an unmerged draft PR
+(better-auth/better-auth#11444, tracking issue #11442), not in any released version. Redoing that
+exact guarantee inside an unfamiliar library via a custom `databaseHooks` interception would add real
+risk for no net gain, when AlEemaan's hand-rolled version already proves the identical guarantee out
+in production. Separately, Better Auth's `organization`/`teams` plugin doesn't map as cleanly onto
+`Tenant`→`Campus` (optional anchor) as this project's own purpose-built schema — team assignment
+lives in a separate join table, not a nullable field on `Member`, so "admin anchored to one campus but
+authorized across all of them" isn't a native concept there either. Full reasoning and sourced
+citations: ask for the spike's original report if needed, or trust this summary — re-litigating it
+without new information isn't necessary. Revisit only if Better Auth's `storeTokenHash` ships and
+stabilizes.
+
+**Practical consequence: build §0.5.1 by adapting AlEemaan's already-built, already-verified
+implementation, not from scratch.** `AlEemaan/src/lib/auth/session.ts`, `password.ts`, and
+`rate-limit.ts` (see that repo's `docs/development-history/phases/phase-0.5.1.5-auth-rebuild.md` for
+the full build record) are the working reference for the mechanism described below — hashed session
+tokens, timing-safe compare, the fixed rate limiter. Port and adapt for `TenantMembership`/`Campus`
+(AlEemaan's `requireAdmin()` → this project's `withAuth()`, `Membership.branchId` →
+`TenantMembership.campusId`), don't reinvent the mechanism itself.
+
+**The fact that triggered this spike (found 2026-09-29, via a two-AI cross-review of this plan and
+AlEemaan's shipped code — see `docs/auth-review-2026-09-29.md` for the full record): Better Auth's
+team took over Auth.js maintenance in September 2025, and Vercel acquired Better Auth in July 2026.
+Auth.js is now maintenance-mode — security patches only, no new features — and its own maintainers
+now point new projects at Better Auth.** Auth.js's role in this plan was already reduced to "read
+`Session` rows via an adapter" even before this decision — and per the resolution above, that role is
+now dropped to zero: no Auth.js dependency at all, same as AlEemaan.
+
+#### Login/logout route design
+
+Guard order, same as every other mutating route in this codebase: `validateCSRF(req)` (the helper
+already exists, `lib/auth/csrf.ts`, built for the setup wizard) → rate limit (key strategy in §0.5.3)
+→ Zod-validate → look up `User` → compare password → create `Session` row → set cookie.
+
+- **Constant-time response, not just a constant-time password compare.** Always run
+  `bcrypt.compare` against a fixed dummy hash — generated once at boot, at the real production cost
+  factor, never a malformed placeholder (a malformed hash makes bcrypt return instantly, which
+  defeats the fix) — even when no user matches the email, or when `passwordHash` is null (an
+  invited-but-not-yet-activated user). Both branches must cost the same regardless of outcome;
+  verify with a test asserting similar timing across both paths, not just code review.
+- **Enumeration-safe error messages** — identical `401 INVALID_CREDENTIALS` for "no such user" and
+  "wrong password."
+- **Password max length: 128 characters, enforced in the Zod schema at both login and account
+  creation.** bcrypt silently truncates at 72 bytes — without a cap, a long passphrase loses
+  entropy with no warning, and nothing stops an oversized payload from being submitted.
+- **Fresh, server-generated, high-entropy session token on every login, never client-supplied**
+  (`crypto.randomBytes(32).toString("hex")`, 256 bits) — the actual defense against session
+  fixation. Stated explicitly so a future change can't "simplify" it into accepting or reusing a
+  token from anywhere else.
+- **Hash the session token before storing it** (SHA-256 is fine — the token itself is already
+  256-bit random, so a fast hash doesn't weaken anything). The client keeps the plaintext token in
+  its cookie; the database stores only the hash. This is the standard pattern documented by Lucia's
+  (no-longer-maintained-as-a-library, but still a correct reference) session guide — a leaked
+  database backup or a read-only SQL injection elsewhere in the app then yields no directly-replayable
+  session tokens, only hashes. **Resolved: write a small custom `getSession()`, same as AlEemaan's
+  `src/lib/auth/session.ts` — Auth.js's Prisma adapter looks sessions up by the raw cookie value and
+  can never find a hashed row without being patched, so wrapping it isn't viable. Drop
+  `next-auth`/`@auth/prisma-adapter` entirely rather than keep an adapter that no longer does
+  anything.**
+- **Normalize email (`trim().toLowerCase()`) at every point `User.email` is read or written** — the
+  setup wizard, this login route, and any future signup/invite flow. Enforce it at the database
+  level too (Postgres `citext` on the column, or a `CHECK (email = lower(email))` constraint) — app-
+  code normalization alone doesn't protect against a seed script or direct SQL import bypassing it.
+- **Cookie**: `httpOnly`, `sameSite: "lax"`, explicit `cookies.sessionToken.name`. Use the
+  **`__Host-` prefix in production, not `__Secure-`** — `__Host-` additionally forces `Path=/` and
+  forbids a `Domain` attribute, closing a subdomain-cookie-planting risk `__Secure-` alone doesn't.
+  Derive the `secure` flag from the actual configured scheme (an explicit env var or the app's own
+  base URL), **not from `NODE_ENV`** — a Solo install genuinely running on `http://` in production
+  mode (a LAN deployment with no reverse-proxy TLS yet) would otherwise get a `200` from login with
+  no cookie ever set, since browsers silently refuse a `Secure` cookie over plain HTTP. Warn about
+  this in the setup wizard if it detects a non-HTTPS base URL in production mode. Add
+  `Cache-Control: no-store` on every auth response. Define the session lifetime as **one shared
+  constant**, imported by both `src/auth.ts`'s `session.maxAge` and the login route's
+  `Session.expires` calculation — never duplicated as a separate literal in each file.
+- `POST /api/v1/auth/logout` — `validateCSRF(req)` → delete the `Session` row (match by the hashed
+  token, per the hashing note above) → **delete the cookie with the exact same attributes it was set
+  with** (`path`, `secure`, `sameSite`, the `__Host-`/`__Secure-` name). A bare `cookies.delete(name)`
+  with no attributes can silently fail to clear a `__Host-`/`__Secure-`-prefixed cookie in a real
+  HTTPS deployment even though the dev-mode unprefixed cookie clears fine — this needs an actual
+  HTTPS end-to-end test before trusting it, not just the dev-mode verification AlEemaan's own logout
+  route was checked against.
+
+#### Session lifecycle (not just create/delete)
+
+- **Rotate at login**: if the incoming request already presents a session cookie, delete that
+  session row before minting the new one — don't let old and new sessions both stay valid.
+- **Cap concurrent sessions per user** (e.g. 10) — evict the oldest on overflow, so a scripted login
+  loop can't grow `Session` rows for one account without bound.
+- **`revokeUserSessions(userId, { except? })`** — one helper, called on every password change, role
+  change, or account deactivation. Without this, a dismissed staff member's session or a password
+  reset's *old* session both stay valid until natural expiry (up to 30 days).
+- **Absolute lifetime cap, shorter for `ADMIN`**, layered on top of the idle/`maxAge` expiry already
+  planned.
+- **A nightly purge job** for expired `Session` rows — nothing currently deletes them once `expires`
+  passes; Auth.js's adapter just stops honoring them, the rows themselves accumulate forever.
+- **Extra `Session` columns needed for the "active devices" UI below to be useful at all**:
+  `createdAt`, `lastUsedAt`, `userAgent` — the current `Session` model (`id`, `sessionToken`,
+  `userId`, `expires`) has nothing to show a user besides "a session exists." Add these to the
+  schema design when this section is actually built, not retrofitted after the UI is written against
+  an incomplete model.
+- `otplib`-based TOTP for MFA, `mfaSecret String?` (encrypted at rest — PRD §10) and
+  `mfaEnabled Boolean @default(false)` on `User`. **The step order matters and needs to be explicit,
+  or MFA becomes decorative**: password verification must **not** create a real `Session` row
+  directly. Issue a short-lived (~5 minute), single-purpose pending-MFA token that `auth()` cannot
+  read as a valid session, and only create the real `Session` row after TOTP verification succeeds
+  (recording `mfaVerifiedAt`). Otherwise an attacker who obtains the password alone gets a real,
+  usable session the instant they submit it, and the TOTP prompt is just UI theater on top of an
+  already-valid session. Rate-limit TOTP attempts separately from login attempts; store recovery
+  codes hashed, never plaintext.
+- Session revocation surface: a "your active devices" page reading the current user's `Session` rows
+  (now with the columns above to actually be useful), with a delete action per row (Audit #23's
+  server-revocable-sessions fix) — cheap specifically *because* database sessions were chosen over
+  JWT in Phase 0.
+
+#### Rate limiting for the login route specifically
+
+Full shared rate-limiting design lives in §0.5.3; the login-specific requirement: **the bucket
+records failed attempts only, not every request** — a correct login must never count against it, or
+a naive "generic auth-route-group middleware" implementation ends up locking out someone switching
+devices or retrying after a network blip.
 
 ### 0.5.2 — Tenant trust boundary (closes Audit's most severe finding)
 
@@ -141,26 +251,92 @@ authenticated user → verified tenant membership → SET LOCAL app.tenant_id �
   `TenantMembership` for `(userId, tenantId)`. No membership row → 403, regardless of what the URL
   says. This function's own test suite is the negative-test requirement from Audit #21: change
   `[code]` to a different tenant's code and confirm every protected route rejects it, not just a
-  sample.
-- `lib/tenant/for-tenant.ts`: the `forTenant(tenantId)` Prisma client extension already named in
-  PRD §7, implemented exactly as the `ims` project's proven version — wraps every query in a
-  transaction that runs `SET LOCAL app.tenant_id = '<verified id>'` first. The `tenantId` passed in
-  must always be the one `resolve-tenant.ts` verified, never a value read directly off `req.url` or
-  `req.params` anywhere else in the codebase — enforced by making `forTenant()` only importable
-  from route handlers that have already called `resolveTenant()`, not by convention alone (an
-  ESLint rule restricting the import, mirroring the tier-boundary lint pattern from Phase 0).
+  sample. Returns a **branded `VerifiedTenantId` type** (`type VerifiedTenantId = string & { readonly
+  __brand: "VerifiedTenantId" }`), not a bare `string` — this is a compile-time guarantee on top of
+  the ESLint import restriction below, not instead of it: TypeScript won't accept a raw `req.url`
+  substring where a `VerifiedTenantId` is expected, so the mistake the ESLint rule catches at review
+  time is also caught by `tsc` before that.
+- **`ADMIN` role scoping, resolved explicitly (2026-09-30) rather than left ambiguous**: same rule
+  AlEemaan already uses for its own `Membership.branchId` — any `TenantMembership` with `role: ADMIN`
+  grants access across every `Campus` under that tenant, regardless of which `campusId` that row
+  happens to anchor to (`campusId` is bookkeeping — which campus onboarded them — never a
+  restriction). Keeping this identical between the two projects matters now that AlEemaan's own auth
+  is being aligned to this plan (see AlEemaan's `domain-implementation-plan.md`) — one authorization
+  rule, not two subtly different ones that happen to look similar.
+- `lib/tenant/for-tenant.ts`: the `forTenant(tenantId: VerifiedTenantId)` Prisma client extension
+  already named in PRD §7 — the parameter type itself is the branded type above, so a caller can't
+  pass an unverified string even if they tried. Wraps every query in a transaction that sets the
+  tenant context first. **Use `set_config`, not string-interpolated `SET LOCAL`**: `SET LOCAL app.tenant_id
+  = '<id>'` requires the value to be lexically part of the SQL string, since `SET LOCAL` doesn't
+  accept bind parameters — if any future code path ever calls this with a value that isn't already
+  the verified branded type (e.g. someone reaching for `$executeRawUnsafe` directly instead of going
+  through `forTenant()`), that's a SQL injection vector in the tenant-isolation safety net itself.
+  `set_config()` is a regular function call and *does* accept a bind parameter:
+  `await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}::text, true)``. Read it back
+  with `current_setting('app.tenant_id', true)` (the `true` "missing OK" argument matters — without
+  it, a context where the setting was never set throws instead of returning null, and every RLS
+  policy below needs the unset case to mean "return zero rows," not "error").
+- **RLS is inert unless the database role connecting actually has it enforced — this needs explicit
+  role setup, not just `CREATE POLICY` statements.** Postgres RLS policies do not apply to a table's
+  owner, to a role with `BYPASSRLS`, or to a superuser, by default — and Prisma's migration role
+  typically *is* the table owner. If the app's runtime `DATABASE_URL` connects as that same owner
+  role, every RLS policy silently does nothing, while `CREATE POLICY` succeeds and a naive negative
+  test can even pass (because the test also runs as the owner). Required: two distinct Postgres
+  roles — a `migrator` role that owns the tables (used only for `prisma migrate`), and a separate
+  `app_user` role with `NOBYPASSRLS` and DML-only grants (used by the actual running app's
+  `DATABASE_URL`). Add `ALTER TABLE ... FORCE ROW LEVEL SECURITY` on every tenant-scoped table so
+  policies apply even to the owner as a second layer. Every policy needs both a `USING` clause (for
+  reads) and a `WITH CHECK` clause (for writes) — a `USING`-only policy lets a query *insert* a row
+  belonging to a different tenant even though it can never be *read* back.
 - RLS policies added in this phase's migration for every tenant-scoped table that exists so far
   (currently: `Campus`, `TenantMembership`). Every table added in Phase 1 onward gets its RLS
   policy in the *same* migration that creates the table — never a follow-up migration, so there's
   no window where a new table exists without RLS.
-- `DEPLOYMENT_MODE=solo` short-circuit: `resolve-tenant.ts` returns the install's single `Tenant`
-  row directly, skipping the membership lookup (there's nothing to disambiguate) — but still calls
-  `forTenant()` with that tenant's real ID, so Solo and SaaS share the exact same downstream code
-  path and RLS policies stay meaningful even under Solo (PRD §7's "same schema, same code paths").
+- **Identity tables queried before any tenant is known, listed explicitly rather than discovered by
+  trial and error**: `User`, `Session`, `Tenant`, `TenantMembership` itself. Login and session lookup
+  happen before `resolve-tenant.ts` has run — if `TenantMembership` were RLS-filtered the same way
+  as tenant-scoped business data, `resolve-tenant.ts` could never read the very row it exists to
+  verify (a chicken-and-egg lockout). These identity tables are deliberately **not** RLS-scoped by
+  tenant; everything they need protected is protected by ordinary query conditions
+  (`WHERE userId = ...`), not RLS. Keep this list reviewed and short — it's the explicit exception
+  list to "every tenant-scoped table gets RLS," and it should only ever contain tables that
+  structurally can't be tenant-scoped, not tables where RLS was merely inconvenient.
+- **Use one interactive transaction per request** (`forTenant(id).$transaction(async (tx) => {...})`
+  style), not `forTenant()` re-wrapping each individual query — a per-query wrapper costs a
+  round trip per call for something that should be set once per request. Size the connection pool
+  with this in mind (each request holds a transaction, not just a query, for its duration); if a
+  pooler sits in front of Postgres, it needs to support transaction-scoped session state (PgBouncer's
+  transaction-pooling mode does).
+- **Cross-tenant identity takeover, closed at the provisioning step, not the auth step**: `User` is
+  global (one row per email, across every tenant) while `TenantMembership` is per-tenant — so a
+  tenant admin directly setting a password for `teacher@gmail.com` at their school, when that same
+  email already belongs to a real person teaching at a *different* school, hands the admin (however
+  unintentionally) a working password for someone else's account at another tenant. **Tenant admins
+  must only ever send an email invite, never set a password directly for an email address they
+  don't already have a verified relationship with.** The invitee proves ownership of the email (a
+  time-limited invite-acceptance link) and sets their own password; if that email already has a
+  `User` row, the new `TenantMembership` attaches to the existing account only once the invitee
+  accepts it while authenticated as themselves, never created silently by the inviting admin alone.
+- **`DEPLOYMENT_MODE=solo` needs a runtime invariant, not just a code-path branch.** The current
+  design has `resolve-tenant.ts` return the install's one `Tenant` row directly under Solo mode,
+  skipping the membership lookup. If that env var were ever mistakenly set on a SaaS deployment (or
+  a second `Tenant` row somehow appeared in what's supposed to be a Solo install), this silently
+  becomes "every authenticated user gets access to whichever tenant row happens to be first" —  a
+  full cross-tenant data leak from a single misconfigured environment variable. Assert, at startup
+  and on every request under this code path, that exactly one `Tenant` row actually exists in the
+  database — fail closed (500, not silently proceed) if that invariant doesn't hold. The env var
+  should only ever change *where the tenant ID comes from*, never skip the membership-verification
+  step itself.
 - Front-door routing (PRD §7 "URL scheme"): `/dashboard`, `/list/*` resolve the session's active
   tenant and redirect into `/schools/[code]/...` when the user belongs to exactly one tenant; a
   school picker otherwise. Built here because it depends on 0.5.2's membership lookup existing
   first.
+- **Keep authorization checks inside route handlers, never in Next.js middleware/`proxy`.** This
+  design already does this (every check above lives in `resolve-tenant.ts`/`withAuth`, called from
+  handlers) — stated explicitly because CVE-2025-29927 was a real, critical Next.js middleware
+  bypass (a spoofed internal header skipped middleware entirely, patched in 15.2.3) affecting any
+  app that put authorization logic in middleware. Use `proxy`/middleware for routing and UX only;
+  keep a rebuild-and-patch routine for Next.js security advisories regardless.
 
 ### 0.5.3 — Shared API infrastructure
 
@@ -173,20 +349,61 @@ Per PRD §7's API-conventions paragraph, built once and reused by every route fr
 - `lib/api/validate.ts` — wraps a Zod schema around a route handler; the same schema instance is
   later fed to `zod-openapi` (PRD §7 stack table) for the generated API docs, so validation and
   documentation cannot drift apart.
-- `lib/api/rate-limit.ts` — `@upstash/ratelimit`-backed (or a Redis token-bucket, per the stack
-  table), applied via middleware to auth, result-lookup, and payment route groups specifically —
-  closes Audit finding #14.
+- `lib/api/rate-limit.ts` — closes Audit finding #14. **Client library correction (2026-09-30):**
+  `@upstash/ratelimit`'s default client talks to Upstash's own hosted REST proxy over HTTP, not the
+  plain Redis wire protocol — it will not work against a self-hosted `redis:7-alpine` container the
+  way `docker-compose.yml` provisions one for local dev, without also running Upstash's separate
+  self-hosted REST-proxy shim. Either actually provision Upstash's hosted Redis for this, or use
+  `ioredis` (talks the real Redis protocol) with a Lua script for atomic increments, or
+  `rate-limiter-flexible` (supports an `ioredis` backend natively) — decide which before this section
+  is built, since the plan currently names a library that doesn't fit the infrastructure already
+  provisioned.
+  - **Layered keys, not a single key** — the earlier "key on `ip + email` combined" note was a real
+    improvement over IP-only but still leaves two gaps open on its own: one IP spraying one common
+    password across *every* account never trips an `ip+email` limit (each combination is fresh), and
+    a botnet hitting *one* account from many IPs never trips it either (each IP's own count stays
+    low). Use three limits together: per-IP across all accounts (stops spraying), per-`ip+email`
+    (stops a single attacker grinding one account), and per-account across all IPs (stops distributed
+    credential stuffing). Make the per-account limit a *soft* response — a delay, a CAPTCHA, a
+    "someone tried to sign in" email notice — rather than a hard lockout, so an attacker can't
+    weaponize the limit itself to lock a real user out.
+  - **Atomic reserve, not check-then-record.** The current AlEemaan-derived pattern checks the limit
+    *before* the slow async work (JSON parse, DB lookup, `bcrypt.compare`) and only records the
+    attempt *after* — concurrent requests can all pass the check before any of them records anything,
+    letting an attacker fire many parallel guesses through in one window regardless of the configured
+    limit. Reserve the attempt atomically at the very start of the handler (a Redis `INCR`+`EXPIRE`,
+    or a Lua script bundling check-and-increment into one round trip), before any `await` — and
+    refund/clear it on a successful login, consistent with "failures only" above.
 - `withAuth(handler, { roles })` — checks the resolved tenant membership's `role` against an
   allow-list, `.some()`-style if a user can ever hold more than one role in the future (not true
   today per PRD §7's Role enum, but this guards against the same class of bug TheNiche's own
   migration plan flagged: don't write `.includes()` against a value that might become an array
-  later without noticing).
+  later without noticing). **CSRF is enforced inside this wrapper for every non-`GET` route**, not
+  left as a per-route opt-in call — a single forgotten `validateCSRF()` call in one route is a real
+  gap in a per-route-call design, and in a multi-tenant app sharing one origin across every school, a
+  stored-XSS payload in any one tenant's user-generated content (rich text, an uploaded SVG) could
+  otherwise ride a logged-in session across tenants. Supplement with a `Sec-Fetch-Site` header check
+  as a second signal, only trust `x-forwarded-host` when the reverse proxy itself sets it (not a
+  client-suppliable header), and keep uploaded user content on a separate, cookieless domain with
+  `X-Content-Type-Options: nosniff` so it can't execute as same-origin script even if a sanitizer
+  gap lets something through.
+- **Missing controls, worth planning now rather than discovering as a gap later**: no
+  password-reset/forgot-password flow, no minimum-password-length or breached-password check (a
+  HaveIBeenPwned-style k-anonymity check at account-creation/reset time), and no audit logging of
+  auth events specifically (logins, failures, resets, role changes, session revocations) beyond the
+  general `AuditLog` model already in the schema. Password reset needs the same care as login:
+  hashed single-use short-lived tokens, a uniform response regardless of whether the email exists,
+  rate limiting, and `revokeUserSessions()` (§0.5.1) called on completion so a compromised-password
+  reset can't be silently followed by the attacker's own still-valid old session.
 
 **Verification for this phase, before Phase 1 starts:** a negative-test file exercising every item
 above — wrong tenant in the URL, no membership, session revoked mid-request, malformed pagination
-params, rate limit exceeded — passes in CI. This is the one phase where "the code compiles" is not
-sufficient evidence of done; per Audit finding #21, RLS-looking-correct and RLS-being-correct are
-different claims until a real cross-tenant test fails when it should.
+params, rate limit exceeded — passes in CI, **run as the `app_user` role** (§0.5.2), not the
+migration-owner role — a negative test that runs with `BYPASSRLS`-equivalent privileges passes
+vacuously regardless of whether the RLS policies actually filter anything. This is the one phase
+where "the code compiles" is not sufficient evidence of done; per Audit finding #21,
+RLS-looking-correct and RLS-being-correct are different claims until a real cross-tenant test fails
+when it should.
 
 ---
 

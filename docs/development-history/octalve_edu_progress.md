@@ -1,6 +1,6 @@
 # Octalve Edu — Development Progress Tracker
 
-Last Updated: 2026-09-28
+Last Updated: 2026-09-30
 
 Companion to `docs/development-history/domain-implementation-plan.md` (the step-by-step build
 plan), `docs/development-history/phases/*.md` (one detailed doc per completed phase), and
@@ -25,15 +25,16 @@ against the real repo, not what a plan says should exist.
   `HTTP 200`. See `docs/development-history/phases/phase-0-foundation.md` for the full record,
   including the one real judgment call (Prisma 8 rc → 6.19.3 downgrade, matching the sibling `ims`
   project).
-- **Phase 0.5 — Auth, RLS & Shared API Infrastructure**: **Partially started.** §0.5.0 (first-run
-  superadmin setup wizard, Solo only) is **done and verified live** — see
-  `docs/development-history/phases/phase-0.5.0-setup-wizard.md`. Everything else in this phase
-  (Auth.js wiring, database sessions, TOTP MFA, the tenant-trust-boundary implementation
-  (`resolve-tenant.ts` + `forTenant()`), and the shared API pagination/rate-limiting helpers beyond
-  the response envelope) is still just the plan in
-  `docs/development-history/domain-implementation-plan.md` §Phase 0.5. Nothing in Phase 1 should
-  start before this phase's own verification gate (negative-test suite for cross-tenant/IDOR access)
-  passes in CI.
+- **Phase 0.5 — Auth, RLS & Shared API Infrastructure**: **Partially started, design complete for
+  §0.5.1.** §0.5.0 (first-run superadmin setup wizard, Solo only) is **done and verified live** — see
+  `docs/development-history/phases/phase-0.5.0-setup-wizard.md`. §0.5.1 (auth) went through a full
+  two-AI security review, a hardening pass, and a Better-Auth-vs-hand-roll spike (resolved: hand-roll,
+  adapting AlEemaan's already-built implementation) — **fully designed, zero code written yet**, no
+  open questions left blocking it. §0.5.2 (tenant-trust boundary: `resolve-tenant.ts` + `forTenant()`
+  + explicit RLS role setup) and §0.5.3 (shared API pagination/rate-limiting helpers beyond the
+  response envelope) are designed, not built, both depending on §0.5.1 landing first. Nothing in
+  Phase 1 should start before this phase's own verification gate (negative-test suite for
+  cross-tenant/IDOR access, run as the `app_user` role) passes in CI.
 - **Phase 1 — MVP: Core SIS + Finance**: **0% — not started.** Full schema designed
   (`sis.prisma`/`finance.prisma` in the plan doc, with every model's reasoning traced to a PRD
   section or a specific security-audit finding) but no migration written, no API routes, no UI.
@@ -81,10 +82,67 @@ update:
   fix (hand-rolled login/logout against the `Session` table instead of Auth.js's own Credentials
   flow) is now inline in that section, so this doesn't get rediscovered live the same way.
 
+## Auth hardening pass (2026-09-29)
+
+`domain-implementation-plan.md` §0.5.1 now has a full route-level design for the hand-rolled
+login/logout (guard order, cookie shape) instead of just "expect to do the same as AlEemaan" —
+written to the same precision as AlEemaan's shipped version, plus fixes found by auditing that
+version after the fact rather than repeating them here:
+
+- A constant-time response (AlEemaan's version has a real timing side-channel — skips
+  `bcrypt.compare` entirely on a missing user, so "no such account" answers faster than "wrong
+  password" even with identical status codes).
+- A `lib/auth/csrf.ts` call on both routes (the helper already exists in this repo from the setup
+  wizard, but nothing said the hand-rolled login has to use it — easy to forget since Auth.js's own
+  Credentials flow would have handled this invisibly).
+- A fresh, server-generated 256-bit session token on every login (session-fixation defense, named
+  explicitly rather than left implicit).
+- Email normalization (`trim().toLowerCase()`) applied everywhere `User.email` is read or written,
+  not just at login.
+- The session lifetime (30 days) as one shared constant, not duplicated separately in `src/auth.ts`
+  and the login route the way AlEemaan currently has it (a real drift risk in AlEemaan worth not
+  repeating).
+- Rate-limit bucket records failed attempts only, not every request — stated explicitly since
+  §0.5.3 describes the limiter as generic middleware, vague enough to get built wrong.
+
+§0.5.3's rate limiter is now also specified to key on `ip + email` combined, not IP alone, fixing a
+shared-IP lockout problem in AlEemaan's current in-memory limiter.
+
+## Second auth hardening pass (2026-09-30) — two-AI review
+
+`domain-implementation-plan.md` §0.5.1–0.5.3 rewritten against a full two-AI cross-review of both
+this plan and AlEemaan's shipped auth code (record: `docs/auth-review-2026-09-29.md`). Sixteen
+findings incorporated, three of them changing real design decisions rather than just adding detail:
+`SET LOCAL` string interpolation replaced with parameterized `set_config()` (the RLS safety net had
+its own SQL-injection surface); RLS role setup made explicit (`app_user` with `NOBYPASSRLS` +
+`FORCE ROW LEVEL SECURITY` — RLS policies are otherwise inert against the table-owner role Prisma
+migrations typically use, meaning CI's own negative tests could pass while protecting nothing); and
+`@upstash/ratelimit` identified as incompatible with the plain self-hosted Redis container
+`docker-compose.yml` actually provisions. Also verified independently (web search, not assumed):
+Better Auth's team now maintains Auth.js (took over September 2025; Vercel acquired Better Auth July
+2026) — Auth.js is maintenance-mode only now, which reopened whether to evaluate Better Auth for this
+phase specifically.
+
+## Better Auth spike — resolved 2026-09-30: hand-roll, mirroring AlEemaan
+
+Ran the spike rather than guess. Better Auth fits well on database sessions, TOTP MFA, and session
+listing/revocation — but its **hashed-session-token-at-rest** support (the one genuinely
+non-negotiable requirement here) is **not shipped**, only an unmerged draft PR
+(better-auth/better-auth#11444). Its `organization`/`teams` plugin also doesn't map as cleanly onto
+`Tenant`→`Campus` as the schema already built here. Decision: hand-roll §0.5.1, adapting
+**AlEemaan's already-built, already-verified implementation** (`src/lib/auth/{session,password,
+rate-limit}.ts`, full record in that repo's `docs/development-history/phases/phase-0.5.1.5-auth-rebuild.md`)
+rather than building from scratch or adopting Better Auth. `domain-implementation-plan.md` §0.5.1
+updated with the full reasoning and the explicit "port AlEemaan's code, adapted for
+TenantMembership/Campus" instruction. This closes the last open design question blocking §0.5.1 —
+nothing left to decide before writing code.
+
 ## Next action
 
-The rest of Phase 0.5, in the order its own section of the implementation plan lays out: Auth.js
-wiring (§0.5.1 — **read its inline warning above before wiring the Credentials provider as
-originally written**; it will need the same database-sessions-without-Credentials fix AlEemaan already
-made), then the tenant-trust-boundary resolver and `forTenant()` (§0.5.2), then the shared API
-helpers (§0.5.3), then that phase's negative-test verification gate before Phase 1 begins.
+**Build §0.5.1** — no remaining open design questions. Port AlEemaan's `session.ts`/`password.ts`/
+`rate-limit.ts`, adapted for `TenantMembership`/`Campus` (`requireAdmin()` → `withAuth()`,
+`Membership.branchId` → `TenantMembership.campusId`). Then the tenant-trust-boundary resolver and
+`forTenant()` with its now-explicit RLS role setup (§0.5.2) — this needs a real `app_user` Postgres
+role created first, not just the Prisma migration owner. Then the shared API helpers (§0.5.3). Then
+that phase's negative-test verification gate — **run as the `app_user` role, not the migration
+owner** — before Phase 1 begins.
