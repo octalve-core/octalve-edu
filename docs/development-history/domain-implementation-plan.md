@@ -951,7 +951,7 @@ Prompted by the question "what else would a Django/Djoser-style auth give us?". 
 
 ---
 
-#### 0.5.F — Dev tooling: a dev email inbox now, a mock Paystack with Finance (planned 2026-10-05; nothing built)
+#### 0.5.F — Dev tooling: a dev email inbox now, a mock Paystack with Finance (planned 2026-10-05; inbox half BUILT 2026-10-05 — the Paystack half waits for Finance)
 
 **Source.** The maintainer's guide *"Development Email System & Dual-Mode Paystack Integration"* (a pattern already
 used locally and on a staging deploy of another project). It has two halves: (1) an in-app **dev email inbox** —
@@ -1002,6 +1002,63 @@ calls produce exactly one fulfilment, an amount mismatch throws, the mock cannot
 and the mock's self-webhook goes through the real handler.
 
 **Build order:** the `inbox` transport + widget first (small; both repos; after 0.5.D); the Paystack engine with Finance.
+
+**Design for the inbox half (2026-10-05, written before any code; approved to build next, ahead of §0.5.E).**
+- **The gate** — `lib/dev-tools.ts`, pure and unit-tested over the whole environment matrix. `appEnv()` is
+  `APP_ENV` if it is exactly `development` / `staging` / `production` (case-insensitive), else `production` when
+  `NODE_ENV=production` **or `VERCEL_ENV=production`**, else `development`; **any unrecognised value is production**
+  (fail closed — `prod`, a typo, an empty string under `next start`). `devToolsEnabled()` is false in production
+  always (even with `DEV_TOOLS=true` and a token); in `staging` it needs `DEV_TOOLS=true` **and** a non-empty
+  `DEV_TOOLS_TOKEN` (no token → off, not open); in `development` it is on unless `DEV_TOOLS=false`. `next start`
+  forces `NODE_ENV=production`, so a deployed server is production unless `APP_ENV` says otherwise on purpose.
+- **The store** — `lib/dev/email-inbox.ts`: newest-first ring buffer of 50 on `globalThis.__devEmailInbox` (survives
+  HMR), each message `{ id, to, subject, text, sentAt }`, text capped at 20 KB. Per process, so it works for a
+  long-lived server (local, Solo, single-instance staging) and **not** across serverless instances — said so in the docs.
+- **The transport** — `inbox`, a fourth `EmailTransport`. `EMAIL_TRANSPORT` always wins; unset → `resend` if
+  `RESEND_API_KEY`, else `inbox` if dev tools are on, else `console` (with the existing production warning).
+  Choosing `inbox` explicitly while dev tools are off is an error (the send fails loudly in the log, never
+  silently into a buffer nobody can read). It also prints one line (`[EMAIL → to] subject — captured in the dev
+  inbox`) — never the body, so a reset link doesn't land in the log.
+- **The routes** — `GET`/`DELETE /api/v1/dev/email-inbox`: **404** when tools are off (a plain 404 in the standard envelope); in `staging`, header `x-dev-tools-token` compared in constant time (hash-then-`timingSafeEqual`),
+  wrong/missing → 401, five wrong in 5 minutes per IP → 429; `DELETE` also needs `validateCSRF()`; every response
+  `no-store`. `development` is open (it is your own machine).
+- **The widget** — `components/dev/DevEmailInbox.tsx` (client), mounted from the root layout only when the gate is
+  on: a launcher bottom-right with an unread count, a dialog (list → message), live refresh every 4 s while
+  authorised, a token form on 401 (kept in `sessionStorage`, best-effort), a "DEV" badge so it is never mistaken
+  for product UI. The body is rendered as **text** (`white-space: pre-wrap`); every `http(s)` URL in it is also
+  offered as a real link (so a reset link is one click). Escape closes and returns focus to the launcher; ≥ 44 px
+  targets; both themes; no inline script or style (nonce CSP).
+- **Tests (before the code).** unit: the gate matrix; the buffer (cap, order, cap on text, lives on `globalThis`).
+  integration: transport selection matrix; the routes in-process (404 when off — including `DEV_TOOLS=true` in
+  production; open in development; token + rate limit + CSRF in staging; prefix-of-token fails). api + e2e against a
+  **third server in staging mode** (`:3102`, token set, `EMAIL_TRANSPORT` unset): forgot-password → the mail is in
+  the inbox → the link works; the main servers 404 and show no launcher; a message containing `<script>` /
+  `<img onerror>` renders inert; axe in both themes for the launcher, token form, list and message; focus return.
+  Mutations: gate open in production; token unchecked / prefix-compared; DELETE without CSRF; no 404 when off;
+  `inbox` as the production default; body rendered as HTML; buffer uncapped; log line printing the body.
+
+**As built — inbox half (2026-10-05)** — record: `phases/phase-0.5.F-dev-email-inbox.md`. As designed, with these
+refinements the build itself forced:
+- **One decision, not two functions.** The first draft had `devToolsEnabled()` and a separate `devToolsToken()`
+  that returned `null` for *both* "no token needed" and "staging with no token configured" — a caller reading
+  `null` as "open" would have failed open. A sweep over all 1,344 combinations of `APP_ENV` / `NODE_ENV` /
+  `VERCEL_ENV` / `DEV_TOOLS` / `DEV_TOOLS_TOKEN` found it. There is now one `devToolsAccess()` returning `off`,
+  `open` or `{ token }` (and `devToolsEnabled()` is just "not off"); the route switches on it.
+- **A fourth test server.** The same build in `APP_ENV=staging` with the tools on, a token and *no*
+  `EMAIL_TRANSPORT`; the other three servers pin `APP_ENV=production` regardless of a developer's own `.env` and
+  the specs assert they 404 the route and render no launcher.
+- **The launcher is bottom-right**, not bottom-left: AlEemaan's admin shell has a left sidebar and Next's own dev
+  indicator lives bottom-left. On phones it sits above the tab bar.
+- **Two UX bugs the browser tests caught.** Clicking "Back to the list" unmounted the focused button, focus fell
+  to `<body>`, and Escape then did nothing — focus now goes to the dialog heading (to the Back button when a
+  message opens), and Escape listens on the document while the dialog is open. The "unread" memory lived in
+  component state and reset on every full page load (the widget remounts per navigation); it is now kept in
+  `sessionStorage` for the tab.
+- Message bodies are text (`white-space: pre-wrap`); every `http(s)` URL in a body is also offered as a link,
+  and a `javascript:` URL can never become one. The route answers a plain 404 in the standard envelope when the
+  tools are off (not byte-identical to an unmatched path — the route's existence isn't a secret).
+- **Not built, by design:** HTML rendering, persistence across restarts or instances (it is process memory), and
+  the Paystack half — that waits for Finance.
 
 ## Phase 1 — MVP: Core SIS + Finance
 

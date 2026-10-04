@@ -1,13 +1,17 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { devToolsEnabled } from "@/lib/dev-tools";
+import { recordDevEmail } from "@/lib/dev/email-inbox";
 
-// Outgoing email (domain-implementation-plan.md §0.5.C): one tiny interface, three implementations
+// Outgoing email (domain-implementation-plan.md §0.5.C, §0.5.F): one tiny interface, four implementations
 // chosen by EMAIL_TRANSPORT.
 //   resend   — production. Uses RESEND_API_KEY and EMAIL_FROM. (Plain fetch: no SDK dependency.)
 //   console  — development. Prints the whole message, link included, to the server log.
 //   file     — tests. Appends one JSON line per message to EMAIL_FILE; the tests read it as the inbox.
-// Unset: `resend` when RESEND_API_KEY is present, otherwise `console` — with a loud warning in
-// production, because a reset link printed to a log is not delivered to anyone.
+//   inbox    — local and staging. Keeps the last 50 messages in memory for the in-app dev inbox widget (see
+//              lib/dev-tools.ts for when that exists — never in production).
+// Unset: `resend` when RESEND_API_KEY is present, else `inbox` when the dev tools are on, otherwise `console` —
+// with a loud warning in production, because a reset link printed to a log is not delivered to anyone.
 //
 // A send failure is logged and swallowed by the caller: showing it to the requester would be an oracle
 // for "this address has an account".
@@ -47,10 +51,24 @@ const fileTransport: EmailTransport = {
   },
 };
 
+/// Refuses to run unless the dev tools are on: a buffer nobody is allowed to read would swallow mail silently.
+/// Logs one line — never the body, so a reset link doesn't end up in a log file.
+const inboxTransport: EmailTransport = {
+  async send(message) {
+    if (!devToolsEnabled()) {
+      throw new Error("EMAIL_TRANSPORT=inbox needs the dev tools enabled (APP_ENV / DEV_TOOLS — see lib/dev-tools.ts)");
+    }
+    recordDevEmail(message);
+    console.log(`[EMAIL → ${message.to}] ${message.subject} — captured in the dev inbox`);
+  },
+};
+
 let warned = false;
 
 export function getEmailTransport(): EmailTransport {
-  const chosen = process.env.EMAIL_TRANSPORT || (process.env.RESEND_API_KEY ? "resend" : "console");
+  const chosen =
+    process.env.EMAIL_TRANSPORT ||
+    (process.env.RESEND_API_KEY ? "resend" : devToolsEnabled() ? "inbox" : "console");
   if (chosen === "console" && process.env.NODE_ENV === "production" && !warned) {
     warned = true;
     console.warn(
@@ -61,7 +79,8 @@ export function getEmailTransport(): EmailTransport {
   if (chosen === "resend") return resend;
   if (chosen === "file") return fileTransport;
   if (chosen === "console") return consoleTransport;
-  throw new Error(`Unknown EMAIL_TRANSPORT "${chosen}" (resend | console | file)`);
+  if (chosen === "inbox") return inboxTransport;
+  throw new Error(`Unknown EMAIL_TRANSPORT "${chosen}" (resend | console | file | inbox)`);
 }
 
 /// Sends, and never throws: callers run this where a failure must not change the response.

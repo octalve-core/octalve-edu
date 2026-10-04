@@ -19,7 +19,13 @@ export const HTTP_PORT = 3100; // plain-HTTP app: APP_URL=http://localhost:3100 
 export const HTTPS_APP_PORT = 3101; // same build, APP_URL=https://localhost:3443
 export const TLS_PORT = 3443; // TLS-terminating reverse proxy in front of 3101
 
+/// A FOURTH server: the same build in "staging" mode with the dev tools on and a token required, the one place
+/// the dev email inbox exists (the other three are production-shaped and must show no trace of it).
+export const DEVTOOLS_PORT = 3102;
+export const DEV_TOOLS_TEST_TOKEN = "test-dev-tools-token-0123456789";
+
 export const HTTP_URL = `http://localhost:${HTTP_PORT}`;
+export const DEVTOOLS_URL = `http://localhost:${DEVTOOLS_PORT}`;
 export const HTTPS_URL = `https://localhost:${TLS_PORT}`;
 
 /// The database tests run against: TEST_DATABASE_URL if set, otherwise the
@@ -57,6 +63,11 @@ process.env.APP_URL = HTTP_URL;
 process.env.DEPLOYMENT_MODE = "solo";
 process.env.EMAIL_TRANSPORT = "file";
 process.env.EMAIL_FILE = EMAIL_FILE;
+// In-process tests start from the safe default (a production-shaped environment with the dev tools off); a test
+// about the dev tools sets what it needs for its own duration.
+process.env.APP_ENV = "production";
+process.env.DEV_TOOLS = "";
+process.env.DEV_TOOLS_TOKEN = "";
 
 /// A fixed key for two-step verification, so the in-process tests and both servers agree on it
 /// (32 bytes, base64). Tests that need "no key" delete it from process.env for their own duration.
@@ -80,5 +91,22 @@ export function serverEnv(appUrl: string): Record<string, string> {
     SETUP_TOKEN: "",
     EMAIL_TRANSPORT: "file",
     EMAIL_FILE,
+    // Production-shaped, whatever the developer's own .env says: no dev tools on these servers.
+    APP_ENV: "production",
+    DEV_TOOLS: "",
+    DEV_TOOLS_TOKEN: "",
+  };
+}
+
+/// The dev-tools server: staging mode, the token required, and NO EMAIL_TRANSPORT / RESEND_API_KEY — so mail
+/// goes where the app sends it by default in that mode: the in-memory dev inbox.
+export function devToolsServerEnv(): Record<string, string> {
+  return {
+    ...serverEnv(DEVTOOLS_URL),
+    EMAIL_TRANSPORT: "",
+    RESEND_API_KEY: "",
+    APP_ENV: "staging",
+    DEV_TOOLS: "true",
+    DEV_TOOLS_TOKEN: DEV_TOOLS_TEST_TOKEN,
   };
 }

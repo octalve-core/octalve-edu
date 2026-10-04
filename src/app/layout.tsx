@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
+import { DevEmailInbox } from "@/components/dev/DevEmailInbox";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
 import { brand } from "@/lib/brand";
+import { devToolsEnabled } from "@/lib/dev-tools";
 import { THEME_COOKIE, parseTheme } from "@/lib/theme";
 import "./globals.css";
 
@@ -35,6 +37,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <ThemeProvider initialTheme={theme}>{children}</ThemeProvider>
+        {/* Development affordances (lib/dev-tools.ts): rendered only where the server says so — never in production. */}
+        {devToolsEnabled() && <DevEmailInbox />}
       </body>
     </html>
   );

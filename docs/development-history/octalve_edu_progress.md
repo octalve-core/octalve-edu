@@ -233,14 +233,25 @@ every "use it once" rule is a conditional update (ten simultaneous submissions o
 page has the Two-step verification card (QR drawn in the browser, recovery codes with Copy/Download),
 `pnpm mfa:reset -- <email>` is the operator's way back in. 548 tests pass; **49 injected bugs, all caught**. Needs
 `MFA_ENCRYPTION_KEY` in production; losing or changing it makes every stored secret undecryptable (→ `mfa:reset`).
-Also planned (not built): plan §0.5.F — a dev email inbox now and a mock Paystack with Finance, adapted from the
-maintainer's guide (its `VERCEL_ENV` gate would be *open* on our self-hosted installs; the adaptation fails closed).
+(Plan §0.5.F — a dev email inbox, and a mock Paystack with Finance — was designed alongside; the inbox is built, see below.)
+
+## Dev email inbox build (2026-10-05) — built and verified, stacked again
+
+Design: plan §0.5.F (+ "As built — inbox half"), adapted from the maintainer's guide on a dev email system and
+dual-mode Paystack. Record: `phases/phase-0.5.F-dev-email-inbox.md`. Branch `claude/dev-email-inbox`, **based on
+`claude/totp-mfa`**. A fourth email transport, `inbox`, keeps the last 50 messages in process memory; an in-app
+widget (bottom-right launcher, unread badge, text bodies, clickable links) shows them, so reset links and
+security notices are readable locally and on staging with no mail provider. Everything hangs off one fail-closed
+gate, `devToolsAccess()` in `lib/dev-tools.ts` (`APP_ENV` + `DEV_TOOLS` + a staging token; **never in production**;
+the guide's `VERCEL_ENV` test would have been open on a self-hosted install). 622 tests pass; **30 injected bugs,
+all caught** (two survived at first and drove two stronger tests). The Paystack half waits for Finance — the plan
+lists what must change in it first.
 
 ## Next action
 
 **The first four phases are open as stacked PRs on the fork** (`roji-tech/octalve-edu-fork` #1 auth → #2 0.5.A →
-#3 0.5.B → #4 0.5.C; each is based on the one before — merge in order). **0.5.D is pushed on `claude/totp-mfa`
-(based on 0.5.C); its PR is not opened yet.**
+#3 0.5.B → #4 0.5.C; each is based on the one before — merge in order). **0.5.D is [#5](https://github.com/roji-tech/octalve-edu-fork/pull/5)
+(`claude/totp-mfa`, based on 0.5.C); 0.5.F is pushed on `claude/dev-email-inbox` (based on 0.5.D).**
 
 **The back-port to AlEemaan is done, verified and merged there** — shared names, the hardening deltas, the 72-byte
 password policy, `method="post"`, the sign-in screens it lacked and this test suite (`roji-tech/AlEemaan` #2), then
@@ -250,7 +261,7 @@ plan docs (§0.5.1.6 there, the shared-names table here).
 
 Then, in order: the rest of the Phase 0.5 addenda, each designed in the plan first and built in both repos
 — ~~**0.5.B** the nonce-based script CSP~~, ~~**0.5.C** password reset and change~~, ~~**0.5.D** TOTP MFA~~ (all built,
-in review/stacked), then **0.5.F** the dev email inbox (planned), **0.5.E** the account-lifecycle extras (planned); then the tenant-trust-boundary resolver and `forTenant()` with its explicit
+in review/stacked), ~~**0.5.F** the dev email inbox~~ (built), **0.5.E** the account-lifecycle extras (planned); then the tenant-trust-boundary resolver and `forTenant()` with its explicit
 RLS role setup (§0.5.2 — needs a real `app_user` Postgres role created first, and `withAuth`'s
 `roles`/`permissions` options and this repo's app shell arrive here); the shared API helpers (§0.5.3, and
 the Redis-backed rate limiter before any multi-instance SaaS deployment). Then that phase's negative-test

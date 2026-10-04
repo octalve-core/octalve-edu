@@ -177,6 +177,18 @@ one-off pattern sources, referenced once for a specific technique and then done:
   session cookie + 12-hour server cap; ticked → the 30 d / 90 d policy, 7 d for admins). AlEemaan has the
   same, in its own green, plus the admin shell. Still to come in this series, each designed in the plan
   first: **0.5.B** nonce-based CSP, **0.5.C** password reset/change, **0.5.D** TOTP MFA.
+- **Phase 0.5.F (dev email inbox) is BUILT AND VERIFIED** — branch `claude/dev-email-inbox`, stacked on the
+  TOTP branch. A fourth email transport, `inbox`, keeps the last 50 messages in process memory and an in-app
+  widget (bottom-right launcher, unread badge, text bodies, clickable links) shows them — so reset links and
+  security notices are readable locally and on a staging deploy with no mail provider. **Rules that follow:**
+  (1) **`devToolsAccess()` in `lib/dev-tools.ts` is the only decision** about whether any dev affordance exists
+  (`off` | `open` | `{token}`) — never test `NODE_ENV` or `VERCEL_ENV` yourself, and never mount, route or run a dev
+  tool without it; production is *never* on, a mistyped `APP_ENV` is production, staging needs `DEV_TOOLS=true`
+  **and** `DEV_TOOLS_TOKEN`; (2) message bodies are rendered as **text**, never HTML; (3) `EMAIL_TRANSPORT=inbox`
+  where the tools are off must fail loudly, and the log line never carries the body; (4) the inbox is per process —
+  do not rely on it across serverless instances. Env: `APP_ENV`, `DEV_TOOLS`, `DEV_TOOLS_TOKEN`. The Paystack half
+  of the maintainer's guide waits for Finance (plan §0.5.F says what must change in it first). Record:
+  `docs/development-history/phases/phase-0.5.F-dev-email-inbox.md`.
 - **Phase 0.5.D (TOTP two-step verification) is BUILT AND VERIFIED** — branch `claude/totp-mfa`, stacked on the
   password-reset branch. Password → (if the account has an *active* second factor) a short-lived, attempt-limited
   **challenge and no session** → `POST /api/v1/auth/login/mfa` with a code or a recovery code → session. TOTP is
