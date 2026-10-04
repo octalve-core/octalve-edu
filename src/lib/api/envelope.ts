@@ -17,3 +17,12 @@ export function fail(message: string, status: number, code?: string) {
     { status },
   );
 }
+
+/// Marks a response uncacheable. Every auth response must carry this: a
+/// shared cache or the browser's back/forward cache must never replay a
+/// login/logout/session response. (Added here first; AlEemaan adopts it in
+/// the cross-repo sync pass — see domain-implementation-plan.md §0.5.1.)
+export function noStore<T extends NextResponse>(response: T): T {
+  response.headers.set("Cache-Control", "no-store");
+  return response;
+}

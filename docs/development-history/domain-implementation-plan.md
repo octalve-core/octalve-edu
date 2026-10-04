@@ -145,6 +145,190 @@ now point new projects at Better Auth.** Auth.js's role in this plan was already
 `Session` rows via an adapter" even before this decision — and per the resolution above, that role is
 now dropped to zero: no Auth.js dependency at all, same as AlEemaan.
 
+#### Build design for the port (added 2026-09-30, immediately before implementation)
+
+Written before any code, per this repo's design-before-code rule. It records what the port keeps,
+what it deliberately does *not* copy from AlEemaan, and what is built beyond AlEemaan's current
+state — each with the reasoning, so none of it has to be re-derived later.
+
+**Shared names — identical in both repos, on purpose.** File names, exported function names, route
+paths and error codes match AlEemaan's already-built versions exactly, so a fix or review finding in
+one repo maps 1:1 onto the other:
+
+| Concern | Name (both repos) |
+| :--- | :--- |
+| Session helpers | `lib/auth/session.ts` — `createSession`, `getSession`, `getSessionFromRequest`, `deleteSessionByToken`, `revokeUserSessions`, `setSessionCookie`, `clearSessionCookie`, `SESSION_COOKIE_NAME` |
+| Passwords | `lib/auth/password.ts` — `hashPassword`, `verifyPassword`, `BCRYPT_COST`; `lib/auth/password-policy.ts` — `PASSWORD_MAX_LENGTH` (128, login input bound), `PASSWORD_MAX_BYTES` (72, every set path), `passwordByteLength` |
+| Rate limiting | `lib/auth/rate-limit.ts` — `reserveAttempt`, `refundAttempt`, `checkRateLimit`, `getClientIp` (all `async`) |
+| Route guard | `lib/auth/with-auth.ts` — `withAuth(handler, options)` (replaces AlEemaan's `requireAdmin()`; AlEemaan migrates too — see its own plan, §0.5.1.6) |
+| CSRF / envelope / db | `lib/auth/csrf.ts`, `lib/api/envelope.ts` (`ok`, `fail`, `noStore`), `lib/db.ts` |
+| Routes | `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me` |
+| Error codes | `INVALID_CREDENTIALS`, `RATE_LIMITED`, `CSRF`, `INVALID_BODY`, `UNAUTHENTICATED` (AlEemaan adds `FORBIDDEN`) |
+| Screens | `/login`, `/dashboard`, `/` (pure router), `/setup`; `components/ui/*`, `components/auth/*` |
+| Tests | `tests/{setup,unit,integration,api,e2e,https}`, `playwright.config.ts`, `pnpm test` — same layout and helpers in both repos (own ports and own `*_test` database each) |
+
+Deliberately **not** synced (different concepts, not naming drift): the models `Campus`/`Branch` and
+`TenantMembership`/`Membership` (this repo has a `Tenant` above `Campus`; AlEemaan has no tenant and
+"branch" is the school's own word), and the cookie's product prefix (`octalve.session-token` /
+`__Host-octalve.session-token` here, `aleemaan.…` there — two products must never share a cookie name).
+
+**Deliberate divergence #1 — `withAuth` ships session + CSRF only in this pass; role/permission
+gating arrives with §0.5.2.** A straight port of AlEemaan's "any `ADMIN` membership row grants
+access" would be a cross-tenant privilege escalation here: an `ADMIN` of School A would pass the
+check on School B's routes. In a multi-tenant schema a role is only meaningful *against a specific,
+verified tenant's membership*, and that verified tenant doesn't exist until `resolve-tenant.ts`
+(§0.5.2) does. So `withAuth(handler, { roles, permissions })` keeps the shared call shape, but until
+§0.5.2 lands, passing `roles`/`permissions` fails closed instead of guessing a tenant — **implemented
+as a compile error (the options are typed `never`) plus a throw at module load if the types are
+bypassed**, so `next build` fails rather than shipping an unguarded route. (The first draft of this
+note said "500 misconfiguration" at request time; catching it at build time is strictly earlier, so
+that is what was built.) The "ADMIN crosses every `Campus`" rule stays exactly as §0.5.2 states it —
+scoped to *that tenant's* campuses.
+
+**Deliberate divergence #2 — rate-limiter backend.** This pass ports AlEemaan's in-memory
+reserve-then-refund limiter (trusted `X-Real-IP` only, size-capped, all three keys: per-IP, per-`ip+email`
+hard gates and a soft per-account signal). That is correct for Solo and for a single-instance SaaS
+deployment. It is **not** sufficient for multi-instance SaaS, where a different instance means a
+different `Map`; that needs the Redis-backed version (§0.5.3, client library still to be chosen —
+`@upstash/ratelimit` does not fit the plain Redis container `docker-compose.yml` provisions). Callers
+`await` the limiter from day one so swapping in an async Redis backend later changes no call site.
+This limitation is a known, tracked condition — **it must be closed before any multi-instance SaaS
+production deployment**, and the setup wizard's own use of the limiter moves to the same API here
+(the old `checkRateLimit`/`recordAttempt` pair, which trusted raw `X-Forwarded-For` and had the
+check-then-record race, is removed entirely).
+
+**Built beyond AlEemaan's current state** (AlEemaan deferred these; this repo's plan already lists
+them as part of the hardened design, and retrofitting schema columns after data exists is the more
+expensive path). Tracked for back-porting to AlEemaan in the cross-repo sync task:
+- **Two-level session expiry.** `Session.expires` is the *idle* expiry (30 days, the one shared
+  `SESSION_MAX_AGE_SECONDS`, slid forward on use — throttled to at most one write per 5 minutes per
+  session); new `Session.absoluteExpires` is a hard cap set at login and never extended: **90 days
+  normally, 7 days for a user holding any `ADMIN` membership.** The cookie's own expiry is set to the
+  absolute expiry (the server is authoritative on idle expiry, so the cookie never needs refreshing).
+  These numbers are policy defaults — the PRD specifies none — and live as named constants.
+- **Bounded growth.** `createSession` also deletes that user's already-expired rows in the same
+  transaction; `purgeExpiredSessions()` is exported for the scheduled nightly purge (the job runner
+  arrives with BullMQ infrastructure later — the function exists and is verified now).
+- **Email case-insensitivity enforced in Postgres**, not only in code: a `CHECK (email = lower(email))`
+  constraint added in the migration's SQL (Prisma's schema language can't express it).
+- **`Cache-Control: no-store`** on every auth response (new additive `noStore()` helper in
+  `lib/api/envelope.ts`).
+- **Password max length (128)** on the setup wizard's schema too, not just login.
+
+**Decisions made during implementation (2026-09-30), recorded as they were made** — each is either a
+refinement of the design above or something the design left open. The first three differ from
+AlEemaan's shipped code and are tracked for back-porting (cross-repo sync task):
+1. **Per-IP login limit is 30 per 5 minutes; per-`ip+email` stays 5.** AlEemaan gates all three
+   layers at 5. A hard 5-per-IP gate lets one person's typos lock out everyone sharing that IP — and
+   shared IPs are the norm here (mobile-carrier NAT, a school's single egress address). The per-IP
+   layer is a coarse anti-spraying gate; the per-`ip+email` layer is what stops grinding one account.
+2. **Client IP is configurable, not hard-wired to `X-Real-IP`:** `CLIENT_IP_HEADER` (default
+   `x-real-ip`) or `x-forwarded-for` read from the *right* (`TRUSTED_PROXY_HOPS`, default 1). Needed
+   because the Solo installer's reverse proxy is Caddy, which appends to `X-Forwarded-For` but does not
+   set `X-Real-IP` unless told to. With no usable header the limiter falls back to one shared bucket
+   and **warns once in production**, since that turns the per-IP limit into a school-wide one.
+3. **True LRU eviction in the limiter.** AlEemaan's sweep evicts oldest-*inserted* keys (a `Map` keeps
+   first-insertion order on overwrite), so an attacker flooding new keys could evict a hot legitimate
+   key; here every write re-inserts the key so eviction is oldest-*touched*.
+4. **Limiter functions are `async` from day one** (their bodies must stay synchronous — an async
+   function runs synchronously to its first `await`, which is what keeps each reservation atomic).
+   Callers `await`, so the Redis backend is a drop-in. Documented as an invariant in the file.
+5. **`GET /api/v1/auth/me` added** — session introspection (user + memberships) for any client, and
+   the first route on `withAuth`, which is what makes the guard verifiable over HTTP.
+6. **Cache headers:** `noStore()` on every auth response; `withAuth` adds `private, no-store` to every
+   authenticated response.
+7. **Cookie lifetime = absolute expiry**; idle expiry is enforced server-side only (so the cookie is
+   never refreshed and Server Components, which can't set cookies, still slide the idle window).
+8. **Setup wizard migrated and retrofitted:** onto the reserve/refund limiter and `hashPassword()`, with
+   a 128-char password cap; on the shared UI primitives with real `<label>` associations,
+   `autocomplete` hints, and the design's "served over plain HTTP in production" warning; the 3.5 s
+   auto-redirect after success was replaced by an explicit "Continue to sign in" button (an unrequested
+   timed context change fails WCAG 2.2.1).
+9. **UI shipped with the phase** (not just API): `/login`, `/dashboard`, `/` (pure router), shared
+   `ui/` primitives and `AuthShell`. Two behaviours worth naming because a server-rendered page can't
+   notice them itself: **cross-tab sign-out** (BroadcastChannel) and **`pageshow` revalidation** so the
+   browser's back/forward cache can't resurrect a signed-out user's dashboard on a shared computer.
+   New modules: `lib/setup/status.ts`, `lib/auth/memberships.ts`, `lib/roles.ts`.
+    Found by driving the real flow in a browser (not by review): after a rejected sign-in the password
+    input was still `disabled` when `focus()` was called, so focus silently fell to `<body>` — keyboard
+    and screen-reader users lost their place. Focus now returns to the (emptied) password field after
+    render; covered by a regression test.
+10. **The migration was authored with `prisma migrate diff` + hand-written SQL**, not `migrate dev`:
+    `migrate dev` refuses to run non-interactively when it must confirm a destructive column drop
+    (`Session.sessionToken`). Recorded so the next migration author doesn't lose time to it.
+11. **Where the work lives:** `octalve-core/octalve-edu` has no Claude GitHub App installed, so this
+    phase is developed on `claude/auth-0.5.1-port` in the maintainer's fork
+    (`roji-tech/octalve-edu-fork`) and merged by PR into `octalve-core/octalve-edu` by the maintainer.
+
+12. **Password limits corrected: 72 bytes at every *set* path, 128 characters at *login*.** The design
+    above (and AlEemaan's shipped code) capped passwords at 128 *characters* with the stated reason that
+    "bcrypt silently truncates at 72 bytes" — but a 128-character cap does not address truncation at all:
+    verified empirically (bcryptjs 3) that a 72-byte prefix plus anything else verifies as the same
+    password, so a 100-character passphrase is really protected by its first 72 bytes and a typo after
+    byte 72 still signs the user in. (Bytes, not characters: 25 emoji is 100 bytes.) Fix, in
+    `lib/auth/password-policy.ts` (client-safe, no Node imports): `PASSWORD_MAX_BYTES = 72` is *rejected*,
+    never truncated, wherever a password is set (setup wizard now; signup / change / reset later), with a
+    message the user can act on and live feedback in the setup form; `hashPassword()` throws as a backstop.
+    `PASSWORD_MAX_LENGTH = 128` remains, but only as the input-size bound for login — login must keep
+    accepting whatever an existing account's password was set to (bcrypt truncates identically at verify
+    time), so tightening it could lock out a real user. **Tracked for back-porting to AlEemaan** (it has
+    live accounts, so its login must stay at 128 while its set paths adopt the byte limit).
+13. **`withAuth`'s own refusals (401 `UNAUTHENTICATED`, 403 `CSRF`) are `no-store` too** — found by the
+    API suite: the first version only marked the handler's success response, so the guard's early
+    returns carried no `Cache-Control`. Every response the wrapper emits is now uncacheable.
+14. **Baseline security headers** (`next.config.ts`, all routes): `X-Frame-Options: DENY` plus
+    `Content-Security-Policy: frame-ancestors 'none'` (clickjacking — the login form was frameable),
+    `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` (tenant
+    codes and record IDs live in paths; cross-origin referrers get the origin only), and
+    `poweredByHeader: false`. **HSTS is deliberately *not* set by the app**: TLS terminates at the
+    reverse proxy, `headers()` in `next.config.ts` is fixed at build time while the scheme is a runtime
+    setting (`APP_URL`), and the header is meaningless over HTTP — so it belongs in the proxy config
+    (add `Strict-Transport-Security "max-age=15552000"` to the Solo installer's Caddyfile; no
+    `includeSubDomains`/`preload` — a school's other subdomains may not be HTTPS-ready). A full
+    nonce-based script CSP is a separate, larger piece of work tracked under §0.5.3.
+15. **Test infrastructure is part of the deliverable** (`tests/`, `playwright.config.ts`, `pnpm test`):
+    Playwright Test as the single runner — `unit` (pure logic), `integration` (modules against Postgres),
+    `api` (real HTTP against a production build), `e2e-desktop`/`e2e-mobile` (real Chromium), `https`
+    (real Chromium over real TLS via a local proxy, so the `__Host-` rules are enforced). Runs against a
+    dedicated `<db>_test` database (created and migrated with `migrate deploy` automatically; every
+    destructive helper refuses to run against any database whose name doesn't end in `_test`). Each test
+    creates its own users and its own client IP (the servers trust `X-Real-IP`, exactly as in
+    production) so tests can't exhaust each other's rate-limit buckets. Every security-relevant assertion
+    was mutation-checked (a deliberate bug is injected and the suite must fail) — see the phase record.
+
+**Explicitly out of scope for this pass, tracked, not forgotten:** TOTP MFA and its pending-state
+token (design above stands; must land **before Phase 1's Settings UI**, which needs step-up MFA and
+`mfaRequiredForTeaching`), password reset, breached-password check, the active-devices page. The login
+route is structured so the pending-MFA step slots between "password verified" and "session created"
+without restructuring.
+
+**UI in this pass** (the setup wizard already redirects to `/login`, which did not exist — an auth API
+with no way to sign in is not a finished phase): a `/login` page in the wizard's visual language
+(properly associated labels, `aria-live` errors, show/hide password, correct `autocomplete`
+attributes, enumeration-safe copy, a clear rate-limited state), a minimal `/dashboard` (who is signed
+in, which schools they belong to, sign out) that becomes the §0.5.2 front-door router, and `/` as a
+pure router (session → `/dashboard`; Solo with setup incomplete → `/setup`; otherwise `/login`),
+replacing the create-next-app placeholder. No `?next=` redirect parameter yet — when one is added it
+must accept only same-origin relative paths (open-redirect defense).
+
+**Verification for this pass** — the standard AlEemaan's rebuild set, made repeatable rather than
+hand-run: (1) scripted API checks against a real Postgres, including direct `psql` inspection that
+`Session.tokenHash` never equals the cookie value and that the email `CHECK` rejects mixed case;
+(2) timing comparison of the no-such-user and wrong-password paths; (3) rate-limit trip test with
+spoofed `X-Forwarded-For` proving it is ignored while `X-Real-IP` is honored; (4) `Set-Cookie`
+attribute assertions for both cookie shapes, plus a **real-browser HTTPS run** (self-signed local TLS
+proxy, Chromium enforcing the actual `__Host-` rules) proving login sets and logout *actually clears*
+the cookie — the open item the two-AI review flagged as unverified (P0 #4); (5) Playwright flow tests
+for the UI: sign-in success, wrong password, rate-limited state, keyboard-only use, session persisting
+across reload, sign-out then back-button, direct navigation to `/dashboard` when signed out, and the
+setup → login hand-off.
+
+**Result (2026-09-30): all five were delivered and exceeded** — see `phases/phase-0.5.1-auth.md`:
+234 tests (`pnpm test`), every security assertion mutation-checked (40 of 40 injected bugs caught), axe
+WCAG 2.2 on every screen and state, and the real-HTTPS run that closes P0 #4 (the `__Host-` cookie is
+accepted on login and actually removed on logout; a bare `cookies.delete()` makes it fail). The
+verification also found ten defects the design had not anticipated — decisions #12–#15 above.
+
 #### Login/logout route design
 
 Guard order, same as every other mutating route in this codebase: `validateCSRF(req)` (the helper
@@ -162,6 +346,9 @@ already exists, `lib/auth/csrf.ts`, built for the setup wizard) → rate limit (
 - **Password max length: 128 characters, enforced in the Zod schema at both login and account
   creation.** bcrypt silently truncates at 72 bytes — without a cap, a long passphrase loses
   entropy with no warning, and nothing stops an oversized payload from being submitted.
+  **Corrected 2026-09-30 (see "Decisions made during implementation" #12):** a 128-character cap
+  bounds the payload but does *not* stop bcrypt's silent truncation. New passwords are limited to 72
+  *bytes* and rejected past that; 128 remains only as login's input-size bound.
 - **Fresh, server-generated, high-entropy session token on every login, never client-supplied**
   (`crypto.randomBytes(32).toString("hex")`, 256 bits) — the actual defense against session
   fixation. Stated explicitly so a future change can't "simplify" it into accepting or reusing a

@@ -43,15 +43,28 @@ pnpm prisma migrate dev
 pnpm dev
 ```
 
+## Tests
+
+```bash
+pnpm exec playwright install chromium   # once
+pnpm test                                # production build + every suite (unit, integration, API, browser, HTTPS)
+pnpm typecheck && pnpm lint
+```
+
+Needs the Postgres above (tests use their own `<database>_test`, created and migrated automatically)
+and `openssl` on the PATH. What each suite proves, and how to add to them: [`tests/README.md`](tests/README.md).
+
 ## Status
 
 **Phase 0 (Foundation) is done** — see
 [`docs/development-history/phases/phase-0-foundation.md`](docs/development-history/phases/phase-0-foundation.md).
 **Phase 0.5.0 (first-run superadmin setup wizard, Solo only) is also done** — see
 [`docs/development-history/phases/phase-0.5.0-setup-wizard.md`](docs/development-history/phases/phase-0.5.0-setup-wizard.md).
-Everything else from Phase 0.5 onward (Auth.js wiring, RLS, the tenant-trust-boundary resolver,
-every domain feature) is planned but not yet built — see the progress tracker linked above for the
-current, honest state.
+**Phase 0.5.1 (auth: hashed-token database sessions, login/logout, `/login` + `/dashboard`, the test
+suite) is built and verified**, awaiting merge — see
+[`docs/development-history/phases/phase-0.5.1-auth.md`](docs/development-history/phases/phase-0.5.1-auth.md).
+Everything else from Phase 0.5.2 onward (the tenant-trust-boundary resolver, RLS, every domain feature)
+is planned but not yet built — see the progress tracker linked above for the current, honest state.
 
 ## Repo layout
 
