@@ -720,6 +720,54 @@ where "the code compiles" is not sufficient evidence of done; per Audit finding 
 RLS-looking-correct and RLS-being-correct are different claims until a real cross-tenant test fails
 when it should.
 
+#### Build design for §0.5.3 (2026-10-05, written before any code)
+
+The design above stands; this settles what it left open. Sub-phases (each ends with tests → mutation pass → docs): **A** envelope with
+`details`, pagination, validation · **B** the first real tenant routes that use them (campuses) · **C** CSRF hardening in `withAuth` · **D** the
+Redis rate-limit store · **E** auth-event audit · **F** breached-password check · **G** the negative-test file. *Not here:* the cookieless
+upload domain (designed with the LMS, Phase 3).
+
+**A. Envelope, pagination, validation.** `fail()` gains an optional `details` array (`[{ path, message }]`) — backward compatible. A test fails if
+any route builds `{ data, meta, error }` inline instead of using `ok`/`fail`. `lib/api/pagination.ts`: *offset* (`page`, `limit`; defaults 1 / 25,
+cap 100; integers only; **repeated or non-numeric params are a 400, never silently first-wins**) returning `{ skip, take }` and `meta
+{ page, limit, total, pages, hasNext }`; *cursor* for high-churn lists (`after`, `limit`) — the cursor is `base64url(JSON {t, id})`, ≤ 256 chars,
+strictly validated (garbage → 400), keyset on `(createdAt, id)`, fetch `limit + 1` to know whether there is a next page. `lib/api/validate.ts`:
+`validate({ body?, query? }, handler)` composes *inside* `withAuth`: JSON parse failure → 400 `INVALID_BODY`, body over 1 MiB → 413
+`PAYLOAD_TOO_LARGE` (declared and actual length), zod failure → 400 `VALIDATION` with `details` (≤ 20, our messages, never zod internals), unknown
+body keys **stripped** (never mass-assigned), the parsed `{ body, query }` is the handler's 4th argument. The same zod schemas are what
+`zod-openapi` will later document, so validation and docs cannot drift. Existing routes keep their bespoke handling (they have their own tests);
+new routes use these.
+
+**B. The first real tenant routes.** `GET /api/v1/schools/[code]/campuses` (any member; ADMIN sees all, others their campus; offset-paginated) and
+`POST` (ADMIN only; `validate`d name 1–100, unique per school, audited before/after, rate-limited). They are real Phase-1 groundwork *and* the
+live exercise of pagination, validation, `roles`, the tenant context and audit; the file-system-discovered boundary test guards them
+automatically.
+
+**C. `withAuth` hardening.** `Sec-Fetch-Site` is a second signal on non-safe methods: `cross-site` and `same-site` are refused (a sibling
+subdomain — the uploaded-content domain — must not be able to ride a session), `same-origin` / `none` / absent pass. `x-forwarded-host` is
+**no longer trusted by default**: it is read only when `TRUST_FORWARDED_HOST=true` (set by the operator when a proxy sets it; the TLS test
+proxy server sets it), otherwise the `Host` header (falling back to the request URL's host) is compared with Origin/Referer.
+
+**D. The Redis store.** The limiter keeps its interface (`reserveAttempt` / `refundAttempt` / `checkRateLimit`, async from day one) and gains a
+**store**: `memory` (today's implementation, unchanged, default) and `redis` (`ioredis`, one atomic Lua script per reserve/refund over a sorted set —
+the same sliding window, so behaviour is identical between stores and one conformance suite runs against both). `RATE_LIMIT_STORE=redis` +
+`REDIS_URL` selects it. **Redis failure degrades to the in-process memory store** (logged once per outage): never "no limit", never "everyone locked
+out". Production SaaS with the memory store logs a loud startup warning (a multi-instance deployment multiplies the limit).
+
+**E. Auth-event audit.** `LOGIN_SUCCEEDED` (user agent, never an IP) and `LOGIN_BLOCKED` (a *known* account hit its limit — once per window, so a
+flood cannot become a flood of audit rows) join the person-level events; unknown addresses are never audited.
+
+**F. Breached passwords.** `lib/auth/pwned-password.ts`: k-anonymity — only the first 5 hex characters of the SHA-1 go to the range API (with
+`Add-Padding: true`), 2 s timeout, **fail open** (a network error never blocks a person from setting a password), applied server-side in setup /
+reset / change after the shape rule: "That password has appeared in a data breach — choose another." `PWNED_PASSWORD_CHECK=off` disables it (the
+test servers); unit tests inject the fetcher.
+
+**G. Tests.** unit: pagination (boundaries 0 / negative / huge / non-numeric / repeated / float / cursor tampering), validate (every error shape,
+stripping, size cap), the CSRF decision table, SHA-1 range logic; **store conformance** (same cases against memory and a real Redis: limit, window,
+refund, independent keys, concurrent reserves → exactly `limit` succeed, outage → fallback); integration: campus routes in-process; api (SaaS server):
+list/paginate/validate/create/duplicate/forbidden-role/rate-limit/cross-tenant/revoked-session. A Redis server is a test prerequisite (`redis-server`
+on `PATH`; the Playwright config starts it on port 6390).
+
 ### Phase 0.5 addenda (2026-09-30, after the auth build)
 
 Four pieces of work that sit between "auth works" and "Phase 1 can start", each designed here first
