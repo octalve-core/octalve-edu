@@ -36,6 +36,9 @@ test.describe("offset pagination", () => {
       expect(refused(`page=${encodeURIComponent(bad)}`), `page=${JSON.stringify(bad)}`).toEqual(["page"]);
     }
     expect(refused("page=0&limit=0")).toEqual(["limit", "page"]); // both reported at once
+    // A signed number is refused as "not a whole number" — a different failure from "out of range".
+    const signed = parseOffsetPagination(q("page=-1"));
+    expect(signed).toMatchObject({ ok: false, issues: [{ path: "page", message: "page must be a whole number." }] });
   });
 
   test("a REPEATED parameter is a 400, never 'the first one wins'", () => {
@@ -75,6 +78,13 @@ test.describe("cursor pagination", () => {
     ]) {
       expect(decodeCursor(bad), JSON.stringify(bad).slice(0, 60)).toBeNull();
     }
+  });
+
+  test("a VALID cursor padded past the length cap is refused too (the cap is its own rule, not a side effect)", () => {
+    const padded = Buffer.from(JSON.stringify({ t: cursor.createdAt.toISOString(), id: cursor.id, pad: "x".repeat(400) })).toString("base64url");
+    expect(padded.length).toBeGreaterThan(256);
+    expect(decodeCursor(padded)).toBeNull();
+    expect(decodeCursor(encodeCursor(cursor))).toEqual(cursor); // …while the ordinary one is fine
   });
 
   test("parseCursorPagination: limit rules, 'after' validated, take = limit + 1", () => {

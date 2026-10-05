@@ -194,6 +194,24 @@ test.describe("fallback when Redis is unreachable", () => {
     }
   });
 
+  test("while Redis STAYS down, re-probing after each cooldown does not log again — one line per outage", async () => {
+    const dead = connectRedis("redis://127.0.0.1:6399");
+    const store = createResilientStore(createRedisStore(dead), createMemoryStore(), { cooldownMs: 50 });
+    const errors: unknown[][] = [];
+    const orig = console.error;
+    console.error = (...a: unknown[]) => void errors.push(a);
+    try {
+      for (let i = 0; i < 3; i++) {
+        await store.reserve(key("probe"), 5);
+        await sleep(80); // the cooldown passes, so the next call probes Redis again — and fails again
+      }
+      expect(errors).toHaveLength(1);
+    } finally {
+      console.error = orig;
+      dead.disconnect();
+    }
+  });
+
   test("a dead Redis costs ONE slow request per cooldown, not one per request", async () => {
     const dead = connectRedis("redis://127.0.0.1:6399");
     const store = createResilientStore(createRedisStore(dead), createMemoryStore(), { cooldownMs: 60_000 });
