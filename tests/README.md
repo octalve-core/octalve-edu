@@ -46,6 +46,23 @@ Tests run against **`<your database>_test`** (e.g. `octalve_edu_test`), never yo
 with `TEST_DATABASE_URL` (its database name **must** end in `_test`). Every destructive helper
 re-checks `current_database()` and refuses to run against anything else.
 
+## Lanes — the same suite, several at once
+
+The suite is serial for a reason: its tests share ONE database and a fixed block of ports. A **lane** is an isolated copy of both, so
+several runs of the same source can go at the same time — what is tested, and every assertion, is unchanged; only *how many at once* is.
+
+- `TEST_LANE=<n>` (a digit; default 0) moves every port up by 10 × `n` (Redis by `n`) and makes the database `<name>_lane<n>_test` — see `tests/support/env.ts`.
+  Each lane also needs its own directory (its own `.next` build, mail outbox and results); `node scripts/lanes.mjs` makes them: lane 0 is this checkout, lanes 1–9 are copies in
+  `../.octalve-lanes/lane<n>` (override with `LANES_ROOT`), kept in sync from your working tree — committed or not — with dependencies taken from the pnpm store (≈ 10 s).
+- **`pnpm test:lanes`** (= `node scripts/lanes.mjs test --lanes 3`): builds **only if the build is older than the code** (a stale `.next` is never reused), copies the build into the
+  lanes, runs `playwright test --shard=k/N` in each lane concurrently, and prints one merged verdict — totals summed over lanes, every failing test named, **exit 1 if any lane failed**.
+  The shards partition the same tests (each shard also runs the `setup` project once, so a 3-lane run reports 2 more passes than a 1-lane run — that is the only difference).
+  Extra Playwright arguments go after `--`: `pnpm test:lanes -- --project=api`. `--lanes N` picks the count (4 cores: 3 is a good default); `--no-build` reuses the build.
+- `pnpm lanes:sync [n…]` refreshes lane copies without running anything (used by mutation passes: each lane applies a bug to **its own copy**, so the working tree is never edited and
+  work can carry on in it while a pass runs).
+- Before a PR, `pnpm test` (one lane, `pnpm build` first) remains the reference; `test:lanes` is for the inner loop and for long runs. If a result ever differs between the two, the one-lane
+  run is right and the difference is a bug in test isolation — fix that.
+
 ## Layout — what each project proves
 
 | Project | Folder | Runs against | Proves |

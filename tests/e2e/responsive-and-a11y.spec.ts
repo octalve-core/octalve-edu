@@ -355,6 +355,7 @@ test.describe("account self-service screens (profile, email, sessions)", () => {
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 
   test("/account: profile editor (idle, editing, error), email card (form, errors, sent), sessions (alone, with others)", async ({ page, isMobile, browser }) => {
+    test.slow(); // seven screens × both themes of axe: ~25 s on an idle machine, so it was always one busy moment from the 30 s default
     const user = await createUser({ role: Role.ADMIN, name: "Amina Yusuf" });
     await signInThroughUi(page, user);
     await page.goto("/account");

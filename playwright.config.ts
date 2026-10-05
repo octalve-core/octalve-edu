@@ -35,8 +35,14 @@ import {
 // One worker, no file-level parallelism: the suites share a database and the
 // setup spec deliberately starts from an empty one. Each test creates its own
 // users and its own client IP, so tests never depend on each other's data.
+// More than one lane shares the machine's cores, and browser tests are CPU-bound: `TEST_TIMEOUT_SCALE` (set by scripts/lanes.mjs, 1 otherwise)
+// stretches the TIMEOUTS in proportion — never an assertion, never a retry: a test that fails still fails, it just isn't blamed for the load.
+const scale = Number(process.env.TEST_TIMEOUT_SCALE ?? "1") || 1;
+
 export default defineConfig({
   testDir: "./tests",
+  timeout: 30_000 * scale,
+  expect: { timeout: 5_000 * scale },
   outputDir: "./test-results",
   fullyParallel: false,
   workers: 1,

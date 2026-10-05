@@ -1,6 +1,6 @@
 import { test, expect } from "../support/fixtures";
 import type { Page } from "@playwright/test";
-import { Role, addMembership, createTenant, createUser, db, removeCreatedTenants, seedInstance, uniqueEmail, type TestTenant } from "../support/db";
+import { Role, createTenant, createUser, db, removeCreatedTenants, seedInstance, uniqueEmail, type TestTenant } from "../support/db";
 import { SAAS_URL } from "../support/env";
 import { hashInvitationToken, newInvitationToken } from "@/lib/invitations/token";
 import { fillCredentials, signInButton, signInThroughUi, HOME_URL } from "./helpers";

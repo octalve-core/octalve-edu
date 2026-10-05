@@ -21,7 +21,9 @@
     "test:api": "playwright test --project=api",
     "test:e2e": "playwright test --project=e2e-desktop --project=e2e-mobile",
     "test:https": "playwright test --project=https",
-    "db:roles": "node scripts/db-roles.mjs"
+    "db:roles": "node scripts/db-roles.mjs",
+    "lanes:sync": "node scripts/lanes.mjs sync",
+    "test:lanes": "node scripts/lanes.mjs test"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/SelectField";
@@ -33,7 +34,6 @@ export function UsersPanel({ schoolCode, schoolName, campuses, currentUserId }: 
   const [status, setStatus] = useState("active");
   const [campusId, setCampusId] = useState("");
   const [page, setPage] = useState(1);
-  const [reload, setReload] = useState(0);
 
   const [members, setMembers] = useState<Member[] | null>(null);
   const [meta, setMeta] = useState<PageMeta | null>(null);
@@ -60,40 +60,61 @@ export function UsersPanel({ schoolCode, schoolName, campuses, currentUserId }: 
     return () => clearTimeout(timer);
   }, [searchText, q]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const params = new URLSearchParams({ status, page: String(page), limit: String(PAGE_SIZE) });
-    if (role) params.set("role", role);
-    if (campusId) params.set("campusId", campusId);
-    if (q) params.set("q", q);
-    getJson(`/api/v1/schools/${schoolCode}/members?${params}`, controller.signal).then((reply) => {
-      if (controller.signal.aborted) return;
-      if (reply.ok) {
-        setMembers(reply.data!.members as Member[]);
-        setMeta(reply.meta as PageMeta);
-        setLoadError(null);
-      } else {
-        setLoadError(failureText(reply.status, reply.message));
-      }
-    });
-    return () => controller.abort();
-  }, [schoolCode, status, role, campusId, q, page, reload]);
+  // The two lists load through plain functions, so an action can AWAIT its own refresh (and, with `flush`, have the new lists in the DOM
+  // when it resumes) instead of guessing with a timer how long the refresh takes.
+  const loadMembers = useCallback(
+    async (signal?: AbortSignal, flush = false) => {
+      const params = new URLSearchParams({ status, page: String(page), limit: String(PAGE_SIZE) });
+      if (role) params.set("role", role);
+      if (campusId) params.set("campusId", campusId);
+      if (q) params.set("q", q);
+      const reply = await getJson(`/api/v1/schools/${schoolCode}/members?${params}`, signal);
+      if (signal?.aborted) return;
+      const apply = () => {
+        if (reply.ok) {
+          setMembers(reply.data!.members as Member[]);
+          setMeta(reply.meta as PageMeta);
+          setLoadError(null);
+        } else {
+          setLoadError(failureText(reply.status, reply.message));
+        }
+      };
+      if (flush) flushSync(apply);
+      else apply();
+    },
+    [schoolCode, status, role, campusId, q, page],
+  );
+  const loadInvitations = useCallback(
+    async (signal?: AbortSignal, flush = false) => {
+      const reply = await getJson(`/api/v1/schools/${schoolCode}/invitations?limit=100`, signal);
+      if (signal?.aborted || !reply.ok) return;
+      const apply = () => setInvitations(reply.data!.invitations as Invitation[]);
+      if (flush) flushSync(apply);
+      else apply();
+    },
+    [schoolCode],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
-    getJson(`/api/v1/schools/${schoolCode}/invitations?limit=100`, controller.signal).then((reply) => {
-      if (!controller.signal.aborted && reply.ok) setInvitations(reply.data!.invitations as Invitation[]);
-    });
+    void loadMembers(controller.signal);
     return () => controller.abort();
-  }, [schoolCode, reload]);
+  }, [loadMembers]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadInvitations(controller.signal);
+    return () => controller.abort();
+  }, [loadInvitations]);
 
-  const refresh = useCallback(() => setReload((n) => n + 1), []);
+  /// Reloads both lists and resolves when they are in the DOM.
+  const refresh = useCallback(() => Promise.all([loadMembers(undefined, true), loadInvitations(undefined, true)]).then(() => undefined), [loadMembers, loadInvitations]);
 
-  /// After something finishes and a control that had focus may be gone, park focus on the page summary instead of <body>.
-  function settleFocus() {
-    setTimeout(() => {
-      if (document.activeElement === document.body || !document.activeElement) summaryRef.current?.focus();
-    }, 50);
+  /// After a change that may have removed the control that had focus (a deactivated person's row, a revoked invitation, the closed dialog's
+  /// opener): wait until the lists are refreshed — and in the DOM — and only then, if focus has fallen to <body>, park it on the page summary.
+  /// No timer: whatever the machine's speed, the check happens after the thing it is checking for.
+  async function afterChange() {
+    await refresh();
+    if (!document.activeElement || document.activeElement === document.body) summaryRef.current?.focus();
   }
 
   async function reactivate(member: Member) {
@@ -102,8 +123,7 @@ export function UsersPanel({ schoolCode, schoolName, campuses, currentUserId }: 
     setBusyUser(null);
     if (reply.ok) {
       setNotice({ variant: "success", text: `${displayName(member)} can use ${schoolName} again.` });
-      refresh();
-      settleFocus();
+      await afterChange();
     } else {
       setNotice({ variant: "error", text: failureText(reply.status, reply.message) });
     }
@@ -115,10 +135,10 @@ export function UsersPanel({ schoolCode, schoolName, campuses, currentUserId }: 
     setBusyInvitation(null);
     if (reply.ok) {
       setNotice({ variant: "success", text: `A new invitation was sent to ${invitation.email}. The earlier link no longer works.` });
-      refresh();
+      await refresh();
     } else if (reply.status === 404) {
       setNotice({ variant: "error", text: "That invitation is no longer open." });
-      refresh();
+      await refresh();
     } else {
       setNotice({ variant: "error", text: failureText(reply.status, reply.message) });
     }
@@ -130,8 +150,7 @@ export function UsersPanel({ schoolCode, schoolName, campuses, currentUserId }: 
     setBusyInvitation(null);
     if (reply.ok || reply.status === 404) {
       setNotice({ variant: "success", text: `The invitation to ${invitation.email} was revoked. Its link no longer works.` });
-      refresh();
-      settleFocus();
+      await afterChange();
     } else {
       setNotice({ variant: "error", text: failureText(reply.status, reply.message) });
     }
@@ -194,7 +213,7 @@ export function UsersPanel({ schoolCode, schoolName, campuses, currentUserId }: 
         {loadError ? (
           <Alert variant="error" className="mt-3">
             <p>{loadError}</p>
-            <Button variant="secondary" className="mt-3" onClick={refresh}>
+            <Button variant="secondary" className="mt-3" onClick={() => void refresh()}>
               Try again
             </Button>
           </Alert>
@@ -316,10 +335,9 @@ export function UsersPanel({ schoolCode, schoolName, campuses, currentUserId }: 
         schoolCode={schoolCode}
         campuses={campuses}
         onInvited={(invitation) => {
-          setInviting(false);
+          flushSync(() => setInviting(false)); // the dialog is closed (and focus handed back) before the lists are reloaded
           setNotice({ variant: "success", text: `Invitation sent to ${invitation.email}. The link works for 7 days.` });
-          refresh();
-          settleFocus();
+          void afterChange();
         }}
       />
       <EditMemberDialog
@@ -328,9 +346,9 @@ export function UsersPanel({ schoolCode, schoolName, campuses, currentUserId }: 
         schoolCode={schoolCode}
         campuses={campuses}
         onSaved={(member, changed) => {
-          setEditing(null);
+          flushSync(() => setEditing(null));
           setNotice({ variant: "success", text: changed ? `Saved. ${displayName(member)} is now ${ROLE_LABELS[member.role]}${member.campusName ? ` at ${member.campusName}` : ""}.` : "Nothing needed changing." });
-          refresh();
+          void refresh();
         }}
       />
       <DeactivateDialog
@@ -339,10 +357,9 @@ export function UsersPanel({ schoolCode, schoolName, campuses, currentUserId }: 
         schoolCode={schoolCode}
         schoolName={schoolName}
         onDone={(member) => {
-          setDeactivating(null);
+          flushSync(() => setDeactivating(null)); // the dialog is closed (and focus handed back) before the lists are reloaded
           setNotice({ variant: "success", text: `${displayName(member)} was deactivated. They lose access on their next request.` });
-          refresh();
-          settleFocus();
+          void afterChange();
         }}
       />
     </div>

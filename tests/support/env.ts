@@ -12,35 +12,44 @@ try {
   // no .env — fine
 }
 
+/// TEST LANES: the suite is serial because it shares one database and a fixed block of ports. A LANE is an isolated copy of both — set
+/// `TEST_LANE=1` (…9) and every port moves up by 10 × the lane (Redis by 1 × the lane) and the test database becomes
+/// `<name>_lane<N>_test` — so several checkouts of the same source can run at once (see tests/README.md, "Lanes", and
+/// scripts/lanes.mjs). Lane 0, the default, is exactly the old layout. Files (the outbox, test-results) are per checkout already.
+const rawLane = process.env.TEST_LANE ?? "0";
+if (!/^[0-9]$/.test(rawLane)) throw new Error(`TEST_LANE must be a single digit 0–9 (got "${rawLane}").`);
+export const LANE = Number(rawLane);
+const lanePort = (base: number) => base + LANE * 10;
+
 /// The "inbox": EMAIL_TRANSPORT=file appends one JSON line per message here (see tests/support/outbox.ts).
 export const EMAIL_FILE = `${process.cwd()}/tests/.tmp/outbox.jsonl`;
 
-export const HTTP_PORT = 3100; // plain-HTTP app: APP_URL=http://localhost:3100 -> unprefixed cookie
-export const HTTPS_APP_PORT = 3101; // same build, APP_URL=https://localhost:3443
-export const TLS_PORT = 3443; // TLS-terminating reverse proxy in front of 3101
+export const HTTP_PORT = lanePort(3100); // plain-HTTP app: APP_URL=http://localhost:3100 -> unprefixed cookie
+export const HTTPS_APP_PORT = lanePort(3101); // same build, APP_URL=https://localhost:3443
+export const TLS_PORT = lanePort(3443); // TLS-terminating reverse proxy in front of 3101
 
 /// A FOURTH server: the same build in "staging" mode with the dev tools on and a token required, the one place
 /// the dev email inbox exists (the other three are production-shaped and must show no trace of it).
-export const DEVTOOLS_PORT = 3102;
+export const DEVTOOLS_PORT = lanePort(3102);
 export const DEV_TOOLS_TEST_TOKEN = "test-dev-tools-token-0123456789";
 
 /// A FIFTH server: the same build in `DEPLOYMENT_MODE=saas`. The other servers are Solo (the whole install is one
 /// school, and a second tenant is an invariant violation that fails closed), so everything that needs SEVERAL
 /// schools in one database — the tenant boundary, the school picker — runs here.
-export const SAAS_PORT = 3103;
+export const SAAS_PORT = lanePort(3103);
 
 /// A SIXTH server, deliberately misconfigured: the SaaS-mode build connected as the ADMIN (the table owner, which
 /// bypasses row-level security) instead of `app_user`. It exists to prove `assertRlsEnforced()` is wired in — a
 /// production process on such a connection must refuse to serve tenant data rather than serve it unprotected.
-export const UNSAFE_RLS_PORT = 3105;
+export const UNSAFE_RLS_PORT = lanePort(3105);
 
 /// A stand-in for the breached-password range API (tests/support/pwned-stub.mjs); the SaaS-mode server checks against it.
-export const PWNED_STUB_PORT = 3104;
+export const PWNED_STUB_PORT = lanePort(3104);
 export const PWNED_STUB_URL = `http://127.0.0.1:${PWNED_STUB_PORT}`;
 
 /// A throwaway Redis for the rate-limit store tests (started by playwright.config.ts: `redis-server` must be on PATH,
 /// or `docker compose up -d redis` provides one on 6380 — set TEST_REDIS_URL to use that instead).
-export const REDIS_TEST_PORT = 6390;
+export const REDIS_TEST_PORT = 6390 + LANE;
 export const TEST_REDIS_URL = process.env.TEST_REDIS_URL ?? `redis://localhost:${REDIS_TEST_PORT}`;
 
 export const HTTP_URL = `http://localhost:${HTTP_PORT}`;
@@ -55,6 +64,7 @@ export const HTTPS_URL = `https://localhost:${TLS_PORT}`;
 ///                          BYPASSRLS). Defaults to DIRECT_URL (else DATABASE_URL) with `_test` appended to the name.
 ///   TEST_APP_DATABASE_URL  the RUNTIME role `app_user`: what the servers under test and every in-process import of the
 ///                          app connect as — so tests exercise row-level security as production does.
+/// (In a lane other than 0 the derived name carries the lane: see LANE above.)
 /// Both are idempotent (a name already ending in `_test` is left alone), which matters because this module is evaluated
 /// again inside every worker process, where DATABASE_URL has already been rewritten — so the results are written back
 /// to the environment below.
@@ -70,7 +80,8 @@ function resolveTestDatabaseUrl(): string {
     if (explicit) {
       throw new Error(`TEST_DATABASE_URL must name a database ending in "_test" (got "${name}").`);
     }
-    url.pathname = `/${name}_test`;
+    // A lane's database is its own: `octalve_edu_lane2_test` — never the default lane's, never the development one.
+    url.pathname = `/${name}${LANE > 0 ? `_lane${LANE}` : ""}_test`;
   }
   return url.toString();
 }
