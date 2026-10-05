@@ -46,17 +46,22 @@ export async function resolveTenant(input: { userId: string; code: string }): Pr
   const code = typeof input.code === "string" ? input.code.trim().toLowerCase() : "";
   if (!isValidTenantCode(code)) return FORBIDDEN;
 
+  // Which tenant the membership is looked up in: the one the URL's code names (SaaS) — or, in Solo, the install's
+  // single tenant BY ID, with the URL's code only checked against it. (Looking up by the URL's code in both modes
+  // would make the Solo code check redundant; the whole point of Solo is that the tenant does NOT come from the URL.)
+  let tenantFilter: { code: string } | { id: string } = { code };
   if (process.env.DEPLOYMENT_MODE === "solo") {
     const only = await soloTenant();
     if (only === "misconfigured") return { ok: false, status: 500, code: "TENANT_MISCONFIGURED" };
     if (only.code !== code) return FORBIDDEN;
+    tenantFilter = { id: only.id };
   }
 
   // The caller's membership in the tenant with this code, read through the user context (the one path by which a
   // person may see their own memberships before any tenant is known). Tenant is not tenant-scoped data.
   const membership = await forUser(input.userId).transaction((tx) =>
     tx.tenantMembership.findFirst({
-      where: { userId: input.userId, tenant: { code } },
+      where: { userId: input.userId, tenant: tenantFilter },
       select: { role: true, campusId: true, tenant: { select: { id: true, code: true, name: true } } },
     }),
   );

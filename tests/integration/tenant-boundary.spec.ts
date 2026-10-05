@@ -147,6 +147,24 @@ test.describe("resolveTenant", () => {
       });
     });
 
+    test("a MALFORMED code is a plain 403 even on a misconfigured install — garbage is refused before the install's state is consulted", async () => {
+      await withEnv(SOLO, async () => {
+        const member = await createUser({ role: Role.ADMIN });
+        await createTenant(); // a second tenant: a well-formed code now gets the 500…
+        const tenant = await db.tenant.findFirstOrThrow({ orderBy: { createdAt: "asc" } });
+        const original = console.error;
+        console.error = () => undefined;
+        try {
+          expect(await resolveTenant({ userId: member.id, code: tenant.code })).toMatchObject({ ok: false, status: 500 });
+          for (const code of ["", "../x", "A B", "dashboard", "x".repeat(200)]) {
+            expect(await resolveTenant({ userId: member.id, code }), JSON.stringify(code)).toEqual({ ok: false, status: 403, code: "FORBIDDEN" }); // …but garbage never reaches that check
+          }
+        } finally {
+          console.error = original;
+        }
+      });
+    });
+
     test("NO tenant at all is a misconfiguration too", async () => {
       await withEnv(SOLO, async () => {
         const member = await createUser({ role: Role.ADMIN });
