@@ -1,17 +1,13 @@
 import Link from "next/link";
-import { AppHeader } from "@/components/auth/AppHeader";
-import { getSession } from "@/lib/auth/session";
 import { ShieldCheckIcon } from "@/components/ui/icons";
 
 // The 403 view (rendered by `forbidden()` — lib/tenant/page-tenant.ts): signed in, but this school isn't yours.
 // It deliberately names nothing: not the school, not whether it exists. "No such school" and "not a member of it"
 // look exactly the same, so the page cannot be used to find out which schools exist.
-export default async function Forbidden() {
-  const session = await getSession();
+export default function Forbidden() {
   return (
-    <div className="min-h-screen bg-canvas text-fg-2">
-      {session && <AppHeader name={session.user.name} email={session.user.email} />}
-      <main className="mx-auto max-w-xl px-4 py-16 text-center sm:px-6 sm:py-24">
+    <div>
+      <div className="mx-auto max-w-xl py-10 text-center sm:py-16">
         <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-warn-bg text-warn-icon">
           <ShieldCheckIcon className="h-7 w-7" />
         </span>
@@ -25,7 +21,7 @@ export default async function Forbidden() {
         >
           Go to your dashboard
         </Link>
-      </main>
+      </div>
     </div>
   );
 }

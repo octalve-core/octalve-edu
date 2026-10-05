@@ -892,6 +892,11 @@ carrying a secret; enumeration (different bodies); the invitation RLS hash path 
 **9. AlEemaan.** It has branches, not schools, and its member model is `Membership` per branch: the same pages and the same invitation flow are ported by reading the raw
 diff after they are proven here — with `branchId` where this has `tenantId`, and **no** `app_invitation_hash` / RLS (single tenant). Differences are logged in both plans.
 
+**As built — the shell (2026-10-05)** — record: `phases/phase-0.5.2H-app-shell.md`, branch `claude/app-shell-users`. As designed (items 1–6), with: (a) a shared `useDisclosure` hook for the switcher and the account menu (the
+Safari `relatedTarget` case written once); (b) `forbidden.tsx` moved **into** the `(app)` group so the 403 view renders inside the shell (still a real 403, still naming nothing, and it shows only the person's *own*
+schools); (c) the sidebar's person card is a named group (`Signed in as`) so it can be asserted; (d) `requireTenantPage` now goes through the cached `requirePageSession`. 26 injected bugs: 24 caught, 1 at build time, 1 equivalent.
+**Not built:** the Users and Settings *pages* (visible "Soon" entries) — Users is §0.5.4 below.
+
 ### Phase 0.5 addenda (2026-09-30, after the auth build)
 
 Four pieces of work that sit between "auth works" and "Phase 1 can start", each designed here first

@@ -277,6 +277,13 @@ The `app_user` role was created with the maintainer's approval; **the app and th
 RLS with `USING` + `WITH CHECK` on `Campus`, `AuditLog` (append-only, two independent locks) and `TenantMembership` (read: tenant **or** own user; write: tenant only); `assertRlsEnforced()` makes a production process
 refuse a bypassing role; a **catalog guard** fails the build when a table with a `tenantId` lacks forced RLS or a policy; a **sixth test server** connected as the owner proves the refusal is wired in. **932 tests pass as `app_user`; 44 injected bugs — 43 caught, 1 equivalent** (nine survived the first pass and drove stronger tests; the lesson: test a policy's `WITH CHECK` with statements that return nothing). Detail in the phase record.
 
+## The app shell (2026-10-05) — built and verified
+
+Design: plan "The app shell, and the Users pages with invitations" + "As built — the shell". Record: `phases/phase-0.5.2H-app-shell.md`. Branch `claude/app-shell-users` (stacked on `claude/tenant-rls`).
+AlEemaan's shell ported and made **school-aware**: every signed-in page now lives in `src/app/(app)/` inside a sidebar / top bar / phone tab bar + More sheet; the navigation follows the school the path is in (from the
+person's own memberships, display only — the pages still guard themselves), with a school switcher for people in several schools; Users and Settings are visible "Soon" entries. 26 injected bugs: 24 caught, 1 at build time,
+1 equivalent. Full suite counts are in the phase record.
+
 ## Shared API infrastructure (2026-10-05) — built and verified
 
 Design: plan §0.5.3 + "Build design" + "As built". Record: `phases/phase-0.5.3-api-infrastructure.md`. Same branch (`claude/tenant-trust-boundary`).

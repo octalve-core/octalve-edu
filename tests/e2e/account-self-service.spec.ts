@@ -19,7 +19,7 @@ const FIREFOX_UA = "Mozilla/5.0 (X11; Linux x86_64; rv:127.0) Gecko/20100101 Fir
 // --- Name ---------------------------------------------------------------------------------------------------
 
 test.describe("edit your name", () => {
-  test("Edit → type → Save: shown at once, persisted, the header follows, focus returns to Edit", async ({ page, isMobile }) => {
+  test("Edit → type → Save: shown at once, persisted, the header follows, focus returns to Edit", async ({ page }) => {
     const user = await createUser({ role: Role.TEACHING_STAFF, name: "Old Name" });
     await signInThroughUi(page, user);
     await page.goto("/account");
@@ -35,7 +35,8 @@ test.describe("edit your name", () => {
     await expect(page.getByRole("status").filter({ hasText: "Name updated." })).toBeVisible();
     await expect(page.getByTestId("profile-name")).toHaveText("Ọlámidé Adéṣànyà"); // trimmed and collapsed, as stored
     await expect(page.getByRole("button", { name: /^Edit name/ })).toBeFocused();
-    if (!isMobile) await expect(page.getByRole("banner").getByText("Ọlámidé Adéṣànyà")).toBeVisible(); // router.refresh()
+    // router.refresh(): the shell's account menu (in the top bar at every width) now names the new name.
+    await expect(page.getByRole("banner").getByRole("button", { name: "Account menu for Ọlámidé Adéṣànyà" })).toBeVisible();
     expect((await db.user.findUniqueOrThrow({ where: { id: user.id } })).name).toBe("Ọlámidé Adéṣànyà");
 
     await page.reload();

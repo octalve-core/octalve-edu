@@ -14,8 +14,10 @@ test.describe("signing in", () => {
     await signInThroughUi(page, user);
 
     await expect(page.getByRole("heading", { name: "Welcome, Amina" })).toBeVisible();
-    await expect(page.getByText("Bright Future Academy")).toBeVisible();
-    await expect(page.getByText("Administrator")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Bright Future Academy" })).toBeVisible();
+    await expect(page.getByRole("main").getByText("Administrator")).toBeVisible();
+    // Sign out lives in the shell's account menu (the same at every width).
+    await page.getByRole("button", { name: /^Account menu for/ }).click();
     await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 
     const cookie = (await context.cookies()).find((c) => c.name === SESSION_COOKIE);
@@ -501,7 +503,7 @@ test.describe("staying signed in, and signing out", () => {
       await signInThroughUi(pageB, b);
       await expect(pageA.getByRole("heading", { name: "Welcome, Amina" })).toBeVisible();
       await expect(pageB.getByRole("heading", { name: "Welcome, Bola" })).toBeVisible();
-      await expect(pageB.getByText("Teaching staff")).toBeVisible();
+      await expect(pageB.getByRole("main").getByText("Teaching staff")).toBeVisible();
     } finally {
       await ctxA.close();
       await ctxB.close();

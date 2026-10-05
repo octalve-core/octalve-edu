@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import { AppHeader } from "@/components/auth/AppHeader";
-import { SessionRevalidator } from "@/components/auth/SessionRevalidator";
 import { GraduationCapIcon } from "@/components/ui/icons";
 import { ROLE_LABELS } from "@/lib/roles";
 import { requireTenantPage } from "@/lib/tenant/page-tenant";
@@ -30,10 +28,7 @@ export default async function SchoolPage({ params }: { params: Promise<{ code: s
   );
 
   return (
-    <div className="min-h-screen bg-canvas text-fg-2">
-      <SessionRevalidator />
-      <AppHeader name={session.user.name} email={session.user.email} />
-      <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-14">
+    <div>
         <h1 className="text-3xl font-bold tracking-tight text-fg">Welcome, {firstName}</h1>
         <div className="mt-8 flex items-start gap-4">
           <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-tint text-brand-fg">
@@ -67,7 +62,6 @@ export default async function SchoolPage({ params }: { params: Promise<{ code: s
             </ul>
           )}
         </section>
-      </main>
     </div>
   );
 }

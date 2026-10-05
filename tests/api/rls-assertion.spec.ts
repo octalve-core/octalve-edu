@@ -15,7 +15,7 @@ let cookie: string;
 
 test.beforeAll(async () => {
   await seedInstance();
-  school = await createTenant({ name: "Guarded School", campuses: ["Main"] });
+  school = await createTenant({ name: "Guarded School", campuses: ["Zeta Hall"] });
   admin = await createUser();
   await addMembership(admin.id, school.id, Role.ADMIN);
   const res = await loginAs(admin, { baseUrl: SAAS_URL });
@@ -42,10 +42,12 @@ test("the same request to a server connected as the table owner is REFUSED (500)
   expect(res.text).not.toContain("Guarded School");
 });
 
-test("…so does the school PAGE: no school data is rendered", async () => {
+test("…so does the school PAGE: no school DATA is rendered (the person's own school list in the shell is identity, not tenant data)", async () => {
   const res = await fetch(`${UNSAFE_RLS_URL}/schools/${school.code}`, { headers: { cookie, "x-real-ip": "10.55.0.1" }, redirect: "manual" });
   expect(res.status).toBe(500);
-  expect(await res.text()).not.toContain("Guarded School");
+  const html = await res.text();
+  expect(html).not.toContain("Zeta Hall"); // the school's campus — read through the tenant context, which was refused
+  expect(html).not.toContain("Welcome,"); // and nothing of the page itself
 });
 
 test("only tenant data is refused — routes that never touch a tenant still work on that server", async () => {

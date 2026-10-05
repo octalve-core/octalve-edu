@@ -12,7 +12,7 @@ async function lint(filePath: string, code: string) {
 }
 
 test.describe("restricted imports in school code", () => {
-  const paths = ["src/app/api/v1/schools/[code]/members/route.ts", "src/app/schools/[code]/students/page.tsx"];
+  const paths = ["src/app/api/v1/schools/[code]/members/route.ts", "src/app/(app)/schools/[code]/students/page.tsx"];
   for (const file of paths) {
     test(`${file}: the raw client is refused`, async () => {
       const messages = await lint(file, `import { prisma } from "@/lib/db";\nexport const x = prisma;\n`);

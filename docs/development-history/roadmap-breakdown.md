@@ -29,7 +29,8 @@ replace a design pass — every phase still gets its design written into the pla
 | 0.5.E Account self-service | ✅ PR #7 open | `phase-0.5.E…` |
 | **0.5.2 Tenant trust boundary** | ✅ application layer (`claude/tenant-trust-boundary`) **and row-level security** (`claude/tenant-rls`) built and verified | `phases/phase-0.5.2…` |
 | 0.5.3 Shared API infrastructure | ✅ built and verified (`claude/tenant-trust-boundary`) | `phases/phase-0.5.3…` |
-| **0.5.2-H App shell · 0.5.4 Users pages & invitations** | 🟡 designed (plan: "The app shell, and the Users pages with invitations"); building | plan |
+| **0.5.2-H App shell** | ✅ built and verified (`claude/app-shell-users`) | `phases/phase-0.5.2H-app-shell.md` |
+| **0.5.4 Users pages & invitations** | 🟡 designed (plan: "The app shell, and the Users pages with invitations"); building next | plan |
 | Phase 1 … 5 | ⬜ | plan |
 
 **No open blocker.** The RLS role was created with the maintainer's approval ("do both and run") and the whole suite now runs as `app_user`. Phase 1 may start once the shell and
@@ -91,10 +92,9 @@ Mutations for A–D (resolver trusting the URL, differing refusals, roles from t
 check after tenant check, forbidden view leaking the name, picker choosing the wrong school); full suites (unit, integration,
 api, e2e desktop + phone, https); plan "as built"; `phases/phase-0.5.2-tenant-boundary.md`; trackers; `CLAUDE.md`.
 
-### 0.5.2-H — The app shell (visual, independent of the boundary) ⬜
-Port AlEemaan's shell (sidebar, top bar, phone tab bar, "More" sheet) so `/schools/[code]/…` and `/account` live inside it.
-Tasks: (1) shell components + nav model driven by role; (2) account menu / sign-out; (3) move `/account` into the shell;
-(4) responsive + axe both themes; (5) update tests that sign out through the header; (6) record.
+### 0.5.2-H — The app shell ✅ built and verified (branch `claude/app-shell-users`)
+T1 shell components + nav model driven by the role **in the school in view** ✅ · T2 account menu / sign-out ✅ · T3 `/account`, `/dashboard`, `/schools/[code]` and the 403 view moved into the shell ✅ · T4 responsive + axe both themes
+(open states too) ✅ · T5 tests that sign out through the header adapted (`signOut` helper) ✅ · T6 record + 26 mutations ✅.
 
 ## 0.5.3 — Shared API infrastructure ⬜ (plan §0.5.3; each item below is its own task)
 - **A envelope** exists; audit that no route builds the shape inline (an ESLint/test guard).

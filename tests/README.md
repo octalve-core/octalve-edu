@@ -95,6 +95,10 @@ in the app.
 - **The sixth server is deliberately wrong.** `UNSAFE_RLS_PORT` (3105, `unsafeRlsServerEnv()`) is the SaaS-mode build connected as the **admin** — a production
   process that bypasses row-level security. `api/rls-assertion.spec.ts` proves it **refuses** tenant data (a generic 500, no role names, the page renders
   no school) while routes that touch no tenant still work. It exists to prove `assertRlsEnforced()` is wired in; do not point other tests at it.
+- **The app shell in tests** (`e2e/shell.spec.ts`, runs on desktop **and** phone; each case skips the project it does not apply to). The shell has two copies of its navigation (sidebar from `lg`, tab bar below), and the phone sheet is a
+  closed `<dialog>` that is still in the DOM: `getByRole` ignores hidden elements, **`getByText` does not** — scope text checks to `main`, `header`, or a named group (`getByRole("group", { name: "Signed in as" })`). To prove a
+  disclosure's Escape handling, **Tab into the panel first** (with focus already on the button nothing can be lost); to prove its outside-click handler, click genuinely inert space (`page.mouse.click(760, 30)` is the top bar's
+  empty middle) — clicking text inside `<main>` focuses it (`tabIndex=-1`) and the blur path closes the menu for you. `signOut(page)` in `helpers.ts` opens the account menu.
 - **Several schools, one database (SaaS-mode server).** The Solo servers fail closed (500) when a second tenant exists, so anything
   with more than one school runs on the **fifth server** (`SAAS_PORT` 3103, `saasServerEnv()`): `test.use({ baseURL: SAAS_URL })` in browser
   specs, `{ baseUrl: SAAS_URL }` in API calls. Make schools with `createTenant({ name, campuses })`, members with `addMembership(userId,

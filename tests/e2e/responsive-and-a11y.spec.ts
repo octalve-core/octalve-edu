@@ -459,6 +459,58 @@ test.describe("school pages: picker, workspace, no-access (SaaS-mode server)", (
   });
 });
 
+test.describe("app shell: the open states (SaaS-mode server)", () => {
+  test.use({ baseURL: SAAS_URL });
+  test.beforeAll(async () => {
+    await seedInstance();
+  });
+  test.afterAll(async () => {
+    await removeCreatedTenants();
+  });
+
+  // The shell around every signed-in screen is checked with each of its disclosures OPEN, in both themes (the closed shell
+  // is already part of every signed-in screen above). A long school name proves the sidebar, switcher and sheet truncate.
+  test("account menu, school switcher, More sheet, and the shell around the 403 view", async ({ page, isMobile }) => {
+    const a = await createTenant({ name: "Alpha School with a rather long name to prove it wraps", campuses: ["Alpha North"] });
+    const b = await createTenant({ name: "Beta Academy", campuses: ["Beta Main"] });
+    const both = await createUser({ name: "Chidi Okafor" });
+    await addMembership(both.id, a.id, Role.ADMIN);
+    await addMembership(both.id, b.id, Role.TEACHING_STAFF, b.campuses[0].id);
+    await signInThroughUi(page, both);
+    await page.goto(`/schools/${a.code}`);
+    await expect(page.getByText("Alpha North")).toBeVisible();
+
+    await page.getByRole("button", { name: /^Account menu for/ }).click();
+    await expect(page.getByRole("link", { name: "Profile" })).toBeVisible();
+    await checkScreen(page, "shell: account menu open", isMobile);
+    await page.keyboard.press("Escape");
+
+    if (isMobile) {
+      await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "More" }).click();
+      await expect(page.getByRole("dialog").getByRole("button", { name: "Sign out" })).toBeVisible();
+      await checkScreen(page, "shell: More sheet open (several schools, administrator)", isMobile);
+      await page.keyboard.press("Escape");
+    } else {
+      await page.getByRole("button", { name: /School.*Alpha School/ }).click();
+      await expect(page.getByRole("link", { name: /Beta Academy/ })).toBeVisible();
+      await checkScreen(page, "shell: school switcher open", isMobile);
+      await page.keyboard.press("Escape");
+    }
+
+    await page.goto(`/schools/${b.code}`);
+    await expect(page.getByText("Beta Main")).toBeVisible();
+    await checkScreen(page, "shell: a teacher in the second school", isMobile);
+
+    const outsider = await createUser();
+    await addMembership(outsider.id, b.id, Role.ADMIN);
+    await page.context().clearCookies();
+    await signInThroughUi(page, outsider);
+    await page.goto(`/schools/${a.code}`);
+    await expect(page.getByRole("heading", { name: "You don't have access to this school" })).toBeVisible();
+    await checkScreen(page, "shell: 403 view inside the shell", isMobile);
+  });
+});
+
 test.describe("dev email inbox widget (the staging-mode server)", () => {
   test.use({ baseURL: DEVTOOLS_URL });
   test.beforeEach(async () => {

@@ -134,9 +134,9 @@ test.describe("setup -> sign in -> dashboard", () => {
     await signInButton(page).click();
     await expect(page).toHaveURL(HOME_URL);
     await expect(page.getByRole("heading", { name: "Welcome, Amina" })).toBeVisible();
-    await expect(page.getByText("Bright Future Academy")).toBeVisible();
-    await expect(page.getByText("Administrator")).toBeVisible();
-    await expect(page.getByText("bright-future-academy")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Bright Future Academy" })).toBeVisible();
+    await expect(page.getByRole("main").getByText("Administrator")).toBeVisible();
+    await expect(page.getByRole("main").getByText("bright-future-academy")).toBeVisible();
 
     // What the wizard wrote is exactly what the UI showed.
     const admin = await db.user.findUniqueOrThrow({ where: { email: "amina@brightfuture.test" } });

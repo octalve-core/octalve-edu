@@ -27,7 +27,7 @@ test.describe("routing after sign-in", () => {
     await expect(page).toHaveURL(new RegExp(`/schools/${a.code}$`));
     await expect(page.getByRole("heading", { level: 1, name: "Welcome, Tunde" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "Alpha School" })).toBeVisible();
-    await expect(page.getByText("Teaching staff")).toBeVisible();
+    await expect(page.getByRole("main").getByText("Teaching staff")).toBeVisible(); // (the shell repeats the role in its person card)
     await expect(page.getByText("Alpha South")).toBeVisible();
     await expect(page.getByText("Alpha North")).toHaveCount(0); // a non-admin sees only their campus
     await expect(page.getByText("Beta")).toHaveCount(0);
@@ -62,7 +62,7 @@ test.describe("routing after sign-in", () => {
     await expect(page).toHaveURL(new RegExp(`/schools/${b.code}$`));
     await expect(page.getByRole("heading", { level: 2 })).toContainText("Beta <b>School</b>");
     await expect(page.getByText("Beta Main")).toBeVisible();
-    await expect(page.getByText("Alpha")).toHaveCount(0);
+    await expect(page.getByRole("main").getByText("Alpha")).toHaveCount(0); // no Alpha DATA in Beta (the shell may list the person's own schools)
   });
 
   test("NO school: an honest message, nothing to click", async ({ page }) => {

@@ -189,7 +189,7 @@ one-off pattern sources, referenced once for a specific technique and then done:
   and `claude/tenant-rls` (the database half). **Rules that follow:** (1) the URL's `[code]` is a lookup key — every school route is
   `withAuth(…, { tenant: true })` and every school page `requireTenantPage(code)`; **never read a school's data from a code, an id in the
   URL or the body**; (2) data is reached only through `auth.tenant.run` / `forTenant(VerifiedTenantId)` — ESLint forbids the raw `prisma`
-  client and `trustedTenantId` under `src/app/schools/**` and `src/app/api/v1/schools/**`; (3) **queries inside the tenant context still
+  client and `trustedTenantId` under `src/app/(app)/schools/**` and `src/app/api/v1/schools/**`; (3) **queries inside the tenant context still
   name the tenant** (`where: { tenantId }`): RLS is the net under the code, not a reason to write unscoped queries; (4) "no such school",
   "malformed", "not a member" and "role not allowed" are **one 403 body**; (5) `roles` is checked against the role **in that school**,
   never any membership; (6) `DEPLOYMENT_MODE=solo` asserts exactly one tenant and fails closed (500); multi-school tests use the **SaaS-mode
@@ -201,6 +201,12 @@ one-off pattern sources, referenced once for a specific technique and then done:
   UPDATE/DELETE policy **and** a `REVOKE` (call `app_grant_runtime_privileges()` again); (10) the **test admin must bypass RLS** and fixtures go through `db`, never the runtime role — a negative test run as
   the owner passes vacuously; (11) a bypassing role in production is refused by `assertRlsEnforced()` (set `ALLOW_RLS_BYPASS=true` only knowingly) — **never memoise a failure**. Records:
   `docs/development-history/phases/phase-0.5.2-tenant-boundary.md`; map: `docs/development-history/roadmap-breakdown.md`. **Next:** the app shell (0.5.2-H) and the Users pages (0.5.4) — designed in the plan; then Phase 1.
+- **The app shell (0.5.2-H) is BUILT AND VERIFIED** — branch `claude/app-shell-users` (stacked on `claude/tenant-rls`). **Rules that follow:** (1) every signed-in page lives in `src/app/(app)/` (no URL change) and renders
+  inside `AppShell`; the layout only **displays** — **each page still guards itself** (`requirePageSession()` / `requireTenantPage(code)`, both `cache`d per request), because a layout is not re-rendered on client navigation;
+  (2) the shell learns "which school is this path in" from the person's **own** memberships (`schoolFromPath`, `ShellProvider`) — display only; a path naming a school they are not in matches nothing; (3) navigation is
+  **data** (`navFor(school)` in `components/shell/nav.ts`) — sidebar, tab bar and sheet derive from it; an entry whose page is not built has `href: null` and renders as visible "Soon" text, **never a link to nothing**;
+  role-hiding is a courtesy, the page and API decide; (4) a new disclosure uses `useDisclosure`; (5) in tests, `getByText` also matches the closed phone `<dialog>` — scope to `main`/`header`/a named group, and test an
+  outside-click handler by clicking **inert** space (a focusable ancestor's blur path masks it). Record: `docs/development-history/phases/phase-0.5.2H-app-shell.md`.
 - **Phase 0.5.E (account self-service) is BUILT AND VERIFIED** — branch `claude/account-self-service`, stacked on the
   dev-inbox branch. A signed-in person can edit their name, change their email (confirmed by a link to the **new**
   address) and see / end the places they are signed in. **Rules that follow:** (1) the change-email request gives the

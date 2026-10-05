@@ -9,7 +9,7 @@ const eslintConfig = defineConfig([
   // `forTenant`: it may not import the raw Prisma client (an unscoped query), and it may not mint a
   // `VerifiedTenantId` itself (`trustedTenantId` is for resolve-tenant.ts, the setup route and audit.ts).
   {
-    files: ["src/app/schools/**/*.{ts,tsx}", "src/app/api/v1/schools/**/*.{ts,tsx}"],
+    files: ["src/app/(app)/schools/**/*.{ts,tsx}", "src/app/api/v1/schools/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": [
         "error",
