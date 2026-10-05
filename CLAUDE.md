@@ -177,6 +177,17 @@ one-off pattern sources, referenced once for a specific technique and then done:
   session cookie + 12-hour server cap; ticked → the 30 d / 90 d policy, 7 d for admins). AlEemaan has the
   same, in its own green, plus the admin shell. Still to come in this series, each designed in the plan
   first: **0.5.B** nonce-based CSP, **0.5.C** password reset/change, **0.5.D** TOTP MFA.
+- **Phase 0.5.2 (tenant trust boundary — application layer) is BUILT AND VERIFIED; its RLS half is NOT built** — branch
+  `claude/tenant-trust-boundary`. **Rules that follow:** (1) the URL's `[code]` is a lookup key — every school route is
+  `withAuth(…, { tenant: true })` and every school page `requireTenantPage(code)`; **never read a school's data from a code, an id in the
+  URL or the body**; (2) data is reached only through `auth.tenant.run` / `forTenant(VerifiedTenantId)` — ESLint forbids the raw `prisma`
+  client and `trustedTenantId` under `src/app/schools/**` and `src/app/api/v1/schools/**`; (3) **queries inside the tenant context still
+  name the tenant** (`where: { tenantId }`): RLS is the net under the code, not a reason to write unscoped queries; (4) "no such school",
+  "malformed", "not a member" and "role not allowed" are **one 403 body**; (5) `roles` is checked against the role **in that school**,
+  never any membership; (6) `DEPLOYMENT_MODE=solo` asserts exactly one tenant and fails closed (500); multi-school tests use the **SaaS-mode
+  server** and clean up their schools; (7) new tenant routes need no new test to be guarded — the file-system-discovered route test hits them
+  cross-tenant; (8) **do not start Phase 1 tables until RLS is built** (they must ship policies in the same migration). Record:
+  `docs/development-history/phases/phase-0.5.2-tenant-boundary.md`; map: `docs/development-history/roadmap-breakdown.md`.
 - **Phase 0.5.E (account self-service) is BUILT AND VERIFIED** — branch `claude/account-self-service`, stacked on the
   dev-inbox branch. A signed-in person can edit their name, change their email (confirmed by a link to the **new**
   address) and see / end the places they are signed in. **Rules that follow:** (1) the change-email request gives the

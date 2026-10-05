@@ -646,6 +646,13 @@ audit rows written without a context; the front door picking the wrong school.
 a divergence recorded in its plan; its own §0.5.2 is School Settings. The pieces that *are* shared in spirit (the roles split,
 the append-only `AuditLog` grants, the "runtime role really is restricted" assertion) are noted there as a possible later hardening.
 
+**As built — application layer (2026-10-05)** — record: `phases/phase-0.5.2-tenant-boundary.md`. As designed above except: (a) **Solo looks the
+membership up by the install's tenant id** and only checks the URL code against it (looking up by code in both modes made the check redundant —
+found by mutation); (b) `requireTenantPage` has **no `roles` option** (nothing used it; untested code is not added); (c) the 403 view uses
+`forbidden()` (`experimental.authInterrupts`), verified to return a real 403; (d) the app shell is a separate later step. **Not built:** everything
+in design items 1, 2, 3 (policies), 8 (`assertRlsEnforced`) and the `app_user` half of 11 — the RLS part is blocked on creating a database role
+(see the phase record). 811 tests pass; 25 injected bugs all caught or equivalent.
+
 ### 0.5.3 — Shared API infrastructure
 
 Per PRD §7's API-conventions paragraph, built once and reused by every route from Phase 1 onward:

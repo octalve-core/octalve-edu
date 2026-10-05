@@ -261,6 +261,16 @@ labels on one page; a second emailed link opened in the same tab was ignored —
 (now one `useFragmentToken()` hook); and focus lost after an awaited save. 740 tests pass; **78 injected bugs, all caught**.
 *Invite & activate* and administrator deactivation wait for the Users pages (§0.5.2).
 
+## Tenant trust boundary — application layer (2026-10-05) — built and verified; RLS pending
+
+Design: plan §0.5.2 + "Build design" + "As built — application layer". Record: `phases/phase-0.5.2-tenant-boundary.md`; map:
+`roadmap-breakdown.md`. Branch `claude/tenant-trust-boundary`, **based on `claude/account-self-service`**. The URL's school code is only a
+lookup key: `resolveTenant` finds the signed-in person's own membership (one 403 for unknown / malformed / not-a-member), the branded
+`VerifiedTenantId` is the only thing tenant data access accepts, `forTenant` runs one transaction with a transaction-local context, and
+`withAuth(…, { tenant: true, roles })` checks the role **in that school**. `/dashboard` is now the front door (one school → in, several →
+picker). 811 tests pass; 25 injected bugs caught or equivalent. **Row-level security is NOT built:** it needs a Postgres role (`app_user`)
+that could not be created from this environment — see the phase record's hand-off. Until then the boundary is application-level only.
+
 ## Next action
 
 **Phases 0.5.1 → 0.5.F are merged to `master`** (the stacked PRs #1–#5 were merged into their stack bases rather than `master`,
