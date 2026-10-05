@@ -263,15 +263,13 @@ labels on one page; a second emailed link opened in the same tab was ignored —
 
 ## Next action
 
-**One PR is open on the fork: [#6](https://github.com/roji-tech/octalve-edu-fork/pull/6)** (base `master`, head
-`claude/dev-email-inbox`), which carries 0.5.A → 0.5.F in one branch. (The earlier PRs #1–#5 were stacked, and merging a
-stacked PR lands it in its *base branch*, not in `master` — so they were closed and consolidated.) **0.5.E (self-service) is
-pushed on `claude/account-self-service`** (based on 0.5.F), no PR yet; it needs #6 merged first.
+**Phases 0.5.1 → 0.5.F are merged to `master`** (the stacked PRs #1–#5 were merged into their stack bases rather than `master`,
+so they were consolidated into #6, which landed). **0.5.E (self-service) is open as
+[#7](https://github.com/roji-tech/octalve-edu-fork/pull/7)** (base `master`, head `claude/account-self-service`).
 
 **The back-port to AlEemaan is done, verified and merged there** — shared names, the hardening deltas, the 72-byte
 password policy, `method="post"`, the sign-in screens it lacked and this test suite (`roji-tech/AlEemaan` #2), then
-its design language and shell (#3). Its 0.5.B (CSP) and 0.5.C (password reset) are merged; [#7](https://github.com/roji-tech/AlEemaan/pull/7) (0.5.D + 0.5.F)
-is open; its 0.5.E is pushed, no PR yet. From here on a change to the shared mechanism is made in both repos or logged as a divergence in both
+its design language and shell (#3). Its 0.5.B–0.5.F are merged; its 0.5.E is open as [#8](https://github.com/roji-tech/AlEemaan/pull/8). From here on a change to the shared mechanism is made in both repos or logged as a divergence in both
 plan docs (§0.5.1.6 there, the shared-names table here).
 
 Then, in order: the rest of the Phase 0.5 addenda, each designed in the plan first and built in both repos
