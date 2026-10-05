@@ -1,6 +1,6 @@
 import { test, expect } from "../support/fixtures";
 import { db, resetDatabase } from "../support/db";
-import { alertWith, emailField, fillCredentials, passwordField, signInButton } from "./helpers";
+import { alertWith, emailField, fillCredentials, passwordField, signInButton, HOME_URL } from "./helpers";
 
 // The journey a brand-new deployer actually takes: empty install -> setup
 // wizard -> sign in -> dashboard. Every test starts from a genuinely empty
@@ -132,7 +132,7 @@ test.describe("setup -> sign in -> dashboard", () => {
 
     await fillCredentials(page, ADMIN.email, ADMIN.password);
     await signInButton(page).click();
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(HOME_URL);
     await expect(page.getByRole("heading", { name: "Welcome, Amina" })).toBeVisible();
     await expect(page.getByText("Bright Future Academy")).toBeVisible();
     await expect(page.getByText("Administrator")).toBeVisible();

@@ -1,16 +1,6 @@
 import { test, expect } from "../support/fixtures";
 import { Role, createUser, db, seedInstance, sha256Hex } from "../support/db";
-import {
-  alerts,
-  emailField,
-  fillCredentials,
-  keepSignedInBox,
-  passwordField,
-  signInButton,
-  signInThroughUi,
-  signOut,
-  trackLoginRequests,
-} from "./helpers";
+import { alerts, emailField, fillCredentials, keepSignedInBox, passwordField, signInButton, signInThroughUi, signOut, trackLoginRequests, HOME_URL } from "./helpers";
 
 test.beforeAll(async () => {
   await seedInstance();
@@ -56,7 +46,7 @@ test.describe("signing in", () => {
     // …and the same form still works on retry.
     await passwordField(page).fill(user.password);
     await signInButton(page).click();
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(HOME_URL);
   });
 
   test("an unknown account gets exactly the same message as a wrong password (no enumeration through the UI)", async ({ page }) => {
@@ -83,7 +73,7 @@ test.describe("signing in", () => {
     await page.goto("/login");
     await fillCredentials(page, `  ${user.email.toUpperCase()} `, user.password);
     await signInButton(page).click();
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(HOME_URL);
   });
 });
 
@@ -155,7 +145,7 @@ test.describe("using only the keyboard", () => {
     expect(outline).not.toBe("none");
 
     await page.keyboard.press("Enter");
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(HOME_URL);
   });
 
   test("Enter inside the password field submits the form", async ({ page }) => {
@@ -163,7 +153,7 @@ test.describe("using only the keyboard", () => {
     await page.goto("/login");
     await fillCredentials(page, user.email, user.password);
     await passwordField(page).press("Enter");
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(HOME_URL);
   });
 });
 
@@ -202,7 +192,7 @@ test.describe("keep me signed in on this device", () => {
     await signInButton(page).click();
 
     expect((await request).postDataJSON()).toMatchObject({ remember: true });
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(HOME_URL);
     const cookie = (await context.cookies()).find((c) => c.name === SESSION_COOKIE);
     expect(cookie!.expires).toBeGreaterThan(Date.now() / 1000 + 80 * 86_400); // ~90 days out
   });
@@ -215,7 +205,7 @@ test.describe("keep me signed in on this device", () => {
     await signInButton(page).click();
 
     expect((await request).postDataJSON()).toMatchObject({ remember: false });
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(HOME_URL);
     const cookie = (await context.cookies()).find((c) => c.name === SESSION_COOKIE);
     expect(cookie!.expires).toBe(-1); // Playwright's marker for a session cookie
     const row = await db.session.findFirstOrThrow({ where: { userId: user.id } });
@@ -267,7 +257,7 @@ test.describe("when the server pushes back", () => {
 
     await fillCredentials(page, user.email, user.password);
     await signInButton(page).dblclick();
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(HOME_URL);
     expect(sent).toHaveLength(1);
   });
 
@@ -285,7 +275,7 @@ test.describe("when the server pushes back", () => {
     await page.unroute("**/api/v1/auth/login");
     await fillCredentials(page, user.email, user.password);
     await signInButton(page).click();
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(HOME_URL);
   });
 
   test("an unexpected server error is reported without leaking details", async ({ page }) => {
@@ -384,13 +374,13 @@ test.describe("staying signed in, and signing out", () => {
     await signInThroughUi(page, user);
 
     await page.reload();
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(HOME_URL);
     await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible();
 
     await page.goto("/login");
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(HOME_URL);
     await page.goto("/");
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(HOME_URL);
   });
 
   test("sign out: back at /login, the session is gone server-side AND in the browser, and the protected page is not left in this tab's history", async ({ page, context }) => {
@@ -456,7 +446,7 @@ test.describe("staying signed in, and signing out", () => {
     await db.session.deleteMany({ where: { userId: user.id } });
     await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: false })));
     await page.waitForTimeout(500);
-    await expect(page).toHaveURL(/\/dashboard$/); // the server is only consulted on real navigations / bfcache restores
+    await expect(page).toHaveURL(HOME_URL); // the server is only consulted on real navigations / bfcache restores
   });
 
   test("signing out in one tab signs out the others without them reloading", async ({ page, context }) => {

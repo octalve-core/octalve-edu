@@ -5,6 +5,23 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  // Tenant business code (domain-implementation-plan.md §0.5.2) reaches data ONLY through `auth.tenant.run` /
+  // `forTenant`: it may not import the raw Prisma client (an unscoped query), and it may not mint a
+  // `VerifiedTenantId` itself (`trustedTenantId` is for resolve-tenant.ts, the setup route and audit.ts).
+  {
+    files: ["src/app/schools/**/*.{ts,tsx}", "src/app/api/v1/schools/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            { name: "@/lib/db", message: "School code must use the tenant context (auth.tenant.run / forTenant), never the raw client." },
+            { name: "@/lib/tenant/verified-tenant", message: "Only resolve-tenant.ts, the setup route and audit.ts may mint a VerifiedTenantId." },
+          ],
+        },
+      ],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

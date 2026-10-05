@@ -24,7 +24,13 @@ export const TLS_PORT = 3443; // TLS-terminating reverse proxy in front of 3101
 export const DEVTOOLS_PORT = 3102;
 export const DEV_TOOLS_TEST_TOKEN = "test-dev-tools-token-0123456789";
 
+/// A FIFTH server: the same build in `DEPLOYMENT_MODE=saas`. The other servers are Solo (the whole install is one
+/// school, and a second tenant is an invariant violation that fails closed), so everything that needs SEVERAL
+/// schools in one database — the tenant boundary, the school picker — runs here.
+export const SAAS_PORT = 3103;
+
 export const HTTP_URL = `http://localhost:${HTTP_PORT}`;
+export const SAAS_URL = `http://localhost:${SAAS_PORT}`;
 export const DEVTOOLS_URL = `http://localhost:${DEVTOOLS_PORT}`;
 export const HTTPS_URL = `https://localhost:${TLS_PORT}`;
 
@@ -96,6 +102,11 @@ export function serverEnv(appUrl: string): Record<string, string> {
     DEV_TOOLS: "",
     DEV_TOOLS_TOKEN: "",
   };
+}
+
+/// The multi-tenant server: production-shaped, `DEPLOYMENT_MODE=saas`.
+export function saasServerEnv(): Record<string, string> {
+  return { ...serverEnv(SAAS_URL), DEPLOYMENT_MODE: "saas" };
 }
 
 /// The dev-tools server: staging mode, the token required, and NO EMAIL_TRANSPORT / RESEND_API_KEY — so mail

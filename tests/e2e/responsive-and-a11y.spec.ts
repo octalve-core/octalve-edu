@@ -1,12 +1,12 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { test, expect } from "../support/fixtures";
-import { Role, codeFor, createUser, db, enableMfa, resetDatabase, seedInstance, uniqueEmail, uniqueIp } from "./../support/db";
-import { DEVTOOLS_URL, DEV_TOOLS_TEST_TOKEN } from "../support/env";
+import { Role, codeFor, createUser, addMembership, createTenant, db, enableMfa, removeCreatedTenants, resetDatabase, seedInstance, uniqueEmail, uniqueIp } from "./../support/db";
+import { DEVTOOLS_URL, DEV_TOOLS_TEST_TOKEN, SAAS_URL } from "../support/env";
 import { linkFrom, waitForMail } from "../support/outbox";
 import { createEmailChangeToken } from "@/lib/auth/email-change";
 import { base32Decode } from "@/lib/auth/mfa/base32";
-import { alerts, codeField, fillCredentials, mfaHeading, passwordField, recoveryField, signInButton, signInThroughUi, verifyButton } from "./helpers";
+import { alerts, codeField, fillCredentials, mfaHeading, passwordField, recoveryField, signInButton, signInThroughUi, verifyButton, HOME_URL } from "./helpers";
 
 // Runs on the desktop AND the phone project (see playwright.config.ts).
 //  - axe-core, WCAG 2.2 A/AA rules, on every screen and on the STATES that
@@ -327,7 +327,7 @@ test.describe("two-step verification screens", () => {
     await startSignIn(page, user);
     await codeField(page).fill(codeFor(secret));
     await verifyButton(page).click();
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(HOME_URL);
 
     await page.goto("/account");
     await expect(alerts(page)).toContainText("running low");
@@ -416,6 +416,46 @@ test.describe("account self-service screens (profile, email, sessions)", () => {
     await page.goto("/confirm-email");
     await expect(page.getByRole("heading", { name: "This link can't be used" })).toBeVisible();
     await checkScreen(page, "/confirm-email (no token)", isMobile);
+  });
+});
+
+test.describe("school pages: picker, workspace, no-access (SaaS-mode server)", () => {
+  test.use({ baseURL: SAAS_URL });
+  test.beforeAll(async () => {
+    await seedInstance();
+  });
+  test.afterAll(async () => {
+    await removeCreatedTenants();
+  });
+
+  test("picker, workspace (admin, staff, no campus) and the 403 view", async ({ page, isMobile }) => {
+    const a = await createTenant({ name: "Alpha School with a rather long name to prove it wraps", campuses: ["Alpha North", "Alpha South"] });
+    const b = await createTenant({ name: "Beta School", campuses: ["Beta Main"] });
+    const both = await createUser({ name: "Chidi Okafor" });
+    await addMembership(both.id, a.id, Role.ADMIN);
+    await addMembership(both.id, b.id, Role.TEACHING_STAFF, b.campuses[0].id);
+    await signInThroughUi(page, both);
+    await expect(page.getByRole("heading", { name: "Your schools" })).toBeVisible();
+    await checkScreen(page, "/dashboard (picker)", isMobile);
+
+    await page.getByRole("link", { name: /Alpha School/ }).click();
+    await expect(page.getByText("Alpha North")).toBeVisible();
+    await checkScreen(page, "/schools/[code] (admin)", isMobile);
+
+    await page.goto(`/schools/${b.code}`);
+    await expect(page.getByText("Beta Main")).toBeVisible();
+    await checkScreen(page, "/schools/[code] (staff, one campus)", isMobile);
+
+    const nocampus = await createUser();
+    await addMembership(nocampus.id, a.id, Role.PARENT, null);
+    await page.context().clearCookies();
+    await signInThroughUi(page, nocampus);
+    await expect(page.getByText("You haven’t been assigned to a campus yet.")).toBeVisible();
+    await checkScreen(page, "/schools/[code] (no campus)", isMobile);
+
+    await page.goto(`/schools/${b.code}`);
+    await expect(page.getByRole("heading", { name: "You don't have access to this school" })).toBeVisible();
+    await checkScreen(page, "/schools/[code] (403)", isMobile);
   });
 });
 

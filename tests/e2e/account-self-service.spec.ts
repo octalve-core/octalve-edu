@@ -3,7 +3,7 @@ import { test, expect } from "../support/fixtures";
 import { Role, createUser, db, seedInstance, uniqueEmail, uniqueIp } from "../support/db";
 import { linkFrom, mailAfterGrace, waitForMail } from "../support/outbox";
 import { createEmailChangeToken } from "@/lib/auth/email-change";
-import { alerts, fillCredentials, signInButton, signInThroughUi } from "./helpers";
+import { alerts, fillCredentials, signInButton, signInThroughUi, HOME_URL } from "./helpers";
 
 // Self-service on the account page, in a real browser (plan §0.5.E): edit your name, change your email address
 // (the link goes to the NEW address), and see / end the devices you're signed in on.
@@ -154,7 +154,7 @@ test.describe("change your email address", () => {
     await expect(alerts(page)).toContainText("incorrect");
     await fillCredentials(page, newEmail, user.password);
     await signInButton(page).click();
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(HOME_URL);
   });
 
   test("the success screen links to sign-in", async ({ page }) => {
@@ -310,7 +310,7 @@ test.describe("active sessions", () => {
     await phone.page.reload();
     await expect(phone.page).toHaveURL(/\/login$/); // that device is out…
     await laptop.page.reload();
-    await expect(laptop.page).toHaveURL(/\/account$|\/dashboard$/); // …the other is not
+    await expect(laptop.page).toHaveURL(/\/account$|\/dashboard$|\/schools\/[a-z0-9-]+$/); // …the other is not
     await phone.context.close();
     await laptop.context.close();
   });

@@ -6,8 +6,11 @@ import {
   HTTP_URL,
   HTTPS_APP_PORT,
   HTTPS_URL,
+  SAAS_PORT,
+  SAAS_URL,
   TLS_PORT,
   devToolsServerEnv,
+  saasServerEnv,
   serverEnv,
 } from "./tests/support/env";
 
@@ -52,6 +55,15 @@ export default defineConfig({
       command: `pnpm exec next start -p ${DEVTOOLS_PORT}`,
       url: `${DEVTOOLS_URL}/favicon.ico`,
       env: devToolsServerEnv(),
+      reuseExistingServer: false,
+      timeout: 60_000,
+    },
+    {
+      // The same build in `DEPLOYMENT_MODE=saas`: the only server where SEVERAL schools may share the database (the
+      // others are Solo, where a second tenant is an invariant violation). Tenant-boundary and picker tests use it.
+      command: `pnpm exec next start -p ${SAAS_PORT}`,
+      url: `${SAAS_URL}/favicon.ico`,
+      env: saasServerEnv(),
       reuseExistingServer: false,
       timeout: 60_000,
     },
