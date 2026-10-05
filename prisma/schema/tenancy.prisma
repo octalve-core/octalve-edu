@@ -24,6 +24,8 @@ model Campus {
   tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   memberships TenantMembership[]
 
+  /// A school cannot have two campuses of the same name (compared exactly, after the API trims it).
+  @@unique([tenantId, name])
   @@index([tenantId])
 }
 

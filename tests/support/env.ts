@@ -29,6 +29,11 @@ export const DEV_TOOLS_TEST_TOKEN = "test-dev-tools-token-0123456789";
 /// schools in one database — the tenant boundary, the school picker — runs here.
 export const SAAS_PORT = 3103;
 
+/// A throwaway Redis for the rate-limit store tests (started by playwright.config.ts: `redis-server` must be on PATH,
+/// or `docker compose up -d redis` provides one on 6380 — set TEST_REDIS_URL to use that instead).
+export const REDIS_TEST_PORT = 6390;
+export const TEST_REDIS_URL = process.env.TEST_REDIS_URL ?? `redis://localhost:${REDIS_TEST_PORT}`;
+
 export const HTTP_URL = `http://localhost:${HTTP_PORT}`;
 export const SAAS_URL = `http://localhost:${SAAS_PORT}`;
 export const DEVTOOLS_URL = `http://localhost:${DEVTOOLS_PORT}`;
@@ -95,6 +100,8 @@ export function serverEnv(appUrl: string): Record<string, string> {
     CLIENT_IP_HEADER: "x-real-ip",
     TRUSTED_PROXY_HOPS: "1",
     SETUP_TOKEN: "",
+    // Only the proxied deployment trusts X-Forwarded-Host (see httpsServerEnv); everything else compares with Host.
+    TRUST_FORWARDED_HOST: "",
     EMAIL_TRANSPORT: "file",
     EMAIL_FILE,
     // Production-shaped, whatever the developer's own .env says: no dev tools on these servers.
@@ -104,9 +111,16 @@ export function serverEnv(appUrl: string): Record<string, string> {
   };
 }
 
+/// The TLS-proxy deployment: the proxy sets X-Forwarded-Host, so the operator says to trust it.
+export function httpsServerEnv(): Record<string, string> {
+  return { ...serverEnv(HTTPS_URL), TRUST_FORWARDED_HOST: "true" };
+}
+
 /// The multi-tenant server: production-shaped, `DEPLOYMENT_MODE=saas`.
 export function saasServerEnv(): Record<string, string> {
-  return { ...serverEnv(SAAS_URL), DEPLOYMENT_MODE: "saas" };
+  // The SaaS-shaped server also uses the shared Redis rate-limit store (the other servers use memory), so the store
+  // is exercised end to end by every limit test that runs here.
+  return { ...serverEnv(SAAS_URL), DEPLOYMENT_MODE: "saas", RATE_LIMIT_STORE: "redis", REDIS_URL: TEST_REDIS_URL };
 }
 
 /// The dev-tools server: staging mode, the token required, and NO EMAIL_TRANSPORT / RESEND_API_KEY — so mail

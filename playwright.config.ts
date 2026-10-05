@@ -6,10 +6,12 @@ import {
   HTTP_URL,
   HTTPS_APP_PORT,
   HTTPS_URL,
+  REDIS_TEST_PORT,
   SAAS_PORT,
   SAAS_URL,
   TLS_PORT,
   devToolsServerEnv,
+  httpsServerEnv,
   saasServerEnv,
   serverEnv,
 } from "./tests/support/env";
@@ -42,6 +44,11 @@ export default defineConfig({
   use: { trace: "retain-on-failure", screenshot: "only-on-failure" },
 
   webServer: [
+    // A throwaway Redis (no persistence) for the rate-limit store tests — see tests/README.md. Skipped when the
+    // developer points TEST_REDIS_URL at their own.
+    ...(process.env.TEST_REDIS_URL
+      ? []
+      : [{ command: `redis-server --port ${REDIS_TEST_PORT} --save "" --appendonly no --bind 127.0.0.1`, port: REDIS_TEST_PORT, reuseExistingServer: false, timeout: 20_000 }]),
     {
       command: `pnpm exec next start -p ${HTTP_PORT}`,
       url: `${HTTP_URL}/favicon.ico`,
@@ -71,7 +78,7 @@ export default defineConfig({
       // The same build, told it is served over HTTPS (=> `__Host-` + Secure cookie)…
       command: `pnpm exec next start -p ${HTTPS_APP_PORT}`,
       url: `http://localhost:${HTTPS_APP_PORT}/favicon.ico`,
-      env: serverEnv(HTTPS_URL),
+      env: httpsServerEnv(),
       reuseExistingServer: false,
       timeout: 60_000,
     },
