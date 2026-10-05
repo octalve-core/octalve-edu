@@ -177,6 +177,14 @@ one-off pattern sources, referenced once for a specific technique and then done:
   session cookie + 12-hour server cap; ticked → the 30 d / 90 d policy, 7 d for admins). AlEemaan has the
   same, in its own green, plus the admin shell. Still to come in this series, each designed in the plan
   first: **0.5.B** nonce-based CSP, **0.5.C** password reset/change, **0.5.D** TOTP MFA.
+- **Phase 0.5.3 (shared API infrastructure) is BUILT AND VERIFIED** — same branch. **Rules that follow:** (1) new routes use `ok`/`fail`, `parseOffsetPagination` /
+  `parseCursorPagination` and `validate({ body, query }, …)` *inside* `withAuth` — a bad parameter is a **400 naming the field**, never clamped, never first-wins;
+  unknown body keys are stripped, never passed on; (2) `X-Forwarded-Host` is **never** trusted unless `TRUST_FORWARDED_HOST=true` (set only behind a proxy that
+  overwrites it); CSRF also refuses `Sec-Fetch-Site: cross-site|same-site`; (3) rate limits go through `reserveAttempt`/`refundAttempt`/`checkRateLimit` — the
+  store (`memory` | `redis`) is a deployment choice; **more than one instance needs `RATE_LIMIT_STORE=redis`**; Redis down degrades to memory, never to "no limit";
+  (4) never put an `await` inside the memory store's `reserve` (the atomicity argument); (5) a new password is checked with `checkNewPasswordOnServer` (shape, then
+  breach, fail-open); (6) audit sign-in events carry a device *kind*, never an IP or a raw user agent. Test prerequisite: `redis-server` on `PATH`. Record:
+  `docs/development-history/phases/phase-0.5.3-api-infrastructure.md`.
 - **Phase 0.5.2 (tenant trust boundary — application layer) is BUILT AND VERIFIED; its RLS half is NOT built** — branch
   `claude/tenant-trust-boundary`. **Rules that follow:** (1) the URL's `[code]` is a lookup key — every school route is
   `withAuth(…, { tenant: true })` and every school page `requireTenantPage(code)`; **never read a school's data from a code, an id in the

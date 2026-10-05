@@ -768,6 +768,11 @@ refund, independent keys, concurrent reserves → exactly `limit` succeed, outag
 list/paginate/validate/create/duplicate/forbidden-role/rate-limit/cross-tenant/revoked-session. A Redis server is a test prerequisite (`redis-server`
 on `PATH`; the Playwright config starts it on port 6390).
 
+**As built — 0.5.3 (2026-10-05)** — record: `phases/phase-0.5.3-api-infrastructure.md`. As designed, with: Redis keeps the offline queue **on** (the first
+version failed the first commands of a fresh process — found by the conformance test) plus a circuit-breaker cooldown; `Campus (tenantId, name)` is unique
+(one additive migration); the success paths of the breach check are tested over HTTP against a local stand-in for the service. **Not built:** the
+"negative tests as `app_user`" gate (needs the RLS role — see 0.5.2) and the upload domain (Phase 3). 896 tests pass; 44 injected bugs all caught.
+
 ### Phase 0.5 addenda (2026-09-30, after the auth build)
 
 Four pieces of work that sit between "auth works" and "Phase 1 can start", each designed here first

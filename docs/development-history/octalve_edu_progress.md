@@ -271,11 +271,20 @@ lookup key: `resolveTenant` finds the signed-in person's own membership (one 403
 picker). 811 tests pass; 25 injected bugs caught or equivalent. **Row-level security is NOT built:** it needs a Postgres role (`app_user`)
 that could not be created from this environment — see the phase record's hand-off. Until then the boundary is application-level only.
 
+## Shared API infrastructure (2026-10-05) — built and verified
+
+Design: plan §0.5.3 + "Build design" + "As built". Record: `phases/phase-0.5.3-api-infrastructure.md`. Same branch (`claude/tenant-trust-boundary`).
+Strict pagination (offset and cursor) and validation helpers, the first real tenant routes (campuses: paginated, ADMIN-only create, audited in the same
+transaction), CSRF hardening (`Sec-Fetch-Site`; `X-Forwarded-Host` no longer trusted by default), a **Redis rate-limit store** behind the same interface
+(atomic Lua, memory fallback with a circuit breaker; one conformance suite for both stores), sign-in audit events (device kind, never an IP) and a
+fail-open **breached-password check** (k-anonymity). 896 tests pass; 44 injected bugs all caught (three survived first and drove stronger tests).
+Still pending from the plan's gate: the negative tests **as `app_user`**, which need the RLS role.
+
 ## Next action
 
 **Phases 0.5.1 → 0.5.F are merged to `master`** (the stacked PRs #1–#5 were merged into their stack bases rather than `master`,
 so they were consolidated into #6, which landed). **0.5.E (self-service) is open as
-[#7](https://github.com/roji-tech/octalve-edu-fork/pull/7)** (base `master`, head `claude/account-self-service`).
+[#7](https://github.com/roji-tech/octalve-edu-fork/pull/7)**; **0.5.2 (application layer) and 0.5.3 are pushed on `claude/tenant-trust-boundary`** (based on 0.5.E), no PR yet.
 
 **The back-port to AlEemaan is done, verified and merged there** — shared names, the hardening deltas, the 72-byte
 password policy, `method="post"`, the sign-in screens it lacked and this test suite (`roji-tech/AlEemaan` #2), then
