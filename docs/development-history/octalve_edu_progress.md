@@ -305,5 +305,9 @@ its design language and shell (#3). Its 0.5.B–0.5.F are merged; its 0.5.E is o
 plan docs (§0.5.1.6 there, the shared-names table here).
 
 Then, in order: ~~the Phase 0.5 addenda~~ (0.5.B–0.5.F, all built), ~~the tenant-trust-boundary resolver and `forTenant()`~~ and ~~its explicit RLS role setup~~ (§0.5.2 — built, verified as `app_user`),
-~~the shared API helpers and the Redis-backed rate limiter~~ (§0.5.3 — built); **now: this repo's app shell (§0.5.2-H) and the Users pages with invitations (§0.5.4)**, designed in the plan; then **Phase 1**
-(`roadmap-breakdown.md`) — every new table with its RLS policy in the same migration.
+~~the shared API helpers and the Redis-backed rate limiter~~ (§0.5.3 — built), ~~this repo's app shell (§0.5.2-H)~~ (built, verified); **now: the Users pages with invitations (§0.5.4) — built and WIP-committed, but its mutation pass,
+a complete green run and its docs are outstanding**; then **Phase 1** (`roadmap-breakdown.md`) — every new table with its RLS policy in the same migration.
+
+**Hand-over (this session):** development has been handed to a **local Claude Code session**, which owns *all* remaining work in the order set out in
+[`handoff/TAKEOVER.md`](handoff/TAKEOVER.md) (baseline → finish 0.5.4 → lanes verification → Phase 1 slice 1 → AlEemaan port). The reviewer session pushes nothing meanwhile and will review the local session's
+`handoff/takeover-report.md` and diff when the maintainer says so. The 0.5.4 mutation set (122 mutations) and a serial runner are in `handoff/tools/`.

@@ -5,9 +5,11 @@ strict engineering discipline. Another Claude session (the "reviewer") built Pha
 cold. Optimise for being *reviewable and provably correct*, not for speed. When something is ambiguous and security-relevant, **stop and write the
 question down** (see "Hand-off") rather than guessing.
 
-**Base:** branch `claude/app-shell-users` on the `fork` remote (`roji-tech/octalve-edu-fork`). The reviewer states the exact commit when handing this over; if the
-maintainer has not named one, run `git log -1` on that branch, record the SHA in your hand-off, and check that `pnpm test` is green there before you start.
-Your branch: `claude/phase-1-0-1-1`.
+> **Read `TAKEOVER.md` (same folder) FIRST.** The maintainer has handed over *all* remaining work, in order: baseline → **finish 0.5.4 (mutation pass, docs, full run, push)** → lanes verification →
+> **this slice** → the AlEemaan port. This brief is step 6 there; the "Base" below is superseded by it.
+
+**Base:** branch `claude/app-shell-users` on the `fork` remote (`roji-tech/octalve-edu-fork`), **as you leave it at the end of `TAKEOVER.md` step 4** (0.5.4 finished, documented, pushed, one-lane suite green).
+Record the SHA you started from in your hand-off. Your branch for this slice: `claude/phase-1-0-1-1`, created from that head.
 
 ## 0. Scope of this slice
 **Phase 1.0 (foundations) and Phase 1.1 (academic structure)** from `docs/development-history/roadmap-breakdown.md` ("Phase 1") and

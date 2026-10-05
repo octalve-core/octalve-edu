@@ -30,7 +30,7 @@ replace a design pass — every phase still gets its design written into the pla
 | **0.5.2 Tenant trust boundary** | ✅ application layer (`claude/tenant-trust-boundary`) **and row-level security** (`claude/tenant-rls`) built and verified | `phases/phase-0.5.2…` |
 | 0.5.3 Shared API infrastructure | ✅ built and verified (`claude/tenant-trust-boundary`) | `phases/phase-0.5.3…` |
 | **0.5.2-H App shell** | ✅ built and verified (`claude/app-shell-users`) | `phases/phase-0.5.2H-app-shell.md` |
-| **0.5.4 Users pages & invitations** | 🟡 designed (plan: "The app shell, and the Users pages with invitations"); building next | plan |
+| **0.5.4 Users pages & invitations** | 🟡 **built and WIP-committed** (`claude/app-shell-users`); **mutation pass (122 written, none run), a complete green run and the docs are outstanding** — handed to the local Claude Code session: `handoff/TAKEOVER.md` | plan; `handoff/` |
 | Phase 1 … 5 | ⬜ | plan |
 
 **No open blocker.** The RLS role was created with the maintainer's approval ("do both and run") and the whole suite now runs as `app_user`. Phase 1 may start once the shell and
