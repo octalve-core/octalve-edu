@@ -11,10 +11,13 @@ import {
   SAAS_PORT,
   SAAS_URL,
   TLS_PORT,
+  UNSAFE_RLS_PORT,
+  UNSAFE_RLS_URL,
   devToolsServerEnv,
   httpsServerEnv,
   saasServerEnv,
   serverEnv,
+  unsafeRlsServerEnv,
 } from "./tests/support/env";
 
 // What runs where (see tests/README.md):
@@ -74,6 +77,15 @@ export default defineConfig({
       command: `pnpm exec next start -p ${SAAS_PORT}`,
       url: `${SAAS_URL}/favicon.ico`,
       env: saasServerEnv(),
+      reuseExistingServer: false,
+      timeout: 60_000,
+    },
+    {
+      // The same build connected as the table OWNER instead of `app_user` — a misconfiguration that would silently turn
+      // row-level security off. It must refuse to serve tenant data (tests/api/rls-assertion.spec.ts).
+      command: `pnpm exec next start -p ${UNSAFE_RLS_PORT}`,
+      url: `${UNSAFE_RLS_URL}/favicon.ico`,
+      env: unsafeRlsServerEnv(),
       reuseExistingServer: false,
       timeout: 60_000,
     },

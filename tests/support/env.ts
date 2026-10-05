@@ -29,6 +29,11 @@ export const DEV_TOOLS_TEST_TOKEN = "test-dev-tools-token-0123456789";
 /// schools in one database — the tenant boundary, the school picker — runs here.
 export const SAAS_PORT = 3103;
 
+/// A SIXTH server, deliberately misconfigured: the SaaS-mode build connected as the ADMIN (the table owner, which
+/// bypasses row-level security) instead of `app_user`. It exists to prove `assertRlsEnforced()` is wired in — a
+/// production process on such a connection must refuse to serve tenant data rather than serve it unprotected.
+export const UNSAFE_RLS_PORT = 3105;
+
 /// A stand-in for the breached-password range API (tests/support/pwned-stub.mjs); the SaaS-mode server checks against it.
 export const PWNED_STUB_PORT = 3104;
 export const PWNED_STUB_URL = `http://127.0.0.1:${PWNED_STUB_PORT}`;
@@ -40,19 +45,24 @@ export const TEST_REDIS_URL = process.env.TEST_REDIS_URL ?? `redis://localhost:$
 
 export const HTTP_URL = `http://localhost:${HTTP_PORT}`;
 export const SAAS_URL = `http://localhost:${SAAS_PORT}`;
+export const UNSAFE_RLS_URL = `http://localhost:${UNSAFE_RLS_PORT}`;
 export const DEVTOOLS_URL = `http://localhost:${DEVTOOLS_PORT}`;
 export const HTTPS_URL = `https://localhost:${TLS_PORT}`;
 
-/// The database tests run against: TEST_DATABASE_URL if set, otherwise the
-/// developer's DATABASE_URL with `_test` appended to the database name. It is
-/// idempotent (a name already ending in `_test` is left alone), which matters
-/// because this module is evaluated again inside every worker process, where
-/// DATABASE_URL has already been rewritten.
+/// The database tests run against — TWO connections, because the runtime role is the one under test (§0.5.2):
+///   TEST_DATABASE_URL      the ADMIN: arranges fixtures across schools (`db` in support/db.ts), empties the database,
+///                          runs `prisma migrate deploy`. Must bypass RLS (a superuser — the docker/CI default — or
+///                          BYPASSRLS). Defaults to DIRECT_URL (else DATABASE_URL) with `_test` appended to the name.
+///   TEST_APP_DATABASE_URL  the RUNTIME role `app_user`: what the servers under test and every in-process import of the
+///                          app connect as — so tests exercise row-level security as production does.
+/// Both are idempotent (a name already ending in `_test` is left alone), which matters because this module is evaluated
+/// again inside every worker process, where DATABASE_URL has already been rewritten — so the results are written back
+/// to the environment below.
 function resolveTestDatabaseUrl(): string {
   const explicit = process.env.TEST_DATABASE_URL;
-  const base = explicit ?? process.env.DATABASE_URL;
+  const base = explicit ?? process.env.DIRECT_URL ?? process.env.DATABASE_URL;
   if (!base) {
-    throw new Error("Set DATABASE_URL (or TEST_DATABASE_URL) — see .env.example.");
+    throw new Error("Set DIRECT_URL (or TEST_DATABASE_URL) — see .env.example.");
   }
   const url = new URL(base);
   const name = decodeURIComponent(url.pathname.replace(/^\//, ""));
@@ -70,8 +80,24 @@ export const TEST_DATABASE_NAME = decodeURIComponent(
   new URL(TEST_DATABASE_URL).pathname.replace(/^\//, ""),
 );
 
-// From here on, anything in this process that reads DATABASE_URL gets the test DB.
-process.env.DATABASE_URL = TEST_DATABASE_URL;
+/// The runtime role's credentials are fixed by the infrastructure (docker/postgres/init, `pnpm db:roles`).
+export const APP_DB_ROLE = "app_user";
+function resolveAppDatabaseUrl(): string {
+  if (process.env.TEST_APP_DATABASE_URL) return process.env.TEST_APP_DATABASE_URL;
+  const url = new URL(TEST_DATABASE_URL);
+  url.username = APP_DB_ROLE;
+  url.password = APP_DB_ROLE;
+  return url.toString();
+}
+export const TEST_APP_DATABASE_URL = resolveAppDatabaseUrl();
+
+// Written back so a worker re-evaluating this module gets the same answers.
+process.env.TEST_DATABASE_URL = TEST_DATABASE_URL;
+process.env.TEST_APP_DATABASE_URL = TEST_APP_DATABASE_URL;
+// From here on, anything in this process that reads DATABASE_URL (the application, imported in-process) connects as the
+// RUNTIME role, to the test database. Fixtures use `db` (the admin) explicitly.
+process.env.DATABASE_URL = TEST_APP_DATABASE_URL;
+process.env.DIRECT_URL = TEST_DATABASE_URL;
 // The in-process (integration) tests exercise the plain-HTTP cookie shape; the
 // https project has its own server with its own APP_URL.
 process.env.APP_URL = HTTP_URL;
@@ -101,7 +127,8 @@ export function serverEnv(appUrl: string): Record<string, string> {
   return {
     ...inherited,
     NODE_ENV: "production",
-    DATABASE_URL: TEST_DATABASE_URL,
+    DATABASE_URL: TEST_APP_DATABASE_URL,
+    DIRECT_URL: TEST_DATABASE_URL,
     DEPLOYMENT_MODE: "solo",
     APP_URL: appUrl,
     CLIENT_IP_HEADER: "x-real-ip",
@@ -129,6 +156,12 @@ export function saasServerEnv(): Record<string, string> {
   // The SaaS-shaped server also uses the shared Redis rate-limit store (the other servers use memory), so the store
   // is exercised end to end by every limit test that runs here.
   return { ...serverEnv(SAAS_URL), DEPLOYMENT_MODE: "saas", RATE_LIMIT_STORE: "redis", REDIS_URL: TEST_REDIS_URL, PWNED_PASSWORD_CHECK: "on", PWNED_PASSWORD_URL: `${PWNED_STUB_URL}/range/` };
+}
+
+/// The misconfigured server (see UNSAFE_RLS_PORT): SaaS-shaped, but its DATABASE_URL is the admin's — and no
+/// ALLOW_RLS_BYPASS, so in production mode it must refuse tenant data.
+export function unsafeRlsServerEnv(): Record<string, string> {
+  return { ...serverEnv(UNSAFE_RLS_URL), DEPLOYMENT_MODE: "saas", DATABASE_URL: TEST_DATABASE_URL, ALLOW_RLS_BYPASS: "" };
 }
 
 /// The dev-tools server: staging mode, the token required, and NO EMAIL_TRANSPORT / RESEND_API_KEY — so mail

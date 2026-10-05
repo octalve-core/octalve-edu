@@ -1,5 +1,6 @@
 import type { Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { assertRlsEnforced } from "@/lib/tenant/assert-rls";
 import { forUser } from "@/lib/tenant/for-tenant";
 import { isValidTenantCode } from "@/lib/tenant/validate-code";
 import { trustedTenantId, type VerifiedTenantId } from "@/lib/tenant/verified-tenant";
@@ -24,7 +25,9 @@ export type ResolveResult =
   | { ok: true; tenant: TenantContext }
   /// 403: no such school, a malformed code, or the caller is not a member — deliberately ONE answer, so the response
   /// cannot be used to find out which schools exist.
-  /// 500: `DEPLOYMENT_MODE=solo` but the database does not hold exactly one tenant — fail closed.
+  /// 500: the installation cannot be trusted to isolate schools — `DEPLOYMENT_MODE=solo` but the database does not hold
+  /// exactly one tenant, or the database role does not really enforce row-level security — fail closed. The cause goes to
+  /// the log; the caller only learns that the installation is misconfigured.
   | { ok: false; status: 403 | 500; code: "FORBIDDEN" | "TENANT_MISCONFIGURED" };
 
 const FORBIDDEN: ResolveResult = { ok: false, status: 403, code: "FORBIDDEN" };
@@ -45,6 +48,15 @@ async function soloTenant(): Promise<{ id: string; code: string; name: string } 
 export async function resolveTenant(input: { userId: string; code: string }): Promise<ResolveResult> {
   const code = typeof input.code === "string" ? input.code.trim().toLowerCase() : "";
   if (!isValidTenantCode(code)) return FORBIDDEN;
+
+  // The database role must really be subject to row-level security (checked once per process) — before any tenant
+  // data is looked up. Garbage codes above never reach it: refusing them says nothing about the install.
+  try {
+    await assertRlsEnforced();
+  } catch (error) {
+    console.error(`[TENANT_MISCONFIGURED] ${error instanceof Error ? error.message : String(error)}`);
+    return { ok: false, status: 500, code: "TENANT_MISCONFIGURED" };
+  }
 
   // Which tenant the membership is looked up in: the one the URL's code names (SaaS) — or, in Solo, the install's
   // single tenant BY ID, with the URL's code only checked against it. (Looking up by the URL's code in both modes

@@ -21,10 +21,24 @@ certificate).
 | `pnpm exec playwright test <file> --headed` | Watch a spec run. `PWDEBUG=1` for the inspector. |
 | `pnpm exec playwright show-report` / `show-trace <trace.zip>` | After a failure: HTML report, or the trace (DOM snapshots, network, console). |
 
-The four ports in `tests/support/env.ts` (`HTTP_PORT`, `HTTPS_APP_PORT`, `TLS_PORT`, `DEVTOOLS_PORT`) must be free (the config never reuses a running server, so a stale one
+The ports in `tests/support/env.ts` (`HTTP_PORT`, `HTTPS_APP_PORT`, `TLS_PORT`, `DEVTOOLS_PORT`, `SAAS_PORT`, `UNSAFE_RLS_PORT`, `PWNED_STUB_PORT`, and Redis's `REDIS_TEST_PORT`) must be free (the config never reuses a running server, so a stale one
 can't be tested by accident).
 
 ## The database
+
+**Two database roles — the suite runs the way production does.** `TEST_DATABASE_URL` is the **admin** (the migrator and table owner): it
+creates the database, runs `prisma migrate deploy`, and arranges fixtures across schools (`db` in `support/db.ts`, `resetDatabase`). The app —
+every in-process module and every `next start` server — connects as **`app_user`** (`TEST_APP_DATABASE_URL`; `DATABASE_URL` in the tests'
+environment), a role with `NOSUPERUSER NOBYPASSRLS` and data-only grants, so **row-level security applies to everything the tests exercise**. A
+test run as the owner would pass vacuously whether or not a policy filtered anything. Consequences:
+
+- The admin **must itself bypass RLS** (a superuser — the docker compose role already is — or `BYPASSRLS`), or fixtures could not be arranged
+  across schools. `database.setup.ts` checks this and prints the exact `ALTER ROLE … BYPASSRLS;` when it does not hold.
+- `app_user` is created by `docker/postgres/init/01-roles.sql` (a fresh compose volume), by `pnpm db:roles` (an existing database — it also
+  re-applies the grants), or by `database.setup.ts` when the admin may create roles. Defaults: user `app_user`, password `app_user`; override with
+  `TEST_APP_DATABASE_URL`. If neither exists the setup fails with the command to run.
+- Arrange data through `db` (admin) and read it back through `prisma` (runtime) — `integration/rls.spec.ts` is the model.
+
 
 Tests run against **`<your database>_test`** (e.g. `octalve_edu_test`), never your dev database.
 `tests/setup/database.setup.ts` creates it if missing, applies every migration with
@@ -78,6 +92,9 @@ in the app.
   **SaaS-mode server** uses them (`RATE_LIMIT_STORE=redis`, `PWNED_PASSWORD_CHECK=on`); every other server and every in-process test has the breach check **off**
   and the memory store. The store conformance suite (`integration/rate-limit-store.spec.ts`) runs the same cases against both stores — add a case there, not in one
   store's own test. Code that calls `after()` (every route with a follow-up) cannot be called in-process: test its refusals in-process and its success paths over HTTP.
+- **The sixth server is deliberately wrong.** `UNSAFE_RLS_PORT` (3105, `unsafeRlsServerEnv()`) is the SaaS-mode build connected as the **admin** — a production
+  process that bypasses row-level security. `api/rls-assertion.spec.ts` proves it **refuses** tenant data (a generic 500, no role names, the page renders
+  no school) while routes that touch no tenant still work. It exists to prove `assertRlsEnforced()` is wired in; do not point other tests at it.
 - **Several schools, one database (SaaS-mode server).** The Solo servers fail closed (500) when a second tenant exists, so anything
   with more than one school runs on the **fifth server** (`SAAS_PORT` 3103, `saasServerEnv()`): `test.use({ baseURL: SAAS_URL })` in browser
   specs, `{ baseUrl: SAAS_URL }` in API calls. Make schools with `createTenant({ name, campuses })`, members with `addMembership(userId,

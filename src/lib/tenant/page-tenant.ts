@@ -18,7 +18,7 @@ export async function requireTenantPage(code: string): Promise<{
 
   const resolved = await resolveTenant({ userId: session.userId, code });
   if (!resolved.ok) {
-    if (resolved.status === 500) throw new Error("Tenant misconfigured: DEPLOYMENT_MODE=solo needs exactly one tenant");
+    if (resolved.status === 500) throw new Error("Tenant misconfigured — the cause is in the server log (TENANT_MISCONFIGURED)");
     forbidden();
   }
   const { tenant } = resolved;

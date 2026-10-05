@@ -27,14 +27,13 @@ replace a design pass — every phase still gets its design written into the pla
 | 0.5.0 Setup wizard · 0.5.1 Auth | ✅ | `phase-0.5.0…`, `phase-0.5.1…` |
 | 0.5.A Design language · 0.5.B CSP · 0.5.C Password reset · 0.5.D TOTP · 0.5.F Dev inbox | ✅ merged to `master` | `phase-0.5.A…F` |
 | 0.5.E Account self-service | ✅ PR #7 open | `phase-0.5.E…` |
-| **0.5.2 Tenant trust boundary** | 🟡 application layer built; ⛔ RLS part blocked | this file §0.5.2 |
-| 0.5.3 Shared API infrastructure | ⬜ | plan §0.5.3 |
+| **0.5.2 Tenant trust boundary** | ✅ application layer (`claude/tenant-trust-boundary`) **and row-level security** (`claude/tenant-rls`) built and verified | `phases/phase-0.5.2…` |
+| 0.5.3 Shared API infrastructure | ✅ built and verified (`claude/tenant-trust-boundary`) | `phases/phase-0.5.3…` |
+| **0.5.2-H App shell · 0.5.4 Users pages & invitations** | 🟡 designed (plan: "The app shell, and the Users pages with invitations"); building | plan |
 | Phase 1 … 5 | ⬜ | plan |
 
-**The one open blocker:** the RLS migration, the `app_user` runtime role and the "run the suite as `app_user`" harness need a
-database role to be created (`app_user`, `NOBYPASSRLS`) and the fixture/admin role to bypass RLS. Creating roles was refused
-by the environment's permission check, so it needs the maintainer's decision (see §0.5.2-F). Everything that does not need it
-is being built and verified first.
+**No open blocker.** The RLS role was created with the maintainer's approval ("do both and run") and the whole suite now runs as `app_user`. Phase 1 may start once the shell and
+the Users pages exist; **every Phase 1 table ships RLS in its own migration** (the catalog guard enforces it).
 
 ---
 
@@ -81,24 +80,11 @@ Design: plan §0.5.2 + "Build design for §0.5.2". Branch `claude/tenant-trust-b
 SaaS-mode **fifth server** (`SAAS_PORT` 3103), `createTenant` / `addMembership` / `removeCreatedTenants`, shared `withEnv`.
 Rule recorded: Solo servers fail closed with two tenants, so multi-tenant specs run on the SaaS server and clean up.
 
-### 0.5.2-F — Row-level security itself ⛔ blocked on a database role (needs the maintainer)
-What is needed (nothing else depends on it, but Phase 1 cannot ship without it): a Postgres role `app_user`
-(`LOGIN NOSUPERUSER NOBYPASSRLS`) and the fixture/admin connection able to bypass RLS (superuser — the docker/CI default — or
-`BYPASSRLS`). Tasks, in order, once unblocked:
-1. **T1 infra** — `docker/postgres/init/01-roles.sql`, `pnpm db:roles`, `DIRECT_URL` (Prisma `directUrl`) in `.env.example`.
-2. **T2 migration** — `app_tenant_id()` / `app_user_id()`; `ENABLE`+`FORCE` RLS and `USING`+`WITH CHECK` on `Campus`, `AuditLog`
-   (append-only: no `UPDATE`/`DELETE`/`TRUNCATE`), `TenantMembership` (read: tenant **or** own user; write: tenant only);
-   `app_grant_runtime_privileges()`; default privileges for future tables.
-3. **T3 harness** — `TEST_APP_DATABASE_URL`; servers and in-process code run as `app_user`; admin for fixtures; setup spec
-   creates/verifies roles and fails with the exact fix.
-4. **T4 `assertRlsEnforced()`** — production throws if the runtime role is superuser / `BYPASSRLS` / owner / tables not forced.
-5. **T5 negative tests as `app_user`** — no context = zero rows; A never sees B; `WITH CHECK` refuses cross-tenant insert and
-   move; no leak across transactions; audit append-only; membership two-path; a **catalog guard** that fails if any table with
-   a `tenantId` column lacks forced RLS or a policy.
-6. **T6 mutations (~30)** — RLS not forced, policy without `WITH CHECK`, `NULLIF` dropped, `set_config(...,false)`, membership
-   user-path writable, `app_user` with `BYPASSRLS`, resolver trusting the URL, unknown-vs-non-member answering differently,
-   roles checked against any membership, Solo invariant removed, assertion removed, audit written without a context, etc.
-7. **T7 docs & PR.**
+### 0.5.2-F — Row-level security itself ✅ built and verified (branch `claude/tenant-rls`)
+T1 infra (`docker/postgres/init/01-roles.sql`, `pnpm db:roles`, `DIRECT_URL`) ✅ · T2 migration `20261008090000_tenant_rls` (`app_tenant_id()` / `app_user_id()`; `ENABLE`+`FORCE` and `USING`+`WITH CHECK` on
+`Campus`, `AuditLog` (append-only: no UPDATE/DELETE policy **and** the privileges revoked), `TenantMembership` (read: tenant **or** own user; write: tenant only); `app_grant_runtime_privileges()` and default privileges) ✅ ·
+T3 harness (`TEST_APP_DATABASE_URL`; every server and in-process module runs as `app_user`; admin for fixtures; setup verifies and prints the exact fix) ✅ · T4 `assertRlsEnforced()` (+ a sixth, deliberately
+misconfigured test server proving it is wired in) ✅ · T5 negative tests as `app_user` incl. the catalog guard (33 + 4) ✅ · T6 mutation pass (44; results in the phase record) ✅ · T7 docs ✅ — PR only when asked.
 
 ### 0.5.2-G — Mutation pass and docs for the application layer ⬜
 Mutations for A–D (resolver trusting the URL, differing refusals, roles from the wrong school, Solo invariant removed, session

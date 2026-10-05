@@ -185,8 +185,8 @@ one-off pattern sources, referenced once for a specific technique and then done:
   (4) never put an `await` inside the memory store's `reserve` (the atomicity argument); (5) a new password is checked with `checkNewPasswordOnServer` (shape, then
   breach, fail-open); (6) audit sign-in events carry a device *kind*, never an IP or a raw user agent. Test prerequisite: `redis-server` on `PATH`. Record:
   `docs/development-history/phases/phase-0.5.3-api-infrastructure.md`.
-- **Phase 0.5.2 (tenant trust boundary — application layer) is BUILT AND VERIFIED; its RLS half is NOT built** — branch
-  `claude/tenant-trust-boundary`. **Rules that follow:** (1) the URL's `[code]` is a lookup key — every school route is
+- **Phase 0.5.2 (tenant trust boundary — application layer AND row-level security) is BUILT AND VERIFIED** — branches `claude/tenant-trust-boundary` (app layer, 0.5.3)
+  and `claude/tenant-rls` (the database half). **Rules that follow:** (1) the URL's `[code]` is a lookup key — every school route is
   `withAuth(…, { tenant: true })` and every school page `requireTenantPage(code)`; **never read a school's data from a code, an id in the
   URL or the body**; (2) data is reached only through `auth.tenant.run` / `forTenant(VerifiedTenantId)` — ESLint forbids the raw `prisma`
   client and `trustedTenantId` under `src/app/schools/**` and `src/app/api/v1/schools/**`; (3) **queries inside the tenant context still
@@ -194,8 +194,13 @@ one-off pattern sources, referenced once for a specific technique and then done:
   "malformed", "not a member" and "role not allowed" are **one 403 body**; (5) `roles` is checked against the role **in that school**,
   never any membership; (6) `DEPLOYMENT_MODE=solo` asserts exactly one tenant and fails closed (500); multi-school tests use the **SaaS-mode
   server** and clean up their schools; (7) new tenant routes need no new test to be guarded — the file-system-discovered route test hits them
-  cross-tenant; (8) **do not start Phase 1 tables until RLS is built** (they must ship policies in the same migration). Record:
-  `docs/development-history/phases/phase-0.5.2-tenant-boundary.md`; map: `docs/development-history/roadmap-breakdown.md`.
+  cross-tenant. **RLS rules:** (8) the app connects as **`app_user`** (`DATABASE_URL`), never the table owner — `DIRECT_URL` is the migrator and is for `prisma migrate` only; create the
+  role with the docker init script or **`pnpm db:roles`**; (9) **every table with a `tenantId` ships, in the SAME migration that creates it,
+  `ENABLE` + `FORCE ROW LEVEL SECURITY` and a policy with BOTH `USING` and `WITH CHECK` on `"tenantId" = app_tenant_id()`** — the catalog guard in `tests/integration/rls.spec.ts` fails the build otherwise
+  (and you must add the table to its expected list); a table with **no** `tenantId` must be added to the reviewed identity-table list *on purpose*; a table that must be append-only gets no
+  UPDATE/DELETE policy **and** a `REVOKE` (call `app_grant_runtime_privileges()` again); (10) the **test admin must bypass RLS** and fixtures go through `db`, never the runtime role — a negative test run as
+  the owner passes vacuously; (11) a bypassing role in production is refused by `assertRlsEnforced()` (set `ALLOW_RLS_BYPASS=true` only knowingly) — **never memoise a failure**. Records:
+  `docs/development-history/phases/phase-0.5.2-tenant-boundary.md`; map: `docs/development-history/roadmap-breakdown.md`. **Next:** the app shell (0.5.2-H) and the Users pages (0.5.4) — designed in the plan; then Phase 1.
 - **Phase 0.5.E (account self-service) is BUILT AND VERIFIED** — branch `claude/account-self-service`, stacked on the
   dev-inbox branch. A signed-in person can edit their name, change their email (confirmed by a link to the **new**
   address) and see / end the places they are signed in. **Rules that follow:** (1) the change-email request gives the
@@ -262,7 +267,7 @@ one-off pattern sources, referenced once for a specific technique and then done:
   as the schema already built here. Worth revisiting only if Better Auth's `storeTokenHash` option
   ships and stabilizes, or if TOTP MFA gets built (Better Auth's `twoFactor` plugin is worth using as
   a *reference implementation*, not a dependency to adopt wholesale).
-- `app_user` Postgres role (§0.5.2's RLS requirement) doesn't exist yet — needs to be created before
-  any RLS policy can be meaningfully tested, not just written.
+- ~~`app_user` Postgres role~~ **Resolved 2026-10-05** — created by `docker/postgres/init/01-roles.sql` / `pnpm db:roles`; the suite runs as it (see §0.5.2 above).
+  Still open: a **production role runbook / installer step** (create the roles, set `DIRECT_URL`) and a check against a managed Postgres whose "superuser" is not a real superuser.
 - No branches-and-environments reality yet beyond the documented convention — see that file's own
   honest note on what's aspirational.

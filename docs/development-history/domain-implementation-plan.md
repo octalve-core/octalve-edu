@@ -649,9 +649,19 @@ the append-only `AuditLog` grants, the "runtime role really is restricted" asser
 **As built — application layer (2026-10-05)** — record: `phases/phase-0.5.2-tenant-boundary.md`. As designed above except: (a) **Solo looks the
 membership up by the install's tenant id** and only checks the URL code against it (looking up by code in both modes made the check redundant —
 found by mutation); (b) `requireTenantPage` has **no `roles` option** (nothing used it; untested code is not added); (c) the 403 view uses
-`forbidden()` (`experimental.authInterrupts`), verified to return a real 403; (d) the app shell is a separate later step. **Not built:** everything
-in design items 1, 2, 3 (policies), 8 (`assertRlsEnforced`) and the `app_user` half of 11 — the RLS part is blocked on creating a database role
-(see the phase record). 811 tests pass; 25 injected bugs all caught or equivalent.
+`forbidden()` (`experimental.authInterrupts`), verified to return a real 403; (d) the app shell is a separate later step. **Not built at that point:** everything
+in design items 1, 2, 3 (policies), 8 (`assertRlsEnforced`) and the `app_user` half of 11 — it needed a database role the environment would not create without the maintainer's say-so
+(**since built — see the next paragraph**). 811 tests passed; 25 injected bugs all caught or equivalent.
+
+**As built — row-level security (2026-10-05)** — record: `phases/phase-0.5.2-tenant-boundary.md`, branch `claude/tenant-rls`. Designed items 1–12 are built as written, with these
+differences and additions: (a) the role is created by **infrastructure** (`docker/postgres/init/01-roles.sql`, **`pnpm db:roles`**, or the harness) and the migration only *grants* it
+privileges through `app_grant_runtime_privileges()` — a function, so `db:roles` can re-run it and a later append-only table can call it again; (b) `DIRECT_URL` is a real Prisma
+`directUrl` (CLI/migrations) and `DATABASE_URL` is `app_user`; (c) `assertRlsEnforced()` returns the fail-closed `TENANT_MISCONFIGURED` 500 through the resolver (cause in the server log only)
+and **never remembers a failure** (a first version memoised a rejected promise — found in review); (d) a **sixth test server** (`UNSAFE_RLS_PORT` 3105, connected as the table owner) proves the assertion
+is wired in; (e) the `AuditLog` policy lock and privilege lock are each tested **alone**; (f) the harness requires the admin to bypass RLS (a superuser or `BYPASSRLS`) and checks it.
+Findings worth keeping: an `ALL` policy without `WITH CHECK` reuses `USING` (so that mutation is *equivalent* — the meaningful one is `WITH CHECK (true)`), and `NULLIF` is defensive (equivalent
+when dropped). **Every existing suite passes unchanged as `app_user`** (the servers connect as it too): 932 tests, 44 injected bugs (43 caught, 1 equivalent). Phase 1 may start; **every new table ships RLS in the migration that creates it** (the catalog guard fails the
+build otherwise).
 
 ### 0.5.3 — Shared API infrastructure
 
@@ -772,6 +782,115 @@ on `PATH`; the Playwright config starts it on port 6390).
 version failed the first commands of a fresh process — found by the conformance test) plus a circuit-breaker cooldown; `Campus (tenantId, name)` is unique
 (one additive migration); the success paths of the breach check are tested over HTTP against a local stand-in for the service. **Not built:** the
 "negative tests as `app_user`" gate (needs the RLS role — see 0.5.2) and the upload domain (Phase 3). 896 tests pass; 44 injected bugs all caught.
+
+### 0.5.2-H + 0.5.4 — The app shell, and the Users pages with invitations
+
+**Why together.** The Users pages are the first real tenant screens; they need the shell (navigation, the school's name, the account menu) around them,
+and the shell needs a page that justifies its Users entry. Phase 1's screens then drop into both. Designed 2026-10-05, before any code.
+
+#### Build design — the shell (0.5.2-H)
+
+**1. Ported, not reinvented.** AlEemaan's shell is the design of record (artifact: "same shell, one brand tweak"): a 248 px sidebar (brand, navigation,
+the signed-in person) and a 60 px top bar (breadcrumb, theme toggle, account menu) from `lg`; below it a compact top bar, a floating bottom tab bar and a "More"
+sheet (a native modal `<dialog>`: focus trap, Escape, inert page, focus return from the platform). Components, tokens and tap targets are copied from the
+raw diff, then adapted for what differs here: **the shell is school-aware**.
+
+**2. Where it lives.** A route group `src/app/(app)/` — `account`, `dashboard`, `schools/[code]/**` — with **no URL change**. Its layout calls the
+signed-in-page guard and the person's memberships and renders `AppShell`; `AppHeader` is removed. As in AlEemaan the layout only *displays*: a layout is not
+re-rendered when navigating between its pages, so **every page still authorises itself** (`requireTenantPage(code)` / the session guard) — the shell
+is never the check.
+
+**3. School context without trusting the URL.** The shell needs "which school am I looking at, and what am I there?" for its navigation. It takes the person's
+memberships `{code, name, role}[]` from the server layout (one `forUser` read) and finds the current school by matching the first path segments against them
+(`schoolFromPath(pathname, memberships)` — a pure function; a path naming a school the person is not in matches **nothing**, and the page behind it answers
+403 anyway). That match is for *display only* (which links to show); the pages and APIs enforce. Stale-membership risk is accepted: a role changed mid-session
+changes what the nav *shows* on the next full load, never what is *allowed*.
+
+**4. Navigation is data.** One `navFor({ schoolCode, role })` returns the entries; sidebar, tab bar and More sheet derive from it so they cannot disagree.
+Outside a school: **Your schools** (`/dashboard`). Inside one: **Overview** (everyone), **Users** (ADMIN), **Settings** (ADMIN, visibly "Soon" until §1.7 — never a
+link to nothing). Role-hiding is a courtesy; the route behind it checks the role. A school **switcher** under the brand when the person has two or more schools
+(a disclosure of links, current one `aria-current`); with one school its name is plain text; the top-bar breadcrumb is `School / Page`.
+
+**5. Role labels** (`lib/roles.ts` already holds some): Administrator, Teaching staff, Non-teaching staff, Student, Parent.
+
+**6. Tests.** *unit:* `navFor` per role and with/without a school; `schoolFromPath` (hostile paths: encoded slashes, uppercase, trailing segments, a
+school the person is not in); `initialsOf`. *e2e (desktop + phone):* every entry present for an admin, Users absent for staff, active entry marked
+`aria-current`, switcher with two schools (and absent with one), More sheet (opens, Escape closes and returns focus, a link closes it), sign-out from the
+account menu **and** the sheet, skip link first in tab order. *axe, both themes:* admin, staff, no-school, menu open, sheet open. Existing tests that
+signed out through the old header are adapted. *Mutations:* a role-hidden entry shown to staff; the switcher listing a school the person is not in;
+`aria-current` dropped; the sheet not closing on navigation.
+
+#### Build design — Users and invitations (0.5.4)
+
+**1. Data (additive migration, RLS in the same file).**
+- `TenantMembership.deactivatedAt TIMESTAMPTZ NULL` — "deactivate" keeps the row (history and reactivation survive). **Every reader of memberships treats a
+  deactivated one as no membership**: `resolveTenant` (→ the one 403), `getUserMemberships`, `completeSignIn`'s admin check, `auditPersonEvent`. Because that is
+  a rule many places must remember, the route guard test gains a **deactivated member** case on every school route, and a membership test per reader.
+- `Invitation` — `id`, `tenantId` (FK, cascade), `email` (lower-cased), `role`, `campusId?`, `tokenHash` (unique; SHA-256 hex — **never the token**), `invitedById`,
+  `createdAt`, `expiresAt` (7 days), `acceptedAt?`, `revokedAt?`; index `(tenantId, email)`. **One live invitation per (school, email):** inviting again revokes the
+  earlier one (the earlier link then fails like any dead link).
+- **RLS on `Invitation`** (the catalog guard demands it): tenant isolation with `WITH CHECK` for writes, and **one extra read path** because the invitee is not
+  a member of anything yet when they open the link: `SELECT … USING ("tenantId" = app_tenant_id() OR "tokenHash" = app_invitation_hash())`, where
+  `app_invitation_hash()` reads a third transaction-local setting (`app.invitation_hash`, set by `forInvitation(hash)` after the app has hashed the presented
+  token). It is read-only and matches exactly the one row whose secret the caller holds — the same shape as the membership user-path.
+- The accept transaction reads the invitation through that path, then sets the **tenant context from the row it found** (`trustedTenantId` — the second place it
+  is legitimately called, because a 256-bit secret's hash names the tenant; ESLint still forbids it in school code) and writes the user/membership/audit in that
+  context. Nothing in the request body ever names a tenant.
+
+**2. The link.** `…/accept-invite#token=<32 random bytes, base64url>` — in the **fragment** (never in a server log or a Referer), exactly like password reset, with
+the same `useFragmentToken()` (so opening a second link in the same tab works). Mail goes out *after* the response (`after()`), identical whether or not an
+account exists for the address (no enumeration of the platform's accounts by a school's admin); per-target-address mail limit as for email change.
+
+**3. Accepting — three cases, one rule: an existing account is attached only by its owner.**
+(a) *No account for that address:* the page asks for a name and a password (policy + breached-password check, the same as everywhere); one transaction creates
+the `User` (`emailVerified = now`, because the link proves the address), the membership, marks the invitation accepted and audits it. It does **not** sign the person
+in (the same decision as password reset — a link in a mailbox is not a session); the page ends on "Sign in".
+(b) *An account exists, and the person is signed in as it:* "Join {school} as {role}" → one click attaches the membership.
+(c) *An account exists, nobody is signed in:* a "Sign in to accept" step that returns to the same link. *Signed in as someone else:* refused with a plain explanation
+(no data about the other account). **An admin can never attach a stranger's existing account** — only the holder of the link while signed in as that address can.
+Single use is a **conditional update** (`acceptedAt IS NULL AND revokedAt IS NULL AND expiresAt > now()` must change exactly one row) inside the same transaction as
+the writes, so two simultaneous accepts produce exactly one membership and one of them is told the link is used. Unknown, expired, revoked and used links are **one
+generic 400**. Public routes: CSRF, per-IP failure limit with refund on success, per-token limit.
+
+**4. Members API** (all `withAuth(…, { tenant: true, roles: ["ADMIN"] })`, validated with `validate()`, audited **in the same transaction** as the change):
+`GET …/members` (offset-paged with the 0.5.3 helpers; filters `role`, `campusId`, `status=active|deactivated|all`, `q` ≤ 64 chars matched against name/email;
+stable order with an id tiebreak), `PATCH …/members/[userId]` (`{ role?, campusId? }`, strict — unknown keys refused), `POST …/members/[userId]/deactivate` and
+`…/reactivate`, `GET/POST …/invitations`, `DELETE …/invitations/[id]` (revoke), `POST …/invitations/[id]/resend` (new token, new expiry, the old one dead).
+**School code never queries `User` directly** (the table has no `tenantId`, so RLS cannot protect it): people are read **through** `tenantMembership` with a narrow
+`select` on the relation, and an ESLint rule forbids `.user.` calls in school paths. Audit actions: `INVITATION_CREATED|RESENT|REVOKED|ACCEPTED`, `MEMBER_ROLE_CHANGED`,
+`MEMBER_CAMPUS_CHANGED`, `MEMBER_DEACTIVATED|REACTIVATED` — each with before/after, never a token, a hash or a password.
+
+**5. Authority rules (the "admin cannot escalate" part).** Only an ADMIN of *this* school manages its members; the tenant context makes another school's members
+simply not exist (a foreign or unknown user id is **one 404**). Then: (i) **the last active ADMIN cannot be demoted or deactivated** — checked inside the transaction
+after locking the school's admin memberships (`SELECT … FOR UPDATE`), so two simultaneous demotions cannot both succeed; (ii) **nobody changes or deactivates
+themselves** here ("ask another administrator" — an accidental self-lockout is worse than an extra step); (iii) a campus must belong to this school — a foreign campus id
+is indistinguishable from a missing one; (iv) a no-op change is a 200 and writes no audit row; (v) inviting an **active** member is a 409 naming only *this* school's
+fact; inviting a **deactivated** member tells the admin to reactivate instead. Role changes need no session revocation: the role is read from the membership on every
+request, so a change (or a deactivation) takes effect on the person's **next request**.
+
+**6. Screens (inside the shell).** `/schools/[code]/users`: a page header with **Invite someone**; filters (role, status, search) and a paged list — a table from `md`,
+cards on a phone — each row: name + email, role chip, campus, status, and a **Change role / campus** and **Deactivate / Reactivate** action (native `<dialog>`s with
+focus returned to the trigger); a "Pending invitations" section with Resend / Revoke and the expiry; honest empty and error states; every change announced in a live
+region. `/accept-invite`: the three cases above plus the dead-link state, in the existing auth layout. New primitives: `SelectField`, a `Dialog` wrapper over `<dialog>`.
+
+**7. Admin-initiated email change — deliberately NOT in the first cut.** The address is the person's **global** login identity: an admin of one school changing it
+changes how that person signs in to *every* school. It is only safe for a person whose sole membership is this school, and it must still be confirmed from the
+**new** address and announced to the old one. Designed as 0.5.4-F, built after the rest if that holds up under review; until then a person changes their own address
+(0.5.E).
+
+**8. Tests.** *unit:* token generation/hash, the pure last-admin and authority rules, invitation status derivation, the filter parser. *integration (as `app_user`):*
+invitation lifecycle (hash at rest, one live per email, expiry, revoke, resend), **accept creates user + membership + audit atomically and rolls back whole** (a breached
+password or an invalid name leaves nothing behind and the link unspent), **two simultaneous accepts → one membership**, accepting while signed in as another address,
+the RLS file grows `Invitation` (isolation, `WITH CHECK`, the hash path reads exactly one row, no context → none), deactivated = no membership in each reader, last-admin under
+concurrency. *api (SaaS server):* every new route in the discovered cross-tenant guard (plus a deactivated member), the authority matrix, validation, pagination, identical
+answers for "has an account" / "has none", CSRF, limits, audit contents, mail contents (a link, never a token in logs). *browser (desktop + phone):* invite → mail → accept
+as a new person → sign in → lands in the school; the existing-account path; the users page flows; axe in both themes for every state. *Mutations (≈ 40):* token stored in the
+clear; invitation not single-use / expiry ignored / revoke ignored; accept trusting a body tenant; existing account attached by an admin or while signed in as someone else;
+deactivated still resolving; last-admin guard removed / not locked; self-change allowed; a foreign campus accepted; user listing without the tenant join; audit missing or
+carrying a secret; enumeration (different bodies); the invitation RLS hash path widened or made writable.
+
+**9. AlEemaan.** It has branches, not schools, and its member model is `Membership` per branch: the same pages and the same invitation flow are ported by reading the raw
+diff after they are proven here — with `branchId` where this has `tenantId`, and **no** `app_invitation_hash` / RLS (single tenant). Differences are logged in both plans.
 
 ### Phase 0.5 addenda (2026-09-30, after the auth build)
 
