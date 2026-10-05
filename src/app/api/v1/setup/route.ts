@@ -8,6 +8,7 @@ import { validateCSRF } from "@/lib/auth/csrf";
 import { reserveAttempt, refundAttempt, getClientIp } from "@/lib/auth/rate-limit";
 import { hashPassword } from "@/lib/auth/password";
 import { checkNewPassword } from "@/lib/auth/password-policy";
+import { isBreachedPassword, BREACHED_MESSAGE } from "@/lib/auth/pwned-password";
 import { slugifyTenantCode, isValidTenantCode } from "@/lib/tenant/validate-code";
 import { setTenantContext } from "@/lib/tenant/for-tenant";
 import { trustedTenantId } from "@/lib/tenant/verified-tenant";
@@ -101,6 +102,11 @@ export async function POST(req: NextRequest) {
   }
 
   const { schoolName, email, password, name, setupToken } = parsed.data;
+
+  // The first administrator's password is the most valuable one on the install.
+  if (await isBreachedPassword(password)) {
+    return fail(BREACHED_MESSAGE, 400, "VALIDATION");
+  }
 
   const expectedToken = process.env.SETUP_TOKEN;
   if (expectedToken) {

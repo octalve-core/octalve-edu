@@ -137,10 +137,10 @@ export function createResilientStore(primary: RateLimitStore, fallback: RateLimi
   const cooldownMs = options.cooldownMs ?? 5_000;
   let down = false;
   let retryAt = 0;
-  async function attempt<T>(use: (store: RateLimitStore) => Promise<T>): Promise<T> {
-    if (down && Date.now() < retryAt) return use(fallback);
+  async function attempt<T>(run: (store: RateLimitStore) => Promise<T>): Promise<T> {
+    if (down && Date.now() < retryAt) return run(fallback);
     try {
-      const result = await use(primary);
+      const result = await run(primary);
       if (down) {
         down = false;
         console.warn("[RATE_LIMIT] Redis is reachable again — using it.");
@@ -152,7 +152,7 @@ export function createResilientStore(primary: RateLimitStore, fallback: RateLimi
         down = true;
         console.error(`[RATE_LIMIT] Redis unavailable (${error instanceof Error ? error.message : error}) — limiting in this process's memory until it returns.`);
       }
-      return use(fallback);
+      return run(fallback);
     }
   }
   return {

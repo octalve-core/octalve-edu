@@ -1,6 +1,8 @@
-import type { NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, type NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 import { forUser } from "@/lib/tenant/for-tenant";
+import { auditPersonEvent } from "@/lib/auth/audit";
+import { describeUserAgent } from "@/lib/auth/user-agent";
 import { ok } from "@/lib/api/envelope";
 import {
   SESSION_COOKIE_NAME,
@@ -35,6 +37,18 @@ export async function completeSignIn(
   const { token, expires, persistent } = await createSession(user.id, req.headers.get("user-agent"), {
     admin: holdsAdmin,
     remember,
+  });
+
+  // The sign-in is on the person's audit trail (one row per school): WHEN and from what KIND of device — never an IP
+  // address (none is stored anywhere). Written after the response, so it costs the person nothing and its failure
+  // can never fail a sign-in.
+  const device = describeUserAgent(req.headers.get("user-agent"));
+  after(async () => {
+    try {
+      await auditPersonEvent(user.id, "LOGIN_SUCCEEDED", { after: { device, remembered: remember } });
+    } catch (error) {
+      console.error("[sign-in] audit failed:", error instanceof Error ? error.message : error);
+    }
   });
 
   const response = ok({ user: { id: user.id, name: user.name, email: user.email }, ...extra });

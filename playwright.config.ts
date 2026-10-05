@@ -6,6 +6,7 @@ import {
   HTTP_URL,
   HTTPS_APP_PORT,
   HTTPS_URL,
+  PWNED_STUB_PORT,
   REDIS_TEST_PORT,
   SAAS_PORT,
   SAAS_URL,
@@ -44,6 +45,8 @@ export default defineConfig({
   use: { trace: "retain-on-failure", screenshot: "only-on-failure" },
 
   webServer: [
+    // The breached-password service stand-in (see tests/support/pwned-stub.mjs).
+    { command: `node tests/support/pwned-stub.mjs ${PWNED_STUB_PORT}`, url: `http://127.0.0.1:${PWNED_STUB_PORT}/__requests`, reuseExistingServer: false, timeout: 20_000 },
     // A throwaway Redis (no persistence) for the rate-limit store tests — see tests/README.md. Skipped when the
     // developer points TEST_REDIS_URL at their own.
     ...(process.env.TEST_REDIS_URL

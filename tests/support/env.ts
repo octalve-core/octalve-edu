@@ -29,6 +29,10 @@ export const DEV_TOOLS_TEST_TOKEN = "test-dev-tools-token-0123456789";
 /// schools in one database — the tenant boundary, the school picker — runs here.
 export const SAAS_PORT = 3103;
 
+/// A stand-in for the breached-password range API (tests/support/pwned-stub.mjs); the SaaS-mode server checks against it.
+export const PWNED_STUB_PORT = 3104;
+export const PWNED_STUB_URL = `http://127.0.0.1:${PWNED_STUB_PORT}`;
+
 /// A throwaway Redis for the rate-limit store tests (started by playwright.config.ts: `redis-server` must be on PATH,
 /// or `docker compose up -d redis` provides one on 6380 — set TEST_REDIS_URL to use that instead).
 export const REDIS_TEST_PORT = 6390;
@@ -74,6 +78,9 @@ process.env.APP_URL = HTTP_URL;
 process.env.DEPLOYMENT_MODE = "solo";
 process.env.EMAIL_TRANSPORT = "file";
 process.env.EMAIL_FILE = EMAIL_FILE;
+// No test talks to the public breach service (and its answers must not decide a test): the check is off everywhere
+// except in the specs that exercise it with an injected fetcher.
+process.env.PWNED_PASSWORD_CHECK = "off";
 // In-process tests start from the safe default (a production-shaped environment with the dev tools off); a test
 // about the dev tools sets what it needs for its own duration.
 process.env.APP_ENV = "production";
@@ -102,6 +109,7 @@ export function serverEnv(appUrl: string): Record<string, string> {
     SETUP_TOKEN: "",
     // Only the proxied deployment trusts X-Forwarded-Host (see httpsServerEnv); everything else compares with Host.
     TRUST_FORWARDED_HOST: "",
+    PWNED_PASSWORD_CHECK: "off",
     EMAIL_TRANSPORT: "file",
     EMAIL_FILE,
     // Production-shaped, whatever the developer's own .env says: no dev tools on these servers.
@@ -120,7 +128,7 @@ export function httpsServerEnv(): Record<string, string> {
 export function saasServerEnv(): Record<string, string> {
   // The SaaS-shaped server also uses the shared Redis rate-limit store (the other servers use memory), so the store
   // is exercised end to end by every limit test that runs here.
-  return { ...serverEnv(SAAS_URL), DEPLOYMENT_MODE: "saas", RATE_LIMIT_STORE: "redis", REDIS_URL: TEST_REDIS_URL };
+  return { ...serverEnv(SAAS_URL), DEPLOYMENT_MODE: "saas", RATE_LIMIT_STORE: "redis", REDIS_URL: TEST_REDIS_URL, PWNED_PASSWORD_CHECK: "on", PWNED_PASSWORD_URL: `${PWNED_STUB_URL}/range/` };
 }
 
 /// The dev-tools server: staging mode, the token required, and NO EMAIL_TRANSPORT / RESEND_API_KEY — so mail
