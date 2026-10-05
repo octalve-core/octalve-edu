@@ -14,7 +14,7 @@ export type AuditDetails = { before?: unknown; after?: unknown; reason?: string 
 /// `trustedTenantId` needs.
 export async function auditPersonEvent(userId: string, action: string, details: AuditDetails = {}): Promise<void> {
   const memberships = await forUser(userId).transaction((tx) =>
-    tx.tenantMembership.findMany({ where: { userId }, select: { tenantId: true } }),
+    tx.tenantMembership.findMany({ where: { userId, deactivatedAt: null }, select: { tenantId: true } }), // not a school they were removed from
   );
   for (const m of memberships) {
     await forTenant(trustedTenantId(m.tenantId)).transaction((tx) =>

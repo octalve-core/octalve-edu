@@ -28,6 +28,19 @@ test.describe("restricted imports in school code", () => {
     });
   }
 
+  test("school code may not query `user` directly: no tenant column, so row-level security cannot protect it", async () => {
+    const lintSyntax = async (filePath: string, code: string) => {
+      const [result] = await eslint.lintText(code, { filePath });
+      return result.messages.filter((m) => m.ruleId === "no-restricted-syntax").map((m) => m.message);
+    };
+    for (const file of paths) {
+      expect((await lintSyntax(file, `export async function f(tx: any) { return tx.user.findMany(); }\n`)).join(" "), file).toMatch(/through `tenantMembership`/);
+      expect((await lintSyntax(file, `export async function f(tx: any) { return tx.tenantMembership.findMany({ include: { user: true } }); }\n`)), file).toEqual([]);
+    }
+    // identity code (the invitation service reads a user by address) is not school code
+    expect(await lintSyntax("src/lib/invitations/service.ts", `export async function f(tx: any) { return tx.user.findUnique({ where: { email: "x" } }); }\n`)).toEqual([]);
+  });
+
   test("elsewhere the raw client is still allowed (identity code needs it)", async () => {
     expect(await lint("src/lib/auth/session-devices.ts", `import { prisma } from "@/lib/db";\nexport const x = prisma;\n`)).toEqual([]);
   });

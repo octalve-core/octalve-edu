@@ -20,6 +20,15 @@ const eslintConfig = defineConfig([
           ],
         },
       ],
+      // `User` has no tenant column, so row-level security cannot protect it: a query on it from school code could return anyone on
+      // the platform. People are read THROUGH `tenantMembership` (lib/members/service.ts) with a narrow `select` on the relation.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "MemberExpression[property.name='user'][object.name=/^(tx|prisma|db|client)$/]",
+          message: "School code must not query `user` directly (no tenant column, so RLS can't protect it): read people through `tenantMembership` — see lib/members/service.ts.",
+        },
+      ],
     },
   },
   // Override default ignores of eslint-config-next.

@@ -14,11 +14,12 @@ test.describe("navFor", () => {
     expect(navFor(null)).toMatchObject([{ label: "Your schools", href: "/dashboard" }]);
   });
 
-  test("an ADMIN of a school: Overview, Users and Settings (not built yet → no link)", () => {
+  test("an ADMIN of a school: Overview, Users (a page) and Settings (not built yet → no link)", () => {
     const items = navFor(admin);
     expect(items.map((i) => i.label)).toEqual(["Overview", "Users", "Settings"]);
     expect(items[0].href).toBe("/schools/riverside");
-    expect(items.filter((i) => i.href === null).map((i) => i.label)).toEqual(["Users", "Settings"]); // "Soon", never a dead link
+    expect(items[1].href).toBe("/schools/riverside/users");
+    expect(items.filter((i) => i.href === null).map((i) => i.label)).toEqual(["Settings"]); // "Soon", never a dead link
   });
 
   test("everyone else sees Overview only — decided by the role IN THAT SCHOOL", () => {

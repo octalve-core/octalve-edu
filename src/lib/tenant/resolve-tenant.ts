@@ -73,7 +73,8 @@ export async function resolveTenant(input: { userId: string; code: string }): Pr
   // person may see their own memberships before any tenant is known). Tenant is not tenant-scoped data.
   const membership = await forUser(input.userId).transaction((tx) =>
     tx.tenantMembership.findFirst({
-      where: { userId: input.userId, tenant: tenantFilter },
+      // A deactivated membership is no membership: the person was removed from this school (the row stays for history).
+      where: { userId: input.userId, tenant: tenantFilter, deactivatedAt: null },
       select: { role: true, campusId: true, tenant: { select: { id: true, code: true, name: true } } },
     }),
   );

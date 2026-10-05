@@ -33,6 +33,16 @@ export async function setUserContext(tx: Tx, userId: string): Promise<void> {
   await tx.$queryRaw`SELECT set_config('app.user_id', ${userId}::text, true)`;
 }
 
+/// Sets the *invitation* context — the third read path, for the one moment a person has no membership: they hold an
+/// invitation link. `tokenHash` is the SHA-256 (hex) of the token they presented, never the token. The policy on
+/// `Invitation` lets this context read exactly the row whose hash matches and nothing else, and nothing is writable
+/// through it: an accepting transaction reads the invitation here, then sets the TENANT context from the row it found
+/// (`setTenantContext` with a `trustedTenantId` — the secret's hash named the tenant) before it writes anything.
+export async function setInvitationContext(tx: Tx, tokenHash: string): Promise<void> {
+  if (!/^[0-9a-f]{64}$/.test(tokenHash)) throw new Error("setInvitationContext: not a token hash");
+  await tx.$queryRaw`SELECT set_config('app.invitation_hash', ${tokenHash}::text, true)`;
+}
+
 export function forTenant(tenantId: VerifiedTenantId) {
   return {
     /// Runs `fn` in one transaction with the tenant context set. Rolls back if `fn` throws.
@@ -50,6 +60,17 @@ export function forUser(userId: string) {
     transaction<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
       return prisma.$transaction(async (tx) => {
         await setUserContext(tx, userId);
+        return fn(tx);
+      }, TRANSACTION_OPTIONS);
+    },
+  };
+}
+
+export function forInvitation(tokenHash: string) {
+  return {
+    transaction<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
+      return prisma.$transaction(async (tx) => {
+        await setInvitationContext(tx, tokenHash);
         return fn(tx);
       }, TRANSACTION_OPTIONS);
     },

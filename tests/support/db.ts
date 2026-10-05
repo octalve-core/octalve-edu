@@ -118,6 +118,15 @@ export async function addMembership(userId: string, tenantId: string, role: Role
   return db.tenantMembership.create({ data: { userId, tenantId, role, campusId } });
 }
 
+/// Deactivates `userId`'s membership of `tenantId` (what an administrator does on the Users page): the row stays, but it
+/// is no longer a membership. `reactivateMembership` is the reverse.
+export async function deactivateMembership(userId: string, tenantId: string) {
+  return db.tenantMembership.update({ where: { userId_tenantId: { userId, tenantId } }, data: { deactivatedAt: new Date() } });
+}
+export async function reactivateMembership(userId: string, tenantId: string) {
+  return db.tenantMembership.update({ where: { userId_tenantId: { userId, tenantId } }, data: { deactivatedAt: null } });
+}
+
 /// Removes every school made by `createTenant` (their campuses, memberships and audit rows go with them), so the
 /// Solo servers see exactly one tenant again.
 export async function removeCreatedTenants(): Promise<void> {

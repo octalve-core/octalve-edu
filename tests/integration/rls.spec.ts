@@ -1,17 +1,21 @@
 import "../support/env";
+import crypto from "node:crypto";
 import { PrismaClient, Role } from "@prisma/client";
 import { test, expect } from "@playwright/test";
 import { TEST_APP_DATABASE_URL, TEST_DATABASE_URL } from "../support/env";
 import { addMembership, createTenant, createUser, db, removeCreatedTenants, seedInstance, type TestTenant } from "../support/db";
 import { prisma } from "@/lib/db";
 import { assertRlsEnforced, checkRlsEnforcement, resetRlsAssertionForTests, rlsVerdict } from "@/lib/tenant/assert-rls";
-import { setTenantContext, setUserContext, forTenant, forUser } from "@/lib/tenant/for-tenant";
+import { setTenantContext, setUserContext, forInvitation, forTenant, forUser } from "@/lib/tenant/for-tenant";
 import { trustedTenantId } from "@/lib/tenant/verified-tenant";
 
 // THE negative-test file of domain-implementation-plan.md §0.5.2 / §0.5.3 — run as `app_user`, the role the app runs
 // as. A negative test that ran as the table owner (or any role that bypasses RLS) would pass vacuously whether or not
 // the policies filter anything: so the first tests prove WHO is running, and everything after arranges its data
 // through the ADMIN (`db`, which bypasses RLS) and reads it back through the runtime role (`prisma`).
+
+/// What an invitation link's token hashes to — the only thing that is ever stored or presented to the database.
+const hashOf = (seed: string) => crypto.createHash("sha256").update(`rls-test-${seed}`).digest("hex");
 
 let a: TestTenant;
 let b: TestTenant;
@@ -28,6 +32,7 @@ test.beforeAll(async () => {
   await addMembership(userBoth.id, a.id, Role.STUDENT);
   await addMembership(userBoth.id, b.id, Role.ADMIN);
   for (const t of [a, b]) {
+    await db.invitation.create({ data: { tenantId: t.id, email: `invitee@${t.code}.test`, role: Role.TEACHING_STAFF, tokenHash: hashOf(t.code), expiresAt: new Date(Date.now() + 3_600_000) } });
     await db.auditLog.create({ data: { tenantId: t.id, actorUserId: userBoth.id, action: "ARRANGED", targetType: "User", targetId: userBoth.id } });
   }
 });
@@ -185,11 +190,13 @@ test.describe("who is running", () => {
 });
 
 test.describe("no context = no rows", () => {
-  test("Campus, AuditLog and TenantMembership return NOTHING without a context, though rows exist", async () => {
+  test("Campus, AuditLog, TenantMembership and Invitation return NOTHING without a context, though rows exist", async () => {
     expect(await db.campus.count({ where: { tenantId: { in: [a.id, b.id] } } })).toBe(3);
     expect(await prisma.campus.findMany()).toEqual([]);
     expect(await prisma.auditLog.findMany()).toEqual([]);
     expect(await prisma.tenantMembership.findMany()).toEqual([]);
+    expect(await db.invitation.count({ where: { tenantId: { in: [a.id, b.id] } } })).toBe(2);
+    expect(await prisma.invitation.findMany()).toEqual([]);
     expect(await prisma.campus.count()).toBe(0);
   });
 
@@ -197,6 +204,7 @@ test.describe("no context = no rows", () => {
     await expect(prisma.campus.create({ data: { tenantId: a.id, name: "No context" } })).rejects.toThrow(violation);
     await expect(prisma.auditLog.create({ data: { tenantId: a.id, actorUserId: "x", action: "NO_CTX", targetType: "t", targetId: "t" } })).rejects.toThrow(violation);
     await expect(prisma.tenantMembership.create({ data: { userId: userA.id, tenantId: b.id, role: Role.ADMIN } })).rejects.toThrow(violation);
+    await expect(prisma.invitation.createMany({ data: [{ tenantId: a.id, email: "x@y.test", role: Role.PARENT, tokenHash: hashOf("no-ctx"), expiresAt: new Date() }] })).rejects.toThrow(violation);
   });
 
   test("an EMPTY-string context (what a pooled connection reads back after a transaction) is also no context", async () => {
@@ -233,11 +241,12 @@ test.describe("a tenant sees ITS rows and never another's", () => {
   test("an UPDATE that reads no column cannot move rows to B either (then no READ policy is consulted — the write check stands alone)", async () => {
     // `UPDATE … WHERE col = …` also runs the read policy on the NEW row, which masks a broken WITH CHECK; an UPDATE with a
     // constant SET and no WHERE reads nothing, so only the WITH CHECK refuses the new tenant (found by mutation, S16).
-    for (const table of ["Campus", "TenantMembership"]) {
+    for (const table of ["Campus", "TenantMembership", "Invitation"]) {
       await expect(asTenant(a, (tx) => tx.$executeRawUnsafe(`UPDATE "${table}" SET "tenantId" = '${b.id}'`)), table).rejects.toThrow(violation);
     }
     expect(await db.campus.count({ where: { tenantId: b.id } })).toBe(1);
     expect(await db.tenantMembership.count({ where: { tenantId: a.id } })).toBe(2);
+    expect(await db.invitation.count({ where: { tenantId: b.id } })).toBe(1);
   });
 
   test("A's context cannot UPDATE or DELETE B's rows — they are not there to touch (0 rows affected)", async () => {
@@ -370,6 +379,93 @@ test.describe("TenantMembership: tenant roster, own memberships, and nobody else
   });
 });
 
+test.describe("Invitation: a school's own invitations — and the ONE row a token names", () => {
+  test("the TENANT context reads that school's invitations and no other school's", async () => {
+    const seen = await asTenant<{ tenantId: string; email: string }[]>(a, (tx) => tx.invitation.findMany());
+    expect(seen.map((i) => i.tenantId)).toEqual([a.id]);
+    expect(await asTenant(a, (tx) => tx.invitation.findMany({ where: { tenantId: b.id } }))).toEqual([]); // asking explicitly changes nothing
+  });
+
+  test("the INVITATION context reads exactly the row whose token-hash it presents — never another's, never a guess", async () => {
+    const mine = await forInvitation(hashOf(a.code)).transaction((tx) => tx.invitation.findMany());
+    expect(mine.map((i) => i.tenantId)).toEqual([a.id]);
+    const theirs = await forInvitation(hashOf(b.code)).transaction((tx) => tx.invitation.findMany());
+    expect(theirs.map((i) => i.tenantId)).toEqual([b.id]); // each hash opens ITS row
+    expect(await forInvitation(hashOf("someone-elses")).transaction((tx) => tx.invitation.findMany())).toEqual([]);
+    // a partial hash, an uppercase hash, a hash with a wildcard — none is "close enough"
+    for (const near of [hashOf(a.code).slice(0, 63), hashOf(a.code).toUpperCase(), hashOf(a.code).slice(0, 10) + "%"]) {
+      await expect(forInvitation(near).transaction((tx) => tx.invitation.findMany())).rejects.toThrow(/not a token hash/); // refused before it reaches SQL
+    }
+    const viaRaw = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT set_config('app.invitation_hash', ${hashOf(a.code).toUpperCase()}::text, true)`; // bypassing the helper: still no match
+      return tx.invitation.findMany();
+    });
+    expect(viaRaw).toEqual([]);
+  });
+
+  test("the invitation context reads NOTHING else: no campuses, no audit rows, no memberships, no other school's invitations", async () => {
+    await forInvitation(hashOf(a.code)).transaction(async (tx) => {
+      expect(await tx.campus.findMany()).toEqual([]);
+      expect(await tx.auditLog.findMany()).toEqual([]);
+      expect(await tx.tenantMembership.findMany()).toEqual([]);
+      expect((await tx.invitation.findMany()).map((i) => i.tenantId)).toEqual([a.id]);
+    });
+  });
+
+  test("the invitation context is READ-ONLY: it cannot insert, update or delete — not even the row it can read", async () => {
+    const row = await db.invitation.findFirstOrThrow({ where: { tenantId: a.id } });
+    await forInvitation(hashOf(a.code)).transaction(async (tx) => {
+      expect((await tx.invitation.updateMany({ where: { id: row.id }, data: { acceptedAt: new Date() } })).count).toBe(0);
+      expect((await tx.invitation.deleteMany({ where: { id: row.id } })).count).toBe(0);
+    });
+    await expect(
+      forInvitation(hashOf(a.code)).transaction((tx) => tx.invitation.createMany({ data: [{ tenantId: a.id, email: "forged@x.test", role: Role.ADMIN, tokenHash: hashOf("forged"), expiresAt: new Date() }] })),
+    ).rejects.toThrow(violation);
+    expect(await db.invitation.findUniqueOrThrow({ where: { id: row.id } })).toMatchObject({ acceptedAt: null, revokedAt: null });
+  });
+
+  test("the accepting path: read by hash, then set the tenant context from the row, then write — and only then", async () => {
+    // What lib/invitations does: one transaction, three contexts in order. The write works only after the tenant context is set.
+    const row = await db.invitation.create({ data: { tenantId: a.id, email: "accept@x.test", role: Role.PARENT, tokenHash: hashOf("accept-path"), expiresAt: new Date(Date.now() + 60_000) } });
+    const claimed = await forInvitation(hashOf("accept-path")).transaction(async (tx) => {
+      const found = await tx.invitation.findUniqueOrThrow({ where: { tokenHash: hashOf("accept-path") } });
+      expect((await tx.invitation.updateMany({ where: { id: found.id, acceptedAt: null }, data: { acceptedAt: new Date() } })).count).toBe(0); // not yet
+      await setTenantContext(tx, trustedTenantId(found.tenantId));
+      return (await tx.invitation.updateMany({ where: { id: found.id, acceptedAt: null }, data: { acceptedAt: new Date() } })).count;
+    });
+    expect(claimed).toBe(1);
+    expect((await db.invitation.findUniqueOrThrow({ where: { id: row.id } })).acceptedAt).not.toBeNull();
+  });
+
+  test("WITH CHECK: A's context cannot create an invitation for B (nothing returned, so only the write check refuses it), nor move one", async () => {
+    const forB = { tenantId: b.id, email: "smuggled@x.test", role: Role.ADMIN, tokenHash: hashOf("smuggled"), expiresAt: new Date(Date.now() + 60_000) };
+    await expect(asTenant(a, (tx) => tx.invitation.createMany({ data: [forB] }))).rejects.toThrow(violation);
+    await expect(asTenant(a, (tx) => tx.invitation.create({ data: forB }))).rejects.toThrow(violation);
+    const mine = await db.invitation.findFirstOrThrow({ where: { tenantId: a.id, acceptedAt: null, revokedAt: null } });
+    await expect(asTenant(a, (tx) => tx.invitation.updateMany({ where: { id: mine.id }, data: { tenantId: b.id } }))).rejects.toThrow(violation);
+    expect(await db.invitation.count({ where: { tokenHash: hashOf("smuggled") } })).toBe(0);
+    expect((await db.invitation.findUniqueOrThrow({ where: { id: mine.id } })).tenantId).toBe(a.id);
+  });
+
+  test("A's context cannot UPDATE or DELETE B's invitations — they are not there to touch", async () => {
+    const theirs = await db.invitation.findFirstOrThrow({ where: { tenantId: b.id } });
+    expect((await asTenant<{ count: number }>(a, (tx) => tx.invitation.updateMany({ where: { id: theirs.id }, data: { revokedAt: new Date() } }))).count).toBe(0);
+    expect((await asTenant<{ count: number }>(a, (tx) => tx.invitation.deleteMany({ where: { id: theirs.id } }))).count).toBe(0);
+    expect((await db.invitation.findUniqueOrThrow({ where: { id: theirs.id } })).revokedAt).toBeNull();
+  });
+
+  test("ONE live invitation per (school, address): a second cannot exist while the first is open — and can once it is revoked or accepted", async () => {
+    const base = { tenantId: a.id, email: "one-live@x.test", role: Role.STUDENT, expiresAt: new Date(Date.now() + 60_000) };
+    const first = await db.invitation.create({ data: { ...base, tokenHash: hashOf("live-1") } });
+    await expect(db.invitation.create({ data: { ...base, tokenHash: hashOf("live-2") } })).rejects.toThrow(/Unique constraint/);
+    await db.invitation.create({ data: { ...base, tenantId: b.id, tokenHash: hashOf("live-other-school") } }); // another school: fine
+    await db.invitation.update({ where: { id: first.id }, data: { revokedAt: new Date() } });
+    const second = await db.invitation.create({ data: { ...base, tokenHash: hashOf("live-2") } }); // the earlier one is dead: allowed
+    await db.invitation.update({ where: { id: second.id }, data: { acceptedAt: new Date() } });
+    await db.invitation.create({ data: { ...base, tokenHash: hashOf("live-3") } }); // accepted is not live either
+  });
+});
+
 // --- the catalog guard: the next table cannot forget -------------------------------------------------------------------
 test.describe("catalog guard", () => {
   // Tables with NO tenantId column — by design, and each for a stated reason. A NEW table must either carry a tenantId
@@ -389,7 +485,7 @@ test.describe("catalog guard", () => {
         JOIN pg_namespace n ON n.oid = c.relnamespace
         JOIN pg_attribute att ON att.attrelid = c.oid AND att.attname = 'tenantId' AND NOT att.attisdropped
        WHERE n.nspname = 'public' AND c.relkind = 'r'`;
-    expect(rows.map((r) => r.relname).sort()).toEqual(["AuditLog", "Campus", "TenantMembership"]); // update this list WITH the migration
+    expect(rows.map((r) => r.relname).sort()).toEqual(["AuditLog", "Campus", "Invitation", "TenantMembership"]); // update this list WITH the migration
     for (const row of rows) {
       expect(row, row.relname).toMatchObject({ enabled: true, forced: true });
       expect(row.policies, `${row.relname} needs a policy`).toBeGreaterThanOrEqual(1);

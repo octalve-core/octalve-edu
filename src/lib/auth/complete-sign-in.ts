@@ -31,7 +31,7 @@ export async function completeSignIn(
   // Read through the user context: a person's own memberships are visible before any tenant is known (§0.5.2).
   const holdsAdmin = Boolean(
     await forUser(user.id).transaction((tx) =>
-      tx.tenantMembership.findFirst({ where: { userId: user.id, role: Role.ADMIN }, select: { id: true } }),
+      tx.tenantMembership.findFirst({ where: { userId: user.id, role: Role.ADMIN, deactivatedAt: null }, select: { id: true } }),
     ),
   );
   const { token, expires, persistent } = await createSession(user.id, req.headers.get("user-agent"), {

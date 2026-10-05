@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { test, expect } from "@playwright/test";
 import { SAAS_URL } from "../support/env";
-import { Role, addMembership, createTenant, createUser, db, removeCreatedTenants, seedInstance, type TestTenant, type TestUser } from "../support/db";
+import { Role, addMembership, createTenant, createUser, db, deactivateMembership, removeCreatedTenants, seedInstance, type TestTenant, type TestUser } from "../support/db";
 import { api, cookieHeader, loginAs } from "../support/http";
 
 // The tenant trust boundary over real HTTP (domain-implementation-plan.md §0.5.2). Several schools share one
@@ -19,6 +19,7 @@ let teacherA: TestUser;
 let adminB: TestUser;
 let both: TestUser; // student in A, admin in B
 let outsider: TestUser;
+let deactivated: TestUser; // an ADMIN of school A whom an administrator has deactivated there
 let cookies: Record<string, string>;
 
 async function cookieFor(user: TestUser) {
@@ -36,17 +37,21 @@ test.beforeAll(async () => {
   adminB = await createUser();
   both = await createUser();
   outsider = await createUser();
+  deactivated = await createUser();
   await addMembership(adminA.id, a.id, Role.ADMIN);
   await addMembership(teacherA.id, a.id, Role.TEACHING_STAFF, a.campuses[1].id);
   await addMembership(adminB.id, b.id, Role.ADMIN);
   await addMembership(both.id, a.id, Role.STUDENT, a.campuses[0].id);
   await addMembership(both.id, b.id, Role.ADMIN);
+  await addMembership(deactivated.id, a.id, Role.ADMIN);
+  await deactivateMembership(deactivated.id, a.id);
   cookies = {
     adminA: await cookieFor(adminA),
     teacherA: await cookieFor(teacherA),
     adminB: await cookieFor(adminB),
     both: await cookieFor(both),
     outsider: await cookieFor(outsider),
+    deactivated: await cookieFor(deactivated),
   };
 });
 test.afterAll(async () => {
@@ -197,6 +202,10 @@ test.describe("EVERY tenant route enforces the boundary", () => {
         expect(crossTenant.status, `${method} ${url(b.code)} as an admin of ANOTHER school`).toBe(403);
         expect(crossTenant.json).toEqual(NO_ACCESS);
         expect((await request(a.code, "outsider")).status, `${method} ${url(a.code)} as a person with no school`).toBe(403);
+        // A deactivated member is no member: the same refusal, to the byte, as a stranger's.
+        const gone = await request(a.code, "deactivated");
+        expect(gone.status, `${method} ${url(a.code)} as a DEACTIVATED member of that very school`).toBe(403);
+        expect(gone.json).toEqual(NO_ACCESS);
         expect((await request(a.code)).status, `${method} ${url(a.code)} signed out`).toBe(401);
       }
     });
