@@ -171,20 +171,98 @@ did not do what it said), that a no-JavaScript submit of the sign-in form put th
 and that focus was lost after a failed sign-in — each fixed and pinned by a regression test. All 40
 deliberately injected bugs (mutation testing) turned the suite red.
 
+## Design language build (2026-09-30) — built and verified, stacked on the auth branch
+
+Design of record: `domain-implementation-plan.md` → "Phase 0.5 addenda" → **0.5.A**. Work log, findings,
+mutation record and screenshot review: `docs/development-history/phases/phase-0.5.A-design-language.md`.
+Branch `claude/design-tokens-theme` of the same fork, **based on `claude/auth-0.5.1-port`** (merge that
+first). Source of the look: the private design canvas "Octalve Edu & AlEemaan — UI Design".
+
+Built: the artifact's colours and layout as a semantic-token system (`globals.css`, with `brand.css` and
+`lib/brand.ts` as the only brand-specific files); Octalve's indigo brand; a light/dark theme rendered by the
+server from a `theme` cookie (no flash, no inline script — the future nonce CSP depends on that); the shared
+components re-skinned to tokens, plus `Card`, `CheckboxField`, `ThemeToggle`; the three existing screens in
+the new look; and a **real "Keep me signed in"** — unchecked (the default) gives a browser-session cookie
+and a 12-hour server-side cap, ticked gives the 30 d / 90 d policy (7 d for admins). The default session is
+therefore *shorter than the first build's* — deliberate, for shared school computers.
+
+Verified: 274 tests pass (5 skipped by design) — up from 234 — including axe WCAG 2.2 on every screen and
+state **in both themes**, the theme's server-rendering and keyboard behaviour, the brand's exact colours,
+and the remember-me pair over real HTTPS; plus clean `tsc`, ESLint and `next build`. All nine deliberately
+injected remember-me bugs turned the suite red. Two flaky *test* races were found and fixed on the way (axe
+sampling a colour mid-transition; axe running before Next applied the page's `<title>`).
+
+Not in this branch, by design: the app shell (arrives here with §0.5.2; built in AlEemaan now); "Forgot
+password?" (0.5.C); the artifact's search box and notification bell (nothing behind them).
+
+## Nonce-based script CSP build (2026-10-01) — built and verified, stacked again
+
+Design: plan §0.5.B (+ "As built"). Record: `docs/development-history/phases/phase-0.5.B-csp.md`. Branch
+`claude/csp-nonce` of the fork, **based on `claude/design-tokens-theme`** (merge order: auth → design language →
+this). `src/proxy.ts` mints a fresh 128-bit nonce per page request and sets a strict policy on request and
+response (`script-src 'self' 'nonce-…' 'strict-dynamic'`, no `unsafe-inline`/`unsafe-eval`; `upgrade-insecure-requests`
+only when `APP_URL` is https); the JSON API gets a static `default-src 'none'; frame-ancestors 'none'`;
+`CSP_REPORT_ONLY=true` is the valve for diagnosing a violation on a live deployment. A new auto test fixture
+fails any browser test during which the browser reports a violation, so the entire browser suite is a CSP test
+— it passed with zero violations, both themes, desktop, phone and https. 11 injected bugs all caught. Finding
+worth remembering: `'strict-dynamic'` trusts script created by trusted script, so the policy defends against
+**markup** injection (what XSS is); the first injection tests used `createElement("script")` and the "attack"
+ran — they now splice attacker markup into the real response.
+
+## Password reset and change build (2026-10-04) — built and verified, stacked again
+
+Design: plan §0.5.C (+ "As built"); extras mapped in §0.5.E. Record: `phases/phase-0.5.C-password-reset.md`. Branch
+`claude/password-reset`, **based on `claude/csp-nonce`**. Forgot-password answers identically whether or not the
+account exists (content and timing — the work runs in `after()`); the emailed link carries a 256-bit token in the
+URL fragment, stored only as a SHA-256 hash, single-use (claimed with a conditional update — 20 concurrent
+attempts, one winner) and valid 30 minutes; a reset signs the person out everywhere and does not sign them in;
+change-password (a new Account page here, in the plain header until §0.5.2's shell) re-verifies the current
+password and keeps only the current session. One shared rule, `checkNewPassword()`, for setup/reset/change.
+`lib/email` (Resend by plain fetch / console / file). 377 tests pass; 18 injected bugs all caught (one survived
+first — a test was added). Needs `RESEND_API_KEY` + `EMAIL_FROM` in production.
+
+## TOTP two-step verification build (2026-10-05) — built and verified, stacked again
+
+Design: plan §0.5.D (+ "As built"). Record: `phases/phase-0.5.D-totp-mfa.md`. Branch `claude/totp-mfa`, **based on
+`claude/password-reset`**. Sign-in becomes two steps for anyone with an *active* second factor: the password yields a
+short-lived, attempt-limited **challenge and no session**; `POST /api/v1/auth/login/mfa` with a code or recovery code
+is the only thing that then creates one (through the single `completeSignIn()`), carrying the "Keep me signed in"
+choice made at step 1. TOTP is our own RFC 6238 (checked against the RFCs' published vectors), secrets are
+AES-256-GCM-encrypted under `MFA_ENCRYPTION_KEY` (**required — no key, no MFA**), recovery codes are keyed-hashed,
+every "use it once" rule is a conditional update (ten simultaneous submissions of one code: one winner). The account
+page has the Two-step verification card (QR drawn in the browser, recovery codes with Copy/Download),
+`pnpm mfa:reset -- <email>` is the operator's way back in. 548 tests pass; **49 injected bugs, all caught**. Needs
+`MFA_ENCRYPTION_KEY` in production; losing or changing it makes every stored secret undecryptable (→ `mfa:reset`).
+(Plan §0.5.F — a dev email inbox, and a mock Paystack with Finance — was designed alongside; the inbox is built, see below.)
+
+## Dev email inbox build (2026-10-05) — built and verified, stacked again
+
+Design: plan §0.5.F (+ "As built — inbox half"), adapted from the maintainer's guide on a dev email system and
+dual-mode Paystack. Record: `phases/phase-0.5.F-dev-email-inbox.md`. Branch `claude/dev-email-inbox`, **based on
+`claude/totp-mfa`**. A fourth email transport, `inbox`, keeps the last 50 messages in process memory; an in-app
+widget (bottom-right launcher, unread badge, text bodies, clickable links) shows them, so reset links and
+security notices are readable locally and on staging with no mail provider. Everything hangs off one fail-closed
+gate, `devToolsAccess()` in `lib/dev-tools.ts` (`APP_ENV` + `DEV_TOOLS` + a staging token; **never in production**;
+the guide's `VERCEL_ENV` test would have been open on a self-hosted install). 622 tests pass; **30 injected bugs,
+all caught** (two survived at first and drove two stronger tests). The Paystack half waits for Finance — the plan
+lists what must change in it first.
+
 ## Next action
 
-**Hand §0.5.1 to the maintainer for review and merge** (PR from `claude/auth-0.5.1-port` on the fork
-into `octalve-core/octalve-edu`; nothing else in this repo depends on it being merged first).
+**The first four phases are open as stacked PRs on the fork** (`roji-tech/octalve-edu-fork` #1 auth → #2 0.5.A →
+#3 0.5.B → #4 0.5.C; each is based on the one before — merge in order). **0.5.D is [#5](https://github.com/roji-tech/octalve-edu-fork/pull/5)
+(`claude/totp-mfa`, based on 0.5.C); 0.5.F is pushed on `claude/dev-email-inbox` (based on 0.5.D).**
 
-**The back-port to AlEemaan is done and verified** — shared names, the hardening deltas, the 72-byte
-password policy, `method="post"`, the sign-in screens it lacked, and this test suite — on branch
-`claude/octalve-auth-sync` of `roji-tech/AlEemaan` (its `phases/phase-0.5.1.6-octalve-sync.md`),
-awaiting *that* repo's maintainer review/merge. From here on a change to the shared mechanism is made
-in both repos or logged as a divergence in both plan docs (§0.5.1.6 there, the shared-names table here).
+**The back-port to AlEemaan is done, verified and merged there** — shared names, the hardening deltas, the 72-byte
+password policy, `method="post"`, the sign-in screens it lacked and this test suite (`roji-tech/AlEemaan` #2), then
+its design language and shell (#3). Its #4 (0.5.B CSP) and #5 (0.5.C password reset) are open; its 0.5.D is pushed,
+no PR yet. From here on a change to the shared mechanism is made in both repos or logged as a divergence in both
+plan docs (§0.5.1.6 there, the shared-names table here).
 
-Then, in order: the tenant-trust-boundary resolver and `forTenant()` with its explicit RLS role setup
-(§0.5.2 — needs a real `app_user` Postgres role created first, and `withAuth`'s `roles`/`permissions`
-options arrive here); TOTP MFA (must precede Phase 1's Settings UI — built in both repos together); the
-shared API helpers (§0.5.3, and the Redis-backed rate limiter before any multi-instance SaaS
-deployment). Then that phase's negative-test verification gate — **run as the `app_user` role, not the
-migration owner** — before Phase 1 begins.
+Then, in order: the rest of the Phase 0.5 addenda, each designed in the plan first and built in both repos
+— ~~**0.5.B** the nonce-based script CSP~~, ~~**0.5.C** password reset and change~~, ~~**0.5.D** TOTP MFA~~ (all built,
+in review/stacked), ~~**0.5.F** the dev email inbox~~ (built), **0.5.E** the account-lifecycle extras (planned); then the tenant-trust-boundary resolver and `forTenant()` with its explicit
+RLS role setup (§0.5.2 — needs a real `app_user` Postgres role created first, and `withAuth`'s
+`roles`/`permissions` options and this repo's app shell arrive here); the shared API helpers (§0.5.3, and
+the Redis-backed rate limiter before any multi-instance SaaS deployment). Then that phase's negative-test
+verification gate — **run as the `app_user` role, not the migration owner** — before Phase 1 begins.

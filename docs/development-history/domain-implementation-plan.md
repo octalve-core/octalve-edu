@@ -592,7 +592,473 @@ where "the code compiles" is not sufficient evidence of done; per Audit finding 
 RLS-looking-correct and RLS-being-correct are different claims until a real cross-tenant test fails
 when it should.
 
+### Phase 0.5 addenda (2026-09-30, after the auth build)
+
+Four pieces of work that sit between "auth works" and "Phase 1 can start", each designed here first
+and built in **both** repos (AlEemaan's plan has the same sections): **A** the shared UI design
+language, **B** a nonce-based script CSP, **C** password reset and change, **D** TOTP MFA. (Named A–D
+rather than numbered, because §0.5.3 already means something different in each repo.)
+
+#### 0.5.A — Shared UI design language (from the design artifact)
+
+Source: the private design canvas "Octalve Edu & AlEemaan — UI Design"
+(`https://claude.ai/artifact/8wGBA2trirEDaTQq1sUf74`) — its own framing is *"Admin app — same shell,
+one brand tweak"* and *"Public marketing sites — bespoke per brand"*. This section covers the first;
+the marketing sites are Phase 5.
+
+**What the artifact fixes.** Octalve Edu is **indigo** (`#4F46E5`, deep `#3730a3`, light `#a5b4fc`,
+tint `#1e1b4b`); AlEemaan is **sea green** (`#2E8B57`, deep `#0b3d24`, light `#6ee7b7`, tint
+`#052e22`). Both share: a dark theme by default with a **light theme toggle**; the login split layout
+(46 % brand panel in the deep colour with a faint dot/cross pattern, headline, blurb, three check-mark
+points, and the form on the right with uppercase 12 px labels, a "Forgot password?" link and a "Keep me
+signed in on this device" checkbox); the admin shell (248 px sidebar with brand mark, nav, user card;
+60 px top bar with breadcrumb, theme toggle and profile menu); and on phones a floating **bottom tab
+bar** with a "More" sheet in place of a hamburger drawer. Dark tokens `#020617` canvas / `#0f172a`
+surface / `#1e293b` line / `#f8fafc` text; light tokens `#f8fafc` / `#ffffff` / `#e2e8f0` / `#0f172a`.
+
+**Mechanism — the shared components stay code-identical; only two per-repo files differ.**
+1. *Semantic tokens, not palette classes.* `globals.css` defines CSS variables for both themes
+   (`--canvas --surface --surface-2 --line --fg --fg-2 --fg-muted`, status colours) and exposes them to
+   Tailwind through `@theme inline` (`bg-canvas`, `bg-surface`, `text-fg`, `text-fg-muted`,
+   `border-line`, `bg-brand`, `text-brand-fg`, …). No component names a colour any more, so re-skinning
+   is a token change, and a theme switch is one attribute.
+2. *Per-repo brand.* `app/brand.css` (colour tokens) and `lib/brand.ts` (strings: name, login
+   headline/blurb/points, what a `Campus`/`Branch` is called) are the **only** brand-specific files.
+3. *Theme without an inline script.* The choice lives in a `theme` cookie (`dark` | `light`, default
+   `dark` per the artifact). The root layout reads it (`cookies()`) and renders `<html data-theme=…>`, so
+   the first paint is already correct — no flash, and **no inline `<script>`**, which is what makes the
+   nonce-based CSP (0.5.B) possible. The toggle sets the cookie and the attribute.
+
+**Deliberate deviations from the artifact, each for a stated reason** (all checked numerically):
+- **Filled-button green is `#2A7F4F`, not `#2E8B57`.** White on `#2E8B57` is **4.25 : 1** — below the
+  4.5 : 1 that WCAG AA requires for 14 px text. `#2A7F4F` is 4.94 : 1 (hover `#267349`, 5.78 : 1).
+  `#2E8B57` stays for the logo mark and other non-text accents (3 : 1 is enough there). Octalve's
+  `#4F46E5` is 6.29 : 1 and needs no change.
+- **Muted text is `#94a3b8` in dark and `#5b6b82` in light**, not the artifact's `#64748b` — which is
+  3.75 : 1 on the dark surface and 4.34 : 1 on the light input background. (The same class of defect the
+  0.5.1 verification found in the first build's `slate-500`.)
+- **Dead controls are omitted, not drawn.** The artifact's top-bar search box and notification bell
+  (with a hard-coded "3" badge) have nothing behind them; shipping them would be a lie. They arrive
+  with the features that back them. "Users" and "Settings" show as *soon* until they exist.
+- **"Keep me signed in" is real.** Unchecked → a browser-session cookie and a 12-hour absolute lifetime;
+  checked → the existing 30-day idle / 90-day absolute policy (7 days for admins). (Shorter by default
+  than the first build — the right default for a shared school computer.)
+- The artifact's "First time on this instance? Run the setup wizard at /setup" line is omitted: the
+  wizard disables itself, and `/login` already redirects to it while it is still needed.
+- Typeface stays Geist (self-hosted via `next/font`); the artifact's system-font stack is the canvas
+  tool's default, not a brand decision. Arabic/RTL UI is out of scope until the school asks for it.
+
+**Scope by repo.** Tokens, theme, brand files and the re-skinned sign-in / setup / dashboard land in
+both. The **app shell** (sidebar, top bar, mobile tab bar, More sheet) lands in AlEemaan now — it has
+real admin pages (branches) to put in it — and in Octalve Edu with §0.5.2, when tenant routing gives it a
+`/schools/[code]/…` to wrap. Octalve Edu's `Campus` is what the artifact draws as "Branches".
+
+**Verification.** axe-core WCAG 2.2 AA on every screen and state **in both themes**; theme persistence
+across reloads (cookie, no flash); toggle keyboard/aria; tap targets; no horizontal scroll; and
+screenshots of the real flow at desktop and phone sizes, read by a human.
+
+**"Keep me signed in on this device" — exact semantics** (designed before it is built).
+- *Wire.* `POST /api/v1/auth/login` takes an optional `remember` — a strict boolean, **default `false`**
+  (the least-privilege default for API callers too). Any other type fails validation and gets the same
+  401 as every other malformed body, so the validation rules stay unprobeable.
+- *Not remembered* (`false`): the cookie carries **no `Expires`/`Max-Age`** (a browser-session cookie) **and**
+  the server caps the session at **12 hours** (`SESSION_ONLY_MAX_AGE_SECONDS`), idle and absolute alike.
+  The server cap is the real bound: browsers that "continue where you left off" restore session cookies
+  across restarts, so "closing the browser" alone can't be relied on to end a session.
+- *Remembered* (`true`): exactly today's policy — 30-day sliding idle, 90-day absolute, 7-day absolute for
+  anyone holding an ADMIN membership — and a persistent cookie expiring at the absolute cap.
+- *Admin rule composes.* The applicable absolute cap is `min(mode cap, 7 days if ADMIN)`, so an admin who
+  doesn't tick the box still gets 12 hours.
+- *No schema change.* `Session.expires` / `absoluteExpires` already differ per row; sliding the idle
+  expiry is already clamped to `absoluteExpires`, so a 12-hour session can never be extended past 12 hours.
+- *UI.* An unchecked-by-default native checkbox with a visible label (as drawn), keyboard-operable, ≥ 44 px
+  hit area; the value is sent as `remember` and nothing about it is persisted client-side.
+- *Tests.* Unit/integration on `createSession` (each mode × admin/non-admin, sliding is clamped);
+  API on `Set-Cookie` attributes per mode and on the strict boolean; browser test that ticking the box
+  yields a persistent cookie (`expires > now`) and not ticking yields a session cookie (`expires === -1`);
+  the same pair over real HTTPS for the `__Host-` cookie; and mutation checks (ignore `remember`, flip the
+  default, keep the cookie session-only but leave a 90-day row) — each must fail the suite.
+
+**As built (2026-09-30)** — the full record is `phases/phase-0.5.A-design-language.md`. Where the build
+refined or departed from the design above, and why:
+- *The checkbox is drawn, not native.* A native one is a 13–16 px target (the repo's own ≥ 44 px phone rule
+  measures the `<input>`) and unbranded, so `CheckboxField` keeps a real `<input>` in a real `<label>` and
+  draws the box, with measured contrast (outline 6.96 : 1 dark / 5.43 : 1 light; checked fill 8.96 : 1 /
+  7.90 : 1; tick 10.1 : 1 / 7.55 : 1) and an invisible 44 × 44 px input over it.
+- *`remember` defaults to false at **both** layers* — the API and `createSession()` — so a future caller
+  (password-reset sign-in, MFA step 2) that forgets to say gets the short session, never the 90-day one.
+  MFA's pending-challenge must carry the user's choice from step 1 to step 2 (0.5.D).
+- *Every page is now dynamic* (the theme cookie is read in the root layout) — noted for 0.5.B, which needs
+  exactly that.
+- *`useSignOut()`* (a hook) now backs every sign-out control, so the header button, AlEemaan's account menu
+  and its phone "More" sheet share one routine and one failure message.
+- *Test-suite rules learned* (in `tests/README.md`): both themes on every screen; wait for CSS transitions
+  and for the page `<title>` before an axe scan (two flakes, both test races); `test.skip(fn)` only at
+  `describe` level; sign-in helpers take `remember` explicitly.
+
+#### 0.5.B — Nonce-based script CSP (designed 2026-09-30, before any code)
+
+**Why.** The baseline headers (0.5.1) stop framing, sniffing and referrer leaks but say nothing about *script*:
+if an XSS bug ever ships, injected inline script runs with the session. A strict CSP makes that class of bug
+inert — the browser refuses any script that doesn't carry this response's secret nonce. Same design in both
+repos; both are already prepared for it (no inline `<script>`, theme via cookie, every page dynamic).
+
+**Mechanism** (Next.js 16: `proxy.ts`, the renamed middleware).
+1. A `proxy.ts` runs on every request except static assets (`/_next/static`, `/_next/image`, `favicon.ico`),
+   mints a **128-bit random nonce** (`crypto.getRandomValues`, base64), builds the policy, and sets it on
+   the **request** headers (so Next applies the nonce to its own bootstrap scripts) and on the **response**.
+   Prefetch requests are skipped, as Next's guide does.
+2. Policy (production):
+   `default-src 'self'; script-src 'self' 'nonce-<n>' 'strict-dynamic'; style-src 'self' 'nonce-<n>';
+   img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self';
+   form-action 'self'; frame-ancestors 'none'` — and `upgrade-insecure-requests` **only when `APP_URL` is
+   https** (on a plain-HTTP LAN install it would break every request). `'strict-dynamic'` lets the nonced
+   bootstrap load Next's chunks without a host allow-list. **No `'unsafe-inline'`, no `'unsafe-eval'`** in
+   `script-src`; development alone adds `'unsafe-eval'` (React's dev tooling needs it).
+3. `frame-ancestors 'none'` moves from `next.config.ts` into the proxy so the policy has a single source;
+   `X-Frame-Options`, `nosniff`, `Referrer-Policy` stay where they are. HSTS stays the reverse proxy's job.
+4. **Rollout valve for a live school:** `CSP_REPORT_ONLY=true` sends the same policy as
+   `Content-Security-Policy-Report-Only` (violations show in the browser console, nothing is blocked). The
+   default is enforcing; the flag exists so an unforeseen violation in production can be diagnosed without
+   an outage. There is deliberately **no report-collection endpoint** (extra unauthenticated surface).
+5. **Styles.** Start strict (`style-src 'self' 'nonce-<n>'`, and no `style=""` attributes in our own markup —
+   audited by grep and by the zero-violation test below). If Next's own output turns out to need inline style
+   *attributes*, the fallback is `style-src-attr 'unsafe-inline'` alone (an attribute can't execute script) —
+   recorded in the as-built note with the reason, never a blanket `'unsafe-inline'` on `style-src`.
+
+**Verification.**
+- *Shape:* every page and API response carries the policy; the directive set is exactly the above; the nonce
+  is 128-bit base64, **different on every request**, present in the header and on every inline `<script>` in
+  the HTML (and every inline script *has* it); no `unsafe-inline`/`unsafe-eval` in `script-src`;
+  `upgrade-insecure-requests` present on the https deployment and absent on http; `frame-ancestors 'none'`
+  survives; `CSP_REPORT_ONLY` flips the header name and nothing else.
+- *It actually blocks:* in real Chromium, an injected inline `<script>` and an injected `onclick=` attribute
+  do **not** run and raise a `securitypolicyviolation`; the page's own scripts do.
+- *Zero violations everywhere:* the shared `page` fixture records `securitypolicyviolation` events and fails
+  **any** test in which one occurred — so every existing flow (sign-in, setup, theme toggle, shell, …) is a
+  CSP test for free, in both themes and on the https deployment.
+- *Mutations (each must go red):* nonce dropped from the policy; `'unsafe-inline'` added; a constant nonce;
+  nonce not forwarded on the request headers (Next's own scripts blocked); `upgrade-insecure-requests`
+  unconditional; the https-only rule inverted.
+
+**Not in scope:** a CSP report endpoint, Trusted Types, SRI (no third-party scripts exist), and the public
+marketing sites (Phase 5 decides their own policy).
+
+**As built (2026-09-30/10-01)** — record: `phases/phase-0.5.B-csp.md`. `src/proxy.ts` mints the nonce and sets
+the policy on request and response; `lib/security/csp.ts` builds it (pure, unit-tested). Where the build refined
+the design: **(1)** the proxy's matcher excludes `/api` (Next's own guidance), so JSON responses get a *static*
+`default-src 'none'; frame-ancestors 'none'` from `next.config.ts` instead — same effect, no per-request work;
+static assets carry neither. **(2)** The strict style policy worked first time: Next emits no inline `<style>` and
+no `style=""` attributes, so `style-src 'self' 'nonce-…'` needed no fallback. **(3)** Nothing reads an `x-nonce`
+header, so none is set. **(4) A property worth knowing:** `'strict-dynamic'` trusts script *created by* trusted
+script, and DevTools-evaluated code is exempt — so the protection is against **markup injection** (a
+parser-inserted `<script>`, `onerror=`, `javascript:` link, injected `<base>`), which is what an XSS bug is; the
+first draft of the injection tests used `page.evaluate(createElement("script"))`, the "attack" ran, and the test
+was rewritten to splice the payload into the real server response instead. **(5) The auto-fixture works:** the
+whole browser suite (≈250 tests, both themes, desktop and phone, https) passes with **zero** policy violations —
+every flow is a CSP test.
+
+#### 0.5.C — Password reset and change (designed 2026-09-30, before any code)
+
+**Scope.** Forgotten-password recovery by email, and change-password for a signed-in person. Built in both
+repos, same design. Nothing here can weaken 0.5.1: no new way to obtain a session, and every path that sets a
+password uses the one 72-byte policy.
+
+**Email transport** (`lib/email/`): one interface, three implementations chosen by `EMAIL_TRANSPORT` —
+`resend` (uses `RESEND_API_KEY`, already in `.env.example`; `EMAIL_FROM` names the sender), `console` (prints the
+message, link included, to the server log — development), and `file` (appends JSON lines to a path — what the
+tests read as "the inbox"). Default: `resend` when a key is set, otherwise `console` **with a loud
+production warning**. A send failure is logged, never shown to the requester (it would be an oracle).
+Messages are plain text (accessible, nothing to track), branded from `lib/brand.ts`.
+
+**Tokens.** 256-bit random, URL-safe; only the **SHA-256 hash** is stored (`PasswordResetToken`: `id`,
+`userId` cascade, `tokenHash` unique, `createdAt`, `expiresAt` = 30 minutes, `usedAt`). One live token per
+person: requesting a new one deletes the previous unused ones. Expired rows are removed on the next request
+for that person and by the same purge that clears sessions (bounded growth). Additive migration only.
+
+**Flow.**
+1. `POST /api/v1/auth/forgot-password` `{ email }` — CSRF; rate-limited **per IP and per email, counting every
+   request** (each can send mail — unlike login, success is not refunded); answers **200 with the same body
+   whether or not the account exists**. To leave no timing oracle the lookup, token insert and email send run
+   in Next's `after()` — the response is sent first, so its time doesn't depend on the account.
+2. The email links to `/reset-password#token=…`. The token is in the **URL fragment**: never sent to the
+   server, so it isn't in access logs or a `Referer`. The page (client) reads it, **removes it from the
+   address bar** (`history.replaceState`), and asks for the new password (live policy feedback, as in setup).
+3. `POST /api/v1/auth/reset-password` `{ token, password }` — CSRF; per-IP limit on failures; policy check;
+   then **one transaction**: an `updateMany where usedAt is null and expiresAt > now` on the token's hash
+   (count must be 1 — so the token is single-use even under concurrent requests), set the new hash, delete
+   **every session** of that user (`revokeUserSessions`), delete their other reset tokens, write an audit row.
+   Any invalid / expired / already-used token gets the same 400 message ("This link is invalid or has expired").
+   Success does **not** sign the person in — they sign in with the new password (and, once 0.5.D exists,
+   their second factor: a reset never bypasses or disables MFA). A "your password was changed" notice is emailed.
+4. **Change password** — `POST /api/v1/auth/change-password` behind `withAuth`: `{ currentPassword,
+   newPassword }`; the current password is verified in constant time and its failures are rate-limited per
+   account; the new one must pass the policy and differ from the old; then the hash is replaced, **every
+   other session is revoked (this one kept)**, an audit row is written and the notice emailed. UI: a
+   "Password" card on the account page. The sign-in screen's "Forgot password?" link (drawn in the artifact,
+   deliberately absent until now) appears with `/forgot-password`.
+
+**Shared code.** The password rules currently inline in the setup route move to `lib/auth/password-policy.ts`
+(`checkNewPassword`) so setup, reset and change cannot drift; screens use the shared `AuthShell` and
+components, in both themes.
+
+**Verification.** Unit: token generation/hash, policy. Integration: create/consume — only the hash stored,
+expiry, single use, **20 concurrent consumes → exactly one wins**, sessions revoked, other tokens dropped. API:
+identical response and status for known/unknown emails, the mail sent only for a known one (read from the
+`file` transport), every rate limit, CSRF, the reset outcomes (success, bad/expired/used/replayed token, weak
+or over-72-byte password with the reason), old password stops working and the new one works, change-password's
+wrong-current / same-password / other-sessions-revoked-this-one-kept, statistical timing parity of
+`forgot-password`. Browser: the whole journey (forgot → "inbox" → link → new password → sign in), the token
+gone from the address bar, keyboard use, axe in both themes for the three new screens and their error states,
+phone tap targets. **Mutations (each must go red):** store the raw token; drop the single-use condition; drop
+the expiry check; don't revoke sessions; respond differently for unknown emails; drop each rate limit; put the
+token in the query string; let change-password skip the current-password check.
+
+**Not in scope:** SMS or security-question recovery (weaker than email), admin-initiated resets (with
+Users/Settings), breached-password checking, and "active devices" (needs its own page).
+
+**As built (2026-10-04)** — record: `phases/phase-0.5.C-password-reset.md`. As designed, with these refinements:
+the password rule now lives in one function, `checkNewPassword()` (client-safe; setup, reset, change and the
+live form feedback all call it); the limiter's window is its fixed 5 minutes, so limits are *per 5 minutes*
+(forgot: 10 per IP, 3 per address; reset: 10 failures per IP, successes and typos refunded; change: 5 wrong
+current passwords per account); the new `lib/email/` is plain `fetch` to Resend (no SDK dependency) with
+`console` and `file` transports; `sendEmailQuietly()` never throws, because a send failure shown to the
+requester would be an oracle; the notice and audit work runs in `after()` too; a reset also clears the browser's
+session cookie. The never-used Auth.js `VerificationToken` table was dropped in the migration (replaced by
+`PasswordResetToken`). The sign-in screen's "Forgot password?" link — drawn in the artifact — is now real.
+Octalve Edu has no app shell until §0.5.2, so its Account page (profile + Password card) is a plain page
+with an "Account" link in the header; AlEemaan's lives in the shell. Audit: Octalve Edu writes one row per
+school the person belongs to; AlEemaan one row.
+
+#### 0.5.D — TOTP two-step verification (designed 2026-09-30, before any code)
+
+**Scope.** Optional per person for now: enrol an authenticator app, be challenged at sign-in, use recovery
+codes, disable. (Requiring it for administrators, and step-up re-verification before sensitive Settings edits,
+are policy layers that build on this and arrive with the Settings work.) Same design in both repos. Nothing
+in `withAuth` changes — the second factor is enforced **at sign-in**, so a request either carries a full
+session or none.
+
+**The algorithm is implemented here, not imported:** RFC 6238 TOTP over HMAC-SHA1 (`node:crypto`), 6 digits,
+30 s step, accepting the current step ±1 for clock drift, constant-time comparison, base32 (RFC 4648) secrets
+of 160 bits — checked against the RFC's own published test vectors. (Security code is worth the ~60 lines to
+own; the QR image is not — see below.)
+
+**Storage.**
+- `MfaCredential { userId (unique, cascade), secretEnc, confirmedAt?, lastUsedStep?, createdAt }`. The secret
+  must be recoverable (unlike a password), so it is **AES-256-GCM encrypted at rest** with `MFA_ENCRYPTION_KEY`
+  (32 bytes, base64) — a database leak alone yields no usable secrets. Enrolment **fails closed (503)** in
+  production when the key is missing. An unconfirmed credential is not an active factor.
+- `MfaRecoveryCode { userId, codeHash, usedAt }` — ten single-use codes (`xxxxx-xxxxx`, 50 random bits each
+  from an unambiguous alphabet), stored as SHA-256 hashes, shown **once** at generation.
+- `MfaChallenge { tokenHash, userId, remember, expiresAt, attempts }` — the *pending-MFA state* promised since
+  §0.5.1. It is **not a session**: no cookie, invisible to `withAuth`. A 256-bit random token is returned in the
+  JSON of sign-in step 1 (held in memory by the sign-in page only), stored hashed, valid 5 minutes, five
+  attempts, single-use.
+
+**Sign-in.** Step 1 (`POST /api/v1/auth/login`) is unchanged up to "password verified"; for a person with a
+confirmed credential it then creates **no session** and returns `{ mfaRequired: true, challenge }` (the same
+generic 401 as ever for a wrong password — MFA status is only revealed after the password is proven). Step 2
+(`POST /api/v1/auth/login/mfa` `{ challenge, code }` or `{ challenge, recoveryCode }`): CSRF, rate limits (per
+IP, per account, per challenge), verify, then — and only then — the shared "complete sign-in" routine used by
+both steps rotates any presented session and creates the session **with the `remember` choice made in step 1**
+(carried in the challenge; see 0.5.A), setting the cookie. **Replay protection:** a code for a step ≤
+`lastUsedStep` is refused, and the step is recorded with a conditional `updateMany` so two simultaneous
+submissions of the same code can't both win.
+
+**Enrolment** (account page, "Two-step verification" card; every action needs a fresh password, and none needs
+a second factor until one exists): `POST …/mfa/enroll` `{ password }` → generates and stores an unconfirmed
+secret and returns the `otpauth://` URL plus the base32 key for manual entry; the page renders a **QR code
+in the browser** (the `qrcode` package, dynamically imported, pinned — **never an online QR service; the secret
+never leaves the device**) beside the manual key; `POST …/mfa/confirm` `{ code }` marks it confirmed, issues the
+recovery codes, revokes the person's *other* sessions and emails a notice. `POST …/mfa/disable` `{ password,
+code | recoveryCode }` removes everything, revokes other sessions, emails a notice. `POST …/mfa/recovery-codes`
+`{ code }` replaces all recovery codes. The UI warns when two or fewer remain.
+
+**Interplay.** Password reset (0.5.C) never touches MFA — after a reset the person still needs their second
+factor. A person who has lost both authenticator and recovery codes is recovered by an operator: `pnpm
+mfa:reset -- <email>` (a small, tested script; an admin UI comes with Users), which also writes an audit row.
+
+**Screens.** Step 2 appears in place on the sign-in card: a numeric, `autocomplete="one-time-code"` field, a
+"Use a recovery code instead" toggle, "Back", the same error/pause treatment as step 1. Enrolment and
+management states on the account page. All in both themes, ≥ 44 px targets.
+
+**Verification.** Unit: the RFC 6238 vectors, base32, ±1 window edges, encryption round-trip and tamper
+detection (GCM auth failure), recovery-code format. Integration: challenge lifecycle (expiry, five attempts
+then dead, single use, **no session exists until step 2 succeeds**), replay under concurrency, recovery-code
+single use, disable. API: the two-step sign-in end to end (no `Set-Cookie` after step 1; wrong / reused / stale
+codes; lock-out; `remember` honoured through the challenge; MFA users can't sidestep by presenting an old
+cookie), enrol/confirm/disable/regenerate and their re-auth requirements, 503 without the key. Browser: enrol
+with a code computed by the test, sign in with it, sign in with a recovery code, disable; axe in both themes
+for every new state; keyboard use. **Mutations (each must go red):** accept ± several steps; skip the replay
+check; store the secret in plaintext; create the session at step 1; let a challenge be reused or attempted
+without limit; let a recovery code be reused; disable without the password; let password reset clear MFA; drop
+the per-IP limit on step 2.
+
+**Not in scope:** WebAuthn/passkeys and SMS codes (a later, separate design), trusted-device "remember for 30
+days" (it would quietly weaken the factor), mandatory-MFA policy and step-up (Settings work), an active-devices
+page.
+
+**As built (2026-10-05)** — record: `phases/phase-0.5.D-totp-mfa.md`. As designed, with these refinements:
+- **No key, no MFA — in every environment, not only production.** `MFA_ENCRYPTION_KEY` (32 bytes, base64) is
+  required; without a valid one the account page says two-step verification isn't available, enrolment answers
+  503 `MFA_UNAVAILABLE`, and sign-in step 2 answers the same *before* spending anything. There is deliberately
+  no development fallback key — a baked-in default is the kind of thing that ships to production by accident.
+- **Recovery codes are stored as keyed hashes (HMAC-SHA256), not plain SHA-256.** A code has 50 bits, so a
+  stolen table of plain hashes could be ground through offline; the key lives in the environment, not the
+  database. Both the AES key and the HMAC key are *derived* from the root key with HKDF (one root secret is never
+  used raw for two purposes). The AES-GCM box carries the owner's user id as AAD, so a ciphertext copied onto
+  another person's row fails to decrypt. Recovery codes are Crockford base32 (`XXXXX-XXXXX`, exactly 50 random
+  bits); typing `o`/`i`/`l` still works.
+- **The challenge spends an attempt *before* the code is checked**, atomically (a conditional increment), so
+  twenty simultaneous guesses on one challenge get five checks, not twenty; a person holds at most five live
+  challenges; and a password **reset or change deletes pending challenges** (a challenge is proof of the old
+  password). A reset still never touches the second factor itself.
+- **Limits on step 2:** per challenge 5 attempts; per **account 10 failures / 5 minutes across all challenges**
+  (hard — the real bound for someone who knows the password and can mint challenges at will); per IP 30. A
+  correct code is refunded; a malformed one (not 6 digits / not a recovery code) is a typo and is refunded too.
+- **Confirming records the step it used**, so the very code that turned two-step verification on can't also sign
+  in — the next code can (an authenticator shows it within 30 s). Confirming and turning off both sign the person
+  out of their *other* devices and send a notice; so does a recovery-code sign-in and a recovery-code
+  regeneration. Audit actions: `MFA_ENABLED`, `MFA_DISABLED`, `MFA_RECOVERY_CODE_USED`,
+  `MFA_RECOVERY_CODES_REPLACED`, `MFA_RESET`.
+- **One `completeSignIn()` creates every session from a sign-in** (rotate a presented session, admin cap,
+  `remember`); step 1 and step 2 both call it. The browser-safe half of the code rules (`lib/auth/mfa/codes.ts`)
+  has no `node:crypto`, so the screens check a code's *shape* with the same function the server uses.
+- **The QR code is drawn in the browser** by the pinned `qrcode` package (dynamic import, `data:` PNG, always
+  dark-on-white in both themes); the tests decode it with `jsqr` and check it encodes the key shown beside it.
+  The secret is held in component state only — never storage, URL or cookie.
+- **Operator recovery:** `pnpm mfa:reset -- <email>` (`scripts/mfa-reset.mjs`, plain Node + Prisma, tested as a
+  child process) removes the factor, signs the person out everywhere and audits it.
+- Small fix on the way: the signed-in header's "Sign out" button wrapped onto two lines on narrow phones; it is
+  now icon-only below `sm` (the accessible name is unchanged).
+
+#### 0.5.E — Account lifecycle extras (planned 2026-10-04; each designed here before it is built)
+
+Prompted by the question "what else would a Django/Djoser-style auth give us?". Mapping and decisions:
+- **Built or designed already:** login/logout/current-user (0.5.1), password reset and change (0.5.C), two-step
+  verification (0.5.D). **Deliberately not used:** token/JWT endpoints (revocable database sessions are a design
+  decision), social login.
+- **Invite & activate** (Djoser's activation flow, adapted): schools invite people; the email carries a
+  single-use, hashed, short-lived link built on exactly the 0.5.C token machinery to set a first password.
+  Arrives with the Users pages (self-signup for Octalve Edu's SaaS mode is a later, separate design).
+- **Change email with confirmation:** the new address must prove it is reachable (a link to the NEW address),
+  the old address is told, other sessions are revoked; reuses the token table with a `purpose` column.
+- **Edit profile** (name) — trivial once the above exist; audited.
+- **Active devices:** list sessions (user agent, last used — the columns already exist), revoke one or all
+  others. Needs its own page.
+- **Account deletion:** for a school this is an administrator *deactivation* (history must survive), not
+  self-service; designed with the Users pages.
+
 ---
+
+#### 0.5.F — Dev tooling: a dev email inbox now, a mock Paystack with Finance (planned 2026-10-05; inbox half BUILT 2026-10-05 — the Paystack half waits for Finance)
+
+**Source.** The maintainer's guide *"Development Email System & Dual-Mode Paystack Integration"* (a pattern already
+used locally and on a staging deploy of another project). It has two halves: (1) an in-app **dev email inbox** —
+when no real mail key is set, outgoing mail is captured in a 50-message ring buffer bound to `globalThis` (so HMR
+doesn't wipe it) and shown in a floating widget; (2) a **dual-mode Paystack engine** — a `PaymentTransaction` table, a
+REST client (Naira ↔ kobo only at the HTTP boundary, HMAC-SHA512 over the *raw* body with `timingSafeEqual`), a
+**mock checkout** that fires genuinely signed webhooks at our own handler (no tunnels, no test cards), and one atomic
+`fulfillPayment(reference)` — `updateMany({ where: { reference, status: 'PENDING' } })` as the lock — called by both
+the webhook and the browser's return page, so the redirect-beats-webhook race resolves to exactly one fulfilment;
+the amount is re-checked against Paystack's verify call (< ₦0.01 tolerance). The architecture is adopted; the
+details below are what had to change to fit *these* repos.
+
+**Where each half lands.**
+- **The dev inbox → a fourth email transport, `inbox`,** in `lib/email/transport.ts` (beside `resend` / `console` /
+  `file`), plus `GET`/`DELETE /api/v1/dev/email-inbox` and a floating widget on the layout. It is the natural next
+  small step: reset links and the 0.5.D notices become visible locally *and* on a staging deploy with no mail
+  provider. Our messages are plain text, so the widget shows text — it never injects HTML.
+- **The Paystack engine → the Finance phase (M2).** It needs the fee/invoice models it fulfils (`PaymentTransaction`
+  gains a `tenantId` in Octalve Edu — RLS, §0.5.2 — or a branch in AlEemaan), so it is *designed* here and *built*
+  there, with the guide as the reference.
+
+**Changes the guide needs before it is safe here** (each becomes a test):
+1. **The gate must fail closed.** The guide's `devToolsEnabled()` is `VERCEL_ENV !== 'production'`. On any host that
+   is not Vercel — our self-hosted Solo installs and AlEemaan's live school — `VERCEL_ENV` is unset, so the gate is
+   **open in production**, and (with the mock) a missing `PAYSTACK_SECRET_KEY` would silently turn the system into
+   one that accepts free "payments". Replace it with an explicit opt-in: dev tools are on only when `DEV_TOOLS=true`
+   **and** `APP_ENV` is `development` or `staging`; an unset `APP_ENV` under `NODE_ENV=production` is production.
+   Production **never** enables them, and a missing `PAYSTACK_SECRET_KEY` in production is a hard `PAYSTACK_NOT_CONFIGURED`,
+   never a fallback to the mock. A unit test walks the whole environment matrix.
+2. **The inbox must not be public on a reachable staging URL.** It is unauthenticated in the guide — but a reset link
+   or a recovery-code notice in it is an account takeover for anyone who finds the URL. It cannot just require a
+   session (password reset happens signed out). On `development` (localhost) it stays open; on `staging` it requires
+   `DEV_TOOLS_TOKEN`, entered once in the widget. Both routes answer 404 when tools are off.
+3. **No `dangerouslySetInnerHTML`.** Plain text only here; if HTML mail is ever added, render it in a
+   `sandbox`ed `srcdoc` iframe. The widget must also pass our nonce CSP (no inline script/style) and axe, in both themes.
+4. **CSRF uses our `validateCSRF()`.** The guide's `origin.includes(host)` is a substring test (`evil-localhost:3000.com`
+   passes it).
+5. **The webhook keeps the guide's discipline** — raw body first, constant-time signature check, 200 even when
+   fulfilment throws — and gains our limiter. `GET …/status` runs `fulfillPayment` (a side effect behind an
+   unauthenticated GET that makes an outbound Paystack call per request), so it is rate-limited per IP and per reference.
+6. **Money stays `Decimal` Naira everywhere**; kobo exists only inside `lib/paystack.ts`.
+
+**Tests this implies (written before the code, like every phase):** the gate matrix; inbox ring buffer (50 cap,
+survives a simulated reload, newest first); routes 404 when off and token-gated on staging; an email containing
+`<script>`/`<img onerror>` renders inert; the `inbox` transport selected by default only when tools are on;
+and, with Finance: a signature computed over a *re-stringified* body is refused, 20 simultaneous `fulfillPayment`
+calls produce exactly one fulfilment, an amount mismatch throws, the mock cannot be reached or used in production,
+and the mock's self-webhook goes through the real handler.
+
+**Build order:** the `inbox` transport + widget first (small; both repos; after 0.5.D); the Paystack engine with Finance.
+
+**Design for the inbox half (2026-10-05, written before any code; approved to build next, ahead of §0.5.E).**
+- **The gate** — `lib/dev-tools.ts`, pure and unit-tested over the whole environment matrix. `appEnv()` is
+  `APP_ENV` if it is exactly `development` / `staging` / `production` (case-insensitive), else `production` when
+  `NODE_ENV=production` **or `VERCEL_ENV=production`**, else `development`; **any unrecognised value is production**
+  (fail closed — `prod`, a typo, an empty string under `next start`). `devToolsEnabled()` is false in production
+  always (even with `DEV_TOOLS=true` and a token); in `staging` it needs `DEV_TOOLS=true` **and** a non-empty
+  `DEV_TOOLS_TOKEN` (no token → off, not open); in `development` it is on unless `DEV_TOOLS=false`. `next start`
+  forces `NODE_ENV=production`, so a deployed server is production unless `APP_ENV` says otherwise on purpose.
+- **The store** — `lib/dev/email-inbox.ts`: newest-first ring buffer of 50 on `globalThis.__devEmailInbox` (survives
+  HMR), each message `{ id, to, subject, text, sentAt }`, text capped at 20 KB. Per process, so it works for a
+  long-lived server (local, Solo, single-instance staging) and **not** across serverless instances — said so in the docs.
+- **The transport** — `inbox`, a fourth `EmailTransport`. `EMAIL_TRANSPORT` always wins; unset → `resend` if
+  `RESEND_API_KEY`, else `inbox` if dev tools are on, else `console` (with the existing production warning).
+  Choosing `inbox` explicitly while dev tools are off is an error (the send fails loudly in the log, never
+  silently into a buffer nobody can read). It also prints one line (`[EMAIL → to] subject — captured in the dev
+  inbox`) — never the body, so a reset link doesn't land in the log.
+- **The routes** — `GET`/`DELETE /api/v1/dev/email-inbox`: **404** when tools are off (a plain 404 in the standard envelope); in `staging`, header `x-dev-tools-token` compared in constant time (hash-then-`timingSafeEqual`),
+  wrong/missing → 401, five wrong in 5 minutes per IP → 429; `DELETE` also needs `validateCSRF()`; every response
+  `no-store`. `development` is open (it is your own machine).
+- **The widget** — `components/dev/DevEmailInbox.tsx` (client), mounted from the root layout only when the gate is
+  on: a launcher bottom-right with an unread count, a dialog (list → message), live refresh every 4 s while
+  authorised, a token form on 401 (kept in `sessionStorage`, best-effort), a "DEV" badge so it is never mistaken
+  for product UI. The body is rendered as **text** (`white-space: pre-wrap`); every `http(s)` URL in it is also
+  offered as a real link (so a reset link is one click). Escape closes and returns focus to the launcher; ≥ 44 px
+  targets; both themes; no inline script or style (nonce CSP).
+- **Tests (before the code).** unit: the gate matrix; the buffer (cap, order, cap on text, lives on `globalThis`).
+  integration: transport selection matrix; the routes in-process (404 when off — including `DEV_TOOLS=true` in
+  production; open in development; token + rate limit + CSRF in staging; prefix-of-token fails). api + e2e against a
+  **third server in staging mode** (`:3102`, token set, `EMAIL_TRANSPORT` unset): forgot-password → the mail is in
+  the inbox → the link works; the main servers 404 and show no launcher; a message containing `<script>` /
+  `<img onerror>` renders inert; axe in both themes for the launcher, token form, list and message; focus return.
+  Mutations: gate open in production; token unchecked / prefix-compared; DELETE without CSRF; no 404 when off;
+  `inbox` as the production default; body rendered as HTML; buffer uncapped; log line printing the body.
+
+**As built — inbox half (2026-10-05)** — record: `phases/phase-0.5.F-dev-email-inbox.md`. As designed, with these
+refinements the build itself forced:
+- **One decision, not two functions.** The first draft had `devToolsEnabled()` and a separate `devToolsToken()`
+  that returned `null` for *both* "no token needed" and "staging with no token configured" — a caller reading
+  `null` as "open" would have failed open. A sweep over all 1,344 combinations of `APP_ENV` / `NODE_ENV` /
+  `VERCEL_ENV` / `DEV_TOOLS` / `DEV_TOOLS_TOKEN` found it. There is now one `devToolsAccess()` returning `off`,
+  `open` or `{ token }` (and `devToolsEnabled()` is just "not off"); the route switches on it.
+- **A fourth test server.** The same build in `APP_ENV=staging` with the tools on, a token and *no*
+  `EMAIL_TRANSPORT`; the other three servers pin `APP_ENV=production` regardless of a developer's own `.env` and
+  the specs assert they 404 the route and render no launcher.
+- **The launcher is bottom-right**, not bottom-left: AlEemaan's admin shell has a left sidebar and Next's own dev
+  indicator lives bottom-left. On phones it sits above the tab bar.
+- **Two UX bugs the browser tests caught.** Clicking "Back to the list" unmounted the focused button, focus fell
+  to `<body>`, and Escape then did nothing — focus now goes to the dialog heading (to the Back button when a
+  message opens), and Escape listens on the document while the dialog is open. The "unread" memory lived in
+  component state and reset on every full page load (the widget remounts per navigation); it is now kept in
+  `sessionStorage` for the tab.
+- Message bodies are text (`white-space: pre-wrap`); every `http(s)` URL in a body is also offered as a link,
+  and a `javascript:` URL can never become one. The route answers a plain 404 in the standard envelope when the
+  tools are off (not byte-identical to an unmatched path — the route's existence isn't a secret).
+- **Not built, by design:** HTML rendering, persistence across restarts or instances (it is process memory), and
+  the Paystack half — that waits for Finance.
 
 ## Phase 1 — MVP: Core SIS + Finance
 

@@ -137,6 +137,19 @@ one-off pattern sources, referenced once for a specific technique and then done:
    anything. Drive UI changes in a real browser and read the screenshots; the verification pass for 0.5.1
    found ten defects (lost keyboard focus, a password leaking into the URL on a no-JS submit, bcrypt's
    silent 72-byte truncation, low contrast, …) that reading the code had not.
+8. **UI is tokens, not colours.** Components name semantic tokens (`bg-surface`, `text-fg-muted`,
+   `border-line`, `bg-brand-strong`, `text-brand-fg`, …) and never palette classes (`slate-400`,
+   `indigo-600`). Exactly two files are brand-specific — `src/app/brand.css` (colours) and
+   `src/lib/brand.ts` (words) — and everything in `src/components/ui` and `src/components/auth` stays
+   **code-identical with AlEemaan's** (`drift.py`-style normalised comparison; a difference needs a
+   reason in the plan doc). Light/dark is a `theme` cookie read on the server (`<html data-theme>`), not
+   an inline script — the nonce-based CSP (plan §0.5.B) depends on there being none. New UI must pass
+   axe in **both** themes, be ≥ 44 px on phones, and be added to `responsive-and-a11y.spec.ts`. Design
+   and numbers: plan §0.5.A; work log: `docs/development-history/phases/phase-0.5.A-design-language.md`.
+   **Porting to/from AlEemaan: product-specific constants are not shared** — the cookie names in
+   `session.ts`, the brand files, the membership model's name. Copying a "shared" file wholesale once
+   carried this repo's cookie name into AlEemaan (58 tests failed at once — on its live school it would have
+   signed everyone out), and the normalised drift comparison had hidden it. After a port, read the *raw* diff.
 
 ## Current state, as of 2026-09-30 (verify against `octalve_edu_progress.md` — it may have moved since)
 
@@ -157,6 +170,50 @@ one-off pattern sources, referenced once for a specific technique and then done:
   before changing anything under `src/lib/auth`, `src/app/api/v1/auth`, `/login`, `/dashboard` or
   `/setup`, and run it before opening a PR. It needs a Postgres (`docker compose up -d db`), Chromium
   (`pnpm exec playwright install chromium`) and `openssl`.
+- **Phase 0.5.A (shared UI design language) is BUILT AND VERIFIED, stacked on the auth branch**: branch
+  `claude/design-tokens-theme` of the same fork (based on `claude/auth-0.5.1-port` — merge that first).
+  Design-artifact colours and layout as semantic tokens with an Octalve-indigo brand, a server-rendered
+  light/dark theme, the re-skinned shared components, and a *real* "Keep me signed in" (unchecked →
+  session cookie + 12-hour server cap; ticked → the 30 d / 90 d policy, 7 d for admins). AlEemaan has the
+  same, in its own green, plus the admin shell. Still to come in this series, each designed in the plan
+  first: **0.5.B** nonce-based CSP, **0.5.C** password reset/change, **0.5.D** TOTP MFA.
+- **Phase 0.5.F (dev email inbox) is BUILT AND VERIFIED** — branch `claude/dev-email-inbox`, stacked on the
+  TOTP branch. A fourth email transport, `inbox`, keeps the last 50 messages in process memory and an in-app
+  widget (bottom-right launcher, unread badge, text bodies, clickable links) shows them — so reset links and
+  security notices are readable locally and on a staging deploy with no mail provider. **Rules that follow:**
+  (1) **`devToolsAccess()` in `lib/dev-tools.ts` is the only decision** about whether any dev affordance exists
+  (`off` | `open` | `{token}`) — never test `NODE_ENV` or `VERCEL_ENV` yourself, and never mount, route or run a dev
+  tool without it; production is *never* on, a mistyped `APP_ENV` is production, staging needs `DEV_TOOLS=true`
+  **and** `DEV_TOOLS_TOKEN`; (2) message bodies are rendered as **text**, never HTML; (3) `EMAIL_TRANSPORT=inbox`
+  where the tools are off must fail loudly, and the log line never carries the body; (4) the inbox is per process —
+  do not rely on it across serverless instances. Env: `APP_ENV`, `DEV_TOOLS`, `DEV_TOOLS_TOKEN`. The Paystack half
+  of the maintainer's guide waits for Finance (plan §0.5.F says what must change in it first). Record:
+  `docs/development-history/phases/phase-0.5.F-dev-email-inbox.md`.
+- **Phase 0.5.D (TOTP two-step verification) is BUILT AND VERIFIED** — branch `claude/totp-mfa`, stacked on the
+  password-reset branch. Password → (if the account has an *active* second factor) a short-lived, attempt-limited
+  **challenge and no session** → `POST /api/v1/auth/login/mfa` with a code or a recovery code → session. TOTP is
+  our own RFC 6238 (`lib/auth/mfa/`), secrets AES-256-GCM-encrypted under `MFA_ENCRYPTION_KEY` (required — no key,
+  no MFA; **never add a development fallback key**), recovery codes keyed-hashed. **Rules that follow:** (1) a
+  session from a sign-in is created in **`completeSignIn()` only**; (2) every "use it once" rule (a TOTP step, a
+  recovery code, a challenge, a confirmation) is a **conditional UPDATE whose row count decides**, never a read
+  then a write; (3) `lib/auth/mfa/codes.ts` is imported by client components — keep it free of `node:crypto`;
+  (4) the enrolment secret lives in component state only, and the QR is drawn in the browser, never by an online
+  service; (5) a password reset/change kills pending challenges but a reset **never** turns MFA off. Lost both
+  factors: `pnpm mfa:reset -- <email>`. Record: `docs/development-history/phases/phase-0.5.D-totp-mfa.md`;
+  next: 0.5.E extras (planned in the plan doc), then the §0.5.2 work.
+- **Phase 0.5.C (password reset and change) is BUILT AND VERIFIED** — branch `claude/password-reset`, stacked on
+  the CSP branch. Forgot → emailed single-use link (token in the URL *fragment*, hashed at rest, 30 min) → reset
+  deletes all the person's sessions; change-password re-verifies the current password and keeps only this
+  session. One shared rule for new passwords: `checkNewPassword()`. Email via `lib/email` (`EMAIL_TRANSPORT`
+  = resend | console | file; production needs `RESEND_API_KEY` + `EMAIL_FROM`). **Never make the forgot-password
+  response depend on whether the account exists** (content or timing). Record:
+  `docs/development-history/phases/phase-0.5.C-password-reset.md`; next: 0.5.D (TOTP — built, see above), then 0.5.E extras (plan).
+- **Phase 0.5.B (nonce-based script CSP) is BUILT AND VERIFIED** — branch `claude/csp-nonce`, stacked on the
+  0.5.A branch. `src/proxy.ts` mints a nonce per page request and sets the policy (`src/lib/security/csp.ts`);
+  `CSP_REPORT_ONLY=true` is the live-deployment valve; the API has a static `default-src 'none'` policy. **Rules
+  that follow:** no inline `<script>` and no `style=""`/`<style>` in our markup; every page stays dynamic; new
+  third-party origins are a CSP change, not a convenience. The `csp` test fixture fails any browser test that
+  triggers a violation. Record: `docs/development-history/phases/phase-0.5.B-csp.md`.
 - Phase 0.5.2 (tenant-trust boundary) and 0.5.3 (shared API infra) are designed, not built, and both
   depend on 0.5.1 landing first.
 - Phase 1 onward (Core SIS + Finance, Communication, LMS, Operations, Expansion) have schema sketches

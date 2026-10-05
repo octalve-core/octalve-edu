@@ -1,10 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
 import {
+  DEVTOOLS_PORT,
+  DEVTOOLS_URL,
   HTTP_PORT,
   HTTP_URL,
   HTTPS_APP_PORT,
   HTTPS_URL,
   TLS_PORT,
+  devToolsServerEnv,
   serverEnv,
 } from "./tests/support/env";
 
@@ -40,6 +43,15 @@ export default defineConfig({
       command: `pnpm exec next start -p ${HTTP_PORT}`,
       url: `${HTTP_URL}/favicon.ico`,
       env: serverEnv(HTTP_URL),
+      reuseExistingServer: false,
+      timeout: 60_000,
+    },
+    {
+      // The same build in "staging" mode with the dev tools on (and a token required): the only server with the
+      // dev email inbox. The three production-shaped servers around it must 404 it and show nothing.
+      command: `pnpm exec next start -p ${DEVTOOLS_PORT}`,
+      url: `${DEVTOOLS_URL}/favicon.ico`,
+      env: devToolsServerEnv(),
       reuseExistingServer: false,
       timeout: 60_000,
     },
