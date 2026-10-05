@@ -342,7 +342,8 @@ test.describe("POST /invitations/accept — a person with no account", () => {
     const { token } = await invitedWithToken(unique("ratelimit"));
     for (let i = 0; i < 9; i++) expect((await accept({ token: newInvitationToken(), name: "X Y", password: FRESH }, { ip })).status).toBe(400);
     expect((await accept({ token, name: "Rate Limit", password: FRESH }, { ip })).status).toBe(200); // the 10th: allowed, and refunded
-    for (let i = 0; i < 10; i++) await accept({ token: newInvitationToken(), name: "X Y", password: FRESH }, { ip });
+    // Refunded means the budget is back: the next ten failures are still ANSWERED (400), not refused (429).
+    for (let i = 0; i < 10; i++) expect((await accept({ token: newInvitationToken(), name: "X Y", password: FRESH }, { ip })).status, `failure ${i + 1} after the success`).toBe(400);
     const blocked = await accept({ token: newInvitationToken(), name: "X Y", password: FRESH }, { ip });
     expect(blocked.status).toBe(429);
     expect(blocked.json.error.code).toBe("RATE_LIMITED");

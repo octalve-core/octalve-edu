@@ -110,15 +110,17 @@ test.describe("creating", () => {
     expect(revoked.reason).toMatch(/replaced/);
   });
 
-  test("two administrators inviting the same person at the same instant: both succeed, exactly ONE link stays live", async () => {
-    const to = email("race");
-    const results = await Promise.all([createInvitation(ctx(a), admin.id, { email: to, role: R.PARENT, campusId: null }), createInvitation(ctx(a), admin.id, { email: to, role: R.STUDENT, campusId: null })]);
-    expect(results.every((r) => r.ok)).toBe(true);
-    const live = await db.invitation.findMany({ where: { tenantId: a.id, email: to, acceptedAt: null, revokedAt: null } });
-    expect(live).toHaveLength(1);
-    const liveTokens = results.flatMap((r) => (r.ok ? [r.token] : []));
-    const working = (await Promise.all(liveTokens.map((t) => previewInvitation(t)))).filter(Boolean);
-    expect(working).toHaveLength(1);
+  test("two administrators inviting the same person at the same instant: both succeed, exactly ONE link stays live (repeated, so lucky timing cannot hide a missing lock)", async () => {
+    for (let round = 0; round < 6; round++) {
+      const to = email(`race${round}`);
+      const results = await Promise.all([createInvitation(ctx(a), admin.id, { email: to, role: R.PARENT, campusId: null }), createInvitation(ctx(a), admin.id, { email: to, role: R.STUDENT, campusId: null })]);
+      expect(results.every((r) => r.ok), `round ${round}`).toBe(true);
+      const live = await db.invitation.findMany({ where: { tenantId: a.id, email: to, acceptedAt: null, revokedAt: null } });
+      expect(live, `round ${round}`).toHaveLength(1);
+      const liveTokens = results.flatMap((r) => (r.ok ? [r.token] : []));
+      const working = (await Promise.all(liveTokens.map((t) => previewInvitation(t)))).filter(Boolean);
+      expect(working, `round ${round}`).toHaveLength(1);
+    }
   });
 
   test("an address that is already a member is named as such; a deactivated one says to reactivate; nothing is created either time", async () => {
