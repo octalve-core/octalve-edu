@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { ok } from "@/lib/api/envelope";
 import { validate } from "@/lib/api/validate";
+import { studentScope } from "@/lib/auth/campus-scope";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { WRITE_ROLES, idField, isPlausibleId, notFound, peopleFailure, peopleWriteLimited } from "@/lib/people/http";
+import { CAMPUS_WRITE_ROLES, idField, isPlausibleId, notFound, peopleFailure, peopleWriteLimited } from "@/lib/people/http";
 import { enrolStudent } from "@/lib/people/students";
 
 // POST /api/v1/schools/[code]/people/students/[id]/enrolments  { sessionId, classArmId } — ADMIN only. One enrolment per student per session; a withdrawn one is reactivated.
@@ -16,10 +17,12 @@ export const POST = withAuth(
     if (!isPlausibleId(id)) return notFound("student");
     const limited = await peopleWriteLimited(auth);
     if (limited) return limited;
+    const scoped = await studentScope(auth, id);
+    if (scoped) return scoped;
     const result = await enrolStudent(auth.tenant, auth.userId, id, input);
     return result.ok
       ? ok({ enrolment: result.enrolment, reenrolled: result.reenrolled }, {}, result.reenrolled ? 200 : 201)
       : peopleFailure(result.reason, result.detail);
   }),
-  { tenant: true, roles: WRITE_ROLES },
+  { tenant: true, roles: CAMPUS_WRITE_ROLES },
 );

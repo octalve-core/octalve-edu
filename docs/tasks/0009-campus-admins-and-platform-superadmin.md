@@ -41,8 +41,10 @@ The design said "25 route files (of 108) name `ADMIN`". That counted one pattern
 - [x] `lib/auth/administer.ts` (`canAdminister`, `isAdministrator`); `ROLE_LABELS`
 - [x] Tests: `tests/unit/administer.spec.ts` (5), `tests/integration/platform.spec.ts` (13); catalog guard list; applied to the `octalve_edu` dev DB
 ### Slice B1: people
-- [ ] tests first (API matrix: campus admin own campus ok, other campus 404, school-wide row 403, staff/students; import/export)
-- [ ] `PEOPLE` write roles + service checks; people pages (`canEdit`)
+- [x] tests first: `tests/api/campus-admin-people.spec.ts` (10), seen failing first (8 of 10 failed against the unchanged routes, for the right reason)
+- [x] `CAMPUS_WRITE_ROLES` on every people write route + `lib/auth/campus-scope.ts` helper called before the service; create defaults to the caller's campus; import honours the campus (row error otherwise); staff link candidates limited to the campus; people pages let a campus administrator in (`canEdit` = `isAdministrator`)
+- Slice B1 result (2026-10-11): people spec 10 passed after `pnpm build`; typecheck, lint clean. NOT run yet: the full suite, existing people specs, e2e.
+- Deliberate limits: `GET staff/[id]/linkable-accounts` and `link-account` are limited to members of the caller's campus; the Academic setup page stays READ-ONLY for a campus administrator in the UI for now (the API for sessions/classes is slice B2); results and report cards are not granted.
 ### Slice B2: academics of a campus, attendance, announcements, timetable
 - [ ] tests first; role lists + service checks; pages
 ### Slice B3: finance

@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { ok } from "@/lib/api/envelope";
 import { validate } from "@/lib/api/validate";
+import { staffScope } from "@/lib/auth/campus-scope";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { READ_ROLES, WRITE_ROLES, isPlausibleId, notFound, peopleFailure, peopleWriteLimited, textField } from "@/lib/people/http";
+import { CAMPUS_WRITE_ROLES, READ_ROLES, isPlausibleId, notFound, peopleFailure, peopleWriteLimited, textField } from "@/lib/people/http";
 import { getStaff, updateStaff } from "@/lib/people/staff";
 
 // GET   /api/v1/schools/[code]/people/staff/[id]  — the record, its sign-in state and what it teaches.
@@ -37,8 +38,10 @@ export const PATCH = withAuth(
     if (!isPlausibleId(id)) return notFound("staff member");
     const limited = await peopleWriteLimited(auth);
     if (limited) return limited;
+    const scoped = await staffScope(auth, id);
+    if (scoped) return scoped;
     const result = await updateStaff(auth.tenant, auth.userId, id, body);
     return result.ok ? ok({ staff: result.staff, changed: result.changed }) : peopleFailure(result.reason, result.detail, "staff member");
   }),
-  { tenant: true, roles: WRITE_ROLES },
+  { tenant: true, roles: CAMPUS_WRITE_ROLES },
 );

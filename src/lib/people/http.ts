@@ -8,7 +8,7 @@ import type { PeopleFailure } from "@/lib/people/results";
 // routes, an unknown id, another school's id and another campus's id share ONE answer (NOT_FOUND).
 
 /// Who may read people (decision P2); only an ADMIN writes them.
-export { READ_ROLES, WRITE_ROLES, isPlausibleId, notFound, idField } from "@/lib/academics/http";
+export { READ_ROLES, WRITE_ROLES, CAMPUS_WRITE_ROLES, isPlausibleId, notFound, idField } from "@/lib/academics/http";
 
 export const textField = z.string({ error: "Give some text." }).max(200, "That is too long.");
 

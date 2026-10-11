@@ -2,8 +2,9 @@ import { z } from "zod";
 import { fail, ok } from "@/lib/api/envelope";
 import { offsetMeta, parseOffsetPagination } from "@/lib/api/pagination";
 import { validate } from "@/lib/api/validate";
+import { createCampus } from "@/lib/auth/campus-scope";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { READ_ROLES, WRITE_ROLES, idField, peopleFailure, peopleWriteLimited, textField } from "@/lib/people/http";
+import { CAMPUS_WRITE_ROLES, READ_ROLES, idField, peopleFailure, peopleWriteLimited, textField } from "@/lib/people/http";
 import { createStaff, listStaff } from "@/lib/people/staff";
 
 // GET  /api/v1/schools/[code]/people/staff   — the school's staff records, A to Z, each with its sign-in state (none / invited / linked). ?q=, ?status=live|archived|all
@@ -45,8 +46,10 @@ export const POST = withAuth(
   validate({ body: createBody }, async (_req, auth: TenantAuthContext, _ctx: unknown, { body }) => {
     const limited = await peopleWriteLimited(auth);
     if (limited) return limited;
-    const result = await createStaff(auth.tenant, auth.userId, body);
+    const campus = createCampus(auth, body.campusId);
+    if (campus instanceof Response) return campus;
+    const result = await createStaff(auth.tenant, auth.userId, { ...body, campusId: campus.campusId });
     return result.ok ? ok({ staff: result.staff }, {}, 201) : peopleFailure(result.reason, result.detail, "staff member");
   }),
-  { tenant: true, roles: WRITE_ROLES },
+  { tenant: true, roles: CAMPUS_WRITE_ROLES },
 );

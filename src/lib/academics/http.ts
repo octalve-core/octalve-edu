@@ -9,8 +9,11 @@ import type { AcademicFailure } from "@/lib/academics/sessions";
 // on. An unknown id, another school's id and another campus's id share ONE answer (NOT_FOUND) — see sessions.ts.
 
 /// Who may read the academic structure (decision 7); only an ADMIN writes it.
-export const READ_ROLES = ["ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF"] as const;
+export const READ_ROLES = ["ADMIN", "CAMPUS_ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF"] as const;
 export const WRITE_ROLES = ["ADMIN"] as const;
+/// Routes a CAMPUS_ADMIN may also write (ADR 0016). Using this constant is a promise: the route asks `lib/auth/campus-scope.ts` about the row's
+/// campus before it writes (the route-role guard test checks it). Everything still on `WRITE_ROLES` stays school-administrator-only.
+export const CAMPUS_WRITE_ROLES = ["ADMIN", "CAMPUS_ADMIN"] as const;
 
 /// A path parameter that cannot be an id of ours is the same "no such thing" as one that merely does not exist.
 export const isPlausibleId = (value: unknown): value is string => typeof value === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(value);

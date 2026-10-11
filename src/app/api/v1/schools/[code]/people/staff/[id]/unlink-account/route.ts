@@ -1,6 +1,7 @@
 import { ok } from "@/lib/api/envelope";
+import { staffScope } from "@/lib/auth/campus-scope";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { WRITE_ROLES, isPlausibleId, notFound, peopleFailure, peopleWriteLimited } from "@/lib/people/http";
+import { CAMPUS_WRITE_ROLES, isPlausibleId, notFound, peopleFailure, peopleWriteLimited } from "@/lib/people/http";
 import { unlinkAccount } from "@/lib/people/staff";
 
 // POST /api/v1/schools/[code]/people/staff/[id]/unlink-account — ADMIN only. Clears the link; the account and its membership are untouched (that is the Users page's).
@@ -12,8 +13,10 @@ export const POST = withAuth(
     if (!isPlausibleId(id)) return notFound("staff member");
     const limited = await peopleWriteLimited(auth);
     if (limited) return limited;
+    const scoped = await staffScope(auth, id);
+    if (scoped) return scoped;
     const result = await unlinkAccount(auth.tenant, auth.userId, id);
     return result.ok ? ok({ staff: result.staff }) : peopleFailure(result.reason, result.detail, "staff member");
   },
-  { tenant: true, roles: WRITE_ROLES },
+  { tenant: true, roles: CAMPUS_WRITE_ROLES },
 );

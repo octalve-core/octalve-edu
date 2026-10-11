@@ -3,7 +3,7 @@ import { fail } from "@/lib/api/envelope";
 import { validate } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { reserveAttempt } from "@/lib/auth/rate-limit";
-import { WRITE_ROLES, idField, peopleFailure } from "@/lib/people/http";
+import { CAMPUS_WRITE_ROLES, idField, peopleFailure } from "@/lib/people/http";
 import { exportStudents } from "@/lib/people/import";
 
 // GET /api/v1/schools/[code]/people/students/export — ADMIN only. The student list's own filters (?q ?status ?campusId ?sessionId ?classArmId ?notEnrolled) as a CSV file
@@ -38,5 +38,5 @@ export const GET = withAuth(
       },
     });
   }),
-  { tenant: true, roles: WRITE_ROLES },
+  { tenant: true, roles: CAMPUS_WRITE_ROLES },
 );

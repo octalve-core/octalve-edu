@@ -97,6 +97,8 @@ type Lookups = {
   groups: { id: string; name: string; campusId: string | null }[];
   arms: { id: string; name: string; classGroupId: string }[];
   sessions: { id: string; label: string; campusId: string | null }[];
+  /// Set for a CAMPUS_ADMIN: every row belongs to THIS campus (a blank campus cell means it; naming another is a row error).
+  onlyCampusId?: string;
 };
 
 /// Candidates of a scoped thing (class group, session) that a student on `campusId` may use: school-wide ones, or their own campus's.
@@ -138,10 +140,12 @@ function readRow(
     if (!admissionNo) bad("admission_no", "An admission number is 1 to 30 letters, digits, / - or . and starts with a letter or digit.");
   }
 
-  let campusId: string | null = null;
+  let campusId: string | null = lookups.onlyCampusId ?? null;
   if (cells.campus !== "") {
     const found = lookups.campuses.filter((campus) => collapse(campus.name) === collapse(cells.campus));
-    if (found.length === 1) campusId = found[0].id;
+    if (found.length === 1 && lookups.onlyCampusId && found[0].id !== lookups.onlyCampusId)
+      bad("campus", "You can only import students of your own campus.");
+    else if (found.length === 1) campusId = found[0].id;
     else
       bad(
         "campus",
@@ -253,6 +257,7 @@ export async function importStudents(
       tenant.run(async (tx): Promise<PeopleResult<{ report: ImportReport }>> => {
         await lockStudents(tx, tenantId);
         const lookups = await loadLookups(tx, tenantId);
+        if (tenant.role === "CAMPUS_ADMIN" && tenant.campusId) lookups.onlyCampusId = tenant.campusId;
         const rows: ImportRow[] = [];
         const counts = { rows: 0, created: 0, skipped: 0, errors: 0 };
         const guardians = new Map<string, string>(); // in-file siblings share one guardian record

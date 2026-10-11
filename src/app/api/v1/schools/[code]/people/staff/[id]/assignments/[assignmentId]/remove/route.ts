@@ -1,6 +1,7 @@
 import { ok } from "@/lib/api/envelope";
+import { staffScope } from "@/lib/auth/campus-scope";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { WRITE_ROLES, isPlausibleId, notFound, peopleFailure, peopleWriteLimited } from "@/lib/people/http";
+import { CAMPUS_WRITE_ROLES, isPlausibleId, notFound, peopleFailure, peopleWriteLimited } from "@/lib/people/http";
 import { removeAssignment } from "@/lib/people/staff";
 
 // POST /api/v1/schools/[code]/people/staff/[id]/assignments/[assignmentId]/remove — ADMIN only. Removes one assignment (a real delete: nothing references it yet).
@@ -12,8 +13,10 @@ export const POST = withAuth(
     if (!isPlausibleId(id) || !isPlausibleId(assignmentId)) return notFound("assignment");
     const limited = await peopleWriteLimited(auth);
     if (limited) return limited;
+    const scoped = await staffScope(auth, id);
+    if (scoped) return scoped;
     const result = await removeAssignment(auth.tenant, auth.userId, id, assignmentId);
     return result.ok ? ok({ removed: result.removed }) : peopleFailure(result.reason, result.detail, "assignment");
   },
-  { tenant: true, roles: WRITE_ROLES },
+  { tenant: true, roles: CAMPUS_WRITE_ROLES },
 );

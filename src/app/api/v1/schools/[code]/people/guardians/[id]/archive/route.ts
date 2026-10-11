@@ -1,6 +1,7 @@
 import { ok } from "@/lib/api/envelope";
+import { guardianScope } from "@/lib/auth/campus-scope";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { WRITE_ROLES, isPlausibleId, notFound, peopleFailure, peopleWriteLimited } from "@/lib/people/http";
+import { CAMPUS_WRITE_ROLES, isPlausibleId, notFound, peopleFailure, peopleWriteLimited } from "@/lib/people/http";
 import { archiveGuardian } from "@/lib/people/guardians";
 
 // POST /api/v1/schools/[code]/people/guardians/[id]/archive — ADMIN only. Idempotent: twice answers 200 with changed: false.
@@ -12,8 +13,10 @@ export const POST = withAuth(
     if (!isPlausibleId(id)) return notFound("guardian");
     const limited = await peopleWriteLimited(auth);
     if (limited) return limited;
+    const scoped = await guardianScope(auth, id);
+    if (scoped) return scoped;
     const result = await archiveGuardian(auth.tenant, auth.userId, id);
     return result.ok ? ok({ guardian: result.guardian, changed: result.changed }) : peopleFailure(result.reason, result.detail, "guardian");
   },
-  { tenant: true, roles: WRITE_ROLES },
+  { tenant: true, roles: CAMPUS_WRITE_ROLES },
 );

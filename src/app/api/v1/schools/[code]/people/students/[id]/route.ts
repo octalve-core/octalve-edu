@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { ok } from "@/lib/api/envelope";
 import { validate } from "@/lib/api/validate";
+import { studentScope } from "@/lib/auth/campus-scope";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { READ_ROLES, WRITE_ROLES, isPlausibleId, notFound, peopleFailure, peopleWriteLimited, textField } from "@/lib/people/http";
+import { CAMPUS_WRITE_ROLES, READ_ROLES, isPlausibleId, notFound, peopleFailure, peopleWriteLimited, textField } from "@/lib/people/http";
 import { getStudent, updateStudent } from "@/lib/people/students";
 
 // GET   /api/v1/schools/[code]/people/students/[id]  — the student and their enrolment history, newest session first.
@@ -35,8 +36,10 @@ export const PATCH = withAuth(
     if (!isPlausibleId(id)) return notFound("student");
     const limited = await peopleWriteLimited(auth);
     if (limited) return limited;
+    const scoped = await studentScope(auth, id);
+    if (scoped) return scoped;
     const result = await updateStudent(auth.tenant, auth.userId, id, body);
     return result.ok ? ok({ student: result.student, changed: result.changed }) : peopleFailure(result.reason, result.detail);
   }),
-  { tenant: true, roles: WRITE_ROLES },
+  { tenant: true, roles: CAMPUS_WRITE_ROLES },
 );

@@ -3,7 +3,7 @@ import { fail, ok } from "@/lib/api/envelope";
 import { validate } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { reserveAttempt } from "@/lib/auth/rate-limit";
-import { WRITE_ROLES, peopleFailure } from "@/lib/people/http";
+import { CAMPUS_WRITE_ROLES, peopleFailure } from "@/lib/people/http";
 import { IMPORT_MAX_BYTES, importStudents } from "@/lib/people/import";
 
 // POST /api/v1/schools/[code]/people/students/import  { csv, dryRun } — ADMIN only. `csv` is the file's text (UTF-8, at most 1 MiB and 1,000 students; the header names the
@@ -28,5 +28,5 @@ export const POST = withAuth(
     const result = await importStudents(auth.tenant, auth.userId, input);
     return result.ok ? ok({ report: result.report }) : peopleFailure(result.reason, result.detail);
   }),
-  { tenant: true, roles: WRITE_ROLES },
+  { tenant: true, roles: CAMPUS_WRITE_ROLES },
 );

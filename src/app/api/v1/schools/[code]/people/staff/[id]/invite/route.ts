@@ -1,10 +1,11 @@
 import { after } from "next/server";
 import { fail, ok } from "@/lib/api/envelope";
+import { staffScope } from "@/lib/auth/campus-scope";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { reserveAttempt } from "@/lib/auth/rate-limit";
 import { mailInvitation } from "@/lib/invitations/deliver";
 import { createInvitation } from "@/lib/invitations/service";
-import { WRITE_ROLES, isPlausibleId, notFound, peopleFailure } from "@/lib/people/http";
+import { CAMPUS_WRITE_ROLES, isPlausibleId, notFound, peopleFailure } from "@/lib/people/http";
 import { staffInviteDetails } from "@/lib/people/staff";
 
 // POST /api/v1/schools/[code]/people/staff/[id]/invite — ADMIN only. Invites the record's email address to sign in, as the role its category signs in as, on its
@@ -18,6 +19,8 @@ export const POST = withAuth(
   async (_req, auth: TenantAuthContext, ctx: Ctx) => {
     const { id } = await ctx.params;
     if (!isPlausibleId(id)) return notFound("staff member");
+    const scoped = await staffScope(auth, id);
+    if (scoped) return scoped;
     const { tenant } = auth;
     const details = await staffInviteDetails(tenant, id);
     if (!details.ok) return peopleFailure(details.reason, details.detail, "staff member");
@@ -64,5 +67,5 @@ export const POST = withAuth(
     );
     return ok({ invitation: result.invitation }, {}, 201);
   },
-  { tenant: true, roles: WRITE_ROLES },
+  { tenant: true, roles: CAMPUS_WRITE_ROLES },
 );
