@@ -14,7 +14,17 @@ import { DeactivateDialog } from "./DeactivateDialog";
 import { EditMemberDialog } from "./EditMemberDialog";
 import { InvitationsList } from "./InvitationsList";
 import { InviteDialog } from "./InviteDialog";
-import { ROLE_OPTIONS, displayName, permissionLabel, type CampusOption, type Invitation, type Member, type PageMeta } from "./model";
+import {
+  ROLE_OPTIONS,
+  displayName,
+  mayManage,
+  permissionLabel,
+  type ActorRole,
+  type CampusOption,
+  type Invitation,
+  type Member,
+  type PageMeta,
+} from "./model";
 
 const PAGE_SIZE = 20;
 const ROW = "md:grid md:grid-cols-[minmax(0,2.2fr)_9rem_minmax(0,1.2fr)_6.5rem_auto] md:items-center md:gap-4";
@@ -38,11 +48,13 @@ export function UsersPanel({
   schoolName,
   campuses,
   currentUserId,
+  actorRole,
 }: {
   schoolCode: string;
   schoolName: string;
   campuses: CampusOption[];
   currentUserId: string;
+  actorRole: ActorRole;
 }) {
   const [searchText, setSearchText] = useState("");
   const [q, setQ] = useState("");
@@ -229,12 +241,14 @@ export function UsersPanel({
             onChange={(e) => (setRole(e.target.value), setPage(1))}
             options={[{ value: "", label: "All roles" }, ...ROLE_OPTIONS]}
           />
-          <SelectField
-            label="Campus"
-            value={campusId}
-            onChange={(e) => (setCampusId(e.target.value), setPage(1))}
-            options={[{ value: "", label: "All campuses" }, ...campuses.map((c) => ({ value: c.id, label: c.name }))]}
-          />
+          {actorRole === "ADMIN" && (
+            <SelectField
+              label="Campus"
+              value={campusId}
+              onChange={(e) => (setCampusId(e.target.value), setPage(1))}
+              options={[{ value: "", label: "All campuses" }, ...campuses.map((c) => ({ value: c.id, label: c.name }))]}
+            />
+          )}
           <SelectField
             label="Status"
             value={status}
@@ -328,7 +342,7 @@ export function UsersPanel({
                       </span>
                     </p>
                     <div className="flex gap-2 md:w-64 md:justify-end">
-                      {self ? null : member.status === "active" ? (
+                      {self || !mayManage(actorRole, member) ? null : member.status === "active" ? (
                         <>
                           <Button
                             variant="secondary"
@@ -406,6 +420,7 @@ export function UsersPanel({
         onClose={() => setInviting(false)}
         schoolCode={schoolCode}
         campuses={campuses}
+        actorRole={actorRole}
         onInvited={(invitation) => {
           flushSync(() => setInviting(false)); // the dialog is closed (and focus handed back) before the lists are reloaded
           setNotice({ variant: "success", text: `Invitation sent to ${invitation.email}. The link works for 7 days.` });
@@ -417,6 +432,7 @@ export function UsersPanel({
         onClose={() => setEditing(null)}
         schoolCode={schoolCode}
         campuses={campuses}
+        actorRole={actorRole}
         onSaved={(member, changed) => {
           flushSync(() => setEditing(null));
           setNotice({

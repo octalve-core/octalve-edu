@@ -9,9 +9,11 @@ import { NETWORK_ERROR, RATE_LIMITED, SESSION_ENDED, problemFor, sendJson } from
 import { CheckboxField } from "@/components/ui/CheckboxField";
 import {
   PERMISSION_OPTIONS,
-  ROLE_OPTIONS,
+  campusChoices,
   canHoldPermissions,
   displayName,
+  roleOptionsFor,
+  type ActorRole,
   type CampusOption,
   type Member,
   type PermissionName,
@@ -25,12 +27,14 @@ export function EditMemberDialog({
   onClose,
   schoolCode,
   campuses,
+  actorRole,
   onSaved,
 }: {
   member: Member | null;
   onClose: () => void;
   schoolCode: string;
   campuses: CampusOption[];
+  actorRole: ActorRole;
   onSaved: (member: Member, changed: boolean) => void;
 }) {
   return (
@@ -41,7 +45,15 @@ export function EditMemberDialog({
       description="Takes effect on their next request."
     >
       {member && (
-        <EditForm key={member.userId} member={member} onClose={onClose} schoolCode={schoolCode} campuses={campuses} onSaved={onSaved} />
+        <EditForm
+          key={member.userId}
+          member={member}
+          onClose={onClose}
+          schoolCode={schoolCode}
+          campuses={campuses}
+          actorRole={actorRole}
+          onSaved={onSaved}
+        />
       )}
     </Dialog>
   );
@@ -52,12 +64,14 @@ function EditForm({
   onClose,
   schoolCode,
   campuses,
+  actorRole,
   onSaved,
 }: {
   member: Member;
   onClose: () => void;
   schoolCode: string;
   campuses: CampusOption[];
+  actorRole: ActorRole;
   onSaved: (member: Member, changed: boolean) => void;
 }) {
   const [role, setRole] = useState<RoleName>(member.role);
@@ -66,6 +80,8 @@ function EditForm({
   const [campusError, setCampusError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  // Only a school administrator grants permissions or moves someone to another campus (the API refuses a campus administrator both).
+  const schoolAdmin = actorRole === "ADMIN";
   const staff = canHoldPermissions(role);
   const willLose = !staff && member.permissions.length > 0;
 
@@ -78,7 +94,11 @@ function EditForm({
     if (role !== member.role) body.role = role;
     if (campusId !== (member.campusId ?? "")) body.campusId = campusId || null;
     // Sent only for a role that can hold them, and only when the set changed; moving to a role that cannot clears them on the server.
-    if (staff && (permissions.length !== member.permissions.length || permissions.some((p) => !member.permissions.includes(p)))) {
+    if (
+      schoolAdmin &&
+      staff &&
+      (permissions.length !== member.permissions.length || permissions.some((p) => !member.permissions.includes(p)))
+    ) {
       body.permissions = PERMISSION_OPTIONS.map((option) => option.value).filter((value) => permissions.includes(value));
     }
     if (Object.keys(body).length === 0) return onClose(); // nothing changed — nothing sent
@@ -105,7 +125,7 @@ function EditForm({
         name="role"
         value={role}
         onChange={(e) => setRole(e.target.value as RoleName)}
-        options={ROLE_OPTIONS}
+        options={roleOptionsFor(actorRole)}
         disabled={pending}
       />
       <SelectField
@@ -116,11 +136,13 @@ function EditForm({
           setCampusId(e.target.value);
           setCampusError(null);
         }}
-        options={[{ value: "", label: "No specific campus" }, ...campuses.map((c) => ({ value: c.id, label: c.name }))]}
+        options={campusChoices(actorRole, role, campuses)}
         error={campusError}
-        disabled={pending}
+        disabled={pending || !schoolAdmin}
       />
-      {staff ? (
+      {!schoolAdmin ? (
+        <p className="text-xs text-fg-muted">Only a school administrator can give extra permissions or move someone to another campus.</p>
+      ) : staff ? (
         <fieldset className="space-y-1" disabled={pending}>
           <legend className="text-sm font-medium text-fg">Extra permissions</legend>
           <p className="text-xs text-fg-muted">Beyond what their role allows. Administrators can do all of these already.</p>

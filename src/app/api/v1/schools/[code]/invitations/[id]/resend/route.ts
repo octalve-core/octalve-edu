@@ -25,6 +25,7 @@ export const POST = withAuth(
       return fail("That invitation was resent several times just now. Please wait a few minutes.", 429, "RATE_LIMITED");
     }
     const result = await resendInvitation(tenant, auth.userId, id);
+    if (result === "ADMIN_ONLY") return fail("Only a school administrator can do that.", 403, "FORBIDDEN");
     if (!result) return notFound("open invitation");
     const { invitation, token } = result;
 
@@ -47,5 +48,5 @@ export const POST = withAuth(
     });
     return ok({ invitation });
   },
-  { tenant: true, roles: ["ADMIN"] },
+  { tenant: true, roles: ["ADMIN", "CAMPUS_ADMIN"] },
 );

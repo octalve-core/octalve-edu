@@ -260,12 +260,11 @@ test.describe("guardians", () => {
 });
 
 test.describe("what stays with the school", () => {
-  test("a campus administrator is refused the school-only routes: settings, creating a campus, members (until their slice), fee structures", async () => {
+  test("a campus administrator is refused the school-only routes: settings, creating a campus, fee structures (members came in slice B4: see campus-admin-users.spec.ts)", async () => {
     const base = `/api/v1/schools/${a.code}`;
     const attempts: [string, string, unknown][] = [
       ["PATCH", `${base}/settings`, { name: "Hijacked" }],
       ["POST", `${base}/campuses`, { name: "Third campus" }],
-      ["GET", `${base}/members`, undefined],
       ["POST", `${base}/finance/fee-structures`, {}],
     ];
     for (const [method, url, payload] of attempts) {

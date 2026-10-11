@@ -30,6 +30,13 @@ export function navFor(school: ShellSchool | null): NavItem[] {
       { label: "Users", href: `/schools/${school.code}/users`, icon: UsersIcon },
       { label: "Settings", href: `/schools/${school.code}/settings`, icon: SlidersIcon },
     );
+  } else if (school.role === "CAMPUS_ADMIN") {
+    // A campus administrator runs their own campus: no school Settings (the school's name, type and campuses are the school administrator's).
+    items.push(
+      { label: "Academics", href: `/schools/${school.code}/academics`, icon: CalendarIcon },
+      { label: "People", href: `/schools/${school.code}/people`, icon: GraduationCapIcon },
+      { label: "Users", href: `/schools/${school.code}/users`, icon: UsersIcon },
+    );
   } else if (school.role === "TEACHING_STAFF" || school.role === "NON_TEACHING_STAFF") {
     // Staff may look at the school year and at the school's people (read-only; plan 1.2, decisions P2 and P9) — they change none of it.
     items.push(

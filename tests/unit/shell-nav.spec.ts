@@ -25,6 +25,17 @@ test.describe("navFor", () => {
     expect(items.filter((i) => i.href === null)).toEqual([]);
   });
 
+  test("a CAMPUS_ADMIN sees Overview, Academics, People and Users - never the school's Settings", () => {
+    const items = navFor({ ...admin, role: "CAMPUS_ADMIN" });
+    expect(items.map((i) => i.label)).toEqual(["Overview", "Academics", "People", "Users"]);
+    expect(items.map((i) => i.href)).toEqual([
+      "/schools/riverside",
+      "/schools/riverside/academics",
+      "/schools/riverside/people",
+      "/schools/riverside/users",
+    ]);
+  });
+
   test("staff see Overview, Academics and People (to look at, never to change); students and parents see Overview only — decided by the role IN THAT SCHOOL", () => {
     for (const role of ["TEACHING_STAFF", "NON_TEACHING_STAFF"] as const) {
       const items = navFor({ ...admin, role });

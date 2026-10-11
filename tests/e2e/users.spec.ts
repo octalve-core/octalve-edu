@@ -368,3 +368,46 @@ test.describe("changing people", () => {
     await expect(dialog(page).getByRole("alert")).toContainText("This person is deactivated. Reactivate them first.");
   });
 });
+
+test.describe("a campus administrator (slice B4, ADR 0016)", () => {
+  async function signedInCampusAdmin(page: Page) {
+    const user = await createUser({ name: "Cam Campusadmin" });
+    await addMembership(user.id, school.id, Role.CAMPUS_ADMIN, school.campuses[0].id);
+    await signInThroughUi(page, user);
+    await page.goto(`/schools/${school.code}/users`);
+    await expect(heading(page)).toBeVisible();
+    await expect(page.getByText(/^\d+ (person|people)/)).toBeVisible();
+  }
+
+  test("sees their own campus's people only; has controls for those below their level and none for a colleague at their level; no campus filter", async ({
+    page,
+  }) => {
+    await member(Role.TEACHING_STAFF, "Tola Teacher", 0);
+    await member(Role.TEACHING_STAFF, "Sola Southern", 1);
+    await member(Role.CAMPUS_ADMIN, "Pia Peer", 0);
+    const boss = await createUser({ name: "Ada Boss" });
+    await addMembership(boss.id, school.id, Role.ADMIN);
+    await signedInCampusAdmin(page);
+    await expect(row(page, "Tola Teacher")).toBeVisible();
+    await expect(row(page, "Sola Southern")).toHaveCount(0);
+    await expect(row(page, "Ada Boss")).toHaveCount(0);
+    await expect(row(page, "Tola Teacher").getByRole("button", { name: "Deactivate Tola Teacher" })).toBeVisible();
+    await expect(row(page, "Pia Peer")).toBeVisible();
+    await expect(row(page, "Pia Peer").getByRole("button")).toHaveCount(0); // a colleague at their own level is not theirs to change
+    await expect(page.getByLabel("Campus", { exact: true })).toHaveCount(0); // there is only their own campus to filter by
+    await expect(page.getByRole("link", { name: "Settings" })).toHaveCount(0);
+  });
+
+  test("the invite dialog offers no administrator roles, and the campus is theirs and fixed", async ({ page }) => {
+    await signedInCampusAdmin(page);
+    await page.getByRole("button", { name: "Invite someone" }).click();
+    const d = dialog(page);
+    await expect(d.getByLabel("Role")).toBeVisible();
+    const roles = await d.getByLabel("Role").locator("option").allTextContents();
+    expect(roles).toEqual(expect.arrayContaining(["Teaching staff", "Non-teaching staff", "Student", "Parent"]));
+    expect(roles).not.toContain("Administrator");
+    expect(roles).not.toContain("Campus administrator");
+    await expect(d.getByLabel("Campus")).toBeDisabled();
+    await expect(d.getByLabel("Campus")).toHaveValue(school.campuses[0].id);
+  });
+});

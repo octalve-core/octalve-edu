@@ -54,6 +54,10 @@ export const POST = withAuth(
           return fail("Choose one of this school's campuses.", 400, "VALIDATION");
         case "INVALID_STAFF_RECORD":
           return fail("That can't be done to it in its current state.", 409, "WRONG_STATE");
+        case "ADMIN_ONLY":
+          return fail("Only a school administrator can do that.", 403, "FORBIDDEN");
+        case "CAMPUS_REQUIRED":
+          return fail("That can't be done.", 400, "VALIDATION"); // (a staff record's role is never a campus administrator)
       }
     }
     after(() =>

@@ -32,7 +32,7 @@ export const GET = withAuth(
     const { invitations, total } = await listOpenInvitations(auth.tenant, page);
     return ok({ invitations }, offsetMeta({ page: page.page, limit: page.limit, total }));
   },
-  { tenant: true, roles: ["ADMIN"] },
+  { tenant: true, roles: ["ADMIN", "CAMPUS_ADMIN"] },
 );
 
 export const POST = withAuth(
@@ -44,7 +44,7 @@ export const POST = withAuth(
     if (!(await reserveAttempt(`invite:to:${tenant.tenantId}:${input.email}`, PER_ADDRESS))) {
       return fail("That address was invited several times just now. Please wait a few minutes.", 429, "RATE_LIMITED");
     }
-    const result = await createInvitation(tenant, auth.userId, { email: input.email, role: input.role, campusId: input.campusId ?? null });
+    const result = await createInvitation(tenant, auth.userId, { email: input.email, role: input.role, campusId: input.campusId });
     if (!result.ok) {
       switch (result.reason) {
         case "ALREADY_MEMBER":
@@ -58,6 +58,12 @@ export const POST = withAuth(
         case "INVALID_CAMPUS":
           return fail("Choose one of this school's campuses.", 400, "VALIDATION", [
             { path: "body.campusId", message: "Choose one of this school's campuses." },
+          ]);
+        case "ADMIN_ONLY":
+          return fail("Only a school administrator can do that.", 403, "FORBIDDEN");
+        case "CAMPUS_REQUIRED":
+          return fail("A campus administrator needs a campus. Choose one.", 400, "VALIDATION", [
+            { path: "body.campusId", message: "Choose the campus they will administer." },
           ]);
         case "INVALID_STAFF_RECORD":
           // This route never names a staff record (the body is strict); the staff page has its own route for that.
@@ -76,5 +82,5 @@ export const POST = withAuth(
     );
     return ok({ invitation: result.invitation }, {}, 201);
   }),
-  { tenant: true, roles: ["ADMIN"] },
+  { tenant: true, roles: ["ADMIN", "CAMPUS_ADMIN"] },
 );
