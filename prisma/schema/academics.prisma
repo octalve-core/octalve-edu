@@ -66,7 +66,7 @@ model AcademicPeriod {
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @default(now()) @updatedAt
 
-  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   session       AcademicSession @relation(fields: [tenantId, sessionId], references: [tenantId, id], onDelete: NoAction)
   results       Result[]
   feeStructures FeeStructure[]

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { fail } from "@/lib/api/envelope";
-import { FinanceNotFound, FinanceRefusal } from "./service";
+import { FinanceConflict, FinanceNotFound, FinanceRefusal } from "./service";
 import { DiscountWorkflowMode } from "@prisma/client";
 
 export const createFeeStructureSchema = z.object({
@@ -50,7 +50,10 @@ export const applyDiscountSchema = z.object({
 /// shown is a 400 with its message, a missing record - or one the caller may not see - is the same 404, and anything else is logged and
 /// answered with a generic 500. Raw error text (database messages, stack hints) never reaches the client.
 export function financeFailure(err: unknown, context: string): Response {
+  if (err instanceof FinanceConflict) return fail(err.message, 409, "CONFLICT");
   if (err instanceof FinanceRefusal) return fail(err.message, 400, "REFUSED");
+  // a unique-index race on a supplied receipt number
+  if ((err as { code?: string } | null)?.code === "P2002") return fail("That receipt number is already used.", 409, "CONFLICT");
   const name = (err as { name?: string; code?: string } | null)?.name;
   const code = (err as { code?: string } | null)?.code;
   if (err instanceof FinanceNotFound || name === "NotFoundError" || code === "P2025") return fail("Not found.", 404, "NOT_FOUND");

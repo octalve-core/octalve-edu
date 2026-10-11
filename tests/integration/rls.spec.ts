@@ -1241,6 +1241,7 @@ test.describe("catalog guard", () => {
       "Invoice",
       "InvoiceDiscount",
       "Payment",
+      "ReceiptCounter",
       "Result",
       "ResultAudit",
       "SchoolSettings",

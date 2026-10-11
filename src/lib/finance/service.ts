@@ -1,6 +1,6 @@
 import { Prisma, InvoiceStatus, PaymentProvider, PaymentStatus, DiscountWorkflowMode } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { forTenant } from "@/lib/tenant/for-tenant";
+import { forTenant, type Tx } from "@/lib/tenant/for-tenant";
 import { trustedTenantId, type VerifiedTenantId } from "@/lib/tenant/verified-tenant";
 import {
   toDecimal,
@@ -385,6 +385,23 @@ export async function initializePayment(
 /**
  * Records a manual payment (Cash, POS, Bank Transfer) by staff.
  */
+const RECEIPT_RETRY_LIMIT = 50;
+
+/// The next receipt number for a school and year: `UPDATE ... RETURNING` on the school's counter (the row lock serialises concurrent
+/// fulfilments; the allocation is in the caller's transaction, so a rollback gives the number back). A number someone typed by hand earlier
+/// is skipped, at most RECEIPT_RETRY_LIMIT times, then the whole payment is refused and rolled back.
+async function allocateReceiptNo(tx: Tx, tenantId: string, schoolCode: string, year: number): Promise<string> {
+  for (let attempt = 0; attempt < RECEIPT_RETRY_LIMIT; attempt++) {
+    const rows = await tx.$queryRaw<{ seq: number }[]>`
+      INSERT INTO "ReceiptCounter" ("tenantId", "year", "next") VALUES (${tenantId}, ${year}::int, 2)
+      ON CONFLICT ("tenantId", "year") DO UPDATE SET "next" = "ReceiptCounter"."next" + 1
+      RETURNING ("next" - 1)::int AS seq`;
+    const candidate = generateReceiptNumber(schoolCode, year, rows[0].seq);
+    if ((await tx.payment.count({ where: { tenantId, receiptNo: candidate } })) === 0) return candidate;
+  }
+  throw new FinanceRefusal("Could not allocate a receipt number. Please try again.");
+}
+
 export async function recordManualPayment(
   tenantId: VerifiedTenantId,
   schoolCode: string,
@@ -408,8 +425,11 @@ export async function recordManualPayment(
 
     const reference = generatePaymentReference(PaymentProvider.PAYSTACK);
     const year = new Date().getFullYear();
-    const receiptCount = await tx.payment.count({ where: { tenantId, status: PaymentStatus.SUCCESS } });
-    const receiptNo = data.receiptNo || generateReceiptNumber(schoolCode, year, receiptCount + 1);
+    const supplied = data.receiptNo?.trim();
+    if (supplied && (await tx.payment.count({ where: { tenantId, receiptNo: supplied } })) > 0) {
+      throw new FinanceConflict("That receipt number is already used.");
+    }
+    const receiptNo = supplied || (await allocateReceiptNo(tx, tenantId, schoolCode, year));
 
     const payment = await tx.payment.create({
       data: {
@@ -468,6 +488,14 @@ export class FinanceRefusal extends Error {
   constructor(message: string) {
     super(message);
     this.name = "FinanceRefusal";
+  }
+}
+
+/// The caller asked for something that clashes with existing data (a supplied receipt number already in use): 409.
+export class FinanceConflict extends FinanceRefusal {
+  constructor(message: string) {
+    super(message);
+    this.name = "FinanceConflict";
   }
 }
 
@@ -562,8 +590,7 @@ export async function fulfillPayment(
 
     const schoolCode = payment.invoice.tenant.code || "SCHOOL";
     const year = new Date().getFullYear();
-    const count = await tx.payment.count({ where: { tenantId, status: PaymentStatus.SUCCESS } });
-    const receiptNo = generateReceiptNumber(schoolCode, year, count);
+    const receiptNo = await allocateReceiptNo(tx, tenantId, schoolCode, year);
 
     await tx.payment.update({
       where: { tenantId, id: payment.id },

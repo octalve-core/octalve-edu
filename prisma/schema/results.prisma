@@ -14,25 +14,25 @@ enum ResultStatus {
 
 /// A term/period subject result for a student.
 model Result {
-  id                 String       @id @default(cuid())
-  tenantId           String
-  studentId          String
-  subjectId          String
-  periodId           String
-  score              Decimal      @db.Decimal(6, 2)
-  maxScore           Decimal      @default(100) @db.Decimal(6, 2)
-  status             ResultStatus @default(DRAFT)
-  componentScores    Json?
-  gradeLetter        String?
-  gradeRemark        String?
-  enteredByStaffId   String?
-  approvedByStaffId  String?
-  publishedAt        DateTime?
-  lockedAt           DateTime?
-  verificationToken  String?      @unique
-  verificationHash   String?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @default(now()) @updatedAt
+  id                String       @id @default(cuid())
+  tenantId          String
+  studentId         String
+  subjectId         String
+  periodId          String
+  score             Decimal      @db.Decimal(6, 2)
+  maxScore          Decimal      @default(100) @db.Decimal(6, 2)
+  status            ResultStatus @default(DRAFT)
+  componentScores   Json?
+  gradeLetter       String?
+  gradeRemark       String?
+  enteredByStaffId  String?
+  approvedByStaffId String?
+  publishedAt       DateTime?
+  lockedAt          DateTime?
+  verificationToken String?      @unique
+  verificationHash  String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @default(now()) @updatedAt
 
   tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   student StudentRecord  @relation(fields: [tenantId, studentId], references: [tenantId, id], onDelete: Cascade)

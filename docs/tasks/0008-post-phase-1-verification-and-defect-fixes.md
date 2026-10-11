@@ -34,7 +34,7 @@ Know the real test state of the Phase 1 stack (1.2–1.8, merged only into featu
 - [ ] Update `academics.spec.ts` (five sections, Attendance first) and `shell.spec.ts` (Settings is a link) to match the shipped behaviour, then re-run those specs on desktop and phone
 
 ### Module B: Defects found by reading (not yet reproduced)
-- [ ] Finance: `receiptNo` from a count of successful payments, no unique constraint → duplicate receipt numbers under concurrency; manual payment accepts a client `receiptNo`
+- [x] Finance: `receiptNo` from a count of successful payments, no unique constraint → duplicate receipt numbers under concurrency; manual payment accepts a client `receiptNo`
 - [x] Finance: webhook returns 200 when fulfilment fails and leaves the event unprocessed → a lost payment is never retried
 - [x] Finance: webhook route falls back to the public secret `test_mock_secret_key`; invalid deliveries still write rows; `evt_${Date.now()}` ids can collide
 - [x] Finance: manual-payment route returns raw `err.message` (all seven finance routes now use `financeFailure`)
@@ -64,3 +64,4 @@ Know the real test state of the Phase 1 stack (1.2–1.8, merged only into featu
 - **Docs:** this file
 
 - 2026-10-11: F2/F3/F3a/F4 done on `claude/fix-phase-1-review-findings`: `unit/paystack-mode` 7, `unit/finance-paystack`, `integration/finance-webhook` 4, `api/finance` + `api/finance-adversarial` 14 passed (finance subset: 70 passed, 0 failed incl. IDOR audit and rules); typecheck, lint, format:check clean. The new webhook/integration tests were not run against the old code (the old shapes differ, so they could not have passed). Still to do: F1 receipt numbers (migration), F5 results transitions, the 6 stale e2e tests, then the full suite.
+- 2026-10-11: F1 done: reproduced first (25 concurrent fulfilments → 9 distinct receipt numbers), then migration `20261021090000_receipt_counter` (counter table + RLS, duplicates renamed `-Rn`, partial unique index, counter seeded from the highest issued number), `allocateReceiptNo`, supplied numbers must be unused (409). `integration/finance-receipts` 4, `finance-webhook` 4, `rls` 68: 76 passed, 0 failed. Found and fixed on the way: my first draft of the migration called `app_grant_runtime_privileges()`, which re-granted UPDATE/DELETE on the append-only audit tables; two RLS tests caught it. Not applied to the `octalve_edu` dev database yet.
