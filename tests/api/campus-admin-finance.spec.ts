@@ -123,7 +123,14 @@ test.describe("reading invoices", () => {
     const [kid, other] = [await invoiced(north), await invoiced(north)];
     const guardian = await db.guardianRecord.create({ data: { tenantId: a.id, userId: parent.id, firstName: "Pat", lastName: "Parent" } });
     await db.guardianLink.create({
-      data: { tenantId: a.id, studentId: kid.student.id, guardianId: guardian.id, relationship: "MOTHER", status: "APPROVED", isPrimary: true },
+      data: {
+        tenantId: a.id,
+        studentId: kid.student.id,
+        guardianId: guardian.id,
+        relationship: "MOTHER",
+        status: "APPROVED",
+        isPrimary: true,
+      },
     });
     expect((await api(`${finance()}/invoices/${kid.invoice.id}`, as("parent"))).status).toBe(200);
     expect((await api(`${finance()}/invoices/${other.invoice.id}`, as("parent"))).status).toBe(404);
