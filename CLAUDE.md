@@ -103,6 +103,7 @@ one-off pattern sources, referenced once for a specific technique and then done:
 
 ## Files that are stable reference — read once, trust, don't expect them to move
 
+- `docs/issues/README.md` — the **issues register** (known and suspected problems by severity and type, with an evidence level and a taxonomy of issue kinds). Add an issue the moment one is suspected, update it as it moves, link it from the task that fixes it; see its "How this register is used".
 - `docs/adr/` — short ADRs (one per decision someone might reverse by mistake); read the index before changing RLS, locks, permissions, deactivation or migrations. Rules are in its README: never edit an accepted decision, supersede it.
 - `docs/PRD.md` — changes only when the canonical Claude Doc is re-synced; treat as authoritative
   between syncs.
