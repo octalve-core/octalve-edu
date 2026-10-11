@@ -28,9 +28,10 @@ Close what TASK-0009 left open: the platform page shows coarse counters and whic
 - [x] service (`listSchools` merges the two functions; `PlatformSchool.counts`), route doc, Platform page (counters line, "No administrator" badge)
 - Result: integration platform-stats 17, integration platform + rls, API platform, e2e platform (desktop + phone) - 112 passed after `pnpm build`; typecheck, lint, prettier clean. NOT run: the full suite (end of task), axe in the dark theme for the platform page.
 ### F2: re-invite the first administrator
-- [ ] tests first (API + integration + script)
-- [ ] migration (additive) `platform_authorize_first_admin_invite`; service; route; Platform page button
-- [ ] `scripts/invite-first-admin.mjs` + `pnpm platform-admin:invite-first-admin`
+- [x] tests first: `tests/integration/platform-first-admin.spec.ts` (7) and `tests/integration/invite-first-admin-script.spec.ts` (4) seen failing (11 of 11: the function / script did not exist); the API block (5 tests) and the e2e dialog steps were written before the code but NOT run failing first
+- [x] migration (additive) `20261023090100_first_admin_invite`: `platform_authorize_first_admin_invite(tenant, email)` (live ADMIN count inside the school, platform audit row); service `reinviteFirstAdministrator` (one transaction: function, revoke open ADMIN invitations, create the new one, school audit rows); route `POST platform/schools/[id]/first-admin-invitation`; Platform page "Invite administrator" button + dialog for a school with no administrator
+- [x] `scripts/invite-first-admin.mjs` + `pnpm platform-admin:invite-first-admin` (`--as` required, prints the link instead of mailing)
+- Result: integration (first-admin 7, script 4, stats 17), route-role guard (8), API platform, e2e platform on desktop and phone - 57 passed after `pnpm build`; lint, typecheck clean. NOT run: the full suite (end of task), axe dark theme.
 ### F3: teachers' attendance reads and roll-call writes
 - [ ] tests first (campus x arm matrix), existing attendance spec adjusted on purpose
 - [ ] service/route rule; arm picker filtered

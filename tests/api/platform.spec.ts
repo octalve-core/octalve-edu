@@ -66,6 +66,7 @@ test.describe("who may call it", () => {
       ["POST", ROUTE, { code: code(), name: "X", schoolType: "K12", adminEmail: "x@example.test", password: PASSWORD }],
       ["POST", `${ROUTE}/${school.id}/suspension`, { suspended: true, reason: "x", password: PASSWORD }],
       ["PATCH", `${ROUTE}/${school.id}`, { schoolType: "K12", password: PASSWORD }],
+      ["POST", `${ROUTE}/${school.id}/first-admin-invitation`, { email: "late@example.test", password: PASSWORD }],
       ["GET", "/api/v1/platform/audit"],
     ];
     for (const [method, path, body] of calls) {
@@ -84,6 +85,7 @@ test.describe("who may call it", () => {
       ["POST", ROUTE, { code: code(), name: "Needs Password", schoolType: "K12", adminEmail: "np@example.test" }, undefined],
       ["POST", `${ROUTE}/${school.id}/suspension`, { suspended: true, reason: "wrong password" }, "wrong-password"],
       ["PATCH", `${ROUTE}/${school.id}`, { schoolType: "HIGHER_ED" }, undefined],
+      ["POST", `${ROUTE}/${school.id}/first-admin-invitation`, { email: "late@example.test" }, undefined],
     ];
     for (const [method, path, body, password] of attempts) {
       const res = await api(path, as("platform", { method, body: { ...body, ...(password ? { password } : {}) } }));
@@ -269,6 +271,116 @@ test.describe("suspension", () => {
     );
     expect(own.status).toBe(403);
     expect((await db.tenant.findUniqueOrThrow({ where: { id: school.id } })).suspendedAt).toBeNull();
+  });
+});
+
+test.describe("re-inviting the first administrator (ISS-0015)", () => {
+  const tokenIn = (text: string) => /#token=([A-Za-z0-9_-]{43})/.exec(text)![1];
+  const preview = (token: string) => api("/api/v1/invitations/preview", { ...SAAS, body: { token } });
+  // their own platform administrator: the change rate limit is per person (30 changes per 5 minutes) and this file makes many
+  let second: TestUser;
+  test.beforeAll(async () => {
+    second = await createUser({ name: "Second Plat Admin", platformAdmin: true });
+    actors.push(second.id);
+    await enableMfa(second.id);
+    cookie.second = await sessionFor(second);
+  });
+  const reinvite = (id: string, body: object = {}, who = "second") =>
+    api(
+      `${ROUTE}/${id}/first-admin-invitation`,
+      as(who, { method: "POST", body: { email: "x@example.test", password: PASSWORD, ...body } }),
+    );
+  /// A school made through the platform page, whose first administrator never accepted: the situation the action exists for.
+  async function schoolNobodyAdministers() {
+    const c = code();
+    madeCodes.push(c);
+    const email = `lost-${c}@example.test`;
+    const made = await api(
+      ROUTE,
+      as("second", {
+        method: "POST",
+        body: { code: c, name: "Nobody Admin School", schoolType: "K12", adminEmail: email, password: PASSWORD },
+      }),
+    );
+    expect(made.status, made.text).toBe(201);
+    const [mail] = await waitForMail(email);
+    return { id: made.json.data.school.id as string, email, token: tokenIn(mail.text) };
+  }
+  const openAdminInvites = (tenantId: string) =>
+    db.invitation.findMany({ where: { tenantId, role: "ADMIN", acceptedAt: null, revokedAt: null } });
+
+  test("a school with no administrator: the old open invitation is revoked and its link dies, ONE new open invitation exists and its link works, it is mailed, and BOTH logs record it", async () => {
+    const lost = await schoolNobodyAdministers();
+    expect((await preview(lost.token)).status).toBe(200);
+    const fresh = `found-${Date.now().toString(36)}@example.test`;
+
+    const res = await reinvite(lost.id, { email: fresh.toUpperCase() });
+    expect(res.status, res.text).toBe(201);
+    expect(res.json.data.invitation).toMatchObject({ email: fresh });
+    expect(res.json.data.school).toMatchObject({ id: lost.id });
+
+    const open = await openAdminInvites(lost.id);
+    expect(open.map((i) => [i.email, i.campusId, i.invitedById])).toEqual([[fresh, null, second.id]]);
+    expect(await db.invitation.count({ where: { tenantId: lost.id, email: lost.email, revokedAt: { not: null } } })).toBe(1);
+
+    const [mail] = await waitForMail(fresh);
+    expect(mail.subject).toMatch(/invit/i);
+    expect((await preview(lost.token)).json.error.code).toBe("INVALID_TOKEN"); // the lost link is dead
+    expect((await preview(tokenIn(mail.text))).status).toBe(200); // the new one works
+
+    const platformLog = await db.platformAuditLog.findMany({ where: { targetTenantId: lost.id, action: "FIRST_ADMIN_REINVITED" } });
+    expect(platformLog).toHaveLength(1);
+    expect([platformLog[0].actorUserId, (platformLog[0].afterValue as { email: string }).email]).toEqual([second.id, fresh]);
+    const schoolLog = await db.auditLog.findMany({ where: { tenantId: lost.id, actorUserId: second.id }, orderBy: { createdAt: "asc" } });
+    expect(schoolLog.map((a) => a.action)).toEqual(expect.arrayContaining(["INVITATION_CREATED", "INVITATION_REVOKED"]));
+    expect(schoolLog.filter((a) => a.action === "INVITATION_CREATED")).toHaveLength(2); // the original and the new one
+  });
+
+  test("doing it twice leaves exactly one open invitation (the second replaces the first)", async () => {
+    const lost = await schoolNobodyAdministers();
+    expect((await reinvite(lost.id, { email: `one-${lost.email}` })).status).toBe(201);
+    expect((await reinvite(lost.id, { email: `two-${lost.email}` })).status).toBe(201);
+    expect((await openAdminInvites(lost.id)).map((i) => i.email)).toEqual([`two-${lost.email}`]);
+  });
+
+  test("a school that HAS an active administrator is refused with a clear answer and nothing is written; a deactivated administrator does not count", async () => {
+    const before = await db.invitation.count({ where: { tenantId: school.id } });
+    const auditBefore = await db.platformAuditLog.count({ where: { targetTenantId: school.id } });
+    const refused = await reinvite(school.id); // `school` has schoolAdmin, an active ADMIN
+    expect([refused.status, refused.json.error.code]).toEqual([409, "HAS_ADMINISTRATOR"]);
+    expect(await db.invitation.count({ where: { tenantId: school.id } })).toBe(before);
+    expect(await db.platformAuditLog.count({ where: { targetTenantId: school.id } })).toBe(auditBefore);
+    expect(await mailTo("x@example.test")).toHaveLength(0);
+
+    const lost = await schoolNobodyAdministers();
+    const boss = await createUser({ name: "Gone Boss" });
+    await addMembership(boss.id, lost.id, Role.ADMIN);
+    expect((await reinvite(lost.id)).status).toBe(409); // now it has one...
+    await db.tenantMembership.update({
+      where: { userId_tenantId: { userId: boss.id, tenantId: lost.id } },
+      data: { deactivatedAt: new Date() },
+    });
+    expect((await reinvite(lost.id)).status).toBe(201); // ...deactivated, so it has none again
+  });
+
+  test("a campus administrator or teacher is not an administrator for this purpose", async () => {
+    const lost = await schoolNobodyAdministers();
+    const campus = await db.campus.create({ data: { tenantId: lost.id, name: "Only" } });
+    await addMembership((await createUser({ name: "Campus Only" })).id, lost.id, Role.CAMPUS_ADMIN, campus.id);
+    expect((await reinvite(lost.id)).status).toBe(201);
+  });
+
+  test("an unknown school is 404, a bad address 400, a missing password 403; a school administrator cannot do it to their own school", async () => {
+    expect((await reinvite("no-such-school")).status).toBe(404);
+    const lost = await schoolNobodyAdministers();
+    expect((await reinvite(lost.id, { email: "not-an-address" })).status).toBe(400);
+    const noPassword = await api(
+      `${ROUTE}/${lost.id}/first-admin-invitation`,
+      as("second", { method: "POST", body: { email: "p@example.test" } }),
+    );
+    expect([noPassword.status, noPassword.json.error.code]).toEqual([403, "WRONG_PASSWORD"]);
+    expect((await reinvite(school.id, {}, "schoolAdmin")).status).toBe(403);
+    expect((await openAdminInvites(lost.id)).map((i) => i.email)).toEqual([lost.email]); // untouched
   });
 });
 

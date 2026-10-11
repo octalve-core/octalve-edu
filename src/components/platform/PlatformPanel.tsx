@@ -46,6 +46,7 @@ const ACTION_LABELS: Record<string, string> = {
   SCHOOL_REINSTATED: "School reinstated",
   SCHOOL_TYPE_CHANGED: "School type changed",
   PLATFORM_ADMIN_GRANTED: "Platform administrator added",
+  FIRST_ADMIN_REINVITED: "First administrator invited again",
 };
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const countsLine = (c: SchoolCounts) =>
@@ -70,6 +71,7 @@ export function PlatformPanel() {
   const [suspending, setSuspending] = useState<School | null>(null);
   const [reinstating, setReinstating] = useState<School | null>(null);
   const [typing, setTyping] = useState<School | null>(null);
+  const [inviting, setInviting] = useState<School | null>(null);
 
   const schools = (schoolsApi.reply?.data?.schools as School[] | undefined) ?? null;
   const entries = (auditApi.reply?.data?.entries as AuditEntry[] | undefined) ?? null;
@@ -138,7 +140,16 @@ export function PlatformPanel() {
                     )}
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {school.counts.administrators === 0 && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => setInviting(school)}
+                      aria-label={`Invite an administrator for ${school.name}`}
+                    >
+                      Invite administrator
+                    </Button>
+                  )}
                   <Button variant="secondary" onClick={() => setTyping(school)} aria-label={`Change the type of ${school.name}`}>
                     Change type
                   </Button>
@@ -208,6 +219,13 @@ export function PlatformPanel() {
         school={reinstating}
         onClose={() => setReinstating(null)}
         onDone={(school) => done(`${school.name} is open again.`, () => setReinstating(null))}
+      />
+      <InviteAdminDialog
+        school={inviting}
+        onClose={() => setInviting(null)}
+        onDone={(school, email) =>
+          done(`An invitation was sent to ${email}. ${school.name} gets an administrator when they accept it.`, () => setInviting(null))
+        }
       />
       <TypeDialog
         school={typing}
@@ -443,6 +461,75 @@ function ReinstateBody({ school, onClose, onDone }: { school: School; onClose: (
       />
       {change.formError && <Alert variant="error">{change.formError}</Alert>}
       <Actions pending={change.pending} label="Reinstate school" onClose={onClose} />
+    </form>
+  );
+}
+
+function InviteAdminDialog({
+  school,
+  onClose,
+  onDone,
+}: {
+  school: School | null;
+  onClose: () => void;
+  onDone: (school: School, email: string) => void;
+}) {
+  return (
+    <Dialog
+      open={school !== null}
+      onClose={onClose}
+      title={school ? `Invite an administrator for ${school.name}` : "Invite an administrator"}
+    >
+      {school && <InviteAdminBody key={school.id} school={school} onClose={onClose} onDone={onDone} />}
+    </Dialog>
+  );
+}
+function InviteAdminBody({
+  school,
+  onClose,
+  onDone,
+}: {
+  school: School;
+  onClose: () => void;
+  onDone: (school: School, email: string) => void;
+}) {
+  const [email, setEmail] = useState("");
+  const change = useChange(`/api/v1/platform/schools/${school.id}/first-admin-invitation`, "POST");
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const reply = await change.send({ email: email.trim() }, ["email"]);
+    if (reply) onDone(reply.data!.school as School, email.trim().toLowerCase());
+  }
+  return (
+    <form onSubmit={submit} noValidate className="space-y-4">
+      <p className="text-sm text-fg-2">
+        {school.name} has no administrator. The person who opens this invitation becomes its administrator, and any earlier invitation for
+        an administrator stops working. You do not get access to the school.
+      </p>
+      <TextField
+        label="Administrator's email"
+        type="email"
+        name="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        error={change.fieldErrors.email}
+        autoComplete="off"
+        inputMode="email"
+        maxLength={254}
+        hint="The invitation works for 7 days. This is kept in the platform's history."
+        disabled={change.pending}
+      />
+      <PasswordField
+        label="Your password"
+        name="password"
+        value={change.password}
+        onChange={(e) => change.setPassword(e.target.value)}
+        error={change.passwordError}
+        autoComplete="current-password"
+        disabled={change.pending}
+      />
+      {change.formError && <Alert variant="error">{change.formError}</Alert>}
+      <Actions pending={change.pending} label="Send invitation" onClose={onClose} />
     </form>
   );
 }

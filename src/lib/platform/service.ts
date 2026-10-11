@@ -49,13 +49,14 @@ const toSchool = (r: SchoolRow, stats: StatsRow | undefined): PlatformSchool => 
 });
 
 /// What the database function raised, by the stable names the migration gives its exceptions (and the unique-index backstop on the code).
-function dbReason(error: unknown): "NOT_PLATFORM_ADMIN" | "HAS_PERIODS" | "INVALID" | "CODE_TAKEN" | null {
+function dbReason(error: unknown): "NOT_PLATFORM_ADMIN" | "HAS_PERIODS" | "HAS_ADMINISTRATOR" | "INVALID" | "CODE_TAKEN" | null {
   const text = [
     error instanceof Error ? error.message : "",
     typeof error === "object" && error && "meta" in error ? JSON.stringify((error as { meta: unknown }).meta) : "",
   ].join(" ");
   if (text.includes("platform_admin_required")) return "NOT_PLATFORM_ADMIN";
   if (text.includes("platform_school_has_periods")) return "HAS_PERIODS";
+  if (text.includes("platform_school_has_admin")) return "HAS_ADMINISTRATOR";
   if (text.includes("platform_invalid_input") || text.includes("platform_reason_required")) return "INVALID";
   if (/Tenant_code_key|duplicate key|23505|Unique constraint/i.test(text)) return "CODE_TAKEN";
   return null;
@@ -121,6 +122,77 @@ export async function createSchool(
   } catch (error) {
     const reason = dbReason(error);
     if (reason === "NOT_PLATFORM_ADMIN" || reason === "INVALID" || reason === "CODE_TAKEN") return { ok: false, reason };
+    throw error;
+  }
+}
+
+export type ReinviteResult =
+  | { ok: true; school: PlatformSchool; invitation: { id: string; email: string; token: string }; revoked: number }
+  | { ok: false; reason: "NOT_FOUND" | "HAS_ADMINISTRATOR" | "NOT_PLATFORM_ADMIN" | "INVALID" };
+
+/// Sends a school's first administrator a NEW invitation (ISS-0015): for a school that has no active ADMIN - the database function checks that LIVE inside
+/// the school and refuses otherwise - and nothing else. In ONE transaction: the function (which writes the platform's audit row), then, in the school's
+/// context, every open ADMIN invitation is revoked and one new one is written, each with a row in the school's own audit log. Either all of it happens or
+/// none. The school's id is proof enough for `trustedTenantId`: the function has just answered that this very school exists (the same justification as
+/// `createSchool`). The platform administrator gains no access to the school: whoever opens the link becomes its administrator.
+export async function reinviteFirstAdministrator(actorUserId: string, tenantId: string, email: string): Promise<ReinviteResult> {
+  try {
+    const token = newInvitationToken();
+    const made = await forUser(actorUserId).transaction(async (tx) => {
+      const [{ platform_authorize_first_admin_invite: found }] = await tx.$queryRaw<{ platform_authorize_first_admin_invite: boolean }[]>`
+        SELECT platform_authorize_first_admin_invite(${tenantId}, ${email})`;
+      if (!found) return null;
+      await setTenantContext(tx, trustedTenantId(tenantId));
+      const now = new Date();
+      const open = await tx.invitation.findMany({
+        where: { tenantId, role: "ADMIN", acceptedAt: null, revokedAt: null },
+        select: { id: true, email: true },
+      });
+      for (const old of open) {
+        await tx.invitation.update({ where: { id: old.id }, data: { revokedAt: now } });
+        await tx.auditLog.create({
+          data: {
+            tenantId,
+            actorUserId,
+            action: "INVITATION_REVOKED",
+            targetType: "Invitation",
+            targetId: old.id,
+            afterValue: { email: old.email },
+            reason: "replaced by a new first-administrator invitation (platform)",
+          },
+        });
+      }
+      const invitation = await tx.invitation.create({
+        data: {
+          tenantId,
+          email,
+          role: "ADMIN",
+          campusId: null,
+          tokenHash: hashInvitationToken(token),
+          invitedById: actorUserId,
+          expiresAt: new Date(now.getTime() + INVITATION_TTL_MS),
+        },
+        select: { id: true },
+      });
+      await tx.auditLog.create({
+        data: {
+          tenantId,
+          actorUserId,
+          action: "INVITATION_CREATED",
+          targetType: "Invitation",
+          targetId: invitation.id,
+          afterValue: { email, role: "ADMIN", campusId: null, firstAdministrator: true, reinvited: true },
+        },
+      });
+      return { invitationId: invitation.id, revoked: open.length };
+    });
+    if (!made) return { ok: false, reason: "NOT_FOUND" };
+    const school = await schoolById(actorUserId, tenantId);
+    if (!school) return { ok: false, reason: "NOT_FOUND" };
+    return { ok: true, school, invitation: { id: made.invitationId, email, token }, revoked: made.revoked };
+  } catch (error) {
+    const reason = dbReason(error);
+    if (reason === "HAS_ADMINISTRATOR" || reason === "NOT_PLATFORM_ADMIN" || reason === "INVALID") return { ok: false, reason };
     throw error;
   }
 }

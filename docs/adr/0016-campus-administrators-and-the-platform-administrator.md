@@ -35,14 +35,14 @@ Until now a school had one kind of administrator (`ADMIN`) who could do everythi
 
 ## Enforced by
 
-`tests/unit/route-role-guard.spec.ts` (every handler declares who may call it; a campus-writing handler asks about the campus; the platform routes call the guard), `tests/api/campus-admin-{people,academics,finance,users}.spec.ts` and `tests/api/platform.spec.ts` (the matrix over real HTTP), `tests/integration/platform.spec.ts` (the CHECK, the `platform_*` functions, a platform administrator reads no tenant table), `tests/unit/administer.spec.ts`.
+`tests/unit/route-role-guard.spec.ts` (every handler declares who may call it; a campus-writing handler asks about the campus; the platform routes call the guard), `tests/api/campus-admin-{people,academics,finance,users}.spec.ts` and `tests/api/platform.spec.ts` (the matrix over real HTTP), `tests/integration/platform.spec.ts` (the CHECK, the `platform_*` functions, a platform administrator reads no tenant table), `tests/integration/platform-stats.spec.ts` (the counters), `tests/integration/platform-first-admin.spec.ts` and `tests/integration/invite-first-admin-script.spec.ts` (the re-invite), `tests/unit/administer.spec.ts`.
 
 ## Binds
 
 - `src/lib/auth/administer.ts`, `src/lib/auth/campus-scope.ts`
 - `src/lib/members/service.ts`, `src/lib/invitations/service.ts`, `src/lib/finance/service.ts`
-- `src/lib/platform/`, `src/app/api/v1/platform/`, `scripts/make-platform-admin.mjs`
-- `prisma/migrations/20261022090000_campus_admin_role/`, `prisma/migrations/20261022090100_campus_admin_and_platform/`
+- `src/lib/platform/`, `src/app/api/v1/platform/`, `scripts/make-platform-admin.mjs`, `scripts/invite-first-admin.mjs`
+- `prisma/migrations/20261022090000_campus_admin_role/`, `prisma/migrations/20261022090100_campus_admin_and_platform/`, `prisma/migrations/20261023090000_tenant_stats/`, `prisma/migrations/20261023090100_first_admin_invite/`
 
 ## Amendment (2026-10-11, same day, still Proposed): counters and the first-administrator re-invite
 
