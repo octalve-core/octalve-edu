@@ -352,7 +352,7 @@ test.describe("Phase 1.4: Results, Grading, Lifecycle & Verification API", () =>
     expect(parentOtherRes.json.error.code).toBe("FORBIDDEN");
   });
 
-  test("Public Verification: unauthenticated token check succeeds without leaking PII", async () => {
+  test("Public Verification: unauthenticated token check shows the student's name in full, never the admission number, and asks search engines to stay away (ISS-0008)", async () => {
     expect(verificationToken).toBeTruthy();
 
     // 1. Unauthenticated public query to /api/v1/verify/[token]
@@ -362,11 +362,32 @@ test.describe("Phase 1.4: Results, Grading, Lifecycle & Verification API", () =>
     const verified = verifyRes.json.data;
     expect(verified.verified).toBe(true);
     expect(verified.institution).toBe(a.name);
-    expect(verified.studentAdmissionNo).toBe("2026/0101");
-    // Name is masked as initials for public privacy
-    expect(verified.studentInitials).toBe("F. Bello");
+    // the maintainer's decision (2026-10-11): the name in full; the admission number (an internal identifier) is NOT public
+    expect(verified.studentName).toBe("Fatima Bello");
+    expect(verified).not.toHaveProperty("studentAdmissionNo");
+    expect(verified).not.toHaveProperty("studentInitials");
+    expect(verifyRes.text).not.toContain("2026/0101");
+    expect(verifyRes.headers.get("x-robots-tag")).toBe("noindex, nofollow");
+    expect(verifyRes.headers.get("cache-control")).toBe("no-store");
+
+    // a middle name is part of the full name
+    await db.studentRecord.update({ where: { id: student1.id }, data: { middleName: "Zainab" } });
+    const withMiddle = await api(`/api/v1/verify/${verificationToken}`, { ...SAAS });
+    expect(withMiddle.json.data.studentName).toBe("Fatima Zainab Bello");
+    await db.studentRecord.update({ where: { id: student1.id }, data: { middleName: null } });
+    // refusals carry the header too
+    const refused = await api(`/api/v1/verify/not-a-token`, { ...SAAS });
+    expect(refused.status).toBe(400);
+    expect(refused.headers.get("x-robots-tag")).toBe("noindex, nofollow");
     expect(verified.subject).toBe("Mathematics");
     expect(verified.verificationHash).toMatch(/^[0-9a-f]{64}$/);
+
+    // a result pulled back out of PUBLISHED/LOCKED stops verifying at once (the link is revoked by the lifecycle itself), and verifies again when republished
+    const row = await db.result.findFirstOrThrow({ where: { verificationToken }, select: { id: true, status: true } });
+    await db.result.update({ where: { id: row.id }, data: { status: "DRAFT" } });
+    expect((await api(`/api/v1/verify/${verificationToken}`, { ...SAAS })).status).toBe(404);
+    await db.result.update({ where: { id: row.id }, data: { status: row.status } });
+    expect((await api(`/api/v1/verify/${verificationToken}`, { ...SAAS })).status).toBe(200);
 
     // 2. Invalid or non-existent token returns 404
     const unknownRes = await api(`/api/v1/verify/00000000000000000000000000000000`, { ...SAAS });

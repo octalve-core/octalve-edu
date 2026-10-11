@@ -442,7 +442,8 @@ export async function getStudentReportCard(
 
 /**
  * Public lookup of a published credential token (referencing VerifyCertificateForm pattern).
- * Returns non-PII verification data.
+ * Returns what a verifier needs and no more: the school, the student's name IN FULL (the maintainer's decision, ISS-0008, 2026-10-11), the
+ * session, period, subject and grade. The admission number is an internal identifier and is NOT public.
  */
 export async function verifyPublicCredential(token: string) {
   if (!/^[0-9a-f]{32}$/.test(token)) {
@@ -473,7 +474,7 @@ export async function verifyPublicCredential(token: string) {
       where: { id: probe.id },
       include: {
         tenant: { select: { name: true, code: true } },
-        student: { select: { admissionNo: true, firstName: true, lastName: true } },
+        student: { select: { firstName: true, middleName: true, lastName: true } },
         subject: { select: { name: true, code: true } },
         period: { select: { label: true, session: { select: { label: true } } } },
       },
@@ -483,14 +484,12 @@ export async function verifyPublicCredential(token: string) {
       return null;
     }
 
-    // Mask student full name for public privacy protection: "Zainab Aliyu" -> "Z. Aliyu"
-    const maskedName = `${result.student.firstName.charAt(0)}. ${result.student.lastName}`;
+    const studentName = [result.student.firstName, result.student.middleName, result.student.lastName].filter(Boolean).join(" ");
 
     return {
       verified: true,
       institution: result.tenant.name,
-      studentAdmissionNo: result.student.admissionNo,
-      studentInitials: maskedName,
+      studentName,
       academicSession: result.period.session.label,
       academicPeriod: result.period.label,
       subject: result.subject.name,

@@ -5,8 +5,7 @@ import React, { useState } from "react";
 export interface VerificationResult {
   verified: boolean;
   institution: string;
-  studentAdmissionNo: string;
-  studentInitials: string;
+  studentName: string;
   academicSession: string;
   academicPeriod: string;
   subject: string;
@@ -117,12 +116,8 @@ export function VerifyCertificateForm() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <span className="block text-xs text-gray-400 uppercase">Student Initials</span>
-                <span className="font-semibold text-gray-800 dark:text-gray-200">{result.studentInitials}</span>
-              </div>
-              <div>
-                <span className="block text-xs text-gray-400 uppercase">Admission Number</span>
-                <span className="font-mono font-semibold text-gray-800 dark:text-gray-200">{result.studentAdmissionNo}</span>
+                <span className="block text-xs text-gray-400 uppercase">Student</span>
+                <span className="font-semibold text-gray-800 dark:text-gray-200">{result.studentName}</span>
               </div>
             </div>
 

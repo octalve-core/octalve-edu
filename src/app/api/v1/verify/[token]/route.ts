@@ -9,8 +9,11 @@ const IP_LIMIT = 60; // 60 attempts per 10 minutes per IP
 
 // GET /api/v1/verify/[token]
 // Unauthenticated public route for external validation of certificates and report cards.
+// The answer names a student, so it is never cached and never indexed (ISS-0008): every response, refusals included, says noindex.
 export async function GET(req: NextRequest, ctx: Ctx) {
-  return noStore(await handle(req, ctx));
+  const response = noStore(await handle(req, ctx));
+  response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  return response;
 }
 
 async function handle(req: NextRequest, ctx: Ctx) {

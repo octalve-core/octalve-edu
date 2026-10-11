@@ -38,7 +38,9 @@ Close what TASK-0009 left open: the platform page shows coarse counters and whic
 - Result: attendance-access 49, attendance 15ish, campus-admin-academics, route-role guard, e2e attendance (desktop + phone), phase-1 lifecycle walk - 81 + 11 passed after `pnpm build`; typecheck, lint clean. NOT run: the full suite (end of task).
 - Consequence for the maintainer: a teacher with NO assignment reads and writes no arm until an administrator gives them one; the "assigned" definition is a subject assignment OR a timetable slot of their staff record. A teaching member with no staff record has no arms.
 ### F4: public verification
-- [ ] test first; service, route header, form
+- [x] test first: the public-verification test in `tests/api/results.spec.ts` was rewritten (full name incl. a middle name, no `studentAdmissionNo`/`studentInitials`, the admission number nowhere in the body, `X-Robots-Tag: noindex, nofollow` on success AND refusals, `no-store`, and a result pulled back to DRAFT stops verifying until republished) and seen failing (`studentName` undefined) before the change
+- [x] `verifyPublicCredential` returns `studentName` (first, middle if any, last) and no admission number; the route sets the header on every response; `VerifyCertificateForm` follows (it is not mounted on any page today)
+- Result: results.spec 10 passed after `pnpm build`; lint, typecheck clean. API change: `studentAdmissionNo` and `studentInitials` are GONE from `GET /api/v1/verify/[token]`, `studentName` is new (nothing in this repo consumed the old fields except the unmounted form). A separate "revoke link" control was NOT built (a token already dies with the result's status).
 ### F5: Academic setup editing for a campus administrator (own PR)
 - [ ] e2e + axe both themes first; UI
 
