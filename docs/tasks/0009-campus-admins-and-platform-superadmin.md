@@ -1,10 +1,10 @@
 # [0009]: Campus administrators and the platform superadmin (build of design C1–C8)
 
 - **Period / Focus:** 2026-10-11 → (authorization model change; multi-tenant, RLS must not weaken)
-- **Status:** In Progress — slices A–D built and committed; the full suite is **(running)**; PR not opened yet
+- **Status:** Completed - landed in octalve-core `dev` (PR #7); follow-ups in TASK-0010
 - **Priority:** High
 - **Assignee:** Claude Agent / Maintainer
-- **Target Branch / PR:** `claude/campus-admins-platform-superadmin` → octalve-core `dev`
+- **Target Branch / PR:** `claude/campus-admins-platform-superadmin` → octalve-core `dev` / PR #7 (merged)
 - **Started:** 2026-10-11 UTC
 - **Ended:** —
 - **Duration:** —
