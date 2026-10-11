@@ -11,7 +11,9 @@ export const POST = withAuth(
     const role = auth.tenant.role;
     const permissions = auth.tenant.permissions ?? [];
 
-    const res = await auth.tenant.run((tx) => transitionResultStatuses(tx, auth.tenant.tenantId, auth.userId, role, permissions, body));
+    const res = await auth.tenant.run((tx) =>
+      transitionResultStatuses(tx, auth.tenant.tenantId, auth.userId, role, permissions, body, auth.tenant.campusId),
+    );
 
     if (!res.ok) {
       return resultFailure(res.failure, res.message);

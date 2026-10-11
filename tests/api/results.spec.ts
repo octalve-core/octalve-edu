@@ -373,3 +373,116 @@ test.describe("Phase 1.4: Results, Grading, Lifecycle & Verification API", () =>
     expect(unknownRes.status).toBe(404);
   });
 });
+
+// Result transitions: authorship, no self-approval, who may pull results back, campus (plan "Fix design - Phase 1 review findings", F5).
+test.describe("Phase 1 review F5: who may move a result", () => {
+  let subject: { id: string };
+  let other: TestUser;
+  const ids: Record<string, string[]> = {};
+
+  async function enter(who: string, subjectId: string, studentIds: string[]) {
+    const res = await api(
+      resultsRoute(),
+      as(who, {
+        method: "POST",
+        body: { periodId: periodA.id, subjectId, results: studentIds.map((studentId) => ({ studentId, score: 70 })) },
+      }),
+    );
+    expect(res.status, JSON.stringify(res.json)).toBe(200);
+    const list = await api(`${resultsRoute()}?periodId=${periodA.id}&subjectId=${subjectId}`, as(who));
+    return (list.json.data.results as Array<{ id: string }>).map((r) => r.id);
+  }
+  const move = (who: string, resultIds: string[], toStatus: string, reason?: string) =>
+    api(transitionRoute(), as(who, { method: "POST", body: { resultIds, toStatus, ...(reason ? { reason } : {}) } }));
+
+  test.beforeAll(async () => {
+    other = await createUser();
+    await addMembership(other.id, a.id, Role.TEACHING_STAFF);
+    cookie.other = await cookieFor(other);
+    subject = await db.subject.create({ data: { tenantId: a.id, name: "Physics F5", code: "PHF5" } });
+    ids.physics = await enter("teacher", subject.id, [student1.id]);
+  });
+
+  test("only the teacher who entered a result (or an administrator) can submit it", async () => {
+    const stranger = await move("other", ids.physics, "SUBMITTED");
+    expect(stranger.status).toBe(403);
+    expect((await db.result.findUniqueOrThrow({ where: { id: ids.physics[0] } })).status).toBe("DRAFT");
+
+    expect((await move("teacher", ids.physics, "SUBMITTED")).status).toBe(200);
+  });
+
+  test("a teacher without the approve permission cannot return a submitted or approved result", async () => {
+    expect((await move("other", ids.physics, "DRAFT", "not mine")).status).toBe(403);
+    expect((await move("approver", ids.physics, "APPROVED")).status).toBe(200);
+    expect((await move("teacher", ids.physics, "SUBMITTED", "pull back")).status).toBe(403);
+    expect((await move("other", ids.physics, "SUBMITTED", "pull back")).status).toBe(403);
+    expect((await db.result.findUniqueOrThrow({ where: { id: ids.physics[0] } })).status).toBe("APPROVED");
+    // the approver may (with a reason)
+    expect((await move("approver", ids.physics, "SUBMITTED", "re-check the marks")).status).toBe(200);
+  });
+
+  test("nobody approves results they entered themselves - except an administrator", async () => {
+    const chem = await db.subject.create({ data: { tenantId: a.id, name: "Chemistry F5", code: "CHF5" } });
+    const own = await enter("approver", chem.id, [student1.id, student2.id]);
+    expect((await move("approver", own, "SUBMITTED")).status).toBe(200);
+
+    const self = await move("approver", own, "APPROVED");
+    expect(self.status).toBe(403);
+    expect(self.json.error.message).toMatch(/entered/i);
+    expect((await db.result.findUniqueOrThrow({ where: { id: own[0] } })).status).toBe("SUBMITTED");
+
+    expect((await move("admin", own, "APPROVED")).status).toBe(200);
+  });
+
+  test("a result the caller cannot see (another campus) is not found, and a batch containing one moves nothing", async () => {
+    const campusA = await db.campus.create({ data: { tenantId: a.id, name: "F5 North" } });
+    const campusB = await db.campus.create({ data: { tenantId: a.id, name: "F5 South" } });
+    const northTeacher = await createUser();
+    await db.tenantMembership.create({
+      data: { userId: northTeacher.id, tenantId: a.id, role: Role.TEACHING_STAFF, campusId: campusA.id },
+    });
+    cookie.north = await cookieFor(northTeacher);
+    const southPupil = await db.studentRecord.create({
+      data: {
+        tenantId: a.id,
+        firstName: "Sule",
+        lastName: "South",
+        dateOfBirth: new Date("2011-02-02"),
+        admissionNo: `F5-${Date.now()}`,
+        campusId: campusB.id,
+      },
+    });
+    const northPupil = await db.studentRecord.create({
+      data: {
+        tenantId: a.id,
+        firstName: "Nana",
+        lastName: "North",
+        dateOfBirth: new Date("2011-02-03"),
+        admissionNo: `F5N-${Date.now()}`,
+        campusId: campusA.id,
+      },
+    });
+    const bio = await db.subject.create({ data: { tenantId: a.id, name: "Biology F5", code: "BIF5" } });
+    const created = await db.result.createMany({
+      data: [southPupil, northPupil].map((s) => ({
+        tenantId: a.id,
+        studentId: s.id,
+        subjectId: bio.id,
+        periodId: periodA.id,
+        score: 60,
+        enteredByStaffId: northTeacher.id,
+      })),
+    });
+    expect(created.count).toBe(2);
+    const rows = await db.result.findMany({ where: { tenantId: a.id, subjectId: bio.id } });
+    const south = rows.find((r) => r.studentId === southPupil.id)!;
+    const north = rows.find((r) => r.studentId === northPupil.id)!;
+
+    const foreign = await move("north", [south.id], "SUBMITTED");
+    expect(foreign.status).toBe(404);
+    const mixed = await move("north", [north.id, south.id], "SUBMITTED");
+    expect(mixed.status).toBe(404);
+    expect((await db.result.findUniqueOrThrow({ where: { id: north.id } })).status).toBe("DRAFT"); // nothing moved
+    expect((await move("north", [north.id], "SUBMITTED")).status).toBe(200);
+  });
+});

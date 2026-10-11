@@ -11,6 +11,8 @@ export type TransitionResult =
 export interface TransitionContext {
   isAdmin: boolean;
   hasApprovePermission: boolean;
+  /// True when the actor is the user who ENTERED this result (`enteredByStaffId`, which holds a user id). Defaults to false.
+  isAuthor?: boolean;
   reason?: string | null;
 }
 
@@ -18,11 +20,11 @@ export interface TransitionContext {
  * Validates whether a state transition is legal and whether the caller holds requisite permissions.
  *
  * Rules:
- * - DRAFT -> SUBMITTED: any teacher or admin can submit.
- * - SUBMITTED -> APPROVED: requires CAN_APPROVE_RESULTS or ADMIN.
- * - SUBMITTED -> DRAFT: rejection back to author; requires reason.
+ * - DRAFT -> SUBMITTED: only the teacher who entered the result, or an admin (plan F5).
+ * - SUBMITTED -> APPROVED: requires CAN_APPROVE_RESULTS or ADMIN, and the approver is not the author (an ADMIN may).
+ * - SUBMITTED -> DRAFT: rejection back to author; requires CAN_APPROVE_RESULTS or ADMIN, and a reason.
  * - APPROVED -> PUBLISHED: requires CAN_APPROVE_RESULTS or ADMIN.
- * - APPROVED -> SUBMITTED: pullback to review; requires reason.
+ * - APPROVED -> SUBMITTED: pullback to review; requires CAN_APPROVE_RESULTS or ADMIN, and a reason.
  * - PUBLISHED -> LOCKED: closing term results; requires ADMIN or CAN_APPROVE_RESULTS.
  * - LOCKED -> DRAFT: emergency correction; requires ADMIN and non-null reason.
  */
@@ -36,6 +38,9 @@ export function canTransitionResult(fromStatus: ResultStatus, toStatus: ResultSt
   switch (fromStatus) {
     case ResultStatus.DRAFT:
       if (toStatus === ResultStatus.SUBMITTED) {
+        if (!ctx.isAdmin && !ctx.isAuthor) {
+          return { allowed: false, error: "Only the teacher who entered a result can submit it", code: "UNAUTHORIZED" };
+        }
         return { allowed: true, reasonRequired: false };
       }
       return { allowed: false, error: "DRAFT results must be SUBMITTED first", code: "INVALID_TRANSITION" };
@@ -45,9 +50,15 @@ export function canTransitionResult(fromStatus: ResultStatus, toStatus: ResultSt
         if (!hasApprovalAuthority) {
           return { allowed: false, error: "Approving results requires CAN_APPROVE_RESULTS or ADMIN", code: "UNAUTHORIZED" };
         }
+        if (ctx.isAuthor && !ctx.isAdmin) {
+          return { allowed: false, error: "You cannot approve results that you entered yourself", code: "UNAUTHORIZED" };
+        }
         return { allowed: true, reasonRequired: false };
       }
       if (toStatus === ResultStatus.DRAFT) {
+        if (!hasApprovalAuthority) {
+          return { allowed: false, error: "Returning a submitted result requires CAN_APPROVE_RESULTS or ADMIN", code: "UNAUTHORIZED" };
+        }
         if (!ctx.reason || ctx.reason.trim().length === 0) {
           return { allowed: false, error: "Rejecting a result back to DRAFT requires a reason", code: "MISSING_REASON" };
         }
@@ -63,6 +74,9 @@ export function canTransitionResult(fromStatus: ResultStatus, toStatus: ResultSt
         return { allowed: true, reasonRequired: false };
       }
       if (toStatus === ResultStatus.SUBMITTED) {
+        if (!hasApprovalAuthority) {
+          return { allowed: false, error: "Reverting an approved result requires CAN_APPROVE_RESULTS or ADMIN", code: "UNAUTHORIZED" };
+        }
         if (!ctx.reason || ctx.reason.trim().length === 0) {
           return { allowed: false, error: "Reverting an APPROVED result requires a reason", code: "MISSING_REASON" };
         }

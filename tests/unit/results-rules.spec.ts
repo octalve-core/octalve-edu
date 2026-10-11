@@ -5,7 +5,7 @@ import { calculateCompetitionRanks, evaluatePromotion } from "@/lib/results/rank
 
 test.describe("Phase 1.4: Results Pure Rules & State Machine", () => {
   test("State Machine: normal lifecycle DRAFT -> SUBMITTED -> APPROVED -> PUBLISHED -> LOCKED", () => {
-    const teacherCtx = { isAdmin: false, hasApprovePermission: false };
+    const teacherCtx = { isAdmin: false, hasApprovePermission: false, isAuthor: true };
     const approverCtx = { isAdmin: false, hasApprovePermission: true };
     const adminCtx = { isAdmin: true, hasApprovePermission: false };
 
@@ -207,5 +207,42 @@ test.describe("Phase 1.4: Competition Ranking & Promotion", () => {
     const evalWeak = evaluatePromotion(weakPerformance, 50, 0.5);
     expect(evalWeak.outcome).toBe("REPEATED");
     expect(evalWeak.meetsAverageCriteria).toBe(false);
+  });
+});
+
+// Authorship and who may pull a result back (plan "Fix design - Phase 1 review findings", F5).
+test.describe("canTransitionResult - authorship and reverts", () => {
+  const author = { isAdmin: false, hasApprovePermission: false, isAuthor: true };
+  const stranger = { isAdmin: false, hasApprovePermission: false, isAuthor: false };
+  const approver = { isAdmin: false, hasApprovePermission: true, isAuthor: false };
+  const authorWhoApproves = { isAdmin: false, hasApprovePermission: true, isAuthor: true };
+  const admin = { isAdmin: true, hasApprovePermission: false, isAuthor: false };
+  const reason = "because";
+  const ok = (r: { allowed: boolean }) => r.allowed;
+
+  test("only the author or an admin submits a draft", () => {
+    expect(ok(canTransitionResult(ResultStatus.DRAFT, ResultStatus.SUBMITTED, author))).toBe(true);
+    expect(ok(canTransitionResult(ResultStatus.DRAFT, ResultStatus.SUBMITTED, admin))).toBe(true);
+    expect(ok(canTransitionResult(ResultStatus.DRAFT, ResultStatus.SUBMITTED, stranger))).toBe(false);
+    expect(ok(canTransitionResult(ResultStatus.DRAFT, ResultStatus.SUBMITTED, approver))).toBe(false); // the permission is not authorship
+  });
+
+  test("an approver never approves their own entries; an admin may", () => {
+    expect(ok(canTransitionResult(ResultStatus.SUBMITTED, ResultStatus.APPROVED, approver))).toBe(true);
+    expect(ok(canTransitionResult(ResultStatus.SUBMITTED, ResultStatus.APPROVED, authorWhoApproves))).toBe(false);
+    expect(ok(canTransitionResult(ResultStatus.SUBMITTED, ResultStatus.APPROVED, { ...admin, isAuthor: true }))).toBe(true);
+  });
+
+  test("returning a submitted result, and reverting an approved one, need approval authority AND a reason", () => {
+    for (const [from, to] of [
+      [ResultStatus.SUBMITTED, ResultStatus.DRAFT],
+      [ResultStatus.APPROVED, ResultStatus.SUBMITTED],
+    ] as const) {
+      expect(ok(canTransitionResult(from, to, { ...author, reason }))).toBe(false);
+      expect(ok(canTransitionResult(from, to, { ...stranger, reason }))).toBe(false);
+      expect(ok(canTransitionResult(from, to, { ...approver, reason }))).toBe(true);
+      expect(ok(canTransitionResult(from, to, { ...admin, reason }))).toBe(true);
+      expect(ok(canTransitionResult(from, to, approver))).toBe(false); // no reason
+    }
   });
 });

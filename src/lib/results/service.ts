@@ -153,14 +153,19 @@ export async function transitionResultStatuses(
   actorRole: string,
   permissions: readonly (Permission | string)[],
   input: TransitionStatusInput,
+  /// The campus the caller's membership is anchored to (null = whole school). A non-admin only sees results of students of their own campus
+  /// or of no campus; an ADMIN sees all. A result the caller cannot see is "not found", and a batch containing one moves nothing.
+  campusId: string | null = null,
 ): Promise<ServiceResult<{ updatedCount: number; toStatus: ResultStatus }>> {
   const isAdmin = actorRole === "ADMIN";
   const hasApprovePermission = permissions.includes("CAN_APPROVE_RESULTS") || isAdmin;
 
+  const requested = [...new Set(input.resultIds)];
   const results = await tx.result.findMany({
     where: {
       tenantId,
-      id: { in: input.resultIds },
+      id: { in: requested },
+      ...(isAdmin || campusId === null ? {} : { student: { OR: [{ campusId: null }, { campusId }] } }),
     },
     include: {
       student: true,
@@ -170,7 +175,8 @@ export async function transitionResultStatuses(
     },
   });
 
-  if (results.length === 0) {
+  // All or nothing: an id that does not exist, belongs to another school, or is out of the caller's campus makes the whole batch "not found".
+  if (results.length === 0 || results.length !== requested.length) {
     return { ok: false, failure: "NOT_FOUND", message: "No matching results found." };
   }
 
@@ -179,6 +185,7 @@ export async function transitionResultStatuses(
     const check = canTransitionResult(res.status, input.toStatus, {
       isAdmin,
       hasApprovePermission,
+      isAuthor: res.enteredByStaffId === actorUserId,
       reason: input.reason,
     });
 
