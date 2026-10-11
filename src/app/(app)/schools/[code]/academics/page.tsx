@@ -28,7 +28,8 @@ export default async function AcademicsPage({
   const { code } = await params;
   const { section: asked } = await searchParams;
   const { tenant } = await requireTenantPage(code);
-  if (tenant.role !== "ADMIN" && tenant.role !== "TEACHING_STAFF" && tenant.role !== "NON_TEACHING_STAFF") forbidden();
+  if (tenant.role !== "ADMIN" && tenant.role !== "CAMPUS_ADMIN" && tenant.role !== "TEACHING_STAFF" && tenant.role !== "NON_TEACHING_STAFF")
+    forbidden();
   const readOnly = tenant.role !== "ADMIN";
 
   const section = isSection(asked) ? asked : "timetable";

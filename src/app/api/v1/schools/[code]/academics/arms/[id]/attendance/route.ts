@@ -4,6 +4,7 @@ import { validate } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { isPlausibleId, notFound } from "@/lib/academics/http";
 import { READ_ROLES, WRITE_ROLES, isoDateField, bulkMarkAttendanceSchema, attendanceFailure } from "@/lib/attendance/http";
+import { armReadScope, armScope } from "@/lib/auth/campus-scope";
 import { getArmRollCall, markArmAttendance } from "@/lib/attendance/service";
 
 type Ctx = { params: Promise<{ code: string; id: string }> };
@@ -17,6 +18,12 @@ export const GET = withAuth(
   validate({ query: querySchema }, async (_req, auth: TenantAuthContext, ctx: Ctx, { query }) => {
     const { id } = await ctx.params;
     if (!isPlausibleId(id)) return notFound("arm");
+
+    // A campus administrator reads the roll of their own campus's arms and the school-wide ones; another campus's arm is the usual 404.
+    if (auth.tenant.role === "CAMPUS_ADMIN") {
+      const outOfScope = await armReadScope(auth, id);
+      if (outOfScope) return outOfScope;
+    }
 
     const dateStr = query.date ?? new Date().toISOString().split("T")[0];
     const role = auth.tenant.role;
@@ -38,6 +45,13 @@ export const POST = withAuth(
   validate({ body: bulkMarkAttendanceSchema }, async (_req, auth: TenantAuthContext, ctx: Ctx, { body: input }) => {
     const { id } = await ctx.params;
     if (!isPlausibleId(id)) return notFound("arm");
+
+    // A campus administrator takes the roll only of their own campus's arms (404 for another campus, 403 for a school-wide arm). Teachers keep
+    // the behaviour they had; reads follow row-level security, which already hides another campus's arm.
+    if (auth.tenant.role === "CAMPUS_ADMIN") {
+      const outOfScope = await armScope(auth, id);
+      if (outOfScope) return outOfScope;
+    }
 
     const role = auth.tenant.role;
 

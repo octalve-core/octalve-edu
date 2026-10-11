@@ -2,7 +2,8 @@ import { z } from "zod";
 import { ok } from "@/lib/api/envelope";
 import { validate } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { WRITE_ROLES, academicFailure, isPlausibleId, isoDateField, nameField, notFound, writeLimited } from "@/lib/academics/http";
+import { CAMPUS_WRITE_ROLES, academicFailure, isPlausibleId, isoDateField, nameField, notFound, writeLimited } from "@/lib/academics/http";
+import { periodScope } from "@/lib/auth/campus-scope";
 import { updatePeriod } from "@/lib/academics/sessions";
 
 // PATCH /api/v1/schools/[code]/academics/periods/[id]  { label?, startDate?, endDate?, ordinal? } — ADMIN only; the kind never changes.
@@ -22,8 +23,10 @@ export const PATCH = withAuth(
     if (!isPlausibleId(id)) return notFound("term");
     const limited = await writeLimited(auth);
     if (limited) return limited;
+    const outOfScope = await periodScope(auth, id);
+    if (outOfScope) return outOfScope;
     const result = await updatePeriod(auth.tenant, auth.userId, id, input);
     return result.ok ? ok({ period: result.period, changed: result.changed }) : academicFailure(result.reason, result.detail, "term");
   }),
-  { tenant: true, roles: WRITE_ROLES },
+  { tenant: true, roles: CAMPUS_WRITE_ROLES },
 );

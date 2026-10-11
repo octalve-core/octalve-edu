@@ -38,7 +38,7 @@ export function daysAgo(dateStr: string, now = new Date()): number {
  */
 export function canEditAttendance(dateStr: string, userRole: string, now = new Date(), maxTeacherDays = MAX_TEACHER_EDIT_DAYS): boolean {
   if (isFutureDate(dateStr, now)) return false;
-  if (userRole === "ADMIN") return true;
+  if (userRole === "ADMIN" || userRole === "CAMPUS_ADMIN") return true; // an administrator may correct any past date
   if (userRole === "TEACHING_STAFF") {
     return daysAgo(dateStr, now) <= maxTeacherDays;
   }

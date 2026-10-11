@@ -50,7 +50,11 @@ export async function listAnnouncements(
       whereClause.classArmId = query.classArmId;
     }
 
-    if (viewer.role !== Role.ADMIN) {
+    if (viewer.role === Role.CAMPUS_ADMIN && viewer.campusId) {
+      // their own campus's announcements in any state, plus what any member would see
+      whereClause.OR = [{ status: AnnouncementStatus.PUBLISHED }, { authorUserId: viewer.userId }, { campusId: viewer.campusId }];
+      if (query.status) whereClause.status = query.status;
+    } else if (viewer.role !== Role.ADMIN) {
       whereClause.OR = [{ status: AnnouncementStatus.PUBLISHED }, { authorUserId: viewer.userId }];
     } else if (query.status) {
       whereClause.status = query.status;
@@ -296,7 +300,7 @@ export async function createAnnouncement(
 export async function updateAnnouncement(
   tenantId: string,
   id: string,
-  editor: { userId: string; role: Role },
+  editor: { userId: string; role: Role; campusId?: string | null },
   input: UpdateAnnouncementInput,
 ): Promise<AnnouncementServiceResult<AnnouncementDto>> {
   const tId = trustedTenantId(tenantId);
@@ -311,7 +315,11 @@ export async function updateAnnouncement(
     }
 
     if (!canManageAnnouncement(existing, editor)) {
-      return { ok: false, failure: "UNAUTHORIZED", detail: "Only the author or an admin can edit this announcement." };
+      return {
+        ok: false,
+        failure: "UNAUTHORIZED",
+        detail: "Only the author or an administrator of its campus can edit this announcement.",
+      };
     }
 
     // Verify foreign keys if updating
@@ -384,7 +392,7 @@ export async function updateAnnouncement(
 export async function deleteAnnouncement(
   tenantId: string,
   id: string,
-  editor: { userId: string; role: Role },
+  editor: { userId: string; role: Role; campusId?: string | null },
 ): Promise<AnnouncementServiceResult<{ id: string; deleted: true }>> {
   const tId = trustedTenantId(tenantId);
 
@@ -398,7 +406,11 @@ export async function deleteAnnouncement(
     }
 
     if (!canManageAnnouncement(existing, editor)) {
-      return { ok: false, failure: "UNAUTHORIZED", detail: "Only the author or an admin can delete this announcement." };
+      return {
+        ok: false,
+        failure: "UNAUTHORIZED",
+        detail: "Only the author or an administrator of its campus can delete this announcement.",
+      };
     }
 
     await tx.announcement.delete({

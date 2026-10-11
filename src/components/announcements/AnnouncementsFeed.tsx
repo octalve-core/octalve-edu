@@ -10,11 +10,18 @@ export interface AnnouncementsFeedProps {
   schoolCode: string;
   userRole: Role;
   userId: string;
+  /// The member's own campus (a campus administrator manages what belongs to it).
+  campusId?: string | null;
   campuses: { id: string; name: string }[];
 }
 
-export function AnnouncementsFeed({ schoolCode, userRole, userId, campuses }: AnnouncementsFeedProps) {
-  const canAuthor = userRole === Role.ADMIN || userRole === Role.TEACHING_STAFF;
+export function AnnouncementsFeed({ schoolCode, userRole, userId, campusId = null, campuses }: AnnouncementsFeedProps) {
+  const canAuthor = userRole === Role.ADMIN || userRole === Role.CAMPUS_ADMIN || userRole === Role.TEACHING_STAFF;
+  // Display only; the API enforces it (a campus administrator manages their own campus's announcements, whoever wrote them).
+  const mayManage = (item: AnnouncementDto) =>
+    userRole === Role.ADMIN ||
+    item.authorUserId === userId ||
+    (userRole === Role.CAMPUS_ADMIN && campusId !== null && item.campusId === campusId);
 
   const { reply, loading, error, reload } = useApi(`/api/v1/schools/${schoolCode}/announcements`);
   const { reply: classesReply } = useApi(canAuthor ? `/api/v1/schools/${schoolCode}/academics/classes` : null);
@@ -38,7 +45,7 @@ export function AnnouncementsFeed({ schoolCode, userRole, userId, campuses }: An
   }, [classesReply]);
 
   const handleEdit = (item: AnnouncementDto) => {
-    const canEdit = userRole === Role.ADMIN || item.authorUserId === userId;
+    const canEdit = mayManage(item);
     if (!canEdit) return;
     setEditingAnnouncement(item);
     setComposerOpen(true);
@@ -81,7 +88,7 @@ export function AnnouncementsFeed({ schoolCode, userRole, userId, campuses }: An
       ) : (
         <div className="mt-4 space-y-3">
           {announcements.map((item) => {
-            const canManage = userRole === Role.ADMIN || item.authorUserId === userId;
+            const canManage = mayManage(item);
             const isDraft = item.status === "DRAFT";
 
             return (
@@ -170,6 +177,7 @@ export function AnnouncementsFeed({ schoolCode, userRole, userId, campuses }: An
           onSaved={() => reload()}
           initialAnnouncement={editingAnnouncement}
           campuses={campuses}
+          campusRequired={userRole === Role.CAMPUS_ADMIN}
           classArms={classArms}
         />
       )}

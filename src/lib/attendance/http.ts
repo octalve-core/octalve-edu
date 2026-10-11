@@ -3,8 +3,9 @@ import { fail } from "@/lib/api/envelope";
 import { isIsoDate } from "@/lib/academics/rules";
 import { AttendanceStatus, AttendanceSource } from "./rules";
 
-export const READ_ROLES = ["ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF"] as const;
-export const WRITE_ROLES = ["ADMIN", "TEACHING_STAFF"] as const;
+export const READ_ROLES = ["ADMIN", "CAMPUS_ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF"] as const;
+/// A CAMPUS_ADMIN takes the roll only of an arm of THEIR campus: the arm route asks lib/auth/campus-scope before it writes (the route-role guard test checks).
+export const WRITE_ROLES = ["ADMIN", "CAMPUS_ADMIN", "TEACHING_STAFF"] as const;
 
 export const isoDateField = z.string({ error: "Give a date as YYYY-MM-DD." }).refine(isIsoDate, "Use a real date, written YYYY-MM-DD.");
 

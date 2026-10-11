@@ -2,7 +2,8 @@ import { z } from "zod";
 import { ok } from "@/lib/api/envelope";
 import { validate } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { READ_ROLES, WRITE_ROLES, academicFailure, idField, isPlausibleId, notFound, writeLimited } from "@/lib/academics/http";
+import { READ_ROLES, CAMPUS_WRITE_ROLES, academicFailure, idField, isPlausibleId, notFound, writeLimited } from "@/lib/academics/http";
+import { classGroupScope } from "@/lib/auth/campus-scope";
 import { listOfferings, setOfferings } from "@/lib/academics/classes";
 
 // GET /api/v1/schools/[code]/academics/class-groups/[id]/subjects  — the subjects this class studies.
@@ -27,8 +28,10 @@ export const PUT = withAuth(
     if (!isPlausibleId(id)) return notFound("class");
     const limited = await writeLimited(auth);
     if (limited) return limited;
+    const outOfScope = await classGroupScope(auth, id);
+    if (outOfScope) return outOfScope;
     const result = await setOfferings(auth.tenant, auth.userId, id, input.subjectIds);
     return result.ok ? ok({ subjects: result.subjects, changed: result.changed }) : academicFailure(result.reason, result.detail, "class");
   }),
-  { tenant: true, roles: WRITE_ROLES },
+  { tenant: true, roles: CAMPUS_WRITE_ROLES },
 );

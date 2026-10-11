@@ -93,6 +93,20 @@ export const armScope = (auth: Auth, id: string) =>
       (await tx.classArm.findFirst({ where: { id }, select: { classGroup: { select: { campusId: true } } } }))?.classGroup.campusId,
   );
 
+/// Reading a student's record-adjacent data (an attendance history): their campus's students and the school-wide ones; another campus's is the usual 404.
+export const studentReadScope = (auth: Auth, id: string) =>
+  lookup(auth, "student", async (tx) => {
+    const row = await tx.studentRecord.findFirst({ where: { id }, select: { campusId: true } });
+    return row ? (row.campusId ?? auth.tenant.campusId) : undefined;
+  });
+
+/// Reading an arm (a roll call): the campus administrator's own and the school-wide ones; another campus's, or an unknown id, is the usual 404.
+export const armReadScope = (auth: Auth, id: string) =>
+  lookup(auth, "class arm", async (tx) => {
+    const row = await tx.classArm.findFirst({ where: { id }, select: { classGroup: { select: { campusId: true } } } });
+    return row ? (row.classGroup.campusId ?? auth.tenant.campusId) : undefined;
+  });
+
 export const announcementScope = (auth: Auth, id: string) =>
   lookup(auth, "announcement", async (tx) => (await tx.announcement.findFirst({ where: { id }, select: { campusId: true } }))?.campusId);
 
@@ -111,3 +125,34 @@ export const invoiceScope = (auth: Auth, id: string) =>
     "invoice",
     async (tx) => (await tx.invoice.findFirst({ where: { id }, select: { student: { select: { campusId: true } } } }))?.student.campusId,
   );
+
+/// The audience a CAMPUS_ADMIN may put on an announcement: their own campus (the default on create; naming any other, or the whole school, is a 403)
+/// and, if a class arm is named, an arm of that campus. Other roles pass through unchanged — teachers keep the audience rules they had, and an ADMIN
+/// is school-wide. On `update` an omitted campus stays as it is.
+export async function announcementAudience(
+  auth: Auth,
+  input: { campusId?: string | null; classArmId?: string | null },
+  mode: "create" | "update",
+): Promise<{ campusId: string | null | undefined } | Response> {
+  if (auth.tenant.role !== "CAMPUS_ADMIN") return { campusId: input.campusId };
+  let campusId: string | null | undefined;
+  if (mode === "create" || input.campusId !== undefined) {
+    const campus = createCampus(auth, input.campusId);
+    if (campus instanceof Response) return campus;
+    campusId = campus.campusId;
+  }
+  if (input.classArmId) {
+    const refused = await armScope(auth, input.classArmId);
+    if (refused) return refused;
+  }
+  return { campusId };
+}
+
+/// Every class arm in `ids` (duplicates and null/undefined are ignored) must be the campus administrator's; the first refusal is returned.
+export async function armsScope(auth: Auth, ids: readonly (string | null | undefined)[]): Promise<Response | null> {
+  for (const id of new Set(ids.filter((x): x is string => Boolean(x)))) {
+    const refused = await armScope(auth, id);
+    if (refused) return refused;
+  }
+  return null;
+}

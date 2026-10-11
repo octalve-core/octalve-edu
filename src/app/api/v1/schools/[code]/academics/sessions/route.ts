@@ -3,7 +3,8 @@ import { fail, ok } from "@/lib/api/envelope";
 import { offsetMeta, parseOffsetPagination } from "@/lib/api/pagination";
 import { validate } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { READ_ROLES, WRITE_ROLES, academicFailure, idField, isoDateField, nameField, writeLimited } from "@/lib/academics/http";
+import { READ_ROLES, CAMPUS_WRITE_ROLES, academicFailure, idField, isoDateField, nameField, writeLimited } from "@/lib/academics/http";
+import { createCampus } from "@/lib/auth/campus-scope";
 import { createSession, listSessions } from "@/lib/academics/sessions";
 
 // GET  /api/v1/schools/[code]/academics/sessions   — the school's academic sessions, newest first (plan "Build design — Phase 1.0 and 1.1", decisions 7, 9, 17).
@@ -41,8 +42,10 @@ export const POST = withAuth(
   validate({ body: createBody }, async (_req, auth: TenantAuthContext, _ctx: unknown, { body }) => {
     const limited = await writeLimited(auth);
     if (limited) return limited;
-    const result = await createSession(auth.tenant, auth.userId, body);
+    const campus = createCampus(auth, body.campusId);
+    if (campus instanceof Response) return campus;
+    const result = await createSession(auth.tenant, auth.userId, { ...body, campusId: campus.campusId });
     return result.ok ? ok({ session: result.session }, {}, 201) : academicFailure(result.reason, result.detail);
   }),
-  { tenant: true, roles: WRITE_ROLES },
+  { tenant: true, roles: CAMPUS_WRITE_ROLES },
 );
