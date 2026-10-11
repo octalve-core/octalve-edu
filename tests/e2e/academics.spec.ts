@@ -48,25 +48,32 @@ async function signedInAdmin(page: Page, section: string, name = "Amina Yusuf") 
 }
 
 test.describe("the page", () => {
-  test("an administrator gets the four sections as links; the address chooses one; an unknown one falls back to sessions", async ({
+  test("an administrator gets the six sections as links; the address chooses one; an unknown one falls back to the timetable", async ({
     page,
   }) => {
     await signedInAdmin(page, "sessions");
     await expect(page).toHaveTitle(/Academic setup/);
     const sections = page.getByRole("navigation", { name: "Academic setup sections" });
-    await expect(sections.getByRole("link")).toHaveText(["Attendance", "Sessions & terms", "Classes & subjects", "Assessment", "Grading"]);
+    await expect(sections.getByRole("link")).toHaveText([
+      "Timetable",
+      "Attendance",
+      "Sessions & terms",
+      "Classes & subjects",
+      "Assessment",
+      "Grading",
+    ]);
     await expect(sections.getByRole("link", { name: "Sessions & terms" })).toHaveAttribute("aria-current", "page");
     await sections.getByRole("link", { name: "Grading" }).click();
     await expect(page).toHaveURL(/section=grading/);
     await expect(page.getByRole("heading", { level: 2, name: "Grade scales" })).toBeVisible();
     await page.goto(`/schools/${school.code}/academics?section=nonsense`);
-    await expect(page.getByRole("heading", { level: 2, name: "Sessions" })).toBeVisible();
+    // the default section is the timetable (1.6), so an unknown one lands there
     await expect(
-      page.getByRole("navigation", { name: "Academic setup sections" }).getByRole("link", { name: "Sessions & terms" }),
+      page.getByRole("navigation", { name: "Academic setup sections" }).getByRole("link", { name: "Timetable" }),
     ).toHaveAttribute("aria-current", "page");
   });
 
-  test("staff may LOOK: the same four sections with nothing that writes (no New session, New class, Edit, Archive…); students and parents get the same 403 view as a stranger", async ({
+  test("staff may LOOK: the same sections with nothing that writes (no New session, New class, Edit, Archive…); students and parents get the same 403 view as a stranger", async ({
     page,
     browser,
   }) => {
@@ -86,7 +93,7 @@ test.describe("the page", () => {
     await db.subject.create({ data: { tenantId: school.id, name: "Mathematics" } });
     await signInThroughUi(page, teacher);
 
-    const response = await page.goto(`/schools/${school.code}/academics`);
+    const response = await page.goto(`/schools/${school.code}/academics?section=sessions`);
     expect(response?.status()).toBe(200);
     await expect(page.getByRole("heading", { level: 1, name: "Academic setup" })).toBeVisible();
     await expect(page.getByText("Only an administrator can change this.")).toBeVisible();

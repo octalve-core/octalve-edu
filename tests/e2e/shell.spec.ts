@@ -36,18 +36,15 @@ async function signedInAs(page: Page, role: Role, opts: { name?: string; also?: 
 test.describe("on a desktop: the sidebar and the top bar", () => {
   test.beforeEach(({ isMobile }) => test.skip(isMobile, "the sidebar exists from the `lg` breakpoint up"));
 
-  test("an ADMIN: the school's name, Overview (current), Users as a link, and Settings as visible 'coming soon' text — never a dead link", async ({
-    page,
-  }) => {
+  test("an ADMIN: the school's name, Overview (current), Users and Settings as links (Settings is built since 1.7)", async ({ page }) => {
     await signedInAs(page, Role.ADMIN);
     await expect(page).toHaveURL(new RegExp(`/schools/${a.code}$`));
     const nav = mainNav(page);
     await expect(nav.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
     await expect(nav.getByRole("link", { name: "Users" })).toHaveAttribute("href", `/schools/${a.code}/users`);
     await expect(nav.getByRole("link", { name: "Users" })).not.toHaveAttribute("aria-current", "page");
-    await expect(nav.getByRole("link", { name: "Settings" })).toHaveCount(0); // not built: text, not a link
-    await expect(nav.getByText("Settings")).toBeVisible();
-    await expect(nav.getByText(", coming soon").first()).toBeAttached(); // said in words too, not only a pill
+    await expect(nav.getByRole("link", { name: "Settings" })).toHaveAttribute("href", `/schools/${a.code}/settings`); // built in 1.7: a real link
+    await expect(nav.getByText(", coming soon")).toHaveCount(0); // nothing in the list is "coming soon" any more
     await expect(page.getByText("Alpha School").first()).toBeVisible(); // the school, under the brand
     await expect(breadcrumb(page)).toContainText("Alpha School");
     await expect(breadcrumb(page).getByText("Overview")).toHaveAttribute("aria-current", "page");
@@ -205,7 +202,7 @@ test.describe("on a phone: the tab bar and the More sheet", () => {
     expect(card && bar && card.y + card.height <= bar.y).toBe(true); // the bar never covers the last thing on the page
   });
 
-  test("More: who you are and where, Settings as 'coming soon' (administrator), Profile, Sign out; Escape closes it and returns focus — Users is a TAB", async ({
+  test("More: who you are and where, Profile, Sign out; Escape closes it and returns focus — Users and Settings are TABS", async ({
     page,
   }) => {
     await signedInAs(page, Role.ADMIN, { name: "Tunde Bello" });
@@ -217,8 +214,8 @@ test.describe("on a phone: the tab bar and the More sheet", () => {
     await expect(sheet.getByText("Administrator · Alpha School")).toBeVisible();
     await expect(mainNav(page).getByRole("link", { name: "Users" })).toBeVisible(); // a page now: it earns a tab on the phone
     await expect(sheet.getByText("Users")).toHaveCount(0);
-    await expect(sheet.getByText("Settings")).toBeVisible();
-    await expect(sheet.getByRole("link", { name: "Settings" })).toHaveCount(0);
+    await expect(mainNav(page).getByRole("link", { name: "Settings" })).toBeVisible(); // built in 1.7: a tab too, so not repeated in the sheet
+    await expect(sheet.getByText("Settings")).toHaveCount(0);
     await expect(sheet.getByRole("link", { name: "Profile" })).toBeVisible();
     await expect(sheet.getByRole("button", { name: "Sign out" })).toBeVisible();
     await page.keyboard.press("Escape");
