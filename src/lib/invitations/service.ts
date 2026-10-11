@@ -60,7 +60,7 @@ const toPublic = (row: InvitationRow, now: Date = new Date()): PublicInvitation 
 
 export type CreateInvitationResult =
   | { ok: true; invitation: PublicInvitation; token: string }
-  | { ok: false; reason: "ALREADY_MEMBER" | "DEACTIVATED_MEMBER" | "INVALID_CAMPUS" };
+  | { ok: false; reason: "ALREADY_MEMBER" | "DEACTIVATED_MEMBER" | "INVALID_CAMPUS" | "INVALID_STAFF_RECORD" };
 
 /// Invites `input.email` to the school. One live invitation per (school, address): an earlier open one is revoked (and audited)
 /// first, and a partial unique index is the guarantee under concurrency — an advisory lock on the pair serialises two administrators
@@ -70,7 +70,7 @@ export type CreateInvitationResult =
 export async function createInvitation(
   tenant: TenantCtx,
   actorUserId: string,
-  input: { email: string; role: Role; campusId: string | null },
+  input: { email: string; role: Role; campusId: string | null; staffRecordId?: string | null },
 ): Promise<CreateInvitationResult> {
   const { tenantId } = tenant;
   return tenant.run(async (tx) => {
@@ -83,15 +83,38 @@ export async function createInvitation(
       if (!campus) return { ok: false, reason: "INVALID_CAMPUS" };
     }
 
-    const member = await tx.tenantMembership.findFirst({ where: { tenantId, user: { email: input.email } }, select: { deactivatedAt: true } });
+    // An invitation made FOR a staff record (plan 1.2, decision P5) names a live record of this school that has no account yet; acceptance links them.
+    if (input.staffRecordId) {
+      const record = await tx.staffRecord.findFirst({
+        where: { id: input.staffRecordId, tenantId, archivedAt: null, userId: null },
+        select: { id: true },
+      });
+      if (!record) return { ok: false, reason: "INVALID_STAFF_RECORD" };
+    }
+
+    const member = await tx.tenantMembership.findFirst({
+      where: { tenantId, user: { email: input.email } },
+      select: { deactivatedAt: true },
+    });
     if (member) return { ok: false, reason: member.deactivatedAt ? "DEACTIVATED_MEMBER" : "ALREADY_MEMBER" };
 
     const now = new Date();
-    const earlier = await tx.invitation.findMany({ where: { tenantId, email: input.email, acceptedAt: null, revokedAt: null }, select: { id: true } });
+    const earlier = await tx.invitation.findMany({
+      where: { tenantId, email: input.email, acceptedAt: null, revokedAt: null },
+      select: { id: true },
+    });
     for (const old of earlier) {
       await tx.invitation.update({ where: { id: old.id }, data: { revokedAt: now } });
       await tx.auditLog.create({
-        data: { tenantId, actorUserId, action: "INVITATION_REVOKED", targetType: "Invitation", targetId: old.id, afterValue: { email: input.email }, reason: "replaced by a new invitation" },
+        data: {
+          tenantId,
+          actorUserId,
+          action: "INVITATION_REVOKED",
+          targetType: "Invitation",
+          targetId: old.id,
+          afterValue: { email: input.email },
+          reason: "replaced by a new invitation",
+        },
       });
     }
 
@@ -102,6 +125,7 @@ export async function createInvitation(
         email: input.email,
         role: input.role,
         campusId: input.campusId,
+        staffRecordId: input.staffRecordId ?? null,
         tokenHash: hashInvitationToken(token),
         invitedById: actorUserId,
         expiresAt: new Date(now.getTime() + INVITATION_TTL_MS),
@@ -109,7 +133,19 @@ export async function createInvitation(
       select: PUBLIC_SELECT,
     });
     await tx.auditLog.create({
-      data: { tenantId, actorUserId, action: "INVITATION_CREATED", targetType: "Invitation", targetId: created.id, afterValue: { email: input.email, role: input.role, campusId: input.campusId } },
+      data: {
+        tenantId,
+        actorUserId,
+        action: "INVITATION_CREATED",
+        targetType: "Invitation",
+        targetId: created.id,
+        afterValue: {
+          email: input.email,
+          role: input.role,
+          campusId: input.campusId,
+          ...(input.staffRecordId ? { staffRecordId: input.staffRecordId } : {}),
+        },
+      },
     });
     return { ok: true, invitation: toPublic(created, now), token };
   });
@@ -117,10 +153,17 @@ export async function createInvitation(
 
 /// A fresh link and a fresh seven days for an invitation that is still open (pending OR expired); the earlier link stops working
 /// at once. `null` when there is no such open invitation in this school (accepted, revoked, someone else's, unknown: one answer).
-export async function resendInvitation(tenant: TenantCtx, actorUserId: string, invitationId: string): Promise<{ invitation: PublicInvitation; token: string } | null> {
+export async function resendInvitation(
+  tenant: TenantCtx,
+  actorUserId: string,
+  invitationId: string,
+): Promise<{ invitation: PublicInvitation; token: string } | null> {
   const { tenantId } = tenant;
   return tenant.run(async (tx) => {
-    const open = await tx.invitation.findFirst({ where: { id: invitationId, tenantId, acceptedAt: null, revokedAt: null }, select: { id: true, email: true } });
+    const open = await tx.invitation.findFirst({
+      where: { id: invitationId, tenantId, acceptedAt: null, revokedAt: null },
+      select: { id: true, email: true },
+    });
     if (!open) return null;
     const now = new Date();
     const token = newInvitationToken();
@@ -129,7 +172,16 @@ export async function resendInvitation(tenant: TenantCtx, actorUserId: string, i
       data: { tokenHash: hashInvitationToken(token), expiresAt: new Date(now.getTime() + INVITATION_TTL_MS) },
       select: PUBLIC_SELECT,
     });
-    await tx.auditLog.create({ data: { tenantId, actorUserId, action: "INVITATION_RESENT", targetType: "Invitation", targetId: open.id, afterValue: { email: open.email } } });
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        actorUserId,
+        action: "INVITATION_RESENT",
+        targetType: "Invitation",
+        targetId: open.id,
+        afterValue: { email: open.email },
+      },
+    });
     return { invitation: toPublic(updated, now), token };
   });
 }
@@ -139,21 +191,42 @@ export async function revokeInvitation(tenant: TenantCtx, actorUserId: string, i
   const { tenantId } = tenant;
   return tenant.run(async (tx) => {
     const target = await tx.invitation.findFirst({ where: { id: invitationId, tenantId }, select: { email: true } });
-    const claimed = await tx.invitation.updateMany({ where: { id: invitationId, tenantId, acceptedAt: null, revokedAt: null }, data: { revokedAt: new Date() } });
+    const claimed = await tx.invitation.updateMany({
+      where: { id: invitationId, tenantId, acceptedAt: null, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
     if (claimed.count !== 1) return false;
-    await tx.auditLog.create({ data: { tenantId, actorUserId, action: "INVITATION_REVOKED", targetType: "Invitation", targetId: invitationId, afterValue: { email: target?.email ?? null } } });
+    await tx.auditLog.create({
+      data: {
+        tenantId,
+        actorUserId,
+        action: "INVITATION_REVOKED",
+        targetType: "Invitation",
+        targetId: invitationId,
+        afterValue: { email: target?.email ?? null },
+      },
+    });
     return true;
   });
 }
 
 /// The school's open invitations (pending, and expired ones that can still be resent), newest first.
-export async function listOpenInvitations(tenant: TenantCtx, page: { skip: number; take: number }): Promise<{ invitations: PublicInvitation[]; total: number }> {
+export async function listOpenInvitations(
+  tenant: TenantCtx,
+  page: { skip: number; take: number },
+): Promise<{ invitations: PublicInvitation[]; total: number }> {
   const { tenantId } = tenant;
   const where: Prisma.InvitationWhereInput = { tenantId, acceptedAt: null, revokedAt: null };
   const [total, rows] = await tenant.run((tx) =>
     Promise.all([
       tx.invitation.count({ where }),
-      tx.invitation.findMany({ where, select: PUBLIC_SELECT, orderBy: [{ createdAt: "desc" }, { id: "asc" }], skip: page.skip, take: page.take }),
+      tx.invitation.findMany({
+        where,
+        select: PUBLIC_SELECT,
+        orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+        skip: page.skip,
+        take: page.take,
+      }),
     ]),
   );
   const now = new Date();
@@ -163,7 +236,13 @@ export async function listOpenInvitations(tenant: TenantCtx, page: { skip: numbe
 // --- the invitee's side ---------------------------------------------------------------------------------------------------
 
 /// `viewer`: nobody signed in ("none"), signed in as the invited address's own account ("invitee"), or as someone else ("other").
-export type InvitationPreview = { schoolName: string; role: Role; maskedEmail: string; accountExists: boolean; viewer: "none" | "invitee" | "other" };
+export type InvitationPreview = {
+  schoolName: string;
+  role: Role;
+  maskedEmail: string;
+  accountExists: boolean;
+  viewer: "none" | "invitee" | "other";
+};
 
 /// What the page shows before anyone commits: the school, the role, and whether this address already has an account (which decides
 /// between "choose a password" and "sign in"). The token holder is the invitee, so this is theirs to know; the address is masked
@@ -190,7 +269,7 @@ export type AcceptInvitationInput = {
 };
 
 export type AcceptInvitationResult =
-  | { ok: true; userId: string; schoolCode: string; newAccount: boolean; reactivated: boolean }
+  | { ok: true; userId: string; schoolCode: string; newAccount: boolean; reactivated: boolean; staffRecordLinked: boolean }
   /// INVALID: unknown, used, revoked or expired — one answer. SIGN_IN_REQUIRED: the address has an account and nobody is signed in.
   /// WRONG_ACCOUNT: signed in as someone else. ALREADY_MEMBER: nothing to do (the link is NOT spent). INPUT_REQUIRED: a new account
   /// needs a name and a password.
@@ -230,7 +309,10 @@ export async function acceptInvitation(input: AcceptInvitationInput): Promise<Ac
       await setTenantContext(tx, trustedTenantId(found.tenantId));
 
       const existing = account
-        ? await tx.tenantMembership.findUnique({ where: { userId_tenantId: { userId: account.id, tenantId: found.tenantId } }, select: { id: true, deactivatedAt: true } })
+        ? await tx.tenantMembership.findUnique({
+            where: { userId_tenantId: { userId: account.id, tenantId: found.tenantId } },
+            select: { id: true, deactivatedAt: true },
+          })
         : null;
       if (existing && !existing.deactivatedAt) throw new Abort("ALREADY_MEMBER");
 
@@ -259,11 +341,29 @@ export async function acceptInvitation(input: AcceptInvitationInput): Promise<Ac
       }
 
       if (existing) {
-        await tx.tenantMembership.update({ where: { id: existing.id }, data: { role: found.role, campusId: found.campusId, deactivatedAt: null } });
+        await tx.tenantMembership.update({
+          where: { id: existing.id },
+          data: { role: found.role, campusId: found.campusId, deactivatedAt: null },
+        });
       } else {
         await tx.tenantMembership.create({ data: { userId, tenantId: found.tenantId, role: found.role, campusId: found.campusId } });
       }
       await tx.invitation.update({ where: { id: found.id }, data: { acceptedById: userId } });
+
+      // An invitation made for a staff record links the new member to it in this same transaction. If the record has since been linked, archived or removed
+      // — or this person already has another record — the membership is still created and the link is skipped (and said so in the audit entry): the
+      // invitee is never stranded by something the administrator did meanwhile.
+      let staffRecordLinked = false;
+      if (found.staffRecordId) {
+        const alreadyHasRecord = await tx.staffRecord.findFirst({ where: { tenantId: found.tenantId, userId }, select: { id: true } });
+        if (!alreadyHasRecord) {
+          const linked = await tx.staffRecord.updateMany({
+            where: { id: found.staffRecordId, tenantId: found.tenantId, userId: null, archivedAt: null },
+            data: { userId },
+          });
+          staffRecordLinked = linked.count === 1;
+        }
+      }
       await tx.auditLog.create({
         data: {
           tenantId: found.tenantId,
@@ -271,12 +371,18 @@ export async function acceptInvitation(input: AcceptInvitationInput): Promise<Ac
           action: "INVITATION_ACCEPTED",
           targetType: "Invitation",
           targetId: found.id,
-          afterValue: { role: found.role, campusId: found.campusId, newAccount: !account, reactivated: Boolean(existing) },
+          afterValue: {
+            role: found.role,
+            campusId: found.campusId,
+            newAccount: !account,
+            reactivated: Boolean(existing),
+            ...(found.staffRecordId ? { staffRecordId: found.staffRecordId, staffRecordLinked } : {}),
+          },
         },
       });
 
       const school = await tx.tenant.findUniqueOrThrow({ where: { id: found.tenantId }, select: { code: true } });
-      return { ok: true, userId, schoolCode: school.code, newAccount: !account, reactivated: Boolean(existing) };
+      return { ok: true, userId, schoolCode: school.code, newAccount: !account, reactivated: Boolean(existing), staffRecordLinked };
     });
   } catch (error) {
     if (error instanceof Abort) return { ok: false, reason: error.reason };

@@ -19,8 +19,7 @@ const valid = () => ({
   email: uniqueEmail("setup"),
   password: "correct-horse-battery-9",
 });
-const post = (body: unknown, opts: { ip?: string | null; origin?: string | null } = {}) =>
-  api(SETUP, { body, ...opts });
+const post = (body: unknown, opts: { ip?: string | null; origin?: string | null } = {}) => api(SETUP, { body, ...opts });
 
 test.describe("GET /api/v1/setup", () => {
   test("reports whether setup is complete", async () => {
@@ -46,6 +45,15 @@ test.describe("POST /api/v1/setup — success and what it creates", () => {
     const memberships = await db.tenantMembership.findMany({ where: { userId: user.id } });
     expect(memberships.map((m) => m.role)).toEqual(["ADMIN"]);
     expect((await db.systemSettings.findUniqueOrThrow({ where: { id: "global" } })).setupComplete).toBe(true);
+
+    // The school exists with its kind and its settings row — made by the database trigger, through the wizard's own code path (runtime role,
+    // tenant context not yet set): the secure defaults are in place without the wizard knowing the table exists.
+    const school = await db.tenant.findUniqueOrThrow({ where: { code: "bright-future-academy" } });
+    expect(school.schoolType).toBe("K12");
+    expect(await db.schoolSettings.findUniqueOrThrow({ where: { tenantId: school.id } })).toMatchObject({
+      resultApprovalRequired: true,
+      mfaRequiredForTeaching: true,
+    });
 
     const audit = await db.auditLog.findFirstOrThrow({ where: { action: "SETUP_WIZARD_COMPLETE" } });
     expect(audit.actorUserId).toBe(user.id);
@@ -119,6 +127,17 @@ test.describe("POST /api/v1/setup — guards", () => {
       expect(await db.user.count()).toBe(0);
     });
   }
+
+  test("a body that names a school type is refused, whatever the value, and nothing is created (the type is the server's decision)", async () => {
+    for (const schoolType of ["HIGHER_ED", "VOCATIONAL", "K12", "nonsense", null]) {
+      const res = await post({ ...valid(), schoolType });
+      expect(res.status, String(schoolType)).toBe(400);
+      expect(res.json.error.code).toBe("VALIDATION");
+      expect(res.json.error.message).toMatch(/set by the server/i);
+    }
+    expect(await db.user.count()).toBe(0);
+    expect(await db.tenant.count()).toBe(0);
+  });
 
   test("a password of exactly 72 bytes is accepted and works at sign-in (no truncation surprises)", async () => {
     const password = `a1${"b".repeat(70)}`;

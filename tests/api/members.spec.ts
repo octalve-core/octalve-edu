@@ -1,7 +1,18 @@
 import "../support/env";
 import { test, expect } from "@playwright/test";
 import { SAAS_URL } from "../support/env";
-import { Role, addMembership, createTenant, createUser, db, deactivateMembership, removeCreatedTenants, seedInstance, type TestTenant, type TestUser } from "../support/db";
+import {
+  Role,
+  addMembership,
+  createTenant,
+  createUser,
+  db,
+  deactivateMembership,
+  removeCreatedTenants,
+  seedInstance,
+  type TestTenant,
+  type TestUser,
+} from "../support/db";
 import { api, cookieHeader, loginAs } from "../support/http";
 
 // The members API over real HTTP against the SaaS-mode server (domain-implementation-plan.md §0.5.4): who may list and change
@@ -61,7 +72,17 @@ test.describe("GET /members", () => {
     expect(people.map((p) => p.userId)).toEqual(expect.arrayContaining([admin.id, colleague.id, teacher.id]));
     expect(people.map((p) => p.userId)).not.toContain(outsider.id);
     expect(res.json.meta).toMatchObject({ page: 1, limit: 25, total: people.length, hasNext: false });
-    expect(Object.keys(people[0]).sort()).toEqual(["campusId", "campusName", "email", "joinedAt", "name", "role", "status", "userId"]);
+    expect(Object.keys(people[0]).sort()).toEqual([
+      "campusId",
+      "campusName",
+      "email",
+      "joinedAt",
+      "name",
+      "permissions",
+      "role",
+      "status",
+      "userId",
+    ]);
     expect(res.text).not.toMatch(/passwordHash|tokenHash|\$2[aby]\$/);
   });
 
@@ -76,7 +97,8 @@ test.describe("GET /members", () => {
   test("filters: status defaults to active; role, campus, status=deactivated|all and a search by name or address", async () => {
     const gone = await newMember(Role.PARENT, null, "Gone Parent");
     await deactivateMembership(gone.id, a.id);
-    const ids = async (qs: string) => ((await api(`${members()}?${qs}`, as("admin"))).json.data.members as { userId: string }[]).map((m) => m.userId);
+    const ids = async (qs: string) =>
+      ((await api(`${members()}?${qs}`, as("admin"))).json.data.members as { userId: string }[]).map((m) => m.userId);
     expect(await ids("")).not.toContain(gone.id);
     expect(await ids("status=deactivated")).toEqual([gone.id]);
     expect(await ids("status=all")).toContain(gone.id);
@@ -92,14 +114,28 @@ test.describe("GET /members", () => {
     for (let i = 0; i < 4; i++) await newMember(Role.PARENT, null, `Paged ${i}`);
     const first = await api(`${members()}?limit=3&status=all`, as("admin"));
     const second = await api(`${members()}?limit=3&page=2&status=all`, as("admin"));
-    const overlap = first.json.data.members.filter((m: { userId: string }) => second.json.data.members.some((n: { userId: string }) => n.userId === m.userId));
+    const overlap = first.json.data.members.filter((m: { userId: string }) =>
+      second.json.data.members.some((n: { userId: string }) => n.userId === m.userId),
+    );
     expect(overlap).toEqual([]);
     expect(first.json.meta).toMatchObject({ page: 1, limit: 3, hasNext: true });
-    for (const [qs, field] of [["role=SUPERUSER", "query.role"], ["status=everyone", "query.status"], ["page=0", "query.page"], ["limit=1000", "query.limit"], ["limit=abc", "query.limit"], ["page=1&page=2", "query.page"], ["q=" + "x".repeat(65), "query.q"], ["role=ADMIN&role=PARENT", "query.role"]]) {
+    for (const [qs, field] of [
+      ["role=SUPERUSER", "query.role"],
+      ["status=everyone", "query.status"],
+      ["page=0", "query.page"],
+      ["limit=1000", "query.limit"],
+      ["limit=abc", "query.limit"],
+      ["page=1&page=2", "query.page"],
+      ["q=" + "x".repeat(65), "query.q"],
+      ["role=ADMIN&role=PARENT", "query.role"],
+    ]) {
       const res = await api(`${members()}?${qs}`, as("admin"));
       expect(res.status, qs).toBe(400);
       expect(res.json.error.code).toBe("VALIDATION");
-      expect(res.json.error.details.map((d: { path: string }) => d.path), qs).toContain(field);
+      expect(
+        res.json.error.details.map((d: { path: string }) => d.path),
+        qs,
+      ).toContain(field);
     }
   });
 });
@@ -133,12 +169,20 @@ test.describe("PATCH /members/[userId]", () => {
 
   test("the body is STRICT: a key it does not name is refused (no tenantId, userId or passwordHash smuggling), and an empty body says what to give", async () => {
     const target = await newMember();
-    for (const body of [{ role: "ADMIN", tenantId: b.id }, { role: "ADMIN", userId: outsider.id }, { passwordHash: "x" }, { email: "evil@x.test" }, {}]) {
+    for (const body of [
+      { role: "ADMIN", tenantId: b.id },
+      { role: "ADMIN", userId: outsider.id },
+      { passwordHash: "x" },
+      { email: "evil@x.test" },
+      {},
+    ]) {
       const res = await api(member(target.id), as("admin", { method: "PATCH", body }));
       expect(res.status, JSON.stringify(body)).toBe(400);
       expect(res.json.error.code).toBe("VALIDATION");
     }
-    expect((await db.tenantMembership.findUniqueOrThrow({ where: { userId_tenantId: { userId: target.id, tenantId: a.id } } })).role).toBe("TEACHING_STAFF");
+    expect((await db.tenantMembership.findUniqueOrThrow({ where: { userId_tenantId: { userId: target.id, tenantId: a.id } } })).role).toBe(
+      "TEACHING_STAFF",
+    );
     expect((await api(member(target.id), as("admin", { method: "PATCH", body: { role: "OWNER" } }))).status).toBe(400); // not a role
     expect((await api(member(target.id), as("admin", { method: "PATCH", rawBody: "{not json" }))).json.error.code).toBe("INVALID_BODY");
   });
@@ -147,7 +191,9 @@ test.describe("PATCH /members/[userId]", () => {
     const res = await api(member(admin.id), as("admin", { method: "PATCH", body: { role: "PARENT" } }));
     expect(res.status).toBe(409);
     expect(res.json.error.code).toBe("SELF");
-    expect((await db.tenantMembership.findUniqueOrThrow({ where: { userId_tenantId: { userId: admin.id, tenantId: a.id } } })).role).toBe("ADMIN");
+    expect((await db.tenantMembership.findUniqueOrThrow({ where: { userId_tenantId: { userId: admin.id, tenantId: a.id } } })).role).toBe(
+      "ADMIN",
+    );
   });
 
   test("the LAST active administrator cannot be demoted (409 LAST_ADMIN) — until another administrator exists", async () => {
@@ -170,6 +216,128 @@ test.describe("PATCH /members/[userId]", () => {
     expect(await db.tenantMembership.count({ where: { tenantId: school.id, role: "ADMIN", deactivatedAt: null } })).toBe(1);
   });
 
+  test("permissions: an ADMIN grants and revokes the FULL desired set on a staff member — audited with before/after, deduplicated order, effective on the next request", async () => {
+    const target = await newMember(Role.NON_TEACHING_STAFF, 0, "Bola Bursar");
+    const grant = await api(
+      member(target.id),
+      as("admin", { method: "PATCH", body: { permissions: ["CAN_PUBLISH_CONTENT", "CAN_MANAGE_FINANCE"] } }),
+    );
+    expect(grant.status).toBe(200);
+    expect(grant.json.data).toMatchObject({ changed: true, member: { permissions: ["CAN_MANAGE_FINANCE", "CAN_PUBLISH_CONTENT"] } }); // canonical order
+    const row = () => db.tenantMembership.findUniqueOrThrow({ where: { userId_tenantId: { userId: target.id, tenantId: a.id } } });
+    expect((await row()).permissions).toEqual(["CAN_MANAGE_FINANCE", "CAN_PUBLISH_CONTENT"]);
+    const audit = await db.auditLog.findFirstOrThrow({
+      where: { tenantId: a.id, targetId: target.id, action: "MEMBER_PERMISSIONS_CHANGED" },
+    });
+    expect(audit).toMatchObject({
+      actorUserId: admin.id,
+      beforeValue: { permissions: [] },
+      afterValue: { permissions: ["CAN_MANAGE_FINANCE", "CAN_PUBLISH_CONTENT"] },
+    });
+    const same = await api(
+      member(target.id),
+      as("admin", { method: "PATCH", body: { permissions: ["CAN_MANAGE_FINANCE", "CAN_PUBLISH_CONTENT"] } }),
+    );
+    expect(same.json.data).toMatchObject({ changed: false }); // the same set (even in another order) is a no-op…
+    expect(await db.auditLog.count({ where: { tenantId: a.id, targetId: target.id, action: "MEMBER_PERMISSIONS_CHANGED" } })).toBe(1); // …and writes no audit row
+    const revoke = await api(member(target.id), as("admin", { method: "PATCH", body: { permissions: ["CAN_MANAGE_FINANCE"] } }));
+    expect(revoke.json.data.member.permissions).toEqual(["CAN_MANAGE_FINANCE"]);
+    const clear = await api(member(target.id), as("admin", { method: "PATCH", body: { permissions: [] } }));
+    expect(clear.json.data.member.permissions).toEqual([]);
+    expect((await row()).permissions).toEqual([]);
+  });
+
+  test("permissions: refused on an ADMIN, a STUDENT and a PARENT (400 on body.permissions); asking for NONE there is a quiet no-op", async () => {
+    for (const role of [Role.ADMIN, Role.STUDENT, Role.PARENT]) {
+      const target = await newMember(role, role === Role.ADMIN ? null : 0, `No perms ${role}`);
+      const res = await api(member(target.id), as("admin", { method: "PATCH", body: { permissions: ["CAN_APPROVE_RESULTS"] } }));
+      expect(res.status, role).toBe(400);
+      expect(res.json.error).toMatchObject({ code: "VALIDATION", details: [{ path: "body.permissions" }] });
+      expect((await api(member(target.id), as("admin", { method: "PATCH", body: { permissions: [] } }))).json.data, role).toMatchObject({
+        changed: false,
+      });
+    }
+  });
+
+  test("permissions: moving a holder to ADMIN or to a non-staff role CLEARS them in the same change, and the audit says why", async () => {
+    for (const toRole of [Role.PARENT, Role.ADMIN]) {
+      const target = await newMember(Role.TEACHING_STAFF, 0, `Demoted to ${toRole}`);
+      await api(member(target.id), as("admin", { method: "PATCH", body: { permissions: ["CAN_MANAGE_USERS", "CAN_APPROVE_RESULTS"] } }));
+      const moved = await api(member(target.id), as("admin", { method: "PATCH", body: { role: toRole } }));
+      expect(moved.status, toRole).toBe(200);
+      expect(moved.json.data.member).toMatchObject({ role: toRole, permissions: [] });
+      const cleared = await db.auditLog.findMany({
+        where: { tenantId: a.id, targetId: target.id, action: "MEMBER_PERMISSIONS_CHANGED" },
+        orderBy: { createdAt: "desc" },
+      });
+      expect(cleared[0]).toMatchObject({
+        beforeValue: { permissions: ["CAN_APPROVE_RESULTS", "CAN_MANAGE_USERS"] },
+        afterValue: { permissions: [], clearedByRoleChange: toRole },
+      });
+    }
+  });
+
+  test("permissions: granted in the SAME request that makes someone staff; the body is validated (unknown value, duplicate, not a list, a non-array)", async () => {
+    const target = await newMember(Role.PARENT, 0, "Becoming staff");
+    const both = await api(
+      member(target.id),
+      as("admin", { method: "PATCH", body: { role: "NON_TEACHING_STAFF", permissions: ["CAN_MANAGE_FINANCE"] } }),
+    );
+    expect(both.json.data.member).toMatchObject({ role: "NON_TEACHING_STAFF", permissions: ["CAN_MANAGE_FINANCE"] });
+    for (const bad of [
+      ["CAN_DO_ANYTHING"],
+      ["CAN_MANAGE_FINANCE", "CAN_MANAGE_FINANCE"],
+      "CAN_MANAGE_FINANCE",
+      [1],
+      ["CAN_MANAGE_FINANCE", "CAN_APPROVE_RESULTS", "CAN_PUBLISH_CONTENT", "CAN_MANAGE_USERS", "CAN_MANAGE_USERS"],
+    ]) {
+      const res = await api(member(target.id), as("admin", { method: "PATCH", body: { permissions: bad } }));
+      expect(res.status, JSON.stringify(bad)).toBe(400);
+      expect(res.json.error.code).toBe("VALIDATION");
+    }
+    expect(
+      (await db.tenantMembership.findUniqueOrThrow({ where: { userId_tenantId: { userId: target.id, tenantId: a.id } } })).permissions,
+    ).toEqual(["CAN_MANAGE_FINANCE"]); // unchanged by the refusals
+  });
+
+  test("permissions: only an ADMIN of the school may change them — a staff member who HOLDS CAN_MANAGE_USERS cannot, and nobody changes their own", async () => {
+    const holder = await newMember(Role.NON_TEACHING_STAFF, 0, "Holds manage users");
+    await db.tenantMembership.update({
+      where: { userId_tenantId: { userId: holder.id, tenantId: a.id } },
+      data: { permissions: ["CAN_MANAGE_USERS"] },
+    });
+    const holderCookie = cookieHeader((await loginAs(holder, SAAS)).token!);
+    const target = await newMember(Role.TEACHING_STAFF, 0, "Target");
+    const res = await api(member(target.id), {
+      ...SAAS,
+      cookie: holderCookie,
+      method: "PATCH",
+      body: { permissions: ["CAN_MANAGE_USERS"] },
+    });
+    expect(res.status).toBe(403);
+    expect(res.json).toEqual(NO_ACCESS);
+    const self = await api(member(holder.id), { ...SAAS, cookie: holderCookie, method: "PATCH", body: { permissions: [] } });
+    expect(self.status).toBe(403); // not even reaching the SELF rule: the route is administrators' alone
+    expect(
+      (await db.tenantMembership.findUniqueOrThrow({ where: { userId_tenantId: { userId: target.id, tenantId: a.id } } })).permissions,
+    ).toEqual([]);
+    const adminSelf = await api(member(admin.id), as("admin", { method: "PATCH", body: { permissions: [] } }));
+    expect(adminSelf.status).toBe(409);
+    expect(adminSelf.json.error.code).toBe("SELF");
+  });
+
+  test("permissions: a deactivated member's cannot be edited (reactivate first), and another school's person is the same 404", async () => {
+    const target = await newMember(Role.NON_TEACHING_STAFF, 0, "Soon deactivated");
+    await api(`${member(target.id)}/deactivate`, as("admin", { method: "POST", body: {} }));
+    const res = await api(member(target.id), as("admin", { method: "PATCH", body: { permissions: ["CAN_MANAGE_FINANCE"] } }));
+    expect(res.status).toBe(409);
+    expect(res.json.error.code).toBe("DEACTIVATED");
+    const foreign = await api(member(outsider.id), as("admin", { method: "PATCH", body: { permissions: ["CAN_MANAGE_FINANCE"] } }));
+    const unknown = await api(member("no-such-user-id"), as("admin", { method: "PATCH", body: { permissions: ["CAN_MANAGE_FINANCE"] } }));
+    expect(foreign.status).toBe(404);
+    expect(foreign.json).toEqual(unknown.json);
+  });
+
   test("another school's person, an unknown id and a malformed id are INDISTINGUISHABLE (404, same body)", async () => {
     const real = await api(member(outsider.id), as("admin", { method: "PATCH", body: { role: "ADMIN" } })); // exists — in school B
     const unknown = await api(member("no-such-user-id"), as("admin", { method: "PATCH", body: { role: "ADMIN" } }));
@@ -179,7 +347,9 @@ test.describe("PATCH /members/[userId]", () => {
       expect(res.status).toBe(404);
       expect(res.json).toEqual(real.json);
     }
-    expect((await db.tenantMembership.findUniqueOrThrow({ where: { userId_tenantId: { userId: outsider.id, tenantId: b.id } } })).role).toBe("ADMIN"); // untouched, in B
+    expect(
+      (await db.tenantMembership.findUniqueOrThrow({ where: { userId_tenantId: { userId: outsider.id, tenantId: b.id } } })).role,
+    ).toBe("ADMIN"); // untouched, in B
   });
 
   test("a campus of another school and one that does not exist are refused alike (400 on body.campusId)", async () => {
@@ -198,7 +368,9 @@ test.describe("PATCH /members/[userId]", () => {
     const res = await api(member(target.id), as("admin", { method: "PATCH", body: { role: "ADMIN" }, origin: "https://evil.example" }));
     expect(res.status).toBe(403);
     expect(res.json.error.code).toBe("CSRF");
-    expect((await db.tenantMembership.findUniqueOrThrow({ where: { userId_tenantId: { userId: target.id, tenantId: a.id } } })).role).toBe("TEACHING_STAFF");
+    expect((await db.tenantMembership.findUniqueOrThrow({ where: { userId_tenantId: { userId: target.id, tenantId: a.id } } })).role).toBe(
+      "TEACHING_STAFF",
+    );
   });
 });
 
@@ -219,9 +391,19 @@ test.describe("POST /members/[userId]/deactivate and /reactivate", () => {
     expect((await api("/api/v1/auth/me", { ...SAAS, cookie: targetCookie })).status).toBe(200); // still a signed-in person
 
     const back = await reactivate(target.id);
-    expect(back.json.data).toMatchObject({ changed: true, member: { status: "active", role: "TEACHING_STAFF", campusName: "Alpha South" } });
+    expect(back.json.data).toMatchObject({
+      changed: true,
+      member: { status: "active", role: "TEACHING_STAFF", campusName: "Alpha South" },
+    });
     expect((await api(`/api/v1/schools/${a.code}`, { ...SAAS, cookie: targetCookie })).status).toBe(200);
-    expect((await db.auditLog.findMany({ where: { tenantId: a.id, targetId: target.id, action: { startsWith: "MEMBER_" } }, orderBy: { createdAt: "asc" } })).map((r) => r.action)).toEqual(["MEMBER_DEACTIVATED", "MEMBER_REACTIVATED"]);
+    expect(
+      (
+        await db.auditLog.findMany({
+          where: { tenantId: a.id, targetId: target.id, action: { startsWith: "MEMBER_" } },
+          orderBy: { createdAt: "asc" },
+        })
+      ).map((r) => r.action),
+    ).toEqual(["MEMBER_DEACTIVATED", "MEMBER_REACTIVATED"]);
   });
 
   test("a deactivated administrator loses the ADMIN routes at once", async () => {
@@ -250,7 +432,12 @@ test.describe("POST /members/[userId]/deactivate and /reactivate", () => {
     const callerCookie = await cookieFor(caller);
     const url = `/api/v1/schools/${school.code}/members/${solo.id}/deactivate`;
     expect((await api(url, { ...SAAS, cookie: callerCookie, method: "POST", body: {} })).status).toBe(200); // two admins → allowed
-    const last = await api(`/api/v1/schools/${school.code}/members/${caller.id}/deactivate`, { ...SAAS, cookie: await cookieFor(solo), method: "POST", body: {} });
+    const last = await api(`/api/v1/schools/${school.code}/members/${caller.id}/deactivate`, {
+      ...SAAS,
+      cookie: await cookieFor(solo),
+      method: "POST",
+      body: {},
+    });
     expect(last.status).toBe(403); // solo is deactivated now: no longer an administrator of this school
   });
 
@@ -261,6 +448,7 @@ test.describe("POST /members/[userId]/deactivate and /reactivate", () => {
     expect(real.json).toEqual(unknown.json);
     expect((await reactivate(outsider.id)).json).toEqual(real.json);
     expect((await deactivate(admin.id, "teacher")).json).toEqual(NO_ACCESS);
+    expect((await reactivate(admin.id, "teacher")).json).toEqual(NO_ACCESS); // found by mutation H4: reactivate had no role check
     expect(await db.tenantMembership.count({ where: { userId: outsider.id, tenantId: b.id, deactivatedAt: null } })).toBe(1);
   });
 });

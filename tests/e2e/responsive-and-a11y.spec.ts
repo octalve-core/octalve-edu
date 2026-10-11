@@ -1,13 +1,37 @@
 import AxeBuilder from "@axe-core/playwright";
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "../support/fixtures";
-import { Role, codeFor, createUser, addMembership, createTenant, db, enableMfa, removeCreatedTenants, resetDatabase, seedInstance, uniqueEmail, uniqueIp } from "./../support/db";
+import {
+  Role,
+  codeFor,
+  createUser,
+  addMembership,
+  createTenant,
+  db,
+  enableMfa,
+  removeCreatedTenants,
+  resetDatabase,
+  seedInstance,
+  uniqueEmail,
+  uniqueIp,
+} from "./../support/db";
 import { DEVTOOLS_URL, DEV_TOOLS_TEST_TOKEN, SAAS_URL } from "../support/env";
 import { linkFrom, waitForMail } from "../support/outbox";
 import { createEmailChangeToken } from "@/lib/auth/email-change";
 import { hashInvitationToken, newInvitationToken } from "@/lib/invitations/token";
 import { base32Decode } from "@/lib/auth/mfa/base32";
-import { alerts, codeField, fillCredentials, mfaHeading, passwordField, recoveryField, signInButton, signInThroughUi, verifyButton, HOME_URL } from "./helpers";
+import {
+  alerts,
+  codeField,
+  fillCredentials,
+  mfaHeading,
+  passwordField,
+  recoveryField,
+  signInButton,
+  signInThroughUi,
+  verifyButton,
+  HOME_URL,
+} from "./helpers";
 
 // Runs on the desktop AND the phone project (see playwright.config.ts).
 //  - axe-core, WCAG 2.2 A/AA rules, on every screen and on the STATES that
@@ -16,6 +40,8 @@ import { alerts, codeField, fillCredentials, mfaHeading, passwordField, recovery
 //  - On phones, every control is a comfortable tap target (>= 44 CSS px).
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
+
+const field = (scope: Locator, label: string) => scope.getByLabel(label, { exact: true });
 
 async function expectAccessible(page: Page, what: string) {
   const results = await new AxeBuilder({ page }).withTags(WCAG).analyze();
@@ -50,7 +76,11 @@ async function expectComfortableTapTargets(page: Page, what: string, isMobile: b
       .filter(visible)
       .map((el) => {
         const r = el.getBoundingClientRect();
-        return { el: `${el.tagName.toLowerCase()}[${el.getAttribute("aria-label") ?? el.getAttribute("name") ?? el.textContent?.trim().slice(0, 20)}]`, w: Math.round(r.width), h: Math.round(r.height) };
+        return {
+          el: `${el.tagName.toLowerCase()}[${el.getAttribute("aria-label") ?? el.getAttribute("name") ?? el.textContent?.trim().slice(0, 20)}]`,
+          w: Math.round(r.width),
+          h: Math.round(r.height),
+        };
       })
       .filter((t) => t.w < 44 || t.h < 44);
   });
@@ -354,7 +384,11 @@ test.describe("account self-service screens (profile, email, sessions)", () => {
   const IPHONE_UA =
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 
-  test("/account: profile editor (idle, editing, error), email card (form, errors, sent), sessions (alone, with others)", async ({ page, isMobile, browser }) => {
+  test("/account: profile editor (idle, editing, error), email card (form, errors, sent), sessions (alone, with others)", async ({
+    page,
+    isMobile,
+    browser,
+  }) => {
     test.slow(); // seven screens × both themes of axe: ~25 s on an idle machine, so it was always one busy moment from the 30 s default
     const user = await createUser({ role: Role.ADMIN, name: "Amina Yusuf" });
     await signInThroughUi(page, user);
@@ -431,7 +465,10 @@ test.describe("school pages: picker, workspace, no-access (SaaS-mode server)", (
   });
 
   test("picker, workspace (admin, staff, no campus) and the 403 view", async ({ page, isMobile }) => {
-    const a = await createTenant({ name: "Alpha School with a rather long name to prove it wraps", campuses: ["Alpha North", "Alpha South"] });
+    const a = await createTenant({
+      name: "Alpha School with a rather long name to prove it wraps",
+      campuses: ["Alpha North", "Alpha South"],
+    });
     const b = await createTenant({ name: "Beta School", campuses: ["Beta Main"] });
     const both = await createUser({ name: "Chidi Okafor" });
     await addMembership(both.id, a.id, Role.ADMIN);
@@ -524,12 +561,26 @@ test.describe("users and invitations (SaaS-mode server)", () => {
 
   async function linkFor(school: { id: string }, email: string, opts: { expired?: boolean } = {}) {
     const token = newInvitationToken();
-    await db.invitation.create({ data: { tenantId: school.id, email, role: Role.TEACHING_STAFF, tokenHash: hashInvitationToken(token), expiresAt: new Date(Date.now() + (opts.expired ? -60_000 : 3_600_000)) } });
+    await db.invitation.create({
+      data: {
+        tenantId: school.id,
+        email,
+        role: Role.TEACHING_STAFF,
+        tokenHash: hashInvitationToken(token),
+        expiresAt: new Date(Date.now() + (opts.expired ? -60_000 : 3_600_000)),
+      },
+    });
     return `/accept-invite#token=${token}`;
   }
 
-  test("the Users page: people, a pending and an expired invitation, a search with no result, and each dialog open (with its errors)", async ({ page, isMobile }) => {
-    const school = await createTenant({ name: "Alpha School with a rather long name to prove it wraps", campuses: ["Alpha North", "Alpha South"] });
+  test("the Users page: people, a pending and an expired invitation, a search with no result, and each dialog open (with its errors)", async ({
+    page,
+    isMobile,
+  }) => {
+    const school = await createTenant({
+      name: "Alpha School with a rather long name to prove it wraps",
+      campuses: ["Alpha North", "Alpha South"],
+    });
     const boss = await createUser({ name: "Amina Yusuf with a rather long name to prove it wraps too" });
     await addMembership(boss.id, school.id, Role.ADMIN);
     const tola = await createUser({ name: "Tola Teacher" });
@@ -537,8 +588,26 @@ test.describe("users and invitations (SaaS-mode server)", () => {
     const gone = await createUser({ name: "Gone Parent" });
     await addMembership(gone.id, school.id, Role.PARENT);
     await db.tenantMembership.updateMany({ where: { userId: gone.id }, data: { deactivatedAt: new Date() } });
-    await db.invitation.create({ data: { tenantId: school.id, email: "waiting.for.an.answer@example.test", role: Role.STUDENT, campusId: school.campuses[1].id, tokenHash: "a".repeat(64), invitedById: boss.id, expiresAt: new Date(Date.now() + 5 * 86_400_000) } });
-    await db.invitation.create({ data: { tenantId: school.id, email: "too.late@example.test", role: Role.PARENT, tokenHash: "b".repeat(64), expiresAt: new Date(Date.now() - 3_600_000) } });
+    await db.invitation.create({
+      data: {
+        tenantId: school.id,
+        email: "waiting.for.an.answer@example.test",
+        role: Role.STUDENT,
+        campusId: school.campuses[1].id,
+        tokenHash: "a".repeat(64),
+        invitedById: boss.id,
+        expiresAt: new Date(Date.now() + 5 * 86_400_000),
+      },
+    });
+    await db.invitation.create({
+      data: {
+        tenantId: school.id,
+        email: "too.late@example.test",
+        role: Role.PARENT,
+        tokenHash: "b".repeat(64),
+        expiresAt: new Date(Date.now() - 3_600_000),
+      },
+    });
     await signInThroughUi(page, boss);
     await page.goto(`/schools/${school.code}/users`);
     await expect(page.getByText("2 people")).toBeVisible();
@@ -563,7 +632,13 @@ test.describe("users and invitations (SaaS-mode server)", () => {
 
     await page.getByRole("button", { name: "Change role or campus for Tola Teacher" }).click();
     await expect(page.getByRole("dialog").getByRole("heading", { name: "Change access for Tola Teacher" })).toBeVisible();
-    await checkScreen(page, "/users (edit dialog)", isMobile);
+    await expect(page.getByRole("dialog").getByRole("group", { name: "Extra permissions" })).toBeVisible();
+    await checkScreen(page, "/users (edit dialog, staff: extra permissions offered)", isMobile);
+    await page.getByRole("dialog").getByLabel("Manage fees and payments").check();
+    await checkScreen(page, "/users (edit dialog, a permission ticked)", isMobile);
+    await page.getByRole("dialog").getByLabel("Role").selectOption("PARENT");
+    await expect(page.getByRole("dialog").getByText("Extra permissions can only be given to staff.")).toBeVisible();
+    await checkScreen(page, "/users (edit dialog, a role that cannot hold permissions)", isMobile);
     await page.keyboard.press("Escape");
 
     await page.getByRole("button", { name: "Deactivate Tola Teacher" }).click();
@@ -576,7 +651,10 @@ test.describe("users and invitations (SaaS-mode server)", () => {
     await checkScreen(page, "/users (after an action: success notice)", isMobile);
   });
 
-  test("the accept-invite page: the new-person form (idle and with errors), sign in first, join as the signed-in invitee, a different account, a dead link, and success", async ({ page, isMobile }) => {
+  test("the accept-invite page: the new-person form (idle and with errors), sign in first, join as the signed-in invitee, a different account, a dead link, and success", async ({
+    page,
+    isMobile,
+  }) => {
     const school = await createTenant({ name: "Alpha School with a rather long name to prove it wraps", campuses: [] });
     await page.goto(await linkFor(school, "brand.new.person@example.test"));
     await expect(page.getByRole("heading", { level: 1, name: /^Join Alpha School/ })).toBeVisible();
@@ -606,6 +684,641 @@ test.describe("users and invitations (SaaS-mode server)", () => {
     await page.getByRole("button", { name: /^Join Alpha School/ }).click();
     await expect(page.getByRole("heading", { level: 1, name: "You're in" })).toBeVisible();
     await checkScreen(page, "/accept-invite (success)", isMobile);
+  });
+});
+
+test.describe("academic setup (SaaS-mode server)", () => {
+  test.use({ baseURL: SAAS_URL });
+  test.beforeAll(async () => {
+    await seedInstance();
+  });
+  test.afterAll(async () => {
+    await removeCreatedTenants();
+  });
+
+  async function admin(page: Page, section: string) {
+    const school = await createTenant({
+      name: "Alpha School with a rather long name to prove it wraps",
+      campuses: ["Alpha North", "Alpha South"],
+    });
+    const boss = await createUser({ name: "Amina Yusuf" });
+    await addMembership(boss.id, school.id, Role.ADMIN);
+    await signInThroughUi(page, boss);
+    return {
+      school,
+      open: async (name = section) => {
+        await page.goto(`/schools/${school.code}/academics?section=${name}`);
+        await expect(page.getByRole("heading", { level: 1, name: "Academic setup" })).toBeVisible();
+      },
+    };
+  }
+  const dialog = (page: Page) => page.getByRole("dialog");
+
+  test("sessions and terms: empty, a list of every status, each dialog (with its errors), the copy preview with a clash, and a term list", async ({
+    page,
+    isMobile,
+  }) => {
+    test.setTimeout(300_000);
+    const { school, open } = await admin(page, "sessions");
+    await open();
+    await expect(page.getByText("No sessions yet.")).toBeVisible();
+    await checkScreen(page, "/academics sessions (empty)", isMobile);
+
+    const day = (iso: string) => new Date(iso);
+    const planned = await db.academicSession.create({
+      data: { tenantId: school.id, label: "2027/2028", startDate: day("2027-09-01"), endDate: day("2028-07-31") },
+    });
+    const active = await db.academicSession.create({
+      data: {
+        tenantId: school.id,
+        label: "2026/2027 with a rather long label",
+        startDate: day("2026-09-01"),
+        endDate: day("2027-07-31"),
+        status: "ACTIVE",
+      },
+    });
+    await db.academicSession.create({
+      data: { tenantId: school.id, label: "2025/2026", startDate: day("2025-09-01"), endDate: day("2026-07-31"), status: "CLOSED" },
+    });
+    await db.academicSession.create({
+      data: {
+        tenantId: school.id,
+        campusId: school.campuses[0].id,
+        label: "North 2026",
+        startDate: day("2026-09-01"),
+        endDate: day("2027-07-31"),
+        archivedAt: new Date(),
+      },
+    });
+    await db.academicPeriod.create({
+      data: {
+        tenantId: school.id,
+        sessionId: active.id,
+        kind: "TERM",
+        ordinal: 1,
+        label: "Term 1",
+        startDate: day("2026-09-07"),
+        endDate: day("2026-12-18"),
+        isCurrent: true,
+      },
+    });
+    await db.academicPeriod.create({
+      data: {
+        tenantId: school.id,
+        sessionId: active.id,
+        kind: "TERM",
+        ordinal: 2,
+        label: "Term 2",
+        startDate: day("2027-01-11"),
+        endDate: day("2027-04-02"),
+      },
+    });
+    await open();
+    await expect(page.getByText("3 sessions")).toBeVisible();
+    await checkScreen(page, "/academics sessions (list)", isMobile);
+    await page.getByLabel("Show", { exact: true }).selectOption("all");
+    await expect(page.getByText("4 sessions")).toBeVisible();
+    await checkScreen(page, "/academics sessions (everything, incl. closed and archived)", isMobile);
+    await page.getByLabel("Show", { exact: true }).selectOption("live");
+    await expect(page.getByText("3 sessions")).toBeVisible();
+
+    await page.getByRole("button", { name: "New session" }).click();
+    await dialog(page).getByRole("button", { name: "Create session" }).click();
+    await expect(dialog(page).getByText("Choose the first day.")).toBeVisible();
+    await checkScreen(page, "/academics sessions (new session, with errors)", isMobile);
+    await page.keyboard.press("Escape");
+
+    await page.getByRole("button", { name: `Open ${planned.label}` }).click();
+    await dialog(page).getByRole("button", { name: "Open session" }).click();
+    await expect(dialog(page).getByText(/is already the active session/)).toBeVisible();
+    await checkScreen(page, "/academics sessions (open: refused, naming the open one)", isMobile);
+    await page.keyboard.press("Escape");
+
+    await page.getByRole("button", { name: `Close ${active.label}` }).click();
+    await checkScreen(page, "/academics sessions (close: the 24-hour countdown)", isMobile);
+    await dialog(page).getByLabel("Close sooner — in 1 minute instead of 24 hours").check();
+    await dialog(page).getByRole("button", { name: "Close in 1 minute" }).click();
+    await expect(dialog(page).getByText("Enter your password to confirm.")).toBeVisible();
+    await checkScreen(page, "/academics sessions (close sooner: password asked, with its error)", isMobile);
+    await page.keyboard.press("Escape");
+    await db.academicSession.update({
+      where: { id: active.id },
+      data: { closeAt: new Date(Date.now() + 86_400_000), closeRequestedById: "an-administrator", closeForced: false },
+    });
+    await page.reload();
+    await expect(page.getByRole("button", { name: `Cancel the planned close of ${active.label}` })).toBeVisible();
+    await checkScreen(page, "/academics sessions (a close is planned)", isMobile);
+    await page.getByRole("button", { name: `Cancel the planned close of ${active.label}` }).click();
+    await checkScreen(page, "/academics sessions (cancel the planned close)", isMobile);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: `Close ${active.label} sooner` }).click();
+    await checkScreen(page, "/academics sessions (close sooner, from a planned close)", isMobile);
+    await page.keyboard.press("Escape");
+    await db.academicSession.update({ where: { id: active.id }, data: { closeAt: null, closeRequestedById: null } });
+    await page.reload();
+    await page.getByRole("button", { name: "Reopen 2025/2026" }).click();
+    await dialog(page).getByRole("button", { name: "Reopen session" }).click();
+    await expect(dialog(page).getByText("Give a reason of at least 5 characters.")).toBeVisible();
+    await checkScreen(page, "/academics sessions (reopen, with its error)", isMobile);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: `Archive ${planned.label}` }).click();
+    await checkScreen(page, "/academics sessions (archive confirmation)", isMobile);
+    await page.keyboard.press("Escape");
+
+    await page.getByRole("button", { name: `Copy ${active.label} to next year` }).click();
+    await dialog(page).getByRole("button", { name: "Preview" }).click();
+    await expect(dialog(page).getByText("The next name can't be worked out from this one.")).toBeVisible(); // a name that is not a year pair
+    await checkScreen(page, "/academics sessions (copy: the next name must be typed)", isMobile);
+    await field(dialog(page), "New name (optional)").fill("2027/2028");
+    await dialog(page).getByRole("button", { name: "Preview" }).click();
+    await expect(dialog(page).getByText("It can't be created yet")).toBeVisible(); // 2027/2028 is taken and overlaps
+    await checkScreen(page, "/academics sessions (copy preview with a clash)", isMobile);
+    await field(dialog(page), "New first day").fill("2028-09-01");
+    await field(dialog(page), "New name (optional)").fill("2028/2029");
+    await dialog(page).getByRole("button", { name: "Preview" }).click();
+    await expect(dialog(page).getByText("No clashes.")).toBeVisible();
+    await checkScreen(page, "/academics sessions (copy preview, no clash)", isMobile);
+    await page.keyboard.press("Escape");
+
+    await page.getByRole("button", { name: `Terms of ${active.label}` }).click();
+    await expect(page.getByText("Term 1")).toBeVisible();
+    await checkScreen(page, "/academics terms (with a current term)", isMobile);
+    await page.getByRole("button", { name: "Add a term" }).click();
+    await dialog(page).getByRole("button", { name: "Add term" }).click();
+    await expect(dialog(page).getByText("Choose the first day.")).toBeVisible();
+    await checkScreen(page, "/academics terms (add, with errors)", isMobile);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Archive Term 2" }).click();
+    await checkScreen(page, "/academics terms (archive confirmation)", isMobile);
+  });
+
+  test("classes and subjects: empty, populated with arms, every dialog and the archive refusal", async ({ page, isMobile }) => {
+    test.setTimeout(300_000);
+    const { school, open } = await admin(page, "classes");
+    await open();
+    await expect(page.getByText("No classes yet.")).toBeVisible();
+    await checkScreen(page, "/academics classes (empty)", isMobile);
+
+    const group = await db.classGroup.create({
+      data: { tenantId: school.id, name: "JSS 1 with a rather long name to prove it wraps", sortOrder: 1 },
+    });
+    await db.classGroup.create({ data: { tenantId: school.id, campusId: school.campuses[0].id, name: "Year 7", sortOrder: 2 } });
+    await db.classArm.create({ data: { tenantId: school.id, classGroupId: group.id, name: "A", capacity: 40 } });
+    await db.classArm.create({ data: { tenantId: school.id, classGroupId: group.id, name: "B" } });
+    const maths = await db.subject.create({ data: { tenantId: school.id, name: "Mathematics", code: "MTH" } });
+    await db.subject.create({ data: { tenantId: school.id, name: "English Language" } });
+    await db.subjectOffering.create({ data: { tenantId: school.id, classGroupId: group.id, subjectId: maths.id } });
+    await open();
+    await expect(page.getByText("2 classes")).toBeVisible();
+    await expect(page.getByRole("listitem").filter({ hasText: "English Language" })).toBeVisible();
+    await checkScreen(page, "/academics classes (classes, arms and subjects)", isMobile);
+
+    await page.getByLabel("Search subjects").fill("zzz-nothing");
+    await expect(page.getByText("No subject matches that search.")).toBeVisible();
+    await checkScreen(page, "/academics classes (subject search, no result)", isMobile);
+    await page.getByLabel("Search subjects").fill("");
+    await expect(page.getByRole("listitem").filter({ hasText: "English Language" })).toBeVisible();
+
+    await page.getByRole("button", { name: "New class" }).click();
+    await dialog(page).getByRole("button", { name: "Create class" }).click();
+    await expect(dialog(page).getByText("Give the class a name, such as JSS 1.")).toBeVisible();
+    await checkScreen(page, "/academics classes (new class, with an error)", isMobile);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: `Add an arm to ${group.name}` }).click();
+    await field(dialog(page), "Name").fill("A");
+    await dialog(page).getByRole("button", { name: "Add arm" }).click();
+    await expect(dialog(page).getByText("That name is already used here.")).toBeVisible();
+    await checkScreen(page, "/academics classes (add arm, name taken)", isMobile);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "New subject" }).click();
+    await dialog(page).getByRole("button", { name: "Create subject" }).click();
+    await expect(dialog(page).getByText("Give the subject a name, such as Mathematics.")).toBeVisible();
+    await checkScreen(page, "/academics classes (new subject, with an error)", isMobile);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: `Subjects of ${group.name}` }).click();
+    await expect(dialog(page).getByLabel("Mathematics (MTH)")).toBeChecked();
+    await checkScreen(page, "/academics classes (subjects of a class)", isMobile);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Archive Mathematics" }).click();
+    await dialog(page).getByRole("button", { name: "Archive subject" }).click();
+    await expect(dialog(page).getByRole("alert")).toContainText("A class still studies this subject");
+    await checkScreen(page, "/academics classes (archive refused)", isMobile);
+  });
+
+  test("assessment schemes: empty, a list (unused, in use, archived), the form with a sum that does not match, and a new version", async ({
+    page,
+    isMobile,
+  }) => {
+    test.setTimeout(300_000);
+    const { school, open } = await admin(page, "assessment");
+    await open();
+    await expect(page.getByText("No assessment scheme yet.")).toBeVisible();
+    await checkScreen(page, "/academics assessment (empty)", isMobile);
+
+    const group = await db.classGroup.create({ data: { tenantId: school.id, name: "SS 3" } });
+    const standard = await db.assessmentScheme.create({
+      data: { tenantId: school.id, name: "Standard", examMax: 60 },
+    });
+    await db.assessmentComponent.createMany({
+      data: [
+        { tenantId: school.id, schemeId: standard.id, name: "CA 1", maxScore: 20, sortOrder: 0 },
+        { tenantId: school.id, schemeId: standard.id, name: "CA 2", maxScore: 20, sortOrder: 1 },
+      ],
+    });
+    await db.assessmentScheme.update({ where: { id: standard.id }, data: { lockedAt: new Date() } }); // locked only after its components exist
+    const own = await db.assessmentScheme.create({
+      data: { tenantId: school.id, classGroupId: group.id, name: "SS 3 scheme with a rather long name", examMax: 70 },
+    });
+    await db.assessmentComponent.create({ data: { tenantId: school.id, schemeId: own.id, name: "Project", maxScore: 30, sortOrder: 0 } });
+    await open();
+    await expect(page.getByText("2 schemes")).toBeVisible();
+    await checkScreen(page, "/academics assessment (list)", isMobile);
+
+    await page.getByRole("button", { name: "New scheme" }).click();
+    await field(dialog(page), "Name").fill("Draft");
+    await field(dialog(page), "Exam mark").fill("60");
+    await field(dialog(page), "Component 1 name").fill("CA");
+    await field(dialog(page), "Component 1 maximum").fill("30");
+    await checkScreen(page, "/academics assessment (new scheme, sum does not match)", isMobile);
+    await dialog(page).getByRole("button", { name: "Create scheme" }).click();
+    await expect(dialog(page).getByText(/add up to 90, not the total/)).toBeVisible();
+    await checkScreen(page, "/academics assessment (new scheme, refused by the server)", isMobile);
+    await page.keyboard.press("Escape");
+
+    await page.getByRole("button", { name: "Make a new version of Standard" }).click();
+    await expect(dialog(page).getByText("Results already use version 1")).toBeVisible();
+    await checkScreen(page, "/academics assessment (new version of a scheme in use)", isMobile);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Archive SS 3 scheme with a rather long name" }).click();
+    await checkScreen(page, "/academics assessment (archive confirmation)", isMobile);
+  });
+
+  test("grade scales: empty, a list with a default and a locked scale, the form with a gap, and the confirmations", async ({
+    page,
+    isMobile,
+  }) => {
+    test.setTimeout(300_000);
+    const { school, open } = await admin(page, "grading");
+    await open();
+    await expect(page.getByText("No grade scale yet.")).toBeVisible();
+    await checkScreen(page, "/academics grading (empty)", isMobile);
+
+    const bands = [
+      { minScore: 0, maxScore: 40, letter: "F", remark: "Fail" },
+      { minScore: 40, maxScore: 70, letter: "C", remark: "Credit" },
+      { minScore: 70, maxScore: 100, letter: "A", remark: "Excellent" },
+    ];
+    const main = await db.gradeScale.create({ data: { tenantId: school.id, name: "Standard A–F", isDefault: true } });
+    const other = await db.gradeScale.create({ data: { tenantId: school.id, name: "Pass / fail" } });
+    for (const [scale, rows] of [
+      [main, bands],
+      [
+        other,
+        [
+          { minScore: 0, maxScore: 50, letter: "F", remark: "Fail" },
+          { minScore: 50, maxScore: 100, letter: "P", remark: "Pass" },
+        ],
+      ],
+    ] as const)
+      await db.gradeBand.createMany({
+        data: rows.map((band, sortOrder) => ({ tenantId: school.id, scaleId: scale.id, sortOrder, ...band })),
+      });
+    await db.gradeScale.update({ where: { id: main.id }, data: { lockedAt: new Date() } }); // locked only after its bands exist
+    await open();
+    await expect(page.getByText("2 scales")).toBeVisible();
+    await checkScreen(page, "/academics grading (list)", isMobile);
+
+    await page.getByRole("button", { name: "New scale" }).click();
+    await field(dialog(page), "Name").fill("Draft");
+    await field(dialog(page), "Band 1 from").fill("0");
+    await field(dialog(page), "Band 1 up to").fill("40");
+    await field(dialog(page), "Band 1 letter").fill("F");
+    await field(dialog(page), "Band 1 remark").fill("Fail");
+    await dialog(page).getByRole("button", { name: "Create scale" }).click();
+    await expect(dialog(page).getByText("The highest band must end at 100.")).toBeVisible();
+    await checkScreen(page, "/academics grading (new scale, refused: does not reach 100)", isMobile);
+    await dialog(page).getByRole("button", { name: "Fill in a standard A–F scale" }).click();
+    await checkScreen(page, "/academics grading (new scale, standard bands filled in)", isMobile);
+    await page.keyboard.press("Escape");
+
+    await page.getByRole("button", { name: "Make a new version of Standard A–F" }).click();
+    await expect(dialog(page).getByText("Results already use version 1")).toBeVisible();
+    await checkScreen(page, "/academics grading (new version of a scale in use)", isMobile);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Make Pass / fail the default" }).click();
+    await checkScreen(page, "/academics grading (make-default confirmation)", isMobile);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Archive Pass / fail" }).click();
+    await checkScreen(page, "/academics grading (archive confirmation)", isMobile);
+  });
+});
+
+test.describe("people (SaaS-mode server)", () => {
+  test.use({ baseURL: SAAS_URL });
+  test.beforeAll(async () => {
+    await seedInstance();
+  });
+  test.afterAll(async () => {
+    await removeCreatedTenants();
+  });
+
+  const dialog = (page: Page) => page.getByRole("dialog");
+  async function setup(page: Page, role: "ADMIN" | "TEACHING_STAFF" = "ADMIN") {
+    const school = await createTenant({
+      name: "Alpha School with a rather long name to prove it wraps",
+      campuses: ["Alpha North", "Alpha South"],
+    });
+    const me = await createUser({ name: "Amina Yusuf" });
+    await addMembership(
+      me.id,
+      school.id,
+      role === "ADMIN" ? Role.ADMIN : Role.TEACHING_STAFF,
+      role === "ADMIN" ? null : school.campuses[0].id,
+    );
+    await signInThroughUi(page, me);
+    return school;
+  }
+  async function seed(school: { id: string; campuses: { id: string }[] }) {
+    const session = await db.academicSession.create({
+      data: {
+        tenantId: school.id,
+        label: "2026/2027",
+        startDate: new Date("2026-09-01"),
+        endDate: new Date("2027-07-31"),
+        status: "ACTIVE",
+      },
+    });
+    const group = await db.classGroup.create({ data: { tenantId: school.id, name: "JSS 1" } });
+    const arm = await db.classArm.create({ data: { tenantId: school.id, classGroupId: group.id, name: "A", capacity: 30 } });
+    await db.classArm.create({ data: { tenantId: school.id, classGroupId: group.id, name: "B" } });
+    const subject = await db.subject.create({ data: { tenantId: school.id, name: "Mathematics" } });
+    await db.subjectOffering.create({ data: { tenantId: school.id, classGroupId: group.id, subjectId: subject.id } });
+    return { session, group, arm, subject };
+  }
+  const student = (schoolId: string, over: Record<string, unknown> = {}) =>
+    db.studentRecord.create({
+      data: {
+        tenantId: schoolId,
+        firstName: "Sade",
+        lastName: "Okoro",
+        dateOfBirth: new Date("2012-05-01"),
+        admissionNo: `ADM/${Math.random().toString(36).slice(2, 8)}`,
+        ...over,
+      },
+    });
+
+  test("students: empty, a list (long names, an archived one), the add form with errors, the import dialog with a report, and the filters", async ({
+    page,
+    isMobile,
+  }) => {
+    test.setTimeout(300_000);
+    const school = await setup(page);
+    await page.goto(`/schools/${school.code}/people?section=students`);
+    await expect(page.getByText("No students yet. Add the first one, or import a file.")).toBeVisible();
+    await checkScreen(page, "/people students (empty)", isMobile);
+
+    const { session, arm } = await seed(school);
+    const sade = await student(school.id, {
+      firstName: "Oluwaseun-Adebayo-Chukwuemeka",
+      lastName: "Okonkwo-Abdulrahman-Wellington",
+      admissionNo: "ADM/LONG/0001",
+    });
+    await db.studentEnrollment.create({ data: { tenantId: school.id, studentId: sade.id, sessionId: session.id, classArmId: arm.id } });
+    await student(school.id, { firstName: "Tunde", lastName: "Bello", campusId: school.campuses[0].id });
+    await student(school.id, { firstName: "Old", lastName: "Boy", archivedAt: new Date() });
+    await page.goto(`/schools/${school.code}/people?section=students`);
+    await expect(page.getByText("2 students")).toBeVisible();
+    await checkScreen(page, "/people students (list)", isMobile);
+    await page.getByLabel("Show", { exact: true }).selectOption("all");
+    await expect(page.getByText("3 students")).toBeVisible();
+    await checkScreen(page, "/people students (everyone, incl. archived)", isMobile);
+    await page.getByLabel("Show", { exact: true }).selectOption("live");
+    await page.getByLabel("Search", { exact: true }).fill("zzzz");
+    await expect(page.getByText("No student matches these filters.")).toBeVisible();
+    await checkScreen(page, "/people students (nothing matches)", isMobile);
+    await page.getByLabel("Search", { exact: true }).fill("");
+
+    await page.getByRole("button", { name: "Add student" }).click();
+    await dialog(page).getByRole("button", { name: "Add student" }).click();
+    await expect(dialog(page).getByText("Give the student's first name.")).toBeVisible();
+    await checkScreen(page, "/people add student (with errors)", isMobile);
+    await page.keyboard.press("Escape");
+
+    await page.getByRole("button", { name: "Import…" }).click();
+    await checkScreen(page, "/people import (before choosing a file)", isMobile);
+    await dialog(page)
+      .locator("#import-file")
+      .setInputFiles({
+        name: "students.csv",
+        mimeType: "text/csv",
+        buffer: Buffer.from("first_name,last_name,date_of_birth\r\nSade,Okoro,2012-05-01\r\n,NoFirst,2012-02-30\r\n"),
+      });
+    await dialog(page).getByRole("button", { name: "Check the file" }).click();
+    await expect(dialog(page).getByRole("table", { name: "Rows with problems" })).toBeVisible();
+    await checkScreen(page, "/people import (report with problems)", isMobile);
+    await dialog(page)
+      .locator("#import-file")
+      .setInputFiles({
+        name: "students.csv",
+        mimeType: "text/csv",
+        buffer: Buffer.from("first_name,last_name,date_of_birth\r\nNew,Pupil,2012-05-01\r\n"),
+      });
+    await dialog(page).getByRole("button", { name: "Check the file" }).click();
+    await expect(dialog(page).getByText("The file is fine: 1 to add.")).toBeVisible();
+    await checkScreen(page, "/people import (clean report)", isMobile);
+  });
+
+  test("a student's page: details, classes, guardians, and each dialog (enrol, move, withdraw, add and edit a guardian, archive)", async ({
+    page,
+    isMobile,
+  }) => {
+    test.setTimeout(300_000);
+    const school = await setup(page);
+    const { session, arm } = await seed(school);
+    const s = await student(school.id, {
+      firstName: "Oluwaseun-Adebayo",
+      lastName: "Okonkwo-Abdulrahman-Wellington",
+      middleName: "Chukwuemeka",
+    });
+    await page.goto(`/schools/${school.code}/people/students/${s.id}`);
+    await expect(page.getByText("Not in a class yet.")).toBeVisible();
+    await expect(page.getByText("No guardian recorded yet.")).toBeVisible();
+    await checkScreen(page, "/people student (no class, no guardian)", isMobile);
+
+    await page.getByRole("button", { name: "Enrol in a class" }).click();
+    await dialog(page).getByRole("button", { name: "Enrol student" }).click();
+    await expect(dialog(page).getByText("Choose a class.")).toBeVisible();
+    await checkScreen(page, "/people enrol dialog (with an error)", isMobile);
+    await page.keyboard.press("Escape");
+    await db.studentEnrollment.create({ data: { tenantId: school.id, studentId: s.id, sessionId: session.id, classArmId: arm.id } });
+    const mum = await db.guardianRecord.create({
+      data: { tenantId: school.id, firstName: "Mary", lastName: "Okonkwo-Abdulrahman", phone: "08031234567", email: "mary@example.com" },
+    });
+    const dad = await db.guardianRecord.create({ data: { tenantId: school.id, firstName: "Gbenga", lastName: "Okonkwo-Abdulrahman" } });
+    await db.guardianLink.create({
+      data: { tenantId: school.id, studentId: s.id, guardianId: mum.id, relationship: "MOTHER", isPrimary: true },
+    });
+    await db.guardianLink.create({ data: { tenantId: school.id, studentId: s.id, guardianId: dad.id, relationship: "FATHER" } });
+    await page.reload();
+    await expect(page.getByText("Primary contact", { exact: true })).toBeVisible();
+    await checkScreen(page, "/people student (enrolled, two guardians)", isMobile);
+
+    await page.getByRole("button", { name: /^Move / }).click();
+    await checkScreen(page, "/people move dialog", isMobile);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: /^Withdraw / }).click();
+    await dialog(page).getByRole("button", { name: "Withdraw student" }).click();
+    await expect(dialog(page).getByText("Say why, in at least 5 characters.")).toBeVisible();
+    await checkScreen(page, "/people withdraw dialog (with an error)", isMobile);
+    await page.keyboard.press("Escape");
+
+    await page.getByRole("button", { name: "Add guardian" }).click();
+    await checkScreen(page, "/people add guardian (new person)", isMobile);
+    await dialog(page).getByLabel("Who is it?").selectOption("existing");
+    await dialog(page).getByLabel("Search guardians").fill("mar");
+    await expect(dialog(page).getByLabel("Guardian").locator("option", { hasText: "Mary" })).toHaveCount(1);
+    await checkScreen(page, "/people add guardian (from the register)", isMobile);
+    // Escape inside a search box only clears it (the browser's own behaviour), so close with the button.
+    await dialog(page).getByRole("button", { name: "Close" }).click();
+    await page.getByRole("button", { name: /^Edit Gbenga/ }).click();
+    await checkScreen(page, "/people edit guardian dialog", isMobile);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: /^Remove Gbenga/ }).click();
+    await checkScreen(page, "/people remove guardian confirmation", isMobile);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: /^Archive / }).click();
+    await dialog(page).getByRole("button", { name: "Archive student" }).click();
+    await expect(dialog(page).getByText("The student is still enrolled. Withdraw them from the class first.")).toBeVisible();
+    await checkScreen(page, "/people archive confirmation (refused)", isMobile);
+  });
+
+  test("staff: the list, a record with no sign-in / an invitation out / a linked account, and each dialog (add, invite, link, add a subject, archive)", async ({
+    page,
+    isMobile,
+  }) => {
+    test.setTimeout(300_000);
+    const school = await setup(page);
+    await page.goto(`/schools/${school.code}/people?section=staff`);
+    await expect(page.getByText("No staff yet. Add the first member of staff.")).toBeVisible();
+    await checkScreen(page, "/people staff (empty)", isMobile);
+
+    const { group, arm, subject } = await seed(school);
+    const plain = await db.staffRecord.create({
+      data: {
+        tenantId: school.id,
+        category: "TEACHING",
+        firstName: "Oluwaseun-Adebayo",
+        lastName: "Okonkwo-Abdulrahman-Wellington",
+        email: "long.name@example.com",
+      },
+    });
+    const invited = await db.staffRecord.create({
+      data: { tenantId: school.id, category: "NON_TEACHING", firstName: "Ivy", lastName: "Invited", email: "ivy@example.com" },
+    });
+    await db.invitation.create({
+      data: {
+        tenantId: school.id,
+        email: "ivy@example.com",
+        role: Role.NON_TEACHING_STAFF,
+        staffRecordId: invited.id,
+        tokenHash: `a11y-${Math.random().toString(36).slice(2)}`,
+        expiresAt: new Date(Date.now() + 86_400_000),
+      },
+    });
+    const member = await createUser({ name: "Lina Linked" });
+    await addMembership(member.id, school.id, Role.TEACHING_STAFF, school.campuses[0].id);
+    const linked = await db.staffRecord.create({
+      data: {
+        tenantId: school.id,
+        category: "TEACHING",
+        firstName: "Lina",
+        lastName: "Linked",
+        userId: member.id,
+        campusId: school.campuses[0].id,
+      },
+    });
+    await db.staffRecord.create({
+      data: { tenantId: school.id, category: "TEACHING", firstName: "Old", lastName: "Hand", archivedAt: new Date() },
+    });
+    await db.staffSubjectAssignment.create({
+      data: { tenantId: school.id, staffRecordId: linked.id, subjectId: subject.id, classArmId: arm.id },
+    });
+    expect(group.id).toBeTruthy();
+    await page.goto(`/schools/${school.code}/people?section=staff`);
+    await expect(page.getByText("3 people")).toBeVisible();
+    await checkScreen(page, "/people staff (list)", isMobile);
+
+    await page.getByRole("button", { name: "Add staff member" }).click();
+    await dialog(page).getByRole("button", { name: "Add staff member" }).click();
+    await expect(dialog(page).getByText("Give their first name.")).toBeVisible();
+    await checkScreen(page, "/people add staff (with errors)", isMobile);
+    await page.keyboard.press("Escape");
+
+    await page.goto(`/schools/${school.code}/people/staff/${plain.id}`);
+    await expect(page.getByText(/No sign-in yet/)).toBeVisible();
+    await checkScreen(page, "/people staff record (no sign-in)", isMobile);
+    await page.getByRole("button", { name: /^Invite / }).click();
+    await checkScreen(page, "/people invite confirmation", isMobile);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: /^Link / }).click();
+    await checkScreen(page, "/people link account dialog", isMobile);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Add a subject" }).click();
+    await dialog(page).getByRole("button", { name: "Add", exact: true }).click();
+    await expect(dialog(page).getByText("Choose a subject.")).toBeVisible();
+    await checkScreen(page, "/people add subject dialog (with errors)", isMobile);
+    await page.keyboard.press("Escape");
+
+    await page.goto(`/schools/${school.code}/people/staff/${invited.id}`);
+    await expect(page.getByText(/An invitation has been sent/)).toBeVisible();
+    await checkScreen(page, "/people staff record (invited)", isMobile);
+
+    await page.goto(`/schools/${school.code}/people/staff/${linked.id}`);
+    await expect(page.getByText(/Linked to/)).toBeVisible();
+    await db.tenantMembership.update({
+      where: { userId_tenantId: { userId: member.id, tenantId: school.id } },
+      data: { role: Role.NON_TEACHING_STAFF },
+    });
+    await page.reload();
+    await expect(page.getByText(/no longer matches this record/)).toBeVisible();
+    await checkScreen(page, "/people staff record (linked, with its notes and a subject)", isMobile);
+    await page.getByRole("button", { name: /^Unlink / }).click();
+    await checkScreen(page, "/people unlink confirmation", isMobile);
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: /^Archive / }).click();
+    await dialog(page).getByRole("button", { name: "Archive record" }).click();
+    await expect(dialog(page).getByText("Subjects are still assigned to this person. Remove those first.")).toBeVisible();
+    await checkScreen(page, "/people archive staff (refused)", isMobile);
+  });
+
+  test("a member of staff looking: the same screens with nothing that writes", async ({ page, isMobile }) => {
+    test.setTimeout(300_000);
+    const school = await setup(page, "TEACHING_STAFF");
+    const { session, arm } = await seed(school);
+    const s = await student(school.id);
+    await db.studentEnrollment.create({ data: { tenantId: school.id, studentId: s.id, sessionId: session.id, classArmId: arm.id } });
+    const g = await db.guardianRecord.create({ data: { tenantId: school.id, firstName: "Mary", lastName: "Okoro", phone: "08031234567" } });
+    await db.guardianLink.create({
+      data: { tenantId: school.id, studentId: s.id, guardianId: g.id, relationship: "MOTHER", isPrimary: true },
+    });
+    const staff = await db.staffRecord.create({
+      data: { tenantId: school.id, category: "TEACHING", firstName: "Tola", lastName: "Bello" },
+    });
+    await page.goto(`/schools/${school.code}/people?section=students`);
+    await expect(page.getByText("Only an administrator can change this.")).toBeVisible();
+    await checkScreen(page, "/people students (read-only)", isMobile);
+    await page.goto(`/schools/${school.code}/people/students/${s.id}`);
+    await expect(page.getByText("Primary contact", { exact: true })).toBeVisible();
+    await checkScreen(page, "/people student (read-only)", isMobile);
+    await page.goto(`/schools/${school.code}/people?section=staff`);
+    await checkScreen(page, "/people staff (read-only)", isMobile);
+    await page.goto(`/schools/${school.code}/people/staff/${staff.id}`);
+    await checkScreen(page, "/people staff record (read-only)", isMobile);
+    for (const section of ["sessions", "classes", "assessment", "grading"]) {
+      await page.goto(`/schools/${school.code}/academics?section=${section}`);
+      await expect(page.getByText("Only an administrator can change this.")).toBeVisible();
+      await checkScreen(page, `/academics ${section} (read-only)`, isMobile);
+    }
   });
 });
 
@@ -642,9 +1355,27 @@ test.describe("dev email inbox widget (the staging-mode server)", () => {
     // A list and a message, with awkward lengths: a long address, a long subject, an unbroken link.
     const now = Date.now();
     const emails = [
-      { id: "a", to: "a-rather-long-address-for-a-person@some-school-with-a-long-domain-name.example.com", subject: "Reset your Octalve Edu password — and a subject long enough to need truncating in the list", text: "Someone asked to reset the password.\n\nOpen this link within 30 minutes:\nhttps://school.example.com/reset-password#token=aVeryLongTokenWithoutAnyBreaksInItAtAllAbcdefghijklmnopqrstuvwxyz0123456789\n\nIf you didn't ask, ignore this.", sentAt: new Date(now).toISOString() },
-      { id: "b", to: "teacher@school.example", subject: "Two-step verification is on for your account", text: "Two-step verification was just turned on.", sentAt: new Date(now - 60_000).toISOString() },
-      { id: "c", to: "admin@school.example", subject: "Your password was changed", text: "The password was changed.", sentAt: new Date(now - 120_000).toISOString() },
+      {
+        id: "a",
+        to: "a-rather-long-address-for-a-person@some-school-with-a-long-domain-name.example.com",
+        subject: "Reset your Octalve Edu password — and a subject long enough to need truncating in the list",
+        text: "Someone asked to reset the password.\n\nOpen this link within 30 minutes:\nhttps://school.example.com/reset-password#token=aVeryLongTokenWithoutAnyBreaksInItAtAllAbcdefghijklmnopqrstuvwxyz0123456789\n\nIf you didn't ask, ignore this.",
+        sentAt: new Date(now).toISOString(),
+      },
+      {
+        id: "b",
+        to: "teacher@school.example",
+        subject: "Two-step verification is on for your account",
+        text: "Two-step verification was just turned on.",
+        sentAt: new Date(now - 60_000).toISOString(),
+      },
+      {
+        id: "c",
+        to: "admin@school.example",
+        subject: "Your password was changed",
+        text: "The password was changed.",
+        sentAt: new Date(now - 120_000).toISOString(),
+      },
     ];
     await page.route("**/api/v1/dev/email-inbox", (route) =>
       route.request().method() === "GET"
