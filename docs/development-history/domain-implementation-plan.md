@@ -2842,3 +2842,12 @@ Record: task `0010`, branch `claude/platform-followups`, amends ADR 0016 (Propos
 **F5 — Academic setup editing controls for a campus administrator.** Follow-up PR: hide the campus picker (their campus is fixed), show school-wide rows read-only ("set by the school"), keep subjects, grade scales and assessment schemes read-only; e2e plus axe in both themes.
 **Order:** F1, F2 (platform, one PR), F3, F4 (one PR), F5 (own PR). Mutation passes stay deferred to the end of Phase 2.
 
+
+##### As built — platform follow-ups F1–F4 (2026-10-11)
+Record: task `0010`, branch `claude/platform-followups`; migrations `20261023090000_tenant_stats` and `20261023090100_first_admin_invite` (both additive; applied to the `octalve_edu` dev database).
+- **F1 counters:** as designed. `TenantStats` (RLS forced, owner-only policy), delta triggers on membership/student/campus, recount backfill, `tenant_stats_recompute`, `platform_school_stats()`; EXECUTE on the apply/recompute functions revoked from PUBLIC. The Platform page shows members · students · campuses and a "No administrator" mark. Deviation (a) of task 0009 is reversed.
+- **F2 re-invite:** as designed. `platform_authorize_first_admin_invite` counts live inside the school (not the counter), the service revokes every open `ADMIN` invitation and writes the new one in the same transaction, both audit logs record it; `pnpm platform-admin:invite-first-admin` requires `--as <platform administrator>` and prints the link.
+- **F3 attendance scoping:** as designed. `lib/attendance/access.ts`; the same rule guards the roll-call write; new `GET academics/attendance/arms` feeds the attendance screen. A teacher with no assignment sees and writes no arm.
+- **F4 public verification:** `studentName` in full, no admission number, `X-Robots-Tag: noindex, nofollow` on every response.
+- **F5 (Academic setup editing for a campus administrator)** is NOT built here; it is its own PR.
+- **Tests:** integration `platform-stats`, `platform-first-admin`, `invite-first-admin-script`; API `platform` (counters, re-invite), `attendance-access`, `results` (verification); e2e `platform`, `attendance`. Mutation pass: **NOT RUN — pending, end of Phase 2.**

@@ -1,7 +1,7 @@
 # [0010]: Platform follow-ups - counters, first-administrator re-invite, teachers' attendance scoping, public verification, campus-admin setup controls
 
 - **Period / Focus:** 2026-10-11 to (open) - the backlog the maintainer approved after TASK-0009 ("go on with all your recommendations")
-- **Status:** In Progress - design committed; no code yet
+- **Status:** In Progress - F1-F4 built and committed; the full suite is **(running)**; F5 not started
 - **Priority:** High
 - **Assignee:** Claude Agent / Maintainer
 - **Target Branch / PR:** `claude/platform-followups` -> octalve-core `dev` (F5 in its own PR)

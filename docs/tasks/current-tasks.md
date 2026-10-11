@@ -20,7 +20,7 @@
 
 | 8 | [TASK-0008](0008-post-phase-1-verification-and-defect-fixes.md) | Post-Phase-1 verification and defect fixes | [x] Completed (suite 1757 passed / 0 failed / 23 skipped; landed in octalve-core `dev`) | 2026-10-11 UTC | 2026-10-11 UTC | [PR #6](https://github.com/octalve-core/octalve-edu/pull/6) |
 | 9 | [TASK-0009](0009-campus-admins-and-platform-superadmin.md) | Campus administrators and the platform superadmin (C1–C8) | [x] Completed (landed in octalve-core `dev`; full suite 1842 passed / 3 failed (shell e2e: the phone one is a pre-existing flake on `dev` too; the two desktop ones unexplained) / 23 skipped) | 2026-10-11 UTC | 2026-10-11 UTC | [PR #7](https://github.com/octalve-core/octalve-edu/pull/7) |
-| 10 | [TASK-0010](0010-platform-followups.md) | Platform follow-ups: counters, first-admin re-invite, teachers' attendance scoping, public verification, campus-admin setup controls | [~] In Progress (design committed) | 2026-10-11 UTC | — | `claude/platform-followups` |
+| 10 | [TASK-0010](0010-platform-followups.md) | Platform follow-ups: counters, first-admin re-invite, teachers' attendance scoping, public verification, campus-admin setup controls | [~] In Progress (F1-F4 built; full suite (running); F5 not started) | 2026-10-11 UTC | — | `claude/platform-followups` |
 ---
 
 ## Detailed Milestone Checklist
