@@ -1,7 +1,7 @@
 # [0008]: Post-Phase-1 verification and defect fixes
 
 - **Period / Focus:** 2026-10-11 (verify what Phase 1.3–1.8 claimed, fix what the review found)
-- **Status:** In Progress — **(running)** full one-lane suite on `claude/phase-1-3-attendance`
+- **Status:** In Progress — full suite finished 2026-10-11: 1728 passed, 6 failed, 23 skipped (stale e2e tests, below)
 - **Priority:** High
 - **Assignee:** Claude Agent / Maintainer
 - **Target Branch / PR:** `claude/phase-1-3-attendance` (HEAD `ddfb1c6`) / no PR yet
@@ -27,8 +27,11 @@ Know the real test state of the Phase 1 stack (1.2–1.8, merged only into featu
 
 ### Module A: Verification
 - [x] Static gate on the newest tree: typecheck, lint, format:check clean (2026-10-11)
-- [~] **(running)** `pnpm build` then the whole suite, one lane (`TEST_LANE=1 TEST_TIMEOUT_SCALE=3`), 1,757 tests, started 2026-10-11 ~10:20 local; output in the scratchpad `full-run.txt`
-- [ ] Record the real result here (passed / failed / skipped, and every failure's cause)
+- [x] `pnpm build` then the whole suite, one lane (`TEST_LANE=1 TEST_TIMEOUT_SCALE=3`), on `claude/phase-1-3-attendance` HEAD `ddfb1c6`, 1.5 h: **1728 passed, 6 failed, 23 skipped** (the skips are viewport-specific tests that skip themselves on the other project)
+- [x] The 6 failures are all stale e2e expectations, none an application defect, but they show the earlier "all green" claims did not include the e2e suite: (1) `academics.spec.ts:51` (desktop + phone): the page now has a fifth section, *Attendance* (added in 1.3), the test still expects four; (2) `academics.spec.ts:69` (desktop + phone): the staff read-only test lands on Attendance instead of Sessions, so "Sessions" is not found; (3) `shell.spec.ts:39` (desktop) and `shell.spec.ts:208` (phone): *Settings* is now a link (1.7) while the tests still expect "coming soon" text. Fixing the tests is part of this task (ISS-0012).
+
+### Module A2: Stale tests the suite exposed
+- [ ] Update `academics.spec.ts` (five sections, Attendance first) and `shell.spec.ts` (Settings is a link) to match the shipped behaviour, then re-run those specs on desktop and phone
 
 ### Module B: Defects found by reading (not yet reproduced)
 - [ ] Finance: `receiptNo` from a count of successful payments, no unique constraint → duplicate receipt numbers under concurrency; manual payment accepts a client `receiptNo`
@@ -47,7 +50,7 @@ Know the real test state of the Phase 1 stack (1.2–1.8, merged only into featu
 ## 4. Unified Verification & Quality Gates
 - [x] `tsc --noEmit` / typecheck clean (0 errors) on `ddfb1c6`
 - [x] Lint & formatting clean on `ddfb1c6`
-- [~] **(running)** full suite — result not known yet
+- [x] full suite: 1728 passed / 6 failed (stale tests) / 23 skipped — see Module A
 - [ ] Each fix: test fails first, then passes
 
 ---
