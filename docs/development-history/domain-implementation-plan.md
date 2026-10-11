@@ -2811,3 +2811,11 @@ Staff, students, parents are unchanged.
 5. Is a suspended school simply "cannot sign in" [yes], or must its data also be hidden from public verification links?
 
 **Order of work.** a) this design (committed alone) → b) your answers → c) migration + helper + tests → d) route review in three groups → e) Users page and a platform page → f) docs, ADR (Proposed), full suite → g) PR into `dev`. Mutation pass: not run — pending, end of Phase 2 (targets: the CHECK, the campus comparison in `canAdminister`, "cannot touch an admin", the platform functions' caller check, the platform-admin-cannot-read-tenant-tables guarantee).
+
+##### Maintainer's answers to the campus-admin / platform-superadmin questions (2026-10-11)
+1. Campus admin is a **role value** (`CAMPUS_ADMIN`), not a flag — as designed.
+2. A campus admin **may manage staff and students (and guardians) of their campus**, below admin level — as designed.
+3. A campus admin **may record manual payments and see their campus's invoices**, and **may not configure fee structures** (school admin only) — as designed.
+4. The platform superadmin has **no access to a school's data in this phase**, and the maintainer **wants an audited support-access feature later**. That feature is added to the backlog with these requirements, to be designed separately before any code: time-boxed, a typed reason, visible to the school's own administrators, read-only by default, every read audited, and never a bypass of row-level security (ADR 0001).
+5. A suspended school simply **cannot sign in** — as designed.
+The design therefore stands as written (C1–C8 with the defaults) and is the plan for building after the review fixes (task 0008) are done. Status: answered; the migration has not been written.

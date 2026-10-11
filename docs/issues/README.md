@@ -30,6 +30,10 @@ Every known or suspected problem, with severity, kind, where it is and how sure 
 
 **Evidence levels:** *Read* = found by reading code (not yet proved); *Reproduced* = a failing test or run exists; *Reported* = from a user/maintainer.
 
+## Planned work that closes issues
+- **Campus admins and a platform superadmin** (design answered 2026-10-11): closes the gap that an `ADMIN` is always school-wide and that nobody can create or suspend a school except through setup.
+- **Audited support access** (maintainer wants it later): design before code; requirements recorded in the plan.
+
 ## Suspects not yet investigated
 - Every other `schools/[code]` route added in 1.3–1.8 for role checks beyond tenant membership (campus scoping in attendance, timetable, announcements, settings).
 - The step-up MFA flow in 1.7: whether every sensitive settings change really requires a fresh proof, and how long a proof lasts.
