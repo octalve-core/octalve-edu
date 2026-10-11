@@ -6,7 +6,6 @@ import { SelectField } from "@/components/ui/SelectField";
 import { LiveNotice, ListState, type Notice } from "./parts";
 import { sendJson } from "@/components/auth/postJson";
 import { useApi } from "./useApi";
-import type { ClassGroupView } from "./model";
 import { AttendanceStatus } from "@/lib/attendance/rules";
 import type { StudentRollCallEntry } from "@/lib/attendance/service";
 
@@ -30,23 +29,12 @@ export function AttendancePanel({ schoolCode, readOnly = false }: { schoolCode: 
   const [notice, setNotice] = useState<Notice>(null);
   const [saving, setSaving] = useState(false);
 
-  // 1. Fetch Class Groups to get available arms
-  const { reply: groupsReply, loading: groupsLoading } = useApi(
-    `/api/v1/schools/${schoolCode}/academics/class-groups?limit=50&status=live`,
-  );
+  // 1. Fetch the arms this person may take or read a roll for (a teacher: only the ones they are assigned to - ISS-0013)
+  const { reply: groupsReply, loading: groupsLoading } = useApi(`/api/v1/schools/${schoolCode}/academics/attendance/arms`);
 
   const armOptions = useMemo(() => {
-    const groups = (groupsReply?.data?.classGroups as ClassGroupView[] | undefined) ?? [];
-    const list: { id: string; label: string }[] = [];
-    for (const g of groups) {
-      for (const arm of g.arms) {
-        list.push({
-          id: arm.id,
-          label: `${g.name} — ${arm.name}`,
-        });
-      }
-    }
-    return list;
+    const arms = (groupsReply?.data?.arms as { id: string; name: string; classGroup: { name: string } }[] | undefined) ?? [];
+    return arms.map((arm) => ({ id: arm.id, label: `${arm.classGroup.name} — ${arm.name}` }));
   }, [groupsReply]);
 
   const selectedArmId = explicitArmId || (armOptions.length > 0 ? armOptions[0].id : "");
@@ -219,7 +207,7 @@ export function AttendancePanel({ schoolCode, readOnly = false }: { schoolCode: 
             options={
               armOptions.length > 0
                 ? armOptions.map((o) => ({ value: o.id, label: o.label }))
-                : [{ value: "", label: groupsLoading ? "Loading arms..." : "No active arms found" }]
+                : [{ value: "", label: groupsLoading ? "Loading arms..." : "No class arms available" }]
             }
           />
         </div>
@@ -308,6 +296,12 @@ export function AttendancePanel({ schoolCode, readOnly = false }: { schoolCode: 
             <div className="text-2xl font-bold text-fg mt-1">{summary.rate}%</div>
           </div>
         </div>
+      )}
+
+      {!groupsLoading && armOptions.length === 0 && (
+        <p className="rounded-2xl border border-dashed border-line-strong p-6 text-center text-sm text-fg-muted">
+          No class arms are assigned to you. Ask a school administrator to assign you to a class, then come back.
+        </p>
       )}
 
       {/* Roster Touch Grid */}

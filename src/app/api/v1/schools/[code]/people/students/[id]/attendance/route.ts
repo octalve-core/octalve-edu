@@ -2,6 +2,7 @@ import { ok } from "@/lib/api/envelope";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { READ_ROLES, isPlausibleId, notFound } from "@/lib/people/http";
 import { studentReadScope } from "@/lib/auth/campus-scope";
+import { studentAccess } from "@/lib/attendance/access";
 import { attendanceFailure } from "@/lib/attendance/http";
 import { getStudentAttendanceHistory } from "@/lib/attendance/service";
 
@@ -18,6 +19,10 @@ export const GET = withAuth(
       const outOfScope = await studentReadScope(auth, id);
       if (outOfScope) return outOfScope;
     }
+
+    // Staff read only the students their campus and (for a teacher) their arms allow; anything else is the 404 an unknown id gets (ISS-0013).
+    const noAccess = await studentAccess(auth, id);
+    if (noAccess) return noAccess;
 
     const result = await auth.tenant.run((tx) => getStudentAttendanceHistory(tx, auth.tenant.tenantId, id));
 

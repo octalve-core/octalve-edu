@@ -33,8 +33,10 @@ Close what TASK-0009 left open: the platform page shows coarse counters and whic
 - [x] `scripts/invite-first-admin.mjs` + `pnpm platform-admin:invite-first-admin` (`--as` required, prints the link instead of mailing)
 - Result: integration (first-admin 7, script 4, stats 17), route-role guard (8), API platform, e2e platform on desktop and phone - 57 passed after `pnpm build`; lint, typecheck clean. NOT run: the full suite (end of task), axe dark theme.
 ### F3: teachers' attendance reads and roll-call writes
-- [ ] tests first (campus x arm matrix), existing attendance spec adjusted on purpose
-- [ ] service/route rule; arm picker filtered
+- [x] tests first: `tests/api/attendance-access.spec.ts` (49: campus x arm matrix for roll-call reads, student history, roll-call writes and the arm list) seen failing against the F2 build (22 failed, 27 passed - the "allowed" cases passed, every "must be 404" case failed); `tests/e2e/attendance.spec.ts` gained a teacher test (written before the UI, NOT run failing first). The existing `tests/api/attendance.spec.ts` teacher was given a staff record and an assignment to armA ON PURPOSE (the new rule) - nothing loosened
+- [x] `src/lib/attendance/access.ts` (`armAccess`, `studentAccess`, `listRollCallArms`); the roll-call GET and POST and the student-history GET call it; new `GET academics/attendance/arms`; the attendance screen uses that list and says "No class arms are assigned to you" when empty
+- Result: attendance-access 49, attendance 15ish, campus-admin-academics, route-role guard, e2e attendance (desktop + phone), phase-1 lifecycle walk - 81 + 11 passed after `pnpm build`; typecheck, lint clean. NOT run: the full suite (end of task).
+- Consequence for the maintainer: a teacher with NO assignment reads and writes no arm until an administrator gives them one; the "assigned" definition is a subject assignment OR a timetable slot of their staff record. A teaching member with no staff record has no arms.
 ### F4: public verification
 - [ ] test first; service, route header, form
 ### F5: Academic setup editing for a campus administrator (own PR)

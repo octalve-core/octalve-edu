@@ -5,6 +5,7 @@ import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { isPlausibleId, notFound } from "@/lib/academics/http";
 import { READ_ROLES, WRITE_ROLES, isoDateField, bulkMarkAttendanceSchema, attendanceFailure } from "@/lib/attendance/http";
 import { armReadScope, armScope } from "@/lib/auth/campus-scope";
+import { armAccess } from "@/lib/attendance/access";
 import { getArmRollCall, markArmAttendance } from "@/lib/attendance/service";
 
 type Ctx = { params: Promise<{ code: string; id: string }> };
@@ -24,6 +25,10 @@ export const GET = withAuth(
       const outOfScope = await armReadScope(auth, id);
       if (outOfScope) return outOfScope;
     }
+
+    // Staff read only the arms their campus and (for a teacher) their assignments allow; anything else is the 404 an unknown id gets (ISS-0013).
+    const noAccess = await armAccess(auth, id);
+    if (noAccess) return noAccess;
 
     const dateStr = query.date ?? new Date().toISOString().split("T")[0];
     const role = auth.tenant.role;
@@ -52,6 +57,10 @@ export const POST = withAuth(
       const outOfScope = await armScope(auth, id);
       if (outOfScope) return outOfScope;
     }
+
+    // The same rule as the read: a teacher who cannot read an arm cannot write to it (ISS-0013).
+    const noAccess = await armAccess(auth, id);
+    if (noAccess) return noAccess;
 
     const role = auth.tenant.role;
 
