@@ -9,8 +9,15 @@ import { generateInvoicesForPeriod, queryInvoices } from "@/lib/finance/service"
 // GET /api/v1/schools/[code]/finance/invoices
 export const GET = withAuth(
   validate({ query: queryInvoicesSchema }, async (_req, auth: TenantAuthContext, _ctx: unknown, { query }) => {
-    // If student, filter by student's own record
-    const result = await queryInvoices(auth.tenant.tenantId, {
+    // Who sees which invoices is decided in the service (invoiceVisibility): finance staff all, a campus administrator their campus's, a
+    // student or guardian only their own.
+    const requester = {
+      userId: auth.userId,
+      roles: [auth.tenant.role],
+      permissions: [...auth.tenant.permissions],
+      campusId: auth.tenant.campusId,
+    };
+    const result = await queryInvoices(auth.tenant.tenantId, requester, {
       periodId: query.periodId,
       studentId: query.studentId,
       status: query.status,
@@ -21,7 +28,7 @@ export const GET = withAuth(
   }),
   {
     tenant: true,
-    roles: [Role.ADMIN, Role.TEACHING_STAFF, Role.NON_TEACHING_STAFF, Role.PARENT, Role.STUDENT],
+    roles: [Role.ADMIN, Role.CAMPUS_ADMIN, Role.TEACHING_STAFF, Role.NON_TEACHING_STAFF, Role.PARENT, Role.STUDENT],
     permissions: [Permission.CAN_MANAGE_FINANCE],
   },
 );

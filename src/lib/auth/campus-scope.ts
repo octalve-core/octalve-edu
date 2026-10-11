@@ -119,12 +119,13 @@ export const timetableSlotScope = (auth: Auth, id: string) =>
     return slot?.classArm.classGroup.campusId;
   });
 
+/// An invoice belongs to its student's campus. Money records are not "visible but off-limits": the invoice of a student with NO campus is the school
+/// administrator's alone, so to a campus administrator it is "no such invoice" (404), not the 403 other school-wide rows get.
 export const invoiceScope = (auth: Auth, id: string) =>
-  lookup(
-    auth,
-    "invoice",
-    async (tx) => (await tx.invoice.findFirst({ where: { id }, select: { student: { select: { campusId: true } } } }))?.student.campusId,
-  );
+  lookup(auth, "invoice", async (tx) => {
+    const row = await tx.invoice.findFirst({ where: { id }, select: { student: { select: { campusId: true } } } });
+    return row?.student.campusId ?? undefined;
+  });
 
 /// The audience a CAMPUS_ADMIN may put on an announcement: their own campus (the default on create; naming any other, or the whole school, is a 403)
 /// and, if a class arm is named, an arm of that campus. Other roles pass through unchanged — teachers keep the audience rules they had, and an ADMIN

@@ -33,6 +33,24 @@ export interface RequesterContext {
   userId: string;
   roles: string[];
   permissions: string[];
+  /// The member's campus (a campus administrator sees only the invoices of that campus's students).
+  campusId?: string | null;
+}
+
+/// Which invoices this member may see. The school's finance people (an ADMIN, or anyone holding CAN_MANAGE_FINANCE) see them all; a campus
+/// administrator sees only their campus's students' - and that wins over a permission, so a campus administrator who is also given
+/// CAN_MANAGE_FINANCE is still a campus administrator; everyone else sees only their own invoices (a student's) and their linked children's (a
+/// guardian's). A student with no campus belongs to no campus administrator.
+function invoiceVisibility(requester: RequesterContext): Prisma.InvoiceWhereInput {
+  if (requester.roles.includes("CAMPUS_ADMIN")) {
+    return requester.campusId ? { student: { campusId: requester.campusId } } : { id: { in: [] } };
+  }
+  if (requester.roles.includes("ADMIN") || requester.permissions.includes("CAN_MANAGE_FINANCE")) return {};
+  return {
+    student: {
+      OR: [{ userId: requester.userId }, { guardians: { some: { status: "APPROVED", guardian: { userId: requester.userId } } } }],
+    },
+  };
 }
 
 /**
@@ -215,13 +233,14 @@ export async function generateInvoicesForPeriod(
 /**
  * Queries invoices with role-based filtering and pagination.
  */
-export async function queryInvoices(tenantId: VerifiedTenantId, filter?: InvoiceFilter) {
+export async function queryInvoices(tenantId: VerifiedTenantId, requester: RequesterContext, filter?: InvoiceFilter) {
   return forTenant(tenantId).transaction(async (tx) => {
     const page = Math.max(1, filter?.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, filter?.pageSize ?? 25));
     const skip = (page - 1) * pageSize;
 
     const where: Prisma.InvoiceWhereInput = {
+      AND: [invoiceVisibility(requester)],
       tenantId,
       ...(filter?.periodId ? { periodId: filter.periodId } : {}),
       ...(filter?.studentId ? { studentId: filter.studentId } : {}),
@@ -264,7 +283,7 @@ export async function getStudentInvoice(tenantId: VerifiedTenantId, invoiceId: s
       where: { tenantId, id: invoiceId },
       include: {
         student: {
-          select: { id: true, firstName: true, middleName: true, lastName: true, admissionNo: true, userId: true },
+          select: { id: true, firstName: true, middleName: true, lastName: true, admissionNo: true, userId: true, campusId: true },
         },
         period: {
           select: { id: true, label: true, kind: true, session: { select: { id: true, label: true } } },
@@ -279,6 +298,11 @@ export async function getStudentInvoice(tenantId: VerifiedTenantId, invoiceId: s
     });
 
     if (requester) {
+      // A campus administrator: their campus's students only (never a student with no campus), whatever else they hold
+      if (requester.roles.includes("CAMPUS_ADMIN")) {
+        if (!requester.campusId || invoice.student.campusId !== requester.campusId) throw new FinanceNotFound("Invoice not found.");
+        return invoice;
+      }
       const isStaffWithFinanceAccess = requester.roles.includes("ADMIN") || requester.permissions.includes("CAN_MANAGE_FINANCE");
 
       if (!isStaffWithFinanceAccess) {
