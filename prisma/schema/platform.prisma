@@ -1,0 +1,18 @@
+// --- The platform surface (plan C5, ADR 0016) ---
+
+/// What the platform did to a school (created, suspended, type changed). No `tenantId` column ON PURPOSE: it is not a school's data, it must
+/// outlive a school, and no school's administrator may read it. Row-level security is on with NO policy for the runtime role, so `app_user`
+/// can neither read nor write it; only the `platform_*` SECURITY DEFINER functions (run as the table owner) do. Append-only by construction.
+model PlatformAuditLog {
+  id             String   @id @default(cuid())
+  actorUserId    String
+  action         String
+  /// The school acted on. Plain text, not a foreign key: the history must survive the school.
+  targetTenantId String?
+  beforeValue    Json?
+  afterValue     Json?
+  reason         String?
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+}
