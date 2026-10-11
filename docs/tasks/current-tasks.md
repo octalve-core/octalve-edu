@@ -18,7 +18,7 @@
 | 6 | [TASK-0006](0006-phase-1-7-settings-and-mfa.md) | Phase 1.7: Settings UI, Step-up MFA & Audit Logging | [x] Completed | 2026-10-10 16:00:00 UTC | 2026-10-10 17:10:00 UTC | [PR #16](https://github.com/roji-tech/octalve-edu-fork/pull/16) (`claude/phase-1-7-settings`) |
 | 7 | [TASK-0007](0007-phase-1-8-phase-gate-and-hardening.md) | Phase 1.8: End-to-End Hardening, Security Walk & Gate | [x] Completed | 2026-10-10 17:35:00 UTC | 2026-10-10 19:25:00 UTC | [PR #17](https://github.com/roji-tech/octalve-edu-fork/pull/17) (`claude/phase-1-8-gate`) |
 
-| 8 | [TASK-0008](0008-post-phase-1-verification-and-defect-fixes.md) | Post-Phase-1 verification and defect fixes | [~] In Progress (full suite done: 1728 passed / 6 stale-test failures) | 2026-10-11 UTC | — | `claude/phase-1-3-attendance` |
+| 8 | [TASK-0008](0008-post-phase-1-verification-and-defect-fixes.md) | Post-Phase-1 verification and defect fixes | [~] In Progress (full suite on the fix branch done: 1757 passed / 0 failed / 23 skipped; next: land the fixes) | 2026-10-11 UTC | — | `claude/phase-1-3-attendance` |
 ---
 
 ## Detailed Milestone Checklist
