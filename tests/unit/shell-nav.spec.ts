@@ -25,6 +25,14 @@ test.describe("navFor", () => {
     expect(items.filter((i) => i.href === null)).toEqual([]);
   });
 
+  test("a platform administrator also gets a Platform link - inside a school and outside any; nobody else does", () => {
+    expect(navFor(null, true).map((i) => i.label)).toEqual(["Your schools", "Platform"]);
+    expect(navFor(admin, true).map((i) => i.label)).toEqual(["Overview", "Academics", "People", "Users", "Settings", "Platform"]);
+    expect(navFor(admin, true).at(-1)).toMatchObject({ href: "/platform" });
+    expect(navFor(admin).map((i) => i.label)).not.toContain("Platform");
+    expect(navFor(null).map((i) => i.label)).not.toContain("Platform");
+  });
+
   test("a CAMPUS_ADMIN sees Overview, Academics, People and Users - never the school's Settings", () => {
     const items = navFor({ ...admin, role: "CAMPUS_ADMIN" });
     expect(items.map((i) => i.label)).toEqual(["Overview", "Academics", "People", "Users"]);

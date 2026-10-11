@@ -22,12 +22,12 @@ const SHEET_ROW =
 /// the platform rather than hand-rolled code.
 export function MobileNav({ name, email }: { name: string | null; email: string | null }) {
   const pathname = usePathname();
-  const { schools, school, home } = useShell();
+  const { schools, school, home, platform } = useShell();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const { signOut, pending, error } = useSignOut();
 
-  const items = navFor(home);
+  const items = navFor(home, platform);
   const tabs = items.filter((item) => item.href);
   const soon = items.filter((item) => !item.href);
   const displayName = name?.trim() || email || "Account";

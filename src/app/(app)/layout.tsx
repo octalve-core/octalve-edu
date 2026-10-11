@@ -7,12 +7,13 @@ import { requirePageSession } from "@/lib/auth/page-session";
 /// page calls `requirePageSession()` (or `requireTenantPage`) itself; the call is cached per request, so that costs nothing
 /// extra. What the shell shows is never what decides access.
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  const { session, memberships } = await requirePageSession();
+  const { session, memberships, isPlatformAdmin } = await requirePageSession();
 
   return (
     <AppShell
       user={{ name: session.user.name, email: session.user.email }}
       schools={memberships.map((m) => ({ code: m.tenantCode, name: m.tenantName, role: m.role }))}
+      platform={isPlatformAdmin}
     >
       {children}
     </AppShell>

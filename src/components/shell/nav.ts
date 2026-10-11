@@ -1,6 +1,6 @@
 import type { ComponentType, SVGProps } from "react";
 import type { Role } from "@prisma/client";
-import { CalendarIcon, GraduationCapIcon, HomeIcon, SlidersIcon, UsersIcon } from "@/components/ui/icons";
+import { BuildingIcon, CalendarIcon, GraduationCapIcon, HomeIcon, SlidersIcon, UsersIcon } from "@/components/ui/icons";
 import { isValidTenantCode } from "@/lib/tenant/validate-code";
 
 /// A school the signed-in person belongs to, as the shell needs it. Display data only (see lib/auth/page-session.ts).
@@ -20,8 +20,9 @@ export type NavItem = {
 /// from this, so they can't disagree. `school` is the school being looked at (or the person's only school, when they
 /// are on a page outside one); without it the person has a school to choose first.
 /// Hiding an entry is a courtesy: the page and the API behind it decide.
-export function navFor(school: ShellSchool | null): NavItem[] {
-  if (!school) return [{ label: "Your schools", href: "/dashboard", icon: HomeIcon, exact: true }];
+export function navFor(school: ShellSchool | null, platform = false): NavItem[] {
+  const platformItem: NavItem[] = platform ? [{ label: "Platform", href: "/platform", icon: BuildingIcon }] : [];
+  if (!school) return [{ label: "Your schools", href: "/dashboard", icon: HomeIcon, exact: true }, ...platformItem];
   const items: NavItem[] = [{ label: "Overview", href: `/schools/${school.code}`, icon: HomeIcon, exact: true }];
   if (school.role === "ADMIN") {
     items.push(
@@ -44,7 +45,7 @@ export function navFor(school: ShellSchool | null): NavItem[] {
       { label: "People", href: `/schools/${school.code}/people`, icon: GraduationCapIcon },
     );
   }
-  return items;
+  return [...items, ...platformItem];
 }
 
 /// Which of the person's schools the path names, if any. **For display only** — which links to draw. A path naming a
@@ -71,7 +72,7 @@ const SCHOOL_PAGES: Record<string, string> = {
   people: "People",
   settings: "Settings",
 };
-const GLOBAL_PAGES: Record<string, string> = { "/dashboard": "Your schools", "/account": "Account" };
+const GLOBAL_PAGES: Record<string, string> = { "/dashboard": "Your schools", "/account": "Account", "/platform": "Platform" };
 
 export function pageLabel(pathname: string): string | null {
   const own = GLOBAL_PAGES[pathname.replace(/\/+$/, "") || "/"];

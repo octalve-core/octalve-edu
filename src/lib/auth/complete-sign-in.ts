@@ -1,5 +1,6 @@
 import { after, type NextRequest, type NextResponse } from "next/server";
 import { Role } from "@prisma/client";
+import { prisma } from "@/lib/db";
 import { forUser } from "@/lib/tenant/for-tenant";
 import { auditPersonEvent } from "@/lib/auth/audit";
 import { describeUserAgent } from "@/lib/auth/user-agent";
@@ -24,11 +25,16 @@ export async function completeSignIn(
   if (presentedToken) await deleteSessionByToken(presentedToken);
 
   // Read through the user context: a person's own memberships are visible before any tenant is known (§0.5.2).
-  const holdsAdmin = Boolean(
-    await forUser(user.id).transaction((tx) =>
-      tx.tenantMembership.findFirst({ where: { userId: user.id, role: Role.ADMIN, deactivatedAt: null }, select: { id: true } }),
-    ),
-  );
+  // An administrator of any kind - school, campus, or platform - is an account worth stealing: their sessions get the shorter absolute cap.
+  const holdsAdmin =
+    Boolean(
+      await forUser(user.id).transaction((tx) =>
+        tx.tenantMembership.findFirst({
+          where: { userId: user.id, role: { in: [Role.ADMIN, Role.CAMPUS_ADMIN] }, deactivatedAt: null },
+          select: { id: true },
+        }),
+      ),
+    ) || Boolean((await prisma.user.findUnique({ where: { id: user.id }, select: { isPlatformAdmin: true } }))?.isPlatformAdmin);
   const { token, expires, persistent } = await createSession(user.id, req.headers.get("user-agent"), {
     admin: holdsAdmin,
     remember,
