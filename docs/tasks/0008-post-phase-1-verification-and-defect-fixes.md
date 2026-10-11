@@ -1,7 +1,7 @@
 # [0008]: Post-Phase-1 verification and defect fixes
 
 - **Period / Focus:** 2026-10-11 (verify what Phase 1.3–1.8 claimed, fix what the review found)
-- **Status:** In Progress — full one-lane suite on `claude/fix-phase-1-review-findings` finished 2026-10-11: **1757 passed, 0 failed, 23 skipped (1.4 h)**. Earlier run on the old stack: 1728 passed, 6 failed (stale e2e tests, since fixed), 23 skipped. Still to do: land the fixes (ISS-0009), then the campus-admin build
+- **Status:** Completed — landed in octalve-core `dev` by PR #6 (2026-10-11, merge `c082055`). Full one-lane suite on `claude/fix-phase-1-review-findings` finished 2026-10-11: **1757 passed, 0 failed, 23 skipped (1.4 h)**. Earlier run on the old stack: 1728 passed, 6 failed (stale e2e tests, since fixed), 23 skipped. Landed (ISS-0009); the campus-admin build is task 0009
 - **Priority:** High
 - **Assignee:** Claude Agent / Maintainer
 - **Target Branch / PR:** `claude/phase-1-3-attendance` (HEAD `ddfb1c6`) / no PR yet
