@@ -1,5 +1,6 @@
+import { financeFailure } from "@/lib/finance/http";
 import { Permission, Role } from "@prisma/client";
-import { ok, fail } from "@/lib/api/envelope";
+import { ok } from "@/lib/api/envelope";
 import { validate } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { createFeeStructureSchema, queryFeeStructuresSchema } from "@/lib/finance/http";
@@ -24,8 +25,7 @@ export const POST = withAuth(
       const feeStructure = await createFeeStructure(auth.tenant.tenantId, body, auth.userId);
       return ok({ feeStructure }, {}, 201);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to create fee structure";
-      return fail(message, 400);
+      return financeFailure(err, "FEE_STRUCTURES");
     }
   }),
   { tenant: true, roles: [Role.ADMIN], permissions: [Permission.CAN_MANAGE_FINANCE] },

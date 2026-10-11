@@ -35,9 +35,9 @@ Know the real test state of the Phase 1 stack (1.2–1.8, merged only into featu
 
 ### Module B: Defects found by reading (not yet reproduced)
 - [ ] Finance: `receiptNo` from a count of successful payments, no unique constraint → duplicate receipt numbers under concurrency; manual payment accepts a client `receiptNo`
-- [ ] Finance: webhook returns 200 when fulfilment fails and leaves the event unprocessed → a lost payment is never retried
-- [ ] Finance: webhook route falls back to the public secret `test_mock_secret_key`; invalid deliveries still write rows; `evt_${Date.now()}` ids can collide
-- [ ] Finance: manual-payment route returns raw `err.message`
+- [x] Finance: webhook returns 200 when fulfilment fails and leaves the event unprocessed → a lost payment is never retried
+- [x] Finance: webhook route falls back to the public secret `test_mock_secret_key`; invalid deliveries still write rows; `evt_${Date.now()}` ids can collide
+- [x] Finance: manual-payment route returns raw `err.message` (all seven finance routes now use `financeFailure`)
 - [ ] Results: `transition` open to every `TEACHING_STAFF` for any result (no ownership/campus check); a teacher can revert APPROVED→SUBMITTED; approver can approve their own entries
 - [ ] Results: `approvedByStaffId`/`enteredByStaffId` hold user ids, no foreign key
 - [ ] Results: public verification returns admission number + surname (decide with the maintainer)
@@ -62,3 +62,5 @@ Know the real test state of the Phase 1 stack (1.2–1.8, merged only into featu
 - **Commits:** —
 - **PR:** —
 - **Docs:** this file
+
+- 2026-10-11: F2/F3/F3a/F4 done on `claude/fix-phase-1-review-findings`: `unit/paystack-mode` 7, `unit/finance-paystack`, `integration/finance-webhook` 4, `api/finance` + `api/finance-adversarial` 14 passed (finance subset: 70 passed, 0 failed incl. IDOR audit and rules); typecheck, lint, format:check clean. The new webhook/integration tests were not run against the old code (the old shapes differ, so they could not have passed). Still to do: F1 receipt numbers (migration), F5 results transitions, the 6 stale e2e tests, then the full suite.

@@ -1,5 +1,6 @@
+import { financeFailure } from "@/lib/finance/http";
 import { Permission, Role } from "@prisma/client";
-import { ok, fail } from "@/lib/api/envelope";
+import { ok } from "@/lib/api/envelope";
 import { validate } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { applyDiscountSchema } from "@/lib/finance/http";
@@ -24,9 +25,7 @@ export const POST = withAuth(
         );
         return ok(res, {}, 201);
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : "Failed to apply discount";
-        const isNotFound = message.includes("not found") || (err as { name?: string })?.name === "NotFoundError";
-        return fail(message, isNotFound ? 404 : 400);
+        return financeFailure(err, "DISCOUNT");
       }
     },
   ),

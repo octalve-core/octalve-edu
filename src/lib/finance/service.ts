@@ -53,7 +53,7 @@ export async function createFeeStructure(tenantId: VerifiedTenantId, data: FeeSt
 
     const amountDecimal = toDecimal(data.amount);
     if (amountDecimal.isNegative()) {
-      throw new Error("Fee structure amount cannot be negative");
+      throw new FinanceRefusal("Fee structure amount cannot be negative");
     }
 
     const fee = await tx.feeStructure.create({
@@ -121,7 +121,7 @@ export async function generateInvoicesForPeriod(
     });
 
     if (feeStructures.length === 0) {
-      throw new Error("No fee structures configured for this academic period");
+      throw new FinanceRefusal("No fee structures configured for this academic period");
     }
 
     const enrollments = await tx.studentEnrollment.findMany({
@@ -295,7 +295,7 @@ export async function getStudentInvoice(tenantId: VerifiedTenantId, invoiceId: s
         });
 
         if (!isStudentHimself && !isLinkedGuardian) {
-          throw new Error("Unauthorized IDOR attempt: access denied to invoice");
+          throw new FinanceNotFound("Invoice not found.");
         }
       }
     }
@@ -321,20 +321,20 @@ export async function initializePayment(
     });
 
     if (invoice.status === InvoiceStatus.PAID) {
-      throw new Error("Invoice is already fully paid");
+      throw new FinanceRefusal("Invoice is already fully paid");
     }
     if (invoice.status === InvoiceStatus.WAIVED) {
-      throw new Error("Invoice has been waived");
+      throw new FinanceRefusal("Invoice has been waived");
     }
 
     const balanceDue = invoice.totalAmount.sub(invoice.amountPaid);
     const amountToPay = amountInNaira ? toDecimal(amountInNaira) : balanceDue;
 
     if (amountToPay.lte(0)) {
-      throw new Error("Payment amount must be greater than zero");
+      throw new FinanceRefusal("Payment amount must be greater than zero");
     }
     if (amountToPay.gt(balanceDue)) {
-      throw new Error("Payment amount cannot exceed the balance due");
+      throw new FinanceRefusal("Payment amount cannot exceed the balance due");
     }
 
     const amountInKobo = toKobo(amountToPay);
@@ -398,12 +398,12 @@ export async function recordManualPayment(
     });
 
     if (invoice.status === InvoiceStatus.PAID || invoice.status === InvoiceStatus.WAIVED) {
-      throw new Error(`Cannot record payment on invoice with status ${invoice.status}`);
+      throw new FinanceRefusal(`Cannot record payment on invoice with status ${invoice.status}`);
     }
 
     const amountDecimal = toDecimal(data.amount);
     if (amountDecimal.lte(0)) {
-      throw new Error("Payment amount must be positive");
+      throw new FinanceRefusal("Payment amount must be positive");
     }
 
     const reference = generatePaymentReference(PaymentProvider.PAYSTACK);
@@ -463,6 +463,31 @@ export async function recordManualPayment(
  * - Amount mismatch throws.
  * - 20 simultaneous fulfilments resolve to one without double-crediting.
  */
+/// A user-facing refusal of a finance action (unpayable invoice, bad amount...): its message is written to be shown, and the routes answer it 400.
+export class FinanceRefusal extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FinanceRefusal";
+  }
+}
+
+/// "No such invoice / record" - also what a caller who may not see it gets (same answer, so existence is not revealed): 404.
+export class FinanceNotFound extends Error {
+  constructor(message = "Not found.") {
+    super(message);
+    this.name = "FinanceNotFound";
+  }
+}
+
+/// A deliberate refusal to fulfil a payment (amount mismatch, unknown reference, gateway says not successful). Retrying the same delivery
+/// can never change the answer, so the webhook records it and answers 200; any OTHER error is treated as transient (plan F2).
+export class FulfilmentRefusal extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FulfilmentRefusal";
+  }
+}
+
 export async function fulfillPayment(
   reference: string,
   options?: { expectedAmountKobo?: number; tenantIdOverride?: string },
@@ -471,11 +496,13 @@ export async function fulfillPayment(
   const verified = await gateway.verifyTransaction(reference);
 
   if (verified.status !== "success") {
-    throw new Error(`Cannot fulfill payment: gateway status is ${verified.status}`);
+    throw new FulfilmentRefusal(`Cannot fulfill payment: gateway status is ${verified.status}`);
   }
 
   if (options?.expectedAmountKobo !== undefined && verified.amountInKobo !== options.expectedAmountKobo) {
-    throw new Error(`Amount mismatch: expected ${options.expectedAmountKobo} kobo but gateway verified ${verified.amountInKobo} kobo`);
+    throw new FulfilmentRefusal(
+      `Amount mismatch: expected ${options.expectedAmountKobo} kobo but gateway verified ${verified.amountInKobo} kobo`,
+    );
   }
 
   let tenantId: VerifiedTenantId;
@@ -486,7 +513,7 @@ export async function fulfillPayment(
       where: { provider_providerRef: { provider: PaymentProvider.PAYSTACK, providerRef: reference } },
     });
     if (!rawPayment) {
-      throw new Error(`Payment with reference "${reference}" not found`);
+      throw new FulfilmentRefusal(`Payment with reference "${reference}" not found`);
     }
     tenantId = trustedTenantId(rawPayment.tenantId);
   }
@@ -528,7 +555,9 @@ export async function fulfillPayment(
 
     const paymentKobo = toKobo(payment.amount);
     if (paymentKobo !== verified.amountInKobo) {
-      throw new Error(`Amount mismatch: payment record requires ${paymentKobo} kobo but gateway confirmed ${verified.amountInKobo} kobo`);
+      throw new FulfilmentRefusal(
+        `Amount mismatch: payment record requires ${paymentKobo} kobo but gateway confirmed ${verified.amountInKobo} kobo`,
+      );
     }
 
     const schoolCode = payment.invoice.tenant.code || "SCHOOL";
@@ -582,12 +611,20 @@ export async function fulfillPayment(
  * Always records event in PaymentWebhookEvent, verifies raw body HMAC, and triggers fulfillment.
  * Always returns HTTP 200 equivalent.
  */
+export type WebhookOutcome =
+  | { status: "processed"; eventId: string; duplicate?: boolean }
+  | { status: "ignored"; eventId: string }
+  | { status: "invalid_signature"; eventId: string }
+  /// A deliberate refusal: recorded on the event row, answered 200 (retrying cannot help).
+  | { status: "refused"; eventId: string; error: string }
+  /// A transient failure (database, network, gateway down): answered 503 so the provider retries; the event stays unprocessed.
+  | { status: "retry"; eventId: string };
+
 export async function processPaystackWebhook(
   rawBody: string | Buffer,
   signatureHeader: string | null | undefined,
   secretKey: string,
-): Promise<{ status: "processed" | "ignored" | "invalid_signature"; eventId: string; duplicate?: boolean }> {
-  const isValid = verifyPaystackSignature(rawBody, signatureHeader, secretKey);
+): Promise<WebhookOutcome> {
   const rawPayloadHash = computePayloadHash(rawBody);
 
   let parsed: {
@@ -602,73 +639,66 @@ export async function processPaystackWebhook(
   try {
     parsed = JSON.parse(typeof rawBody === "string" ? rawBody : rawBody.toString("utf8"));
   } catch {
-    // Malformed JSON is recorded with error
+    // Malformed JSON: no event to process; it can only be ignored (or refused as unsigned below).
   }
 
-  const eventId = String(parsed?.data?.id || parsed?.data?.reference || `evt_${Date.now()}`);
+  // Derived from the payload itself when the provider names none - never from the clock, so the same body is the same event.
+  const eventId = String(parsed?.data?.id || parsed?.data?.reference || `sha256:${rawPayloadHash.slice(0, 32)}`);
+
+  // An unsigned or wrongly signed delivery is not evidence of anything: it writes NOTHING (no ledger row an outsider could fill).
+  if (!verifyPaystackSignature(rawBody, signatureHeader, secretKey)) {
+    return { status: "invalid_signature", eventId };
+  }
 
   const existing = await prisma.paymentWebhookEvent.findUnique({
-    where: {
-      provider_eventId: {
-        provider: PaymentProvider.PAYSTACK,
-        eventId,
-      },
-    },
+    where: { provider_eventId: { provider: PaymentProvider.PAYSTACK, eventId } },
   });
-
   if (existing?.processedAt) {
     return { status: "processed", eventId, duplicate: true };
   }
 
-  // Record webhook delivery in PaymentWebhookEvent ledger
+  // Record the (signed) delivery in the PaymentWebhookEvent ledger.
   await prisma.paymentWebhookEvent.upsert({
-    where: {
-      provider_eventId: {
-        provider: PaymentProvider.PAYSTACK,
-        eventId,
-      },
-    },
+    where: { provider_eventId: { provider: PaymentProvider.PAYSTACK, eventId } },
     create: {
       provider: PaymentProvider.PAYSTACK,
       eventId,
       eventType: parsed?.event || null,
-      signatureValid: isValid,
+      signatureValid: true,
       rawPayloadHash,
       processedAt: null,
     },
-    update: {
-      signatureValid: isValid,
-    },
+    update: { signatureValid: true },
   });
 
-  if (!isValid) {
-    return { status: "invalid_signature", eventId, duplicate: false };
-  }
-
   if (parsed?.event === "charge.success" && parsed?.data?.reference) {
-    const gateway = getPaystackClient();
-    if (gateway instanceof MockPaystackGateway) {
-      gateway.simulatePaymentCompletion(parsed.data.reference, "success", parsed.data.amount);
+    try {
+      const gateway = getPaystackClient();
+      if (gateway instanceof MockPaystackGateway) {
+        gateway.simulatePaymentCompletion(parsed.data.reference, "success", parsed.data.amount);
+      }
+
+      await fulfillPayment(parsed.data.reference, {
+        expectedAmountKobo: parsed.data.amount,
+        tenantIdOverride: parsed.data.metadata?.tenantId,
+      });
+    } catch (err) {
+      if (err instanceof FulfilmentRefusal) {
+        await prisma.paymentWebhookEvent.update({
+          where: { provider_eventId: { provider: PaymentProvider.PAYSTACK, eventId } },
+          data: { error: err.message.slice(0, 500) },
+        });
+        return { status: "refused", eventId, error: err.message };
+      }
+      console.error("[PAYSTACK_WEBHOOK_TRANSIENT]", err);
+      return { status: "retry", eventId };
     }
 
-    const tenantIdFromMetadata = parsed.data.metadata?.tenantId;
-
-    await fulfillPayment(parsed.data.reference, {
-      expectedAmountKobo: parsed.data.amount,
-      tenantIdOverride: tenantIdFromMetadata,
-    });
-
     await prisma.paymentWebhookEvent.update({
-      where: {
-        provider_eventId: {
-          provider: PaymentProvider.PAYSTACK,
-          eventId,
-        },
-      },
-      data: { processedAt: new Date() },
+      where: { provider_eventId: { provider: PaymentProvider.PAYSTACK, eventId } },
+      data: { processedAt: new Date(), error: null },
     });
-
-    return { status: "processed", eventId, duplicate: false };
+    return { status: "processed", eventId };
   }
 
   return { status: "ignored", eventId };
@@ -690,18 +720,18 @@ export async function applyInvoiceDiscount(
     });
 
     if (invoice.status === InvoiceStatus.PAID) {
-      throw new Error("Cannot apply discount to an already fully paid invoice");
+      throw new FinanceRefusal("Cannot apply discount to an already fully paid invoice");
     }
 
     const discountAmount = toDecimal(data.amount);
     if (discountAmount.lte(0)) {
-      throw new Error("Discount amount must be positive");
+      throw new FinanceRefusal("Discount amount must be positive");
     }
 
     // Verify discount does not exceed balance
     const currentBalance = invoice.totalAmount.sub(invoice.amountPaid);
     if (discountAmount.gt(currentBalance)) {
-      throw new Error("Discount cannot exceed the outstanding invoice balance");
+      throw new FinanceRefusal("Discount cannot exceed the outstanding invoice balance");
     }
 
     const discount = await tx.invoiceDiscount.create({

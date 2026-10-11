@@ -1,5 +1,6 @@
+import { financeFailure } from "@/lib/finance/http";
 import { Role } from "@prisma/client";
-import { ok, fail } from "@/lib/api/envelope";
+import { ok } from "@/lib/api/envelope";
 import { validate } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { initializePaymentSchema } from "@/lib/finance/http";
@@ -24,9 +25,7 @@ export const POST = withAuth(
         const result = await initializePayment(auth.tenant.tenantId, id, userEmail, body.amount);
         return ok(result);
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : "Failed to initialize payment";
-        const status = message.includes("IDOR") || message.includes("Unauthorized") ? 403 : 400;
-        return fail(message, status);
+        return financeFailure(err, "PAY");
       }
     },
   ),

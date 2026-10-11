@@ -1,5 +1,6 @@
+import { financeFailure } from "@/lib/finance/http";
 import { Role } from "@prisma/client";
-import { ok, fail } from "@/lib/api/envelope";
+import { ok } from "@/lib/api/envelope";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { getStudentInvoice } from "@/lib/finance/service";
 
@@ -15,9 +16,7 @@ export const GET = withAuth(
       });
       return ok({ invoice });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Invoice not found";
-      const status = message.includes("IDOR") || message.includes("Unauthorized") ? 403 : 404;
-      return fail(message, status);
+      return financeFailure(err, "INVOICE");
     }
   },
   {

@@ -309,11 +309,15 @@ test.describe("Phase 1.5: Finance, Invoicing & Dual-Mode Paystack Integration", 
     expect(parent1View.status).toBe(200);
     expect(parent1View.json.data.invoice.student.id).toBe(student1.id);
 
-    // Parent 1 attempting to view student2's invoice (IDOR attempt) MUST be refused with 403
+    // Parent 1 attempting to view student2's invoice (IDOR attempt) gets the SAME 404 as an invoice that does not exist (plan F4: existence is
+    // not revealed; the old 403 + "Unauthorized IDOR attempt" text told an attacker the invoice was there)
     const idorAttempt = await api(invoiceDetailRoute(invoice2Id), as("parent1"));
-    expect(idorAttempt.status).toBe(403);
+    const missing = await api(invoiceDetailRoute("does-not-exist"), as("parent1"));
+    expect(idorAttempt.status).toBe(404);
+    expect(missing.status).toBe(404);
+    expect(idorAttempt.json.error.message).toBe(missing.json.error.message);
 
-    // Outsider from School B attempting to view School A's invoice MUST be refused with 403
+    // Outsider from School B attempting to view School A's invoice MUST be refused with 403 (the school boundary, as everywhere)
     const crossSchoolAttempt = await api(invoiceDetailRoute(invoice1Id), as("outsider"));
     expect(crossSchoolAttempt.status).toBe(403);
   });
@@ -430,7 +434,7 @@ test.describe("Phase 1.5: Finance, Invoicing & Dual-Mode Paystack Integration", 
       },
       rawBody: rawPayload,
     });
-    expect(badSigRes.status).toBe(200);
+    expect(badSigRes.status).toBe(401); // refused and nothing written (plan F3)
     expect(badSigRes.json.status).toBe("invalid_signature");
 
     // Test 6b: Valid signature succeeds and returns 200

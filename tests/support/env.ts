@@ -128,6 +128,8 @@ export const TEST_MFA_KEY = Buffer.alloc(32, 7).toString("base64");
 process.env.MFA_ENCRYPTION_KEY = TEST_MFA_KEY;
 
 process.env.FORCE_MOCK_PAYSTACK = "true";
+// The servers under test are production-shaped, so mock payments need the second, loudly named switch (plan F3a).
+process.env.ALLOW_MOCK_PAYMENTS_IN_PRODUCTION = "true";
 process.env.PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || "mock_sk_test_octalve_secret";
 
 /// Environment for the Next.js servers under test. Explicit and complete on

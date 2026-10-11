@@ -1,5 +1,6 @@
+import { financeFailure } from "@/lib/finance/http";
 import { Role } from "@prisma/client";
-import { ok, fail } from "@/lib/api/envelope";
+import { ok } from "@/lib/api/envelope";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { fulfillPayment } from "@/lib/finance/service";
 
@@ -13,8 +14,7 @@ export const GET = withAuth(
       });
       return ok(result);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Payment verification failed";
-      return fail(message, 400);
+      return financeFailure(err, "STATUS");
     }
   },
   {

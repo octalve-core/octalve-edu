@@ -13,7 +13,7 @@ import {
   type TestTenant,
   type TestUser,
 } from "../support/db";
-import { api } from "../support/http";
+import { api, cookieHeader, loginAs } from "../support/http";
 import { mockPaystack } from "@/lib/finance/mock-paystack";
 import { initializePayment } from "@/lib/finance/service";
 import { trustedTenantId } from "@/lib/tenant/verified-tenant";
@@ -117,17 +117,11 @@ test.describe.serial("Paystack Webhook & Finance Adversarial Security Suite", ()
       },
       rawBody: rawPayload,
     });
-    expect(forgedRes.status).toBe(200);
-    expect(forgedRes.json.received).toBe(true);
+    // An unsigned or wrongly signed delivery is refused (401) and writes NOTHING - no ledger row an outsider could fill (plan F3).
+    expect(forgedRes.status).toBe(401);
+    expect(forgedRes.json.received).toBe(false);
     expect(forgedRes.json.status).toBe("invalid_signature");
-
-    // Verify DB ledger marked as invalid
-    const ledger = await db.paymentWebhookEvent.findFirst({
-      where: { eventId: "11223344" },
-    });
-    expect(ledger).not.toBeNull();
-    expect(ledger?.signatureValid).toBe(false);
-    expect(ledger?.processedAt).toBeNull();
+    expect(await db.paymentWebhookEvent.count({ where: { eventId: "11223344" } })).toBe(0);
 
     // Verify invoice remains completely unpaid
     const invoice = await db.invoice.findUniqueOrThrow({ where: { id: invoiceAId } });
@@ -141,8 +135,9 @@ test.describe.serial("Paystack Webhook & Finance Adversarial Security Suite", ()
       headers: { "content-type": "application/json" },
       rawBody: rawPayload,
     });
-    expect(missingSigRes.status).toBe(200);
+    expect(missingSigRes.status).toBe(401);
     expect(missingSigRes.json.status).toBe("invalid_signature");
+    expect(await db.paymentWebhookEvent.count({ where: { eventId: "11223344" } })).toBe(0);
   });
 
   test("2. Replay Attack Resistance: Re-sending identical charge events is idempotent and prevents double-crediting", async () => {
@@ -318,5 +313,34 @@ test.describe.serial("Paystack Webhook & Finance Adversarial Security Suite", ()
       where: { providerRef: init.reference, status: PaymentStatus.SUCCESS },
     });
     expect(successPayments).toHaveLength(1);
+  });
+});
+
+test.describe("finance routes never return raw error text", () => {
+  test("an unknown invoice and a refusal are answered in words written to be shown; nothing from the database or the code leaks", async () => {
+    const admin = await createUser({ name: "Bursar Error Text" });
+    await addMembership(admin.id, schoolA.id, Role.ADMIN);
+    const { token } = await loginAs(admin, SAAS);
+    const cookie = cookieHeader(token!);
+    const base = `/api/v1/schools/${schoolA.code}/finance/invoices`;
+
+    const missing = await api(`${base}/does-not-exist/manual-payment`, {
+      ...SAAS,
+      method: "POST",
+      cookie,
+      body: { amount: 100, channel: "cash" },
+    });
+    expect(missing.status).toBe(404);
+    expect(missing.json.error.message).toBe("Not found.");
+
+    const tooMuch = await api(`${base}/${invoiceAId}/manual-payment`, {
+      ...SAAS,
+      method: "POST",
+      cookie,
+      body: { amount: 999999999, channel: "cash" },
+    });
+    expect(tooMuch.status).toBe(400);
+    expect(tooMuch.json.error.code).toBe("REFUSED");
+    expect(JSON.stringify(tooMuch.json)).not.toMatch(/prisma|invocation|stack|\bat \w+\.\w+ \(|SELECT|findFirst/i);
   });
 });

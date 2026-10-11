@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { fail } from "@/lib/api/envelope";
+import { FinanceNotFound, FinanceRefusal } from "./service";
 import { DiscountWorkflowMode } from "@prisma/client";
 
 export const createFeeStructureSchema = z.object({
@@ -43,3 +45,15 @@ export const applyDiscountSchema = z.object({
   reason: z.string().trim().min(2, "Reason is required").max(255),
   mode: z.nativeEnum(DiscountWorkflowMode).default(DiscountWorkflowMode.MANUAL_OVERRIDE),
 });
+
+/// The ONE way a finance route turns a thrown error into an answer (plan "Fix design - Phase 1 review findings", F4): a refusal written to be
+/// shown is a 400 with its message, a missing record - or one the caller may not see - is the same 404, and anything else is logged and
+/// answered with a generic 500. Raw error text (database messages, stack hints) never reaches the client.
+export function financeFailure(err: unknown, context: string): Response {
+  if (err instanceof FinanceRefusal) return fail(err.message, 400, "REFUSED");
+  const name = (err as { name?: string; code?: string } | null)?.name;
+  const code = (err as { code?: string } | null)?.code;
+  if (err instanceof FinanceNotFound || name === "NotFoundError" || code === "P2025") return fail("Not found.", 404, "NOT_FOUND");
+  console.error(`[FINANCE_${context}]`, err);
+  return fail("Something went wrong. Please try again.", 500, "INTERNAL");
+}

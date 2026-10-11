@@ -35,9 +35,15 @@ test.describe("finance paystack: mock and dual-mode client factory", () => {
   test("getPaystackClient returns MockPaystackGateway in non-production when key is unset", () => {
     delete process.env.PAYSTACK_SECRET_KEY;
     (process.env as Record<string, string | undefined>).NODE_ENV = "test";
-
-    const client = getPaystackClient();
-    expect(client).toBeInstanceOf(MockPaystackGateway);
+    // the mock fallback exists only where the deployment says it is not production (resolvePaystackMode); the harness is production-shaped
+    const previous = process.env.APP_ENV;
+    process.env.APP_ENV = "development";
+    try {
+      const client = getPaystackClient();
+      expect(client).toBeInstanceOf(MockPaystackGateway);
+    } finally {
+      process.env.APP_ENV = previous;
+    }
   });
 
   test("getPaystackClient throws PAYSTACK_NOT_CONFIGURED in production when key is unset", () => {
