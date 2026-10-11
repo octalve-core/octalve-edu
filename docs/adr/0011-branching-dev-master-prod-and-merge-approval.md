@@ -1,5 +1,5 @@
 # 0011 — Development happens on `dev`; `master` needs the maintainer's approval; `prod` is reserved
-Status: accepted · Decided: by the maintainer · Recorded: 2026-10-08
+Status: accepted (partly superseded by 0015: the roles of master and prod) · Decided: by the maintainer · Recorded: 2026-10-08
 
 ## Context
 The AI pushed feature branches to the fork and the maintainer merged everything; octalve-core was read-only to the AI. That made each step wait on a human.

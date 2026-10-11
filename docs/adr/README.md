@@ -46,3 +46,4 @@ Plans and phase records link to the ADR instead of re-arguing the reason.
 | [0012](0012-the-docker-databases-are-local-dev-databases.md) | The docker databases are local dev databases with full access | accepted |
 | [0013](0013-commit-and-pr-messages-are-comprehensive.md) | Commit and PR messages are comprehensive | accepted |
 | [0014](0014-audited-override-for-namesake-student-registrations.md) | Audited in-place override for namesake student registrations | accepted |
+| [0015](0015-dev-is-development-master-is-staging-prod-is-production.md) | `dev` is development, `master` is staging, `prod` is production | accepted |
