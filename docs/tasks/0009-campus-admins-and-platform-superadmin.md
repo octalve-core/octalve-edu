@@ -1,7 +1,7 @@
 # [0009]: Campus administrators and the platform superadmin (build of design C1–C8)
 
 - **Period / Focus:** 2026-10-11 → (authorization model change; multi-tenant, RLS must not weaken)
-- **Status:** In Progress — slice A done
+- **Status:** In Progress — slices A–D built and committed; the full suite is **(running)**; PR not opened yet
 - **Priority:** High
 - **Assignee:** Claude Agent / Maintainer
 - **Target Branch / PR:** `claude/campus-admins-platform-superadmin` → octalve-core `dev`
@@ -80,12 +80,17 @@ The design said "25 route files (of 108) name `ADMIN`". That counted one pattern
 - Slice C result (2026-10-11): platform API 10, script 4, e2e 7 (3 x 2 + setup), unit nav 14; regression api+integration (login, mfa-login, session-endpoints, tenant-boundary (+solo), setup, deactivated-members, platform x2, rls) = 213 passed, 0 failed. typecheck, lint, format:check clean. NOT run: the full suite; axe in the dark theme for the platform page.
 - Not done (deliberate): the platform page does not show member counts or any school data (C5 deviation, above); a first-administrator invitation cannot be re-sent from the platform page (invite again from the school once an administrator exists; if the first mail is lost the platform administrator can create the invitation again only by contacting the maintainer — **open question for the maintainer**); audited support access is its own design.
 ### Slice D: guard, docs, gate
-- [ ] route-role guard test (every handler declares `roles:` or is allowlisted; a handler that writes a campus row asks `canAdminister`)
-- [ ] ADR 0016 (Proposed), plan "As built", CLAUDE.md rule, tests/README, issues register
-- [ ] full one-lane suite; PR into `dev`
+- [x] **Route-role guard** `tests/unit/route-role-guard.spec.ts` (8): every handler declares `roles:` / `permissions:` / `platformGuard(` or is on a reasoned allowlist; a handler that lets a campus administrator write calls a campus helper or is listed with where the campus IS checked; the platform routes call `platformGuard` and write no SQL; school-only routes never list the role. Seen to fail: first run listed the 6 undeclared handlers (public/dev/webhook/any-member reads) and 2 campus-writing handlers (student import/export) which I documented with reasons; then removed the `armScope` call from `arms/[id]/archive` and the test named it; restored.
+- [x] ADR 0016 (**Proposed** — only the maintainer accepts), plan "As built", CLAUDE.md rule 9, tests/README, issues register (ISS-0013, ISS-0014), progress tracker.
+- [ ] full one-lane suite — **(running)**; see "Suite result" below
+- [ ] PR into octalve-core `dev` (verify `base.ref` is `dev` first)
 
 ## 5. Notes, Findings & Deviations
 - **Deviation from C5 (accepted by nobody yet — the maintainer should see it):** `platform_list_schools()` returns no member counts. A count needs a cross-tenant read, which is the bypass C5 forbids, and under FORCE RLS a definer function owned by a non-superuser could not do it anyway.
 - **Order is a safety property:** nothing can hold `CAMPUS_ADMIN` until slice B4, so routes extended earlier are inert; do not move B4 earlier.
 - The campus FK is `ON DELETE SET NULL`: with the new CHECK, deleting a campus that has a campus administrator fails instead of silently making them school-wide. There is no campus-delete feature; if one is built it must reassign first.
 - Mutation pass: not run — pending, end of Phase 2 (targets: the CHECK, the campus comparison in `canAdminister`, "cannot touch an admin", `platform_assert_admin`, the platform-admin-reads-nothing guarantee).
+
+
+## 6. Suite result
+**(running)** — full one-lane suite (`pnpm build` first, then `TEST_LANE=1 TEST_TIMEOUT_SCALE=3 pnpm exec playwright test`), started 2026-10-11 after the commit that records slice D. The real result replaces this line.

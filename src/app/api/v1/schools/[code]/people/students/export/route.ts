@@ -6,7 +6,7 @@ import { reserveAttempt } from "@/lib/auth/rate-limit";
 import { CAMPUS_WRITE_ROLES, idField, peopleFailure } from "@/lib/people/http";
 import { exportStudents } from "@/lib/people/import";
 
-// GET /api/v1/schools/[code]/people/students/export — ADMIN only. The student list's own filters (?q ?status ?campusId ?sessionId ?classArmId ?notEnrolled) as a CSV file
+// GET /api/v1/schools/[code]/people/students/export — ADMIN and CAMPUS_ADMIN (a campus administrator's file holds the students the list shows them). The student list's own filters (?q ?status ?campusId ?sessionId ?classArmId ?notEnrolled) as a CSV file
 // (at most 10,000 rows, else 400: narrow the filter). Every cell that a spreadsheet would run as a formula is neutralised; the response is never cached; the export is
 // audited (who, how many, which filters — never the search text) and limited per administrator.
 const EXPORTS_PER_WINDOW = 12; // per administrator per school per 5 minutes

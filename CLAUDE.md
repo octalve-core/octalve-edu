@@ -161,6 +161,16 @@ one-off pattern sources, referenced once for a specific technique and then done:
    `session.ts`, the brand files, the membership model's name. Copying a "shared" file wholesale once
    carried this repo's cookie name into AlEemaan (58 tests failed at once — on its live school it would have
    signed everyone out), and the normalised drift comparison had hidden it. After a port, read the *raw* diff.
+9. **A campus administrator acts on their own campus only; a platform administrator reads no school's data (ADR 0016).**
+   `CAMPUS_ADMIN` is a role value with a campus required. `withAuth({ roles })` only says "a role was listed", so every route that lets a campus
+   administrator write calls a helper from `lib/auth/campus-scope.ts` (or the rule lives in the service: members, invitations, invoices, announcements)
+   — another campus or an unknown id is the same 404, a school-wide row is a 403, a new row defaults to their campus — and
+   `tests/unit/route-role-guard.spec.ts` fails a route that forgets. The helpers answer 403 to any non-administrating role, so routes shared with
+   teachers call them only when `role === "CAMPUS_ADMIN"`. School-only (never list `CAMPUS_ADMIN`): settings, campuses, fee structures, discounts,
+   invoice generation, subjects, grade scales, assessment schemes, results. The platform surface (`/api/v1/platform/*`, `lib/platform/`) goes only
+   through the `platform_*` definer functions, needs two-step verification and the password again for every change, and has **no RLS bypass and no
+   "act as a school" mode**; `pnpm platform-admin:make` is the only way to make one. Never call `app_grant_runtime_privileges()` in a new migration
+   (it re-grants UPDATE/DELETE on append-only tables).
 
 ## Current state, as of 2026-10-06 (verify against `octalve_edu_progress.md` — it may have moved since)
 

@@ -1,6 +1,6 @@
 # Octalve Edu — Development Progress Tracker
 
-Last Updated: 2026-10-10
+Last Updated: 2026-10-11
 
 Companion to `docs/development-history/domain-implementation-plan.md` (the step-by-step build
 plan), `docs/development-history/phases/*.md` (one detailed doc per completed phase), and
@@ -27,6 +27,7 @@ against the real repo, not what a plan says should exist.
   project).
 - **Phase 0.5 — Auth, RLS & Shared API Infrastructure**: **100% Complete.** All sub-phases (0.5.0–0.5.F, 0.5.2 tenant trust boundary, 0.5.2-RLS, 0.5.2-H app shell, 0.5.3 API infrastructure, 0.5.4 users and invitations) built, verified with automated test suites under `app_user` role, and merged.
 - **Phase 1 — MVP: Core SIS + Finance**: **100% Complete.** All 8 milestones built, verified, hardened, and gated across Phase 1.0 (Foundations), 1.1 (Academic Structure), 1.2 (People & Enrolment), 1.3 (Attendance), 1.4 (Results & Grading), 1.5 (Finance & Invoicing with dual-mode Paystack), 1.6 (Timetable & Announcements), 1.7 (Settings & Step-up MFA), and 1.8 (End-to-End Hardening, Cross-Tenant IDOR Matrix, Lifecycle Walk, Finance Adversarial Suite, PostgreSQL EXPLAIN Query Plan Sanity, and Phase Gate). Full repository gates clean. Records: `phases/phase-1.*.md`.
+- **Campus administrators and a platform administrator (task 0009, ADR 0016 Proposed)**: **built on `claude/campus-admins-platform-superadmin`, in review (not merged).** Slices A (migrations, `canAdminister`), B1–B4 (people; academics, attendance, announcements, timetable; invoices and manual payment; members and invitations), C (suspension, `pnpm platform-admin:make`, the platform API and page), D (route-role guard, ADR, docs). Found and fixed on the way: ISS-0014 (every invoice listed to any parent), the role being assignable without a campus; ISS-0013 (teacher attendance read scope) is open. Mutation pass NOT RUN — pending, end of Phase 2.
 - **Phase 2 — Communication**: **0% — not started.** Schema designed (`comms.prisma`).
 - **Phase 3 — LMS**: **0% — not started.** Schema designed (`lms.prisma`).
 - **Phase 4 — Operations**: **0% — not started.** Schema deliberately thin per the plan's own
