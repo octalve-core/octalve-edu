@@ -96,12 +96,34 @@ test.describe("who may call it", () => {
 });
 
 test.describe("the schools", () => {
-  test("list: identity data only - and the school we made earlier is in it, no member counts, no people", async () => {
+  test("list: identity data and four coarse counters - and nothing about any person", async () => {
     const res = await api(ROUTE, as("platform"));
     expect(res.status).toBe(200);
     const row = (res.json.data.schools as Record<string, unknown>[]).find((s) => s.id === school.id)!;
-    expect(Object.keys(row).sort()).toEqual(["code", "createdAt", "id", "name", "schoolType", "suspendedAt"]);
+    expect(Object.keys(row).sort()).toEqual(["code", "counts", "createdAt", "id", "name", "schoolType", "suspendedAt"]);
+    expect(Object.keys(row.counts as object).sort()).toEqual(["administrators", "campuses", "members", "students"]);
     expect(row.code).toBe(school.code);
+    // the school has one campus and one ADMIN (beforeAll); nothing else is counted yet
+    expect(row.counts).toEqual({ members: 1, administrators: 1, students: 0, campuses: 1 });
+  });
+
+  test("the counters follow the school: a member, a student and a second campus move them; a school with no administrator shows 0", async () => {
+    const bare = await createTenant({ name: "Counted School", campuses: ["A"] });
+    const counts = async () => {
+      const list = await api(ROUTE, as("platform"));
+      return (list.json.data.schools as { id: string; counts: object }[]).find((s) => s.id === bare.id)!.counts;
+    };
+    expect(await counts()).toEqual({ members: 0, administrators: 0, students: 0, campuses: 1 });
+    const teacher = await createUser({ name: "Counted Teacher" });
+    await addMembership(teacher.id, bare.id, Role.TEACHING_STAFF);
+    await db.studentRecord.create({
+      data: { tenantId: bare.id, firstName: "Counted", lastName: "Pupil", dateOfBirth: new Date("2012-01-01"), admissionNo: "CNT/1" },
+    });
+    await db.campus.create({ data: { tenantId: bare.id, name: "B" } });
+    expect(await counts()).toEqual({ members: 1, administrators: 0, students: 1, campuses: 2 });
+    const boss = await createUser({ name: "Counted Boss" });
+    await addMembership(boss.id, bare.id, Role.ADMIN);
+    expect(await counts()).toEqual({ members: 2, administrators: 1, students: 1, campuses: 2 });
   });
 
   test("create: a school with its type, the platform's audit row, and an invitation for its first administrator (emailed); a duplicate code, a reserved or malformed one, and a bad address are refused", async () => {

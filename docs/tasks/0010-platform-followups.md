@@ -23,9 +23,10 @@ Close what TASK-0009 left open: the platform page shows coarse counters and whic
 
 ## 3. Work Breakdown
 ### F1: counters
-- [ ] tests first (integration + API + e2e), seen failing
-- [ ] migration (additive): `TenantStats`, triggers, backfill, `tenant_stats_recompute`, `platform_school_stats`; Prisma model
-- [ ] service, route output, Platform page
+- [x] tests first: `tests/integration/platform-stats.spec.ts` (17) seen failing (14 of 14 then, all "relation TenantStats does not exist"); API (`platform.spec.ts` list + a counter-following test) and e2e (`platform.spec.ts`: counters line, "No administrator" mark) were edited before the code but NOT run failing first
+- [x] migration (additive) `20261023090000_tenant_stats`: `TenantStats` (RLS forced, owner-only policy), `tenant_stats_apply`/`_recompute` (EXECUTE revoked from PUBLIC), definer triggers on membership/student/campus, `platform_school_stats()`, backfill; Prisma model `TenantStats`; applied to the `octalve_edu` dev DB
+- [x] service (`listSchools` merges the two functions; `PlatformSchool.counts`), route doc, Platform page (counters line, "No administrator" badge)
+- Result: integration platform-stats 17, integration platform + rls, API platform, e2e platform (desktop + phone) - 112 passed after `pnpm build`; typecheck, lint, prettier clean. NOT run: the full suite (end of task), axe in the dark theme for the platform page.
 ### F2: re-invite the first administrator
 - [ ] tests first (API + integration + script)
 - [ ] migration (additive) `platform_authorize_first_admin_invite`; service; route; Platform page button

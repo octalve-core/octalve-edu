@@ -3,12 +3,16 @@ import { forUser, setTenantContext } from "@/lib/tenant/for-tenant";
 import { trustedTenantId } from "@/lib/tenant/verified-tenant";
 import { hashInvitationToken, INVITATION_TTL_MS, newInvitationToken } from "@/lib/invitations/token";
 
-// The platform surface (plan C5, ADR 0016): the schools of the whole installation, seen as identity data only, through the narrow `platform_*`
+// The platform surface (plan C5, ADR 0016): the schools of the whole installation, seen as identity data and four coarse counters, through the narrow `platform_*`
 // SECURITY DEFINER functions. Nothing here reads or writes a school's own tables except the one atomic step in `createSchool` (the new school's
 // first-administrator invitation, in the new school's context, in the same transaction that created it). There is no "act as a school" mode.
 //
 // The functions re-check, inside the database, that the caller is a platform administrator (`app.user_id` must name one) and write the platform's
 // own audit row in the same transaction as the change. This module only translates their answers.
+
+/// Four coarse numbers about a school - never a person or a row. They come from counters kept by triggers (`TenantStats`, migration 20261023090000)
+/// and may be momentarily behind a transaction in flight.
+export type SchoolCounts = { members: number; administrators: number; students: number; campuses: number };
 
 export type PlatformSchool = {
   id: string;
@@ -17,6 +21,7 @@ export type PlatformSchool = {
   schoolType: SchoolType;
   createdAt: Date;
   suspendedAt: Date | null;
+  counts: SchoolCounts;
 };
 
 export type PlatformAuditEntry = {
@@ -29,13 +34,18 @@ export type PlatformAuditEntry = {
 };
 
 type SchoolRow = { id: string; code: string; name: string; school_type: SchoolType; created_at: Date; suspended_at: Date | null };
-const toSchool = (r: SchoolRow): PlatformSchool => ({
+type StatsRow = { tenant_id: string; active_members: number; active_admins: number; students: number; campuses: number };
+const NO_COUNTS: SchoolCounts = { members: 0, administrators: 0, students: 0, campuses: 0 };
+const toSchool = (r: SchoolRow, stats: StatsRow | undefined): PlatformSchool => ({
   id: r.id,
   code: r.code,
   name: r.name,
   schoolType: r.school_type,
   createdAt: r.created_at,
   suspendedAt: r.suspended_at,
+  counts: stats
+    ? { members: stats.active_members, administrators: stats.active_admins, students: stats.students, campuses: stats.campuses }
+    : NO_COUNTS,
 });
 
 /// What the database function raised, by the stable names the migration gives its exceptions (and the unique-index backstop on the code).
@@ -52,8 +62,12 @@ function dbReason(error: unknown): "NOT_PLATFORM_ADMIN" | "HAS_PERIODS" | "INVAL
 }
 
 export async function listSchools(actorUserId: string): Promise<PlatformSchool[]> {
-  const rows = await forUser(actorUserId).transaction((tx) => tx.$queryRaw<SchoolRow[]>`SELECT * FROM platform_list_schools()`);
-  return rows.map(toSchool);
+  const { rows, stats } = await forUser(actorUserId).transaction(async (tx) => ({
+    rows: await tx.$queryRaw<SchoolRow[]>`SELECT * FROM platform_list_schools()`,
+    stats: await tx.$queryRaw<StatsRow[]>`SELECT * FROM platform_school_stats()`,
+  }));
+  const byId = new Map(stats.map((row) => [row.tenant_id, row]));
+  return rows.map((row) => toSchool(row, byId.get(row.id)));
 }
 
 async function schoolById(actorUserId: string, id: string): Promise<PlatformSchool | null> {

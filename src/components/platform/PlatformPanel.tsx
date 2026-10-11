@@ -10,11 +10,20 @@ import { TextField } from "@/components/ui/TextField";
 import { NETWORK_ERROR, RATE_LIMITED, SESSION_ENDED, problemFor, sendJson, type Reply } from "@/components/auth/postJson";
 import { useApi } from "@/components/academics/useApi";
 
-// The platform page (plan C5, ADR 0016): the schools of the installation, seen as identity data only - code, name, type, created, whether suspended -
+// The platform page (plan C5, ADR 0016): the schools of the installation, seen as identity data and four coarse counters - code, name, type, created, whether suspended, how many members, students and campuses, whether anyone administers it -
 // and the four things a platform administrator does: create a school (with its first administrator's invitation), suspend, reinstate, change the type.
 // Every change asks for the password again. The page reads no school's data, and the API behind it enforces who may do what.
 
-type School = { id: string; code: string; name: string; schoolType: SchoolType; createdAt: string; suspendedAt: string | null };
+type SchoolCounts = { members: number; administrators: number; students: number; campuses: number };
+type School = {
+  id: string;
+  code: string;
+  name: string;
+  schoolType: SchoolType;
+  createdAt: string;
+  suspendedAt: string | null;
+  counts: SchoolCounts;
+};
 type AuditEntry = {
   id: string;
   actorUserId: string;
@@ -38,6 +47,9 @@ const ACTION_LABELS: Record<string, string> = {
   SCHOOL_TYPE_CHANGED: "School type changed",
   PLATFORM_ADMIN_GRANTED: "Platform administrator added",
 };
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+const countsLine = (c: SchoolCounts) =>
+  [plural(c.members, "member", "members"), plural(c.students, "student", "students"), plural(c.campuses, "campus", "campuses")].join(" · ");
 const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
 type Notice = { variant: "success" | "error"; text: string } | null;
@@ -112,12 +124,18 @@ export function PlatformPanel() {
                     <span className="font-mono text-xs">{school.code}</span> · {TYPE_LABELS[school.schoolType]} · created{" "}
                     {when(school.createdAt)}
                   </p>
-                  <p className="mt-1">
+                  <p className="mt-0.5 text-sm text-fg-muted">{countsLine(school.counts)}</p>
+                  <p className="mt-1 flex flex-wrap gap-2">
                     <span
                       className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${school.suspendedAt ? "bg-warn-bg text-warn-fg" : "bg-ok-bg text-ok-fg"}`}
                     >
                       {school.suspendedAt ? `Suspended ${when(school.suspendedAt)}` : "Active"}
                     </span>
+                    {school.counts.administrators === 0 && (
+                      <span className="inline-flex rounded-full bg-warn-bg px-2.5 py-1 text-xs font-semibold text-warn-fg">
+                        No administrator
+                      </span>
+                    )}
                   </p>
                 </div>
                 <div className="flex gap-2">

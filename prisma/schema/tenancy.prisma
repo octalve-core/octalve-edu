@@ -9,21 +9,22 @@ enum SchoolType {
 }
 
 model Tenant {
-  id         String     @id @default(cuid())
+  id          String     @id @default(cuid())
   /// URL slug (PRD §7 "Tenant code selection") — unique, reserved-word-checked
   /// and format-validated at the application layer before insert, fixed at
   /// creation for MVP (support-mediated changes only).
-  code       String     @unique
-  name       String
+  code        String     @unique
+  name        String
   /// Defaults to K12 because every school that exists today is one; the setup wizard does not ask until the Settings screen exists.
-  schoolType SchoolType @default(K12)
-  createdAt  DateTime   @default(now())
+  schoolType  SchoolType @default(K12)
+  createdAt   DateTime   @default(now())
   /// Set when the platform suspends the school: its members can no longer reach it (the resolver and the person's school list treat it as
   /// absent). The data is untouched. Only the `platform_*` functions write it (plan C5).
   suspendedAt DateTime?
 
   campuses             Campus[]
   memberships          TenantMembership[]
+  stats                TenantStats?
   invitations          Invitation[]
   /// Exactly one row, created by the database when the tenant is (a trigger — see the phase 1.0 migration).
   settings             SchoolSettings?

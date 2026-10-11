@@ -16,3 +16,17 @@ model PlatformAuditLog {
 
   @@index([createdAt])
 }
+
+/// Four coarse counters per school for the platform page (task 0010 F1, ADR 0016). Kept by triggers on TenantMembership, StudentRecord and Campus
+/// (migration 20261023090000); row-level security forces a policy for the OWNER only, so the runtime role reads and writes nothing here - the
+/// numbers leave the database only through `platform_school_stats()`. Not used by application code directly.
+model TenantStats {
+  tenantId      String   @id
+  activeMembers Int      @default(0)
+  activeAdmins  Int      @default(0)
+  students      Int      @default(0)
+  campuses      Int      @default(0)
+  updatedAt     DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}

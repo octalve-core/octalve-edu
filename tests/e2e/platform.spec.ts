@@ -69,6 +69,9 @@ test.describe("the platform page", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Platform" })).toBeVisible();
     await expect(row(page, "Existing E2E School")).toContainText(existing.code);
     await expect(row(page, "Existing E2E School")).toContainText("Active");
+    // coarse counters, and a school nobody administers is marked
+    await expect(row(page, "Existing E2E School")).toContainText("0 members · 0 students · 1 campus");
+    await expect(row(page, "Existing E2E School")).toContainText("No administrator");
     await expectAccessible(page, "/platform");
 
     // create
@@ -87,6 +90,7 @@ test.describe("the platform page", () => {
     await d.getByRole("button", { name: "Create school" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Brand New E2E School was created" })).toBeVisible();
     await expect(row(page, "Brand New E2E School")).toContainText("Higher education");
+    await expect(row(page, "Brand New E2E School")).toContainText("No administrator"); // invited, not yet accepted
 
     // suspend (a reason is required), then reinstate
     await page.getByRole("button", { name: "Suspend Brand New E2E School" }).click();
