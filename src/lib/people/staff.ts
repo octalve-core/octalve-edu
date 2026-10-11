@@ -360,6 +360,8 @@ export async function linkableAccounts(
         deactivatedAt: null,
         role: roleForCategory(record.category),
         staffRecords: { none: {} },
+        // a campus administrator chooses among their own campus's members (a school administrator among everyone)
+        ...(tenant.role === "CAMPUS_ADMIN" ? { campusId: tenant.campusId } : {}),
       },
       select: { userId: true, user: { select: { name: true, email: true } } },
       orderBy: [{ user: { name: "asc" } }, { userId: "asc" }],
@@ -386,7 +388,12 @@ export async function linkAccount(
       if (record.userId) return refuse("ALREADY_LINKED_ACCOUNT");
       await lockStaff(tx, tenantId);
       const member = await tx.tenantMembership.findFirst({
-        where: { tenantId, userId: input.userId, deactivatedAt: null },
+        where: {
+          tenantId,
+          userId: input.userId,
+          deactivatedAt: null,
+          ...(tenant.role === "CAMPUS_ADMIN" ? { campusId: tenant.campusId } : {}),
+        },
         select: { role: true },
       });
       if (!member || member.role !== roleForCategory(record.category)) return refuse("ACCOUNT_MISMATCH");

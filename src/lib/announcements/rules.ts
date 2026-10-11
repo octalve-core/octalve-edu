@@ -92,6 +92,11 @@ export function isAnnouncementVisible(announcement: AnnouncementLike, viewer: Vi
     return true;
   }
 
+  // A campus administrator manages their campus's announcements, so they see every one of them, drafts and expired ones included
+  if (viewer.role === Role.CAMPUS_ADMIN && viewer.campusId && announcement.campusId === viewer.campusId) {
+    return true;
+  }
+
   // Authors can always see their own announcements (even drafts or expired)
   if (viewer.userId && announcement.authorUserId === viewer.userId) {
     return true;
@@ -123,16 +128,18 @@ export function sortAnnouncements<T extends Pick<AnnouncementLike, "isPinned" | 
  * Evaluates whether a user role has authority to author announcements.
  */
 export function canAuthorAnnouncements(role: Role): boolean {
-  return role === Role.ADMIN || role === Role.TEACHING_STAFF;
+  return role === Role.ADMIN || role === Role.CAMPUS_ADMIN || role === Role.TEACHING_STAFF;
 }
 
 /**
  * Evaluates whether a user can edit/delete a given announcement.
  */
 export function canManageAnnouncement(
-  announcement: Pick<AnnouncementLike, "authorUserId">,
-  viewer: { userId: string; role: Role },
+  announcement: Pick<AnnouncementLike, "authorUserId" | "campusId">,
+  viewer: { userId: string; role: Role; campusId?: string | null },
 ): boolean {
   if (viewer.role === Role.ADMIN) return true;
+  // A campus administrator manages whatever belongs to THEIR campus, whoever wrote it; a school-wide announcement (no campus) is not theirs.
+  if (viewer.role === Role.CAMPUS_ADMIN && viewer.campusId && announcement.campusId === viewer.campusId) return true;
   return viewer.userId === announcement.authorUserId;
 }

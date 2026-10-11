@@ -241,10 +241,11 @@ test.describe("resend, revoke, list", () => {
     expect(await previewInvitation(token)).toBeNull(); // expired
     const resent = await resendInvitation(ctx(a), admin.id, invitation.id);
     expect(resent).not.toBeNull();
-    expect(resent!.token).not.toBe(token);
+    if (!resent || resent === "ADMIN_ONLY") throw new Error("expected a fresh link"); // (narrowing only: an ADMIN is never refused)
+    expect(resent.token).not.toBe(token);
     expect(await previewInvitation(token)).toBeNull();
-    expect(await previewInvitation(resent!.token)).not.toBeNull();
-    expect(Math.abs(resent!.invitation.expiresAt.getTime() - (Date.now() + SEVEN_DAYS_MS))).toBeLessThan(60_000);
+    expect(await previewInvitation(resent.token)).not.toBeNull();
+    expect(Math.abs(resent.invitation.expiresAt.getTime() - (Date.now() + SEVEN_DAYS_MS))).toBeLessThan(60_000);
     expect((await db.auditLog.findMany({ where: { targetId: invitation.id, action: "INVITATION_RESENT" } })).length).toBe(1);
   });
 

@@ -47,5 +47,11 @@ export function memberFailure(reason: MemberFailure): Response {
       ]);
     case "DEACTIVATED":
       return fail("This person is deactivated. Reactivate them first.", 409, "DEACTIVATED");
+    case "ADMIN_ONLY":
+      return fail("Only a school administrator can do that.", 403, "FORBIDDEN");
+    case "CAMPUS_REQUIRED":
+      return fail("A campus administrator needs a campus. Choose one.", 400, "VALIDATION", [
+        { path: "body.campusId", message: "Choose the campus they will administer." },
+      ]);
   }
 }

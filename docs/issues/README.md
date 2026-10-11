@@ -17,6 +17,9 @@ Every known or suspected problem, with severity, kind, where it is and how sure 
 | ISS-0010 | P2 | Test gap | Phase 1.3–1.8 "all green" claims listed only unit/RLS/static gates; the full suite (1728 passed, 6 failed, 23 skipped) shows 6 e2e tests stale since 1.3/1.7 | Fixed on `claude/fix-phase-1-review-findings` (not merged): the full suite there is 1757 passed, 0 failed, 23 skipped (2026-10-11) | unknown | Read | task 0008 | 2026-10-11 |
 | ISS-0012 | P2 | Test gap | `academics.spec` (x2, desktop + phone) and `shell.spec` (x2) expect pre-1.3/1.7 UI: four Academics sections and Settings as text | Fixed on `claude/fix-phase-1-review-findings` (not merged) | n/a | Reproduced (full suite) | `tests/e2e/academics.spec.ts:51,69`, `tests/e2e/shell.spec.ts:39,208` | 2026-10-11 |
 | ISS-0011 | P3 | Process | Phase commits 1.3, 1.4, 1.5, 1.7 have one-line messages (ADR 0013); designs for some phases not committed first | Open | unknown | Read | git log | 2026-10-11 |
+| ISS-0013 | P3 | Authorization | `GET academics/arms/[id]/attendance` and `GET people/students/[id]/attendance` do not hide another campus's arm / student from a teacher of a different campus (a roll call of another campus's arm names the arm; the history route returns the student). Found while adding campus administrators (they are scoped; teachers are not) | Open | unknown | Read (the campus-administrator test for the same routes failed first with 200 for another campus's student) | `src/lib/attendance/service.ts`, `.../people/students/[id]/attendance/route.ts` | 2026-10-11 |
+| ISS-0014 | P1 | Authorization / Privacy | `GET finance/invoices` returned EVERY invoice of the school to any parent, student or teacher: the route admits those roles (for the "own invoice" case) but `queryInvoices` applied no per-caller filter, and Invoice RLS is tenant-wide. A parent's list held another family's invoice (name, admission number, amounts, payments) | Fixed in the slice B3 commit on `claude/campus-admins-platform-superadmin` (not merged): `invoiceVisibility` in `src/lib/finance/service.ts` - finance staff all, a campus administrator their campus's, a student/guardian only their own | unknown | Reproduced (the campus-admin-finance spec's parent test failed on the unchanged route: two invoices where one was expected) | `src/lib/finance/service.ts` (`queryInvoices`), `src/app/api/v1/schools/[code]/finance/invoices/route.ts` | 2026-10-11 |
+| ISS-0015 | P3 | Process / Availability | A school created from the platform page has its first administrator's invitation emailed once; if that mail is lost (wrong address, spam) nobody can re-send it - the platform may not look inside the school, and no one inside exists yet - so the school has no administrator and no in-app way to get one | Open (maintainer decision: a platform "invite first administrator again" action that writes one invitation and reads nothing, or an operator script) | unknown | Read | `src/lib/platform/service.ts` (`createSchool`), task 0009 | 2026-10-11 |
 
 ## Priority scale
 | P | Meaning | Examples |
@@ -29,6 +32,10 @@ Every known or suspected problem, with severity, kind, where it is and how sure 
 "**Live?**" says whether the problem exists on production (`yes` / `no` / `unknown`). Nothing here has been checked against a production deployment, so it is `unknown` until someone confirms what is deployed.
 
 **Evidence levels:** *Read* = found by reading code (not yet proved); *Reproduced* = a failing test or run exists; *Reported* = from a user/maintainer.
+
+## Planned work that closes issues
+- **Campus admins and a platform superadmin** (design answered 2026-10-11): closes the gap that an `ADMIN` is always school-wide and that nobody can create or suspend a school except through setup.
+- **Audited support access** (maintainer wants it later): design before code; requirements recorded in the plan.
 
 ## Suspects not yet investigated
 - Every other `schools/[code]` route added in 1.3–1.8 for role checks beyond tenant membership (campus scoping in attendance, timetable, announcements, settings).

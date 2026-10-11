@@ -81,7 +81,8 @@ export async function resolveTenant(input: { userId: string; code: string }): Pr
   const membership = await forUser(input.userId).transaction((tx) =>
     tx.tenantMembership.findFirst({
       // A deactivated membership is no membership: the person was removed from this school (the row stays for history).
-      where: { userId: input.userId, tenant: tenantFilter, deactivatedAt: null },
+      // A suspended school is, to its members, a school that does not answer: the same refusal as no membership (platform administrators suspend schools).
+      where: { userId: input.userId, tenant: { ...tenantFilter, suspendedAt: null }, deactivatedAt: null },
       select: { role: true, campusId: true, permissions: true, tenant: { select: { id: true, code: true, name: true, schoolType: true } } },
     }),
   );

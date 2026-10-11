@@ -11,6 +11,8 @@ export interface AnnouncementComposerModalProps {
   onSaved: () => void;
   initialAnnouncement?: AnnouncementDto | null;
   campuses: { id: string; name: string }[];
+  /// A campus administrator's announcements always belong to their campus: no "All Campuses" choice.
+  campusRequired?: boolean;
   classArms: { id: string; name: string }[];
 }
 
@@ -29,12 +31,13 @@ export function AnnouncementComposerModal({
   onSaved,
   initialAnnouncement,
   campuses,
+  campusRequired = false,
   classArms,
 }: AnnouncementComposerModalProps) {
   const [title, setTitle] = useState(initialAnnouncement?.title ?? "");
   const [body, setBody] = useState(initialAnnouncement?.body ?? "");
   const [targetRoles, setTargetRoles] = useState<Role[]>(initialAnnouncement?.targetRoles ?? []);
-  const [campusId, setCampusId] = useState<string>(initialAnnouncement?.campusId ?? "");
+  const [campusId, setCampusId] = useState<string>(initialAnnouncement?.campusId ?? (campusRequired ? (campuses[0]?.id ?? "") : ""));
   const [classArmId, setClassArmId] = useState<string>(initialAnnouncement?.classArmId ?? "");
   const [status, setStatus] = useState<AnnouncementStatus>(initialAnnouncement?.status ?? AnnouncementStatus.PUBLISHED);
   const [isPinned, setIsPinned] = useState<boolean>(initialAnnouncement?.isPinned ?? false);
@@ -184,13 +187,13 @@ export function AnnouncementComposerModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-fg-muted">Campus (Optional)</label>
+              <label className="block text-xs font-medium text-fg-muted">Campus{campusRequired ? "" : " (Optional)"}</label>
               <select
                 value={campusId}
                 onChange={(e) => setCampusId(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-line bg-field px-3 py-2 text-sm text-fg"
               >
-                <option value="">All Campuses</option>
+                {!campusRequired && <option value="">All Campuses</option>}
                 {campuses.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}

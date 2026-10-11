@@ -18,7 +18,8 @@
 | 6 | [TASK-0006](0006-phase-1-7-settings-and-mfa.md) | Phase 1.7: Settings UI, Step-up MFA & Audit Logging | [x] Completed | 2026-10-10 16:00:00 UTC | 2026-10-10 17:10:00 UTC | [PR #16](https://github.com/roji-tech/octalve-edu-fork/pull/16) (`claude/phase-1-7-settings`) |
 | 7 | [TASK-0007](0007-phase-1-8-phase-gate-and-hardening.md) | Phase 1.8: End-to-End Hardening, Security Walk & Gate | [x] Completed | 2026-10-10 17:35:00 UTC | 2026-10-10 19:25:00 UTC | [PR #17](https://github.com/roji-tech/octalve-edu-fork/pull/17) (`claude/phase-1-8-gate`) |
 
-| 8 | [TASK-0008](0008-post-phase-1-verification-and-defect-fixes.md) | Post-Phase-1 verification and defect fixes | [~] In Progress (full suite on the fix branch done: 1757 passed / 0 failed / 23 skipped; next: land the fixes) | 2026-10-11 UTC | — | `claude/phase-1-3-attendance` |
+| 8 | [TASK-0008](0008-post-phase-1-verification-and-defect-fixes.md) | Post-Phase-1 verification and defect fixes | [x] Completed (suite 1757 passed / 0 failed / 23 skipped; landed in octalve-core `dev`) | 2026-10-11 UTC | 2026-10-11 UTC | [PR #6](https://github.com/octalve-core/octalve-edu/pull/6) |
+| 9 | [TASK-0009](0009-campus-admins-and-platform-superadmin.md) | Campus administrators and the platform superadmin (C1–C8) | [~] In Progress (slices A–D built; full suite 1842 passed / 3 failed (shell e2e: the phone one is a pre-existing flake on `dev` too; the two desktop ones unexplained) / 23 skipped; PR not yet opened) | 2026-10-11 UTC | — | `claude/campus-admins-platform-superadmin` |
 ---
 
 ## Detailed Milestone Checklist
@@ -125,8 +126,15 @@
 
 
 ### TASK-0008: Post-Phase-1 verification and defect fixes
-- **Status:** In Progress — full suite finished: 1728 passed, 6 failed (stale e2e tests), 23 skipped
+- **Status:** Completed — landed in octalve-core `dev` (PR #6); full suite 1757 passed / 0 failed / 23 skipped
 - [x] Static gate clean
-- [x] Full suite run (result in the task file); [ ] fix the 6 stale e2e tests
-- [ ] Defects from code review fixed test-first (finance receipts and webhook, results transitions)
-- [ ] `dev` created; stack landed via one `dev` → `master` PR (approval needed)
+- [x] Full suite run (result in the task file); [x] the 6 stale e2e tests fixed
+- [x] Defects from code review fixed test-first (finance receipts and webhook, results transitions)
+- [x] Stack landed in octalve-core `dev` (one PR from the fork's stack branch); `dev` → `master` (staging) still needs the maintainer's approval
+
+### TASK-0009: Campus administrators and the platform superadmin
+- **Status:** In Progress — see the task file for the slices
+- [x] Slice A: migrations (`CAMPUS_ADMIN`, CHECK, `isPlatformAdmin`, `suspendedAt`, `PlatformAuditLog`, `platform_*` functions), `canAdminister`, tests
+- [ ] Slices B1–B4: campus-capable routes (people; academics + attendance + announcements + timetable; finance; members/invitations), enabling the role last
+- [ ] Slice C: suspension in the resolver, `make-platform-admin` script, platform API and page
+- [ ] Slice D: route-role guard test, ADR 0016 (Proposed), docs, full suite, PR

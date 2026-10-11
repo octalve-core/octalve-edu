@@ -1,8 +1,18 @@
 import { z } from "zod";
 import { ok } from "@/lib/api/envelope";
 import { validate } from "@/lib/api/validate";
+import { studentScope } from "@/lib/auth/campus-scope";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { READ_ROLES, WRITE_ROLES, idField, isPlausibleId, notFound, peopleFailure, peopleWriteLimited, textField } from "@/lib/people/http";
+import {
+  CAMPUS_WRITE_ROLES,
+  READ_ROLES,
+  idField,
+  isPlausibleId,
+  notFound,
+  peopleFailure,
+  peopleWriteLimited,
+  textField,
+} from "@/lib/people/http";
 import { addGuardian, listLinks } from "@/lib/people/guardians";
 
 // GET  /api/v1/schools/[code]/people/students/[id]/guardians  — the student's guardians (live links), the primary contact first.
@@ -35,6 +45,8 @@ export const POST = withAuth(
     if (!isPlausibleId(id)) return notFound("student");
     const limited = await peopleWriteLimited(auth);
     if (limited) return limited;
+    const scoped = await studentScope(auth, id);
+    if (scoped) return scoped;
     const result = await addGuardian(auth.tenant, auth.userId, id, input);
     return result.ok
       ? ok(
@@ -44,5 +56,5 @@ export const POST = withAuth(
         )
       : peopleFailure(result.reason, result.detail);
   }),
-  { tenant: true, roles: WRITE_ROLES },
+  { tenant: true, roles: CAMPUS_WRITE_ROLES },
 );

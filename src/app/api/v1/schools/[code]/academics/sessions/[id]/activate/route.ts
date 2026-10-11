@@ -4,7 +4,8 @@ import { validate } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { PASSWORD_MAX_LENGTH } from "@/lib/auth/password";
 import { passwordProofFailure, proveOwnPassword } from "@/lib/auth/reauth";
-import { WRITE_ROLES, academicFailure, isPlausibleId, notFound, writeLimited } from "@/lib/academics/http";
+import { CAMPUS_WRITE_ROLES, academicFailure, isPlausibleId, notFound, writeLimited } from "@/lib/academics/http";
+import { sessionScope } from "@/lib/auth/campus-scope";
 import { activateSession } from "@/lib/academics/sessions";
 
 // POST /api/v1/schools/[code]/academics/sessions/[id]/activate  { closeCurrent? } — ADMIN only.
@@ -20,6 +21,8 @@ export const POST = withAuth(
     if (!isPlausibleId(id)) return notFound("session");
     const limited = await writeLimited(auth);
     if (limited) return limited;
+    const outOfScope = await sessionScope(auth, id);
+    if (outOfScope) return outOfScope;
     if (options.closeCurrent) {
       if (options.password === undefined) {
         return fail("Enter your password to confirm closing the current session.", 400, "VALIDATION", [
@@ -32,5 +35,5 @@ export const POST = withAuth(
     const result = await activateSession(auth.tenant, auth.userId, id, { closeCurrent: options.closeCurrent });
     return result.ok ? ok({ session: result.session, closed: result.closed }) : academicFailure(result.reason, result.detail);
   }),
-  { tenant: true, roles: WRITE_ROLES },
+  { tenant: true, roles: CAMPUS_WRITE_ROLES },
 );

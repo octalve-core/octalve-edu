@@ -18,6 +18,9 @@ model Tenant {
   /// Defaults to K12 because every school that exists today is one; the setup wizard does not ask until the Settings screen exists.
   schoolType SchoolType @default(K12)
   createdAt  DateTime   @default(now())
+  /// Set when the platform suspends the school: its members can no longer reach it (the resolver and the person's school list treat it as
+  /// absent). The data is untouched. Only the `platform_*` functions write it (plan C5).
+  suspendedAt DateTime?
 
   campuses             Campus[]
   memberships          TenantMembership[]
@@ -80,6 +83,9 @@ model Campus {
 
 enum Role {
   ADMIN
+  /// Administers ONE campus (people, academics, attendance, announcements, timetable, manual payments of that campus); `campusId` is
+  /// REQUIRED on the membership (a CHECK constraint). An ADMIN stays school-wide (plan C1–C3, ADR 0016).
+  CAMPUS_ADMIN
   TEACHING_STAFF
   NON_TEACHING_STAFF
   STUDENT

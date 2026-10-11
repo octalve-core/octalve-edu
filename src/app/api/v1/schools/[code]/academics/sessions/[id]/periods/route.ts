@@ -4,7 +4,7 @@ import { validate } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import {
   READ_ROLES,
-  WRITE_ROLES,
+  CAMPUS_WRITE_ROLES,
   academicFailure,
   isPlausibleId,
   isoDateField,
@@ -12,6 +12,7 @@ import {
   notFound,
   writeLimited,
 } from "@/lib/academics/http";
+import { sessionScope } from "@/lib/auth/campus-scope";
 import { createPeriod, listPeriods } from "@/lib/academics/sessions";
 
 // GET  /api/v1/schools/[code]/academics/sessions/[id]/periods  — the session's terms/semesters/cohorts in order (`?archived=true` includes archived).
@@ -42,8 +43,10 @@ export const POST = withAuth(
     if (!isPlausibleId(id)) return notFound("session");
     const limited = await writeLimited(auth);
     if (limited) return limited;
+    const outOfScope = await sessionScope(auth, id);
+    if (outOfScope) return outOfScope;
     const result = await createPeriod(auth.tenant, auth.userId, id, input);
     return result.ok ? ok({ period: result.period }, {}, 201) : academicFailure(result.reason, result.detail, "session");
   }),
-  { tenant: true, roles: WRITE_ROLES },
+  { tenant: true, roles: CAMPUS_WRITE_ROLES },
 );

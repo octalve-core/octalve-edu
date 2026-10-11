@@ -77,14 +77,16 @@ export type TestUser = { id: string; email: string; name: string; password: stri
 /// Creates a user with a real bcrypt hash. `role` adds a membership in a
 /// (seeded) school; omit it for a user with no school. `password: null` makes
 /// an invited-but-not-activated account (no passwordHash).
-export async function createUser(opts: { email?: string; name?: string; password?: string | null; role?: Role } = {}): Promise<TestUser> {
+export async function createUser(
+  opts: { email?: string; name?: string; password?: string | null; role?: Role; platformAdmin?: boolean } = {},
+): Promise<TestUser> {
   const email = opts.email ?? uniqueEmail();
   const password = opts.password === undefined ? DEFAULT_PASSWORD : opts.password;
   const name = opts.name ?? "Amina Yusuf";
   const tenant = await seedInstance();
 
   const user = await db.user.create({
-    data: { email, name, passwordHash: password === null ? null : await hashOnce(password) },
+    data: { email, name, passwordHash: password === null ? null : await hashOnce(password), isPlatformAdmin: opts.platformAdmin ?? false },
   });
   if (opts.role) {
     await db.tenantMembership.create({ data: { userId: user.id, tenantId: tenant.id, role: opts.role } });

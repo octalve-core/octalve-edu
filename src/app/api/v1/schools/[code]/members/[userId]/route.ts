@@ -32,5 +32,5 @@ export const PATCH = withAuth(
     const result = await changeMember(auth.tenant, auth.userId, userId, change);
     return result.ok ? ok({ member: result.member, changed: result.changed }) : memberFailure(result.reason);
   }),
-  { tenant: true, roles: ["ADMIN"] },
+  { tenant: true, roles: ["ADMIN", "CAMPUS_ADMIN"] },
 );

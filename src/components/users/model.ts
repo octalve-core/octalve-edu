@@ -56,6 +56,22 @@ export const ROLE_OPTIONS: SelectOption[] = (Object.keys(ROLE_LABELS) as RoleNam
   label: ROLE_LABELS[role],
 }));
 
+/// Who is using the page: a school administrator, or a campus administrator (one campus, nobody at their own level or above).
+export type ActorRole = "ADMIN" | "CAMPUS_ADMIN";
+const ADMIN_LEVEL: readonly RoleName[] = ["ADMIN", "CAMPUS_ADMIN"];
+/// The roles this person may give: a campus administrator cannot make an administrator or another campus administrator (the API refuses it too).
+export const roleOptionsFor = (actor: ActorRole): SelectOption[] =>
+  actor === "ADMIN" ? ROLE_OPTIONS : ROLE_OPTIONS.filter((option) => !ADMIN_LEVEL.includes(option.value as RoleName));
+/// Whether this person's controls are shown for `member`: a campus administrator does not manage their own level or above.
+export const mayManage = (actor: ActorRole, member: Pick<Member, "role">) => actor === "ADMIN" || !ADMIN_LEVEL.includes(member.role);
+/// The campus choices for a form: a campus administrator has exactly their own, with no "no campus" option; for the role "campus administrator" a
+/// campus is required, so the blank option asks for a choice instead of meaning "none".
+export function campusChoices(actor: ActorRole, role: RoleName, campuses: CampusOption[]): SelectOption[] {
+  const list = campuses.map((c) => ({ value: c.id, label: c.name }));
+  if (actor === "CAMPUS_ADMIN") return list;
+  return [{ value: "", label: role === "CAMPUS_ADMIN" ? "Choose a campus" : "No specific campus" }, ...list];
+}
+
 export const displayName = (member: Pick<Member, "name" | "email">) => member.name?.trim() || member.email || "Unnamed person";
 
 const UNITS: [string, number][] = [

@@ -1,3 +1,4 @@
+import { isAdministrator } from "@/lib/auth/administer";
 import type { Metadata } from "next";
 import { forbidden, notFound } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
@@ -15,7 +16,8 @@ export const dynamic = "force-dynamic";
 export default async function StudentPage({ params }: { params: Promise<{ code: string; id: string }> }) {
   const { code, id } = await params;
   const { tenant } = await requireTenantPage(code);
-  if (tenant.role !== "ADMIN" && tenant.role !== "TEACHING_STAFF" && tenant.role !== "NON_TEACHING_STAFF") forbidden();
+  if (tenant.role !== "ADMIN" && tenant.role !== "CAMPUS_ADMIN" && tenant.role !== "TEACHING_STAFF" && tenant.role !== "NON_TEACHING_STAFF")
+    forbidden();
   if (!isPlausibleId(id)) notFound();
   const found = await getStudent(tenant, id);
   if (!found.ok) notFound();
@@ -31,7 +33,7 @@ export default async function StudentPage({ params }: { params: Promise<{ code: 
           schoolCode={tenant.tenantCode}
           studentId={id}
           campuses={campuses}
-          canEdit={tenant.role === "ADMIN"}
+          canEdit={isAdministrator(tenant.role)}
           fallbackName={fullName(found.student)}
         />
       </div>

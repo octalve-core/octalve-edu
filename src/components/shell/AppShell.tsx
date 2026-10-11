@@ -33,9 +33,20 @@ function BrandMark({ size }: { size: "sm" | "md" }) {
 /// Unlike AlEemaan's, this shell is **school-aware**: the navigation follows the school the path is in (see
 /// `ShellProvider`). A skip link is the first thing in the tab order. Every page inside is still responsible for its own
 /// session and school check; the shell only displays who is signed in and which schools they belong to.
-export function AppShell({ user, schools, children }: { user: ShellUser; schools: readonly ShellSchool[]; children: ReactNode }) {
+export function AppShell({
+  user,
+  schools,
+  platform = false,
+  children,
+}: {
+  user: ShellUser;
+  schools: readonly ShellSchool[];
+  /// The person is a platform administrator: the navigation gets a "Platform" link (display only).
+  platform?: boolean;
+  children: ReactNode;
+}) {
   return (
-    <ShellProvider schools={schools}>
+    <ShellProvider schools={schools} platform={platform}>
       <div className="min-h-screen bg-canvas text-fg-2">
         <SessionRevalidator />
         <a

@@ -3,7 +3,8 @@ import { fail, ok } from "@/lib/api/envelope";
 import { offsetMeta, parseOffsetPagination } from "@/lib/api/pagination";
 import { validate } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { READ_ROLES, WRITE_ROLES, academicFailure, idField, nameField, writeLimited } from "@/lib/academics/http";
+import { READ_ROLES, CAMPUS_WRITE_ROLES, academicFailure, idField, nameField, writeLimited } from "@/lib/academics/http";
+import { createCampus } from "@/lib/auth/campus-scope";
 import { createClassGroup, listClassGroups } from "@/lib/academics/classes";
 
 // GET  /api/v1/schools/[code]/academics/class-groups   — class groups in progression order, each with its live arms and a subject count.
@@ -32,8 +33,10 @@ export const POST = withAuth(
   validate({ body: createBody }, async (_req, auth: TenantAuthContext, _ctx: unknown, { body }) => {
     const limited = await writeLimited(auth);
     if (limited) return limited;
-    const result = await createClassGroup(auth.tenant, auth.userId, body);
+    const campus = createCampus(auth, body.campusId);
+    if (campus instanceof Response) return campus;
+    const result = await createClassGroup(auth.tenant, auth.userId, { ...body, campusId: campus.campusId });
     return result.ok ? ok({ classGroup: result.group }, {}, 201) : academicFailure(result.reason, result.detail, "class");
   }),
-  { tenant: true, roles: WRITE_ROLES },
+  { tenant: true, roles: CAMPUS_WRITE_ROLES },
 );

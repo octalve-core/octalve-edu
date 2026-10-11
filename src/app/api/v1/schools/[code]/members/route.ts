@@ -4,6 +4,7 @@ import { offsetMeta, parseOffsetPagination } from "@/lib/api/pagination";
 import { validate } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { campusIdField, roleField } from "@/lib/members/http";
+import { ownCampusOnly } from "@/lib/auth/campus-scope";
 import { listMembers } from "@/lib/members/service";
 
 // GET /api/v1/schools/[code]/members                                                       (plan §0.5.4)
@@ -32,8 +33,11 @@ export const GET = withAuth(
         "VALIDATION",
         page.issues.map((i) => ({ ...i, path: `query.${i.path}` })),
       );
+    // A campus administrator's list is their own campus's; naming another campus is a 403 rather than an empty answer that hides the rule.
+    const refused = ownCampusOnly(auth, filters.campusId);
+    if (refused) return refused;
     const { members, total } = await listMembers(auth.tenant, filters, page);
     return ok({ members }, offsetMeta({ page: page.page, limit: page.limit, total }));
   }),
-  { tenant: true, roles: ["ADMIN"] },
+  { tenant: true, roles: ["ADMIN", "CAMPUS_ADMIN"] },
 );

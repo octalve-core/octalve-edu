@@ -1,3 +1,4 @@
+import { isAdministrator } from "@/lib/auth/administer";
 import type { Metadata } from "next";
 import { forbidden } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
@@ -24,8 +25,9 @@ export default async function PeoplePage({
   const { code } = await params;
   const { section: asked } = await searchParams;
   const { tenant } = await requireTenantPage(code);
-  if (tenant.role !== "ADMIN" && tenant.role !== "TEACHING_STAFF" && tenant.role !== "NON_TEACHING_STAFF") forbidden();
-  const canEdit = tenant.role === "ADMIN";
+  if (tenant.role !== "ADMIN" && tenant.role !== "CAMPUS_ADMIN" && tenant.role !== "TEACHING_STAFF" && tenant.role !== "NON_TEACHING_STAFF")
+    forbidden();
+  const canEdit = isAdministrator(tenant.role);
 
   const section = isSection(asked) ? asked : "students";
   const campuses = await tenant.run((tx) =>

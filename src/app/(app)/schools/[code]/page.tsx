@@ -65,7 +65,13 @@ export default async function SchoolPage({ params }: { params: Promise<{ code: s
         )}
       </section>
 
-      <AnnouncementsFeed schoolCode={tenant.tenantCode} userRole={tenant.role} userId={session.user.id} campuses={campuses} />
+      <AnnouncementsFeed
+        schoolCode={tenant.tenantCode}
+        userRole={tenant.role}
+        userId={session.user.id}
+        campusId={tenant.campusId}
+        campuses={campuses}
+      />
     </div>
   );
 }

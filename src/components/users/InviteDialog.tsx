@@ -7,7 +7,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
 import { NETWORK_ERROR, RATE_LIMITED, SESSION_ENDED, problemFor, sendJson } from "@/components/auth/postJson";
-import { ROLE_OPTIONS, type CampusOption, type Invitation, type RoleName } from "./model";
+import { campusChoices, roleOptionsFor, type ActorRole, type CampusOption, type Invitation, type RoleName } from "./model";
 
 /// "Invite someone": an address, a role and (optionally) a campus. The server checks everything again; this form only gives the answer where
 /// the person is looking. The dialog is remounted per opening (the owner keys it), so it always starts clean.
@@ -16,17 +16,20 @@ export function InviteDialog({
   onClose,
   schoolCode,
   campuses,
+  actorRole,
   onInvited,
 }: {
   open: boolean;
   onClose: () => void;
   schoolCode: string;
   campuses: CampusOption[];
+  actorRole: ActorRole;
   onInvited: (invitation: Invitation) => void;
 }) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<RoleName>("TEACHING_STAFF");
-  const [campusId, setCampusId] = useState("");
+  // a campus administrator always invites into their own campus (the only one they are given)
+  const [campusId, setCampusId] = useState(actorRole === "CAMPUS_ADMIN" ? (campuses[0]?.id ?? "") : "");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -82,7 +85,7 @@ export function InviteDialog({
           name="role"
           value={role}
           onChange={(e) => setRole(e.target.value as RoleName)}
-          options={ROLE_OPTIONS}
+          options={roleOptionsFor(actorRole)}
           disabled={pending}
         />
         <SelectField
@@ -90,11 +93,17 @@ export function InviteDialog({
           name="campus"
           value={campusId}
           onChange={(e) => setCampusId(e.target.value)}
-          options={[{ value: "", label: "No specific campus" }, ...campuses.map((c) => ({ value: c.id, label: c.name }))]}
+          options={campusChoices(actorRole, role, campuses)}
           hint={
-            role === "ADMIN" ? "Administrators can see every campus whatever is chosen here." : "Everyone else sees only their own campus."
+            actorRole === "CAMPUS_ADMIN"
+              ? "People you invite join your campus."
+              : role === "ADMIN"
+                ? "Administrators can see every campus whatever is chosen here."
+                : role === "CAMPUS_ADMIN"
+                  ? "A campus administrator looks after one campus: its people, classes, payments and announcements."
+                  : "Everyone else sees only their own campus."
           }
-          disabled={pending}
+          disabled={pending || actorRole === "CAMPUS_ADMIN"}
         />
         {formError && <Alert variant="error">{formError}</Alert>}
         <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">

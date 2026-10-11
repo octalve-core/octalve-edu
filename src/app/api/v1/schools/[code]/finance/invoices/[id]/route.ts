@@ -13,6 +13,7 @@ export const GET = withAuth(
         userId: auth.userId,
         roles: [auth.tenant.role],
         permissions: [...auth.tenant.permissions],
+        campusId: auth.tenant.campusId,
       });
       return ok({ invoice });
     } catch (err: unknown) {
@@ -21,6 +22,6 @@ export const GET = withAuth(
   },
   {
     tenant: true,
-    roles: [Role.ADMIN, Role.TEACHING_STAFF, Role.NON_TEACHING_STAFF, Role.PARENT, Role.STUDENT],
+    roles: [Role.ADMIN, Role.CAMPUS_ADMIN, Role.TEACHING_STAFF, Role.NON_TEACHING_STAFF, Role.PARENT, Role.STUDENT],
   },
 );

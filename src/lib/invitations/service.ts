@@ -2,6 +2,7 @@ import type { Prisma, Role } from "@prisma/client";
 import { forInvitation, setTenantContext } from "@/lib/tenant/for-tenant";
 import { trustedTenantId } from "@/lib/tenant/verified-tenant";
 import type { TenantAuthContext } from "@/lib/auth/with-auth";
+import { ADMIN_LEVEL_ROLES } from "@/lib/members/service";
 import { maskEmail } from "@/lib/auth/mask-email";
 import { INVITATION_TTL_MS, hashInvitationToken, newInvitationToken } from "./token";
 import { invitationStatus, isLiveInvitation, type InvitationStatus } from "./status";
@@ -60,7 +61,18 @@ const toPublic = (row: InvitationRow, now: Date = new Date()): PublicInvitation 
 
 export type CreateInvitationResult =
   | { ok: true; invitation: PublicInvitation; token: string }
-  | { ok: false; reason: "ALREADY_MEMBER" | "DEACTIVATED_MEMBER" | "INVALID_CAMPUS" | "INVALID_STAFF_RECORD" };
+  | {
+      ok: false;
+      reason:
+        | "ALREADY_MEMBER"
+        | "DEACTIVATED_MEMBER"
+        | "INVALID_CAMPUS"
+        | "INVALID_STAFF_RECORD"
+        /// A campus administrator asked for an administrator-level role, another campus, or no campus (the whole school).
+        | "ADMIN_ONLY"
+        /// The role needs a campus (a campus administrator) and none was given.
+        | "CAMPUS_REQUIRED";
+    };
 
 /// Invites `input.email` to the school. One live invitation per (school, address): an earlier open one is revoked (and audited)
 /// first, and a partial unique index is the guarantee under concurrency — an advisory lock on the pair serialises two administrators
@@ -70,16 +82,25 @@ export type CreateInvitationResult =
 export async function createInvitation(
   tenant: TenantCtx,
   actorUserId: string,
-  input: { email: string; role: Role; campusId: string | null; staffRecordId?: string | null },
+  /// `campusId` undefined = "not said": a campus administrator's invitation then goes to THEIR campus; an ADMIN's is school-wide (null).
+  input: { email: string; role: Role; campusId?: string | null; staffRecordId?: string | null },
 ): Promise<CreateInvitationResult> {
   const { tenantId } = tenant;
+  // A campus administrator invites into their own campus only, and never at their own level or above (plan C1-C4, ADR 0016).
+  if (tenant.role === "CAMPUS_ADMIN") {
+    if (!tenant.campusId || ADMIN_LEVEL_ROLES.includes(input.role)) return { ok: false, reason: "ADMIN_ONLY" };
+    if (input.campusId !== undefined && input.campusId !== tenant.campusId) return { ok: false, reason: "ADMIN_ONLY" };
+    input = { ...input, campusId: tenant.campusId };
+  }
+  const campusId = input.campusId ?? null;
+  if (input.role === "CAMPUS_ADMIN" && !campusId) return { ok: false, reason: "CAMPUS_REQUIRED" };
   return tenant.run(async (tx) => {
     // (`$executeRaw`: the lock function returns `void`, which `$queryRaw` cannot deserialise.)
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`invitation:${tenantId}:${input.email}`}::text))`;
 
-    if (input.campusId) {
+    if (campusId) {
       // A campus of ANOTHER school is, to this one, a campus that does not exist.
-      const campus = await tx.campus.findFirst({ where: { id: input.campusId, tenantId }, select: { id: true } });
+      const campus = await tx.campus.findFirst({ where: { id: campusId, tenantId }, select: { id: true } });
       if (!campus) return { ok: false, reason: "INVALID_CAMPUS" };
     }
 
@@ -124,7 +145,7 @@ export async function createInvitation(
         tenantId,
         email: input.email,
         role: input.role,
-        campusId: input.campusId,
+        campusId,
         staffRecordId: input.staffRecordId ?? null,
         tokenHash: hashInvitationToken(token),
         invitedById: actorUserId,
@@ -142,7 +163,7 @@ export async function createInvitation(
         afterValue: {
           email: input.email,
           role: input.role,
-          campusId: input.campusId,
+          campusId,
           ...(input.staffRecordId ? { staffRecordId: input.staffRecordId } : {}),
         },
       },
@@ -151,20 +172,31 @@ export async function createInvitation(
   });
 }
 
+/// What a CAMPUS_ADMIN may do to an existing invitation: only their own campus's (another campus's, or a school-wide one, is "no such open
+/// invitation"), and not one at their own level or above (ADMIN_ONLY). Any other actor is not constrained here.
+function campusActorInvitationRefusal(tenant: TenantCtx, row: { role: Role; campusId: string | null }): "NOT_FOUND" | "ADMIN_ONLY" | null {
+  if (tenant.role !== "CAMPUS_ADMIN") return null;
+  if (!tenant.campusId) return "ADMIN_ONLY";
+  if (row.campusId !== tenant.campusId) return "NOT_FOUND";
+  return ADMIN_LEVEL_ROLES.includes(row.role) ? "ADMIN_ONLY" : null;
+}
+
 /// A fresh link and a fresh seven days for an invitation that is still open (pending OR expired); the earlier link stops working
 /// at once. `null` when there is no such open invitation in this school (accepted, revoked, someone else's, unknown: one answer).
 export async function resendInvitation(
   tenant: TenantCtx,
   actorUserId: string,
   invitationId: string,
-): Promise<{ invitation: PublicInvitation; token: string } | null> {
+): Promise<{ invitation: PublicInvitation; token: string } | null | "ADMIN_ONLY"> {
   const { tenantId } = tenant;
   return tenant.run(async (tx) => {
     const open = await tx.invitation.findFirst({
       where: { id: invitationId, tenantId, acceptedAt: null, revokedAt: null },
-      select: { id: true, email: true },
+      select: { id: true, email: true, role: true, campusId: true },
     });
     if (!open) return null;
+    const refused = campusActorInvitationRefusal(tenant, open);
+    if (refused) return refused === "NOT_FOUND" ? null : refused;
     const now = new Date();
     const token = newInvitationToken();
     const updated = await tx.invitation.update({
@@ -187,10 +219,17 @@ export async function resendInvitation(
 }
 
 /// Ends an open invitation. The conditional update is the gate: it changes exactly one row or the answer is "no such open invitation".
-export async function revokeInvitation(tenant: TenantCtx, actorUserId: string, invitationId: string): Promise<boolean> {
+export async function revokeInvitation(tenant: TenantCtx, actorUserId: string, invitationId: string): Promise<boolean | "ADMIN_ONLY"> {
   const { tenantId } = tenant;
   return tenant.run(async (tx) => {
-    const target = await tx.invitation.findFirst({ where: { id: invitationId, tenantId }, select: { email: true } });
+    const target = await tx.invitation.findFirst({
+      where: { id: invitationId, tenantId },
+      select: { email: true, role: true, campusId: true },
+    });
+    if (target) {
+      const refused = campusActorInvitationRefusal(tenant, target);
+      if (refused) return refused === "NOT_FOUND" ? false : refused;
+    }
     const claimed = await tx.invitation.updateMany({
       where: { id: invitationId, tenantId, acceptedAt: null, revokedAt: null },
       data: { revokedAt: new Date() },
@@ -216,7 +255,13 @@ export async function listOpenInvitations(
   page: { skip: number; take: number },
 ): Promise<{ invitations: PublicInvitation[]; total: number }> {
   const { tenantId } = tenant;
-  const where: Prisma.InvitationWhereInput = { tenantId, acceptedAt: null, revokedAt: null };
+  const where: Prisma.InvitationWhereInput = {
+    tenantId,
+    acceptedAt: null,
+    revokedAt: null,
+    // a campus administrator sees their own campus's invitations only
+    ...(tenant.role === "CAMPUS_ADMIN" ? { campusId: tenant.campusId ?? "none" } : {}),
+  };
   const [total, rows] = await tenant.run((tx) =>
     Promise.all([
       tx.invitation.count({ where }),
