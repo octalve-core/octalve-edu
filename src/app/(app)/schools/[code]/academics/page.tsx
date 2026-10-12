@@ -52,9 +52,11 @@ export default async function AcademicsPage({
         description={
           campusAdmin
             ? `The school year, classes, subjects, timetable and grading for ${tenant.tenantName}. You can change the sessions and classes of your own campus; the rest is set by the school administrator.`
-            : readOnly
-              ? `The school year, classes, subjects, timetable and grading for ${tenant.tenantName}. Only an administrator can change this.`
-              : `The school year, classes, subjects, timetable and grading for ${tenant.tenantName}. Nothing here is ever deleted — old items are archived.`
+            : tenant.role === "TEACHING_STAFF"
+              ? `The school year, classes, subjects, timetable and grading for ${tenant.tenantName}. You can take the roll for the classes you are assigned to; the rest is set by an administrator.`
+              : readOnly
+                ? `The school year, classes, subjects, timetable and grading for ${tenant.tenantName}. Only an administrator can change this.`
+                : `The school year, classes, subjects, timetable and grading for ${tenant.tenantName}. Nothing here is ever deleted — old items are archived.`
         }
       />
       <SectionNav schoolCode={tenant.tenantCode} current={section} />

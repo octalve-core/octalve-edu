@@ -189,6 +189,8 @@ test.describe("Attendance Screen", () => {
 
       await signInThroughUi(page, person);
       await page.goto(`/schools/${school.code}/academics?section=attendance`);
+      // the page must not tell someone who CAN take the roll that only an administrator can change things
+      await expect(page.getByText("Only an administrator can change this.")).toHaveCount(0);
       await expect(page.getByText("Aliyu, Fatima")).toBeVisible();
       await page.getByRole("button", { name: "Mark All Present" }).click();
       await page.getByRole("button", { name: "Save Roll Call" }).first().click();
