@@ -15,3 +15,6 @@ One deployment, one default type until a superadmin exists. The commit can be dr
 
 ## Related
 Plan decision P1 · `phases/phase-1.2-people.md`.
+
+## Update (2026-10-13)
+The platform superadmin this record waited for now exists (ADR 0016): a platform administrator changes a school's type from the Platform page, through `platform_set_school_type()` (refused once the school has an academic period; audited in the platform's own log). `DEFAULT_SCHOOL_TYPE` stays the default for the **first-run setup wizard only**; the wizard still does not ask. The maintainer accepted this reading on 2026-10-13. No decision here changed.

@@ -142,4 +142,58 @@ test.describe("Attendance Screen", () => {
     await page.goto(`/schools/${school.code}/academics?section=attendance`);
     await expect(page.getByText("No class arms are assigned to you")).toBeVisible();
   });
+
+  for (const who of ["teacher", "campus administrator"] as const) {
+    test(`a ${who} takes the roll of their arm from the screen and saves it (the screen used to be read-only for everyone but a school administrator)`, async ({
+      page,
+    }) => {
+      const north = school.campuses[0].id;
+      await db.academicSession.create({
+        data: {
+          tenantId: school.id,
+          label: "2026/2027",
+          startDate: new Date("2026-09-01"),
+          endDate: new Date("2027-07-20"),
+          status: "ACTIVE",
+        },
+      });
+      const group = await db.classGroup.create({ data: { tenantId: school.id, campusId: north, name: "Primary 1", sortOrder: 1 } });
+      const arm = await db.classArm.create({ data: { tenantId: school.id, classGroupId: group.id, name: "Diamond" } });
+      const session = await db.academicSession.findFirstOrThrow({ where: { tenantId: school.id } });
+      const pupil = await db.studentRecord.create({
+        data: {
+          tenantId: school.id,
+          campusId: north,
+          admissionNo: "ROLL-1",
+          firstName: "Fatima",
+          lastName: "Aliyu",
+          dateOfBirth: new Date("2019-03-15"),
+        },
+      });
+      await db.studentEnrollment.create({
+        data: { tenantId: school.id, studentId: pupil.id, sessionId: session.id, classArmId: arm.id, status: "ACTIVE" },
+      });
+      const person = await createUser({ name: "Roll Taker" });
+      if (who === "teacher") {
+        await addMembership(person.id, school.id, Role.TEACHING_STAFF, north);
+        const subject = await db.subject.create({ data: { tenantId: school.id, name: "English", code: "ENGRC" } });
+        const staff = await db.staffRecord.create({
+          data: { tenantId: school.id, campusId: north, userId: person.id, category: "TEACHING", firstName: "Roll", lastName: "Taker" },
+        });
+        await db.staffSubjectAssignment.create({
+          data: { tenantId: school.id, staffRecordId: staff.id, subjectId: subject.id, classArmId: arm.id },
+        });
+      } else {
+        await addMembership(person.id, school.id, Role.CAMPUS_ADMIN, north);
+      }
+
+      await signInThroughUi(page, person);
+      await page.goto(`/schools/${school.code}/academics?section=attendance`);
+      await expect(page.getByText("Aliyu, Fatima")).toBeVisible();
+      await page.getByRole("button", { name: "Mark All Present" }).click();
+      await page.getByRole("button", { name: "Save Roll Call" }).first().click();
+      await expect(page.getByText(/Attendance saved for/)).toBeVisible();
+      expect(await db.attendanceRecord.count({ where: { tenantId: school.id, studentId: pupil.id, status: "PRESENT" } })).toBe(1);
+    });
+  }
 });

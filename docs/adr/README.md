@@ -47,4 +47,4 @@ Plans and phase records link to the ADR instead of re-arguing the reason.
 | [0013](0013-commit-and-pr-messages-are-comprehensive.md) | Commit and PR messages are comprehensive | accepted |
 | [0014](0014-audited-override-for-namesake-student-registrations.md) | Audited in-place override for namesake student registrations | accepted |
 | [0015](0015-dev-is-development-master-is-staging-prod-is-production.md) | `dev` is development, `master` is staging, `prod` is production | accepted |
-| [0016](0016-campus-administrators-and-the-platform-administrator.md) | Campus administrators run one campus; a platform administrator runs schools, not their data | **proposed** |
+| [0016](0016-campus-administrators-and-the-platform-administrator.md) | Campus administrators run one campus; a platform administrator runs schools, not their data | accepted |

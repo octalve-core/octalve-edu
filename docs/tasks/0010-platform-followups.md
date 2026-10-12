@@ -51,3 +51,10 @@ Gate order: typecheck -> lint -> format:check -> build -> tests. Results are rec
 
 ## 5. Not decided / waiting on the maintainer
 Accept ADR 0016 (amended) and ADR 0014 (AlEemaan).
+
+## 6. Follow-on after the maintainer's review (2026-10-13)
+The maintainer accepted every recommendation of the review (including "accept ADR 0016"). Done here, in one small PR:
+- [x] **ADR 0016 -> Accepted** (index updated; the amendment is accepted with it). **ADR 0010** gets an "Update" note: the platform page now owns later type changes, the env default stays for first-run setup only.
+- [x] **Teachers and campus administrators can take the roll from the screen** (the attendance section was read-only for everyone but a school administrator; the API always allowed it). `tests/e2e/attendance.spec.ts` gained two tests (teacher, campus administrator), seen failing first (no "Mark All Present" button), then passing with the page change (`canTakeRoll`: ADMIN, CAMPUS_ADMIN, TEACHING_STAFF; registrars still look only).
+- [x] **Pre-deploy check for ISS-0013:** `pnpm teachers:unassigned [-- <school-code>]` (read-only) lists the active teaching staff who would see no class arm under the new attendance rule. Run it against each live school before this ships and have an administrator assign them. `tests/integration/unassigned-teachers-script.spec.ts` (3) was written before the script but NOT run failing first. The opt-in "grace mode" was NOT built: the maintainer accepted keeping the rule as is.
+- Not done / waiting: ADR 0014 (AlEemaan) acceptance and its superadmin list - see the AlEemaan repo.
