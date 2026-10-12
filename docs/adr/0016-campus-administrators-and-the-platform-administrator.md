@@ -1,7 +1,7 @@
 # 0016 — Campus administrators run one campus; a platform administrator runs schools, not their data
 
-Status: Proposed
-Decided by: <the maintainer — to accept or modify> · Date: 2026-10-11 (answers C1–C5 given in the session)
+Status: Accepted
+Decided by: the maintainer — accepted 2026-10-13 ("I'll accept all your suggestions or recommendations", in answer to the review of this record with its amendment) · Date: 2026-10-11 (answers C1–C5 given in the session)
 Recorded: 2026-10-11
 
 ## Context
@@ -44,7 +44,7 @@ Until now a school had one kind of administrator (`ADMIN`) who could do everythi
 - `src/lib/platform/`, `src/app/api/v1/platform/`, `scripts/make-platform-admin.mjs`, `scripts/invite-first-admin.mjs`
 - `prisma/migrations/20261022090000_campus_admin_role/`, `prisma/migrations/20261022090100_campus_admin_and_platform/`, `prisma/migrations/20261023090000_tenant_stats/`, `prisma/migrations/20261023090100_first_admin_invite/`
 
-## Amendment (2026-10-11, same day, still Proposed): counters and the first-administrator re-invite
+## Amendment (2026-10-11, same day; accepted with the record on 2026-10-13): counters and the first-administrator re-invite
 
 Written before the code of task 0010 (design commit first). Two things the first draft left open were decided by the maintainer: "member counts are not acceptable without them" and "build both" (a platform action **and** an operator script) for a lost first-administrator invitation.
 

@@ -36,6 +36,10 @@ export default async function AcademicsPage({
   const campusAdmin = tenant.role === "CAMPUS_ADMIN" && tenant.campusId !== null;
   const ownCampusId = campusAdmin ? tenant.campusId : null;
 
+  // Taking the roll is open to the people the attendance API admits (lib/attendance/http.ts WRITE_ROLES): administrators and teachers. Which ARMS a teacher
+  // or campus administrator may take is decided by the API and the list it offers (ISS-0013); registrars (non-teaching staff) only look.
+  const canTakeRoll = tenant.role === "ADMIN" || tenant.role === "CAMPUS_ADMIN" || tenant.role === "TEACHING_STAFF";
+
   const section = isSection(asked) ? asked : "timetable";
   const campuses = await tenant.run((tx) =>
     tx.campus.findMany({ where: { tenantId: tenant.tenantId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
@@ -56,7 +60,7 @@ export default async function AcademicsPage({
       <SectionNav schoolCode={tenant.tenantCode} current={section} />
       <div className="mt-8">
         {section === "timetable" && <TimetablePanel schoolCode={tenant.tenantCode} readOnly={readOnly} />}
-        {section === "attendance" && <AttendancePanel schoolCode={tenant.tenantCode} readOnly={readOnly} />}
+        {section === "attendance" && <AttendancePanel schoolCode={tenant.tenantCode} readOnly={!canTakeRoll} />}
         {section === "sessions" && (
           <SessionsPanel
             schoolCode={tenant.tenantCode}
