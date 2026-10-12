@@ -9,7 +9,7 @@ import { changeLimited, codeField, emailField, nameField, passwordField, schoolT
 import { createSchool, listSchools } from "@/lib/platform/service";
 
 // /api/v1/platform/schools                                                               (plan C5, ADR 0016)
-//   GET   every school: identity data only (id, code, name, type, created, suspended) - no member counts, no people
+//   GET   every school: identity data (id, code, name, type, created, suspended) and four coarse counters (members, administrators, students, campuses) - no people
 //   POST  create a school and invite its first administrator (one atomic step); needs the password again
 // PLATFORM ADMINISTRATORS only, with two-step verification on (lib/platform/guard.ts). Reads no school's data.
 const body = z.strictObject({

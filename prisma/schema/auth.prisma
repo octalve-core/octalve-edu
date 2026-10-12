@@ -17,16 +17,16 @@
 // bypass the app-layer normalization.
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
+  id              String    @id @default(cuid())
+  name            String?
+  email           String?   @unique
+  emailVerified   DateTime?
+  image           String?
   /// Nullable: an invited-but-not-yet-activated user has none (Phase 0.5 plan).
-  passwordHash  String?
+  passwordHash    String?
   /// A person who runs the PLATFORM (list/create/suspend schools, set a school's type): authority over Tenant rows only, never over a
   /// school's data (no RLS bypass). Set by `pnpm platform-admin:make`, never by a request (plan C5).
-  isPlatformAdmin Boolean @default(false)
+  isPlatformAdmin Boolean   @default(false)
 
   sessions            Session[]
   resetTokens         PasswordResetToken[]

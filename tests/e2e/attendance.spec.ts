@@ -101,4 +101,45 @@ test.describe("Attendance Screen", () => {
     // 6. Expect success notification
     await expect(page.getByText(/Attendance saved for/)).toBeVisible();
   });
+
+  test("a teacher is offered only the arms they are assigned to; one with no assignment is told why (ISS-0013)", async ({ page }) => {
+    const session = await db.academicSession.create({
+      data: {
+        tenantId: school.id,
+        label: "2026/2027",
+        startDate: new Date("2026-09-01"),
+        endDate: new Date("2027-07-20"),
+        status: "ACTIVE",
+      },
+    });
+    const group = await db.classGroup.create({ data: { tenantId: school.id, name: "Primary 1", sortOrder: 1 } });
+    const [mine, notMine] = await Promise.all([
+      db.classArm.create({ data: { tenantId: school.id, classGroupId: group.id, name: "Diamond" } }),
+      db.classArm.create({ data: { tenantId: school.id, classGroupId: group.id, name: "Ruby" } }),
+    ]);
+    expect(session.id).toBeTruthy();
+    const subject = await db.subject.create({ data: { tenantId: school.id, name: "English", code: "ENGE2E" } });
+    const teacher = await createUser({ name: "Tola Teacher" });
+    await addMembership(teacher.id, school.id, Role.TEACHING_STAFF);
+    const staff = await db.staffRecord.create({
+      data: { tenantId: school.id, userId: teacher.id, category: "TEACHING", firstName: "Tola", lastName: "Teacher" },
+    });
+    await db.staffSubjectAssignment.create({
+      data: { tenantId: school.id, staffRecordId: staff.id, subjectId: subject.id, classArmId: mine.id },
+    });
+    expect(notMine.id).toBeTruthy();
+
+    await signInThroughUi(page, teacher);
+    await page.goto(`/schools/${school.code}/academics?section=attendance`);
+    const options = page.getByLabel("Class Arm").locator("option");
+    await expect(options).toHaveText(["Primary 1 — Diamond"]);
+
+    // a teacher with nothing assigned is told what to do, not shown an empty mystery
+    const idle = await createUser({ name: "Idle Teacher" });
+    await addMembership(idle.id, school.id, Role.TEACHING_STAFF);
+    await page.context().clearCookies();
+    await signInThroughUi(page, idle);
+    await page.goto(`/schools/${school.code}/academics?section=attendance`);
+    await expect(page.getByText("No class arms are assigned to you")).toBeVisible();
+  });
 });

@@ -15,6 +15,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "mfa:reset": "node scripts/mfa-reset.mjs",
     "platform-admin:make": "node scripts/make-platform-admin.mjs",
+    "platform-admin:invite-first-admin": "node scripts/invite-first-admin.mjs",
     "typecheck": "tsc --noEmit",
     "test": "pnpm build && playwright test",
     "test:fast": "playwright test",

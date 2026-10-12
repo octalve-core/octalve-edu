@@ -19,7 +19,8 @@
 | 7 | [TASK-0007](0007-phase-1-8-phase-gate-and-hardening.md) | Phase 1.8: End-to-End Hardening, Security Walk & Gate | [x] Completed | 2026-10-10 17:35:00 UTC | 2026-10-10 19:25:00 UTC | [PR #17](https://github.com/roji-tech/octalve-edu-fork/pull/17) (`claude/phase-1-8-gate`) |
 
 | 8 | [TASK-0008](0008-post-phase-1-verification-and-defect-fixes.md) | Post-Phase-1 verification and defect fixes | [x] Completed (suite 1757 passed / 0 failed / 23 skipped; landed in octalve-core `dev`) | 2026-10-11 UTC | 2026-10-11 UTC | [PR #6](https://github.com/octalve-core/octalve-edu/pull/6) |
-| 9 | [TASK-0009](0009-campus-admins-and-platform-superadmin.md) | Campus administrators and the platform superadmin (C1–C8) | [~] In Progress (slices A–D built; full suite 1842 passed / 3 failed (shell e2e: the phone one is a pre-existing flake on `dev` too; the two desktop ones unexplained) / 23 skipped; PR not yet opened) | 2026-10-11 UTC | — | `claude/campus-admins-platform-superadmin` |
+| 9 | [TASK-0009](0009-campus-admins-and-platform-superadmin.md) | Campus administrators and the platform superadmin (C1–C8) | [x] Completed (landed in octalve-core `dev`; full suite 1842 passed / 3 failed (shell e2e: the phone one is a pre-existing flake on `dev` too; the two desktop ones unexplained) / 23 skipped) | 2026-10-11 UTC | 2026-10-11 UTC | [PR #7](https://github.com/octalve-core/octalve-edu/pull/7) |
+| 10 | [TASK-0010](0010-platform-followups.md) | Platform follow-ups: counters, first-admin re-invite, teachers' attendance scoping, public verification, campus-admin setup controls | [~] In Progress (F1-F4 built; full suite 1927 passed / 1 failed (phone shell flake, family known) / 23 skipped; F5 not started) | 2026-10-11 UTC | — | `claude/platform-followups` |
 ---
 
 ## Detailed Milestone Checklist

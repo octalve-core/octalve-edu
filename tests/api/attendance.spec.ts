@@ -104,6 +104,15 @@ test.beforeAll(async () => {
     },
   });
 
+  // The teacher teaches armA: a teacher reads and writes only the arms they are assigned to (task 0010 F3, ISS-0013; tests/api/attendance-access.spec.ts)
+  const subjectA = await db.subject.create({ data: { tenantId: a.id, name: "English", code: "ENGATT" } });
+  const staffA = await db.staffRecord.create({
+    data: { tenantId: a.id, userId: teacher.id, category: "TEACHING", firstName: "Tola", lastName: "Teacher" },
+  });
+  await db.staffSubjectAssignment.create({
+    data: { tenantId: a.id, staffRecordId: staffA.id, subjectId: subjectA.id, classArmId: armA.id },
+  });
+
   await db.studentEnrollment.createMany({
     data: [
       {

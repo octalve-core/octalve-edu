@@ -69,6 +69,10 @@ test.describe("the platform page", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Platform" })).toBeVisible();
     await expect(row(page, "Existing E2E School")).toContainText(existing.code);
     await expect(row(page, "Existing E2E School")).toContainText("Active");
+    // coarse counters, and a school nobody administers is marked
+    await expect(row(page, "Existing E2E School")).toContainText("0 members · 0 students · 1 campus");
+    await expect(row(page, "Existing E2E School")).toContainText("No administrator");
+    await expect(row(page, "Existing E2E School").getByRole("button", { name: /^Invite an administrator for/ })).toBeVisible();
     await expectAccessible(page, "/platform");
 
     // create
@@ -87,6 +91,20 @@ test.describe("the platform page", () => {
     await d.getByRole("button", { name: "Create school" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Brand New E2E School was created" })).toBeVisible();
     await expect(row(page, "Brand New E2E School")).toContainText("Higher education");
+    await expect(row(page, "Brand New E2E School")).toContainText("No administrator"); // invited, not yet accepted
+
+    // a school nobody administers can be sent a new first-administrator invitation (and one that has an administrator is not offered it)
+    await page.getByRole("button", { name: "Invite an administrator for Brand New E2E School" }).click();
+    await expectAccessible(page, "/platform (invite administrator dialog)");
+    const found = `again-${code}@example.test`;
+    await dialog(page).getByLabel("Administrator's email").fill(found);
+    await dialog(page).getByRole("button", { name: "Send invitation" }).click(); // no password yet: said in place
+    await expect(dialog(page).getByText("That password isn't right.")).toBeVisible();
+    await dialog(page).getByLabel("Your password").fill(DEFAULT_PASSWORD);
+    await dialog(page).getByRole("button", { name: "Send invitation" }).click();
+    await expect(page.getByRole("status").filter({ hasText: `An invitation was sent to ${found}` })).toBeVisible();
+    expect(await db.invitation.count({ where: { email: found, role: "ADMIN", revokedAt: null, acceptedAt: null } })).toBe(1);
+    await expect(page.getByText("First administrator invited again")).toBeVisible(); // in the history
 
     // suspend (a reason is required), then reinstate
     await page.getByRole("button", { name: "Suspend Brand New E2E School" }).click();

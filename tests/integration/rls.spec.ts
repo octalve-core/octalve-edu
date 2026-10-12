@@ -1254,6 +1254,7 @@ test.describe("catalog guard", () => {
       "Subject",
       "SubjectOffering",
       "TenantMembership",
+      "TenantStats",
       "TimetableSlot",
     ]); // update this list WITH the migration
     for (const row of rows) {
