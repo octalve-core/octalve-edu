@@ -31,6 +31,10 @@ export default async function AcademicsPage({
   if (tenant.role !== "ADMIN" && tenant.role !== "CAMPUS_ADMIN" && tenant.role !== "TEACHING_STAFF" && tenant.role !== "NON_TEACHING_STAFF")
     forbidden();
   const readOnly = tenant.role !== "ADMIN";
+  // A campus administrator (ADR 0016) builds their own campus's calendar and classes; everything else here stays read-only for them, and a row the whole
+  // school owns is shown read-only too. The academics API enforces the same rules again.
+  const campusAdmin = tenant.role === "CAMPUS_ADMIN" && tenant.campusId !== null;
+  const ownCampusId = campusAdmin ? tenant.campusId : null;
 
   const section = isSection(asked) ? asked : "timetable";
   const campuses = await tenant.run((tx) =>
@@ -42,9 +46,11 @@ export default async function AcademicsPage({
       <PageHeader
         title="Academic setup"
         description={
-          readOnly
-            ? `The school year, classes, subjects, timetable and grading for ${tenant.tenantName}. Only an administrator can change this.`
-            : `The school year, classes, subjects, timetable and grading for ${tenant.tenantName}. Nothing here is ever deleted — old items are archived.`
+          campusAdmin
+            ? `The school year, classes, subjects, timetable and grading for ${tenant.tenantName}. You can change the sessions and classes of your own campus; the rest is set by the school administrator.`
+            : readOnly
+              ? `The school year, classes, subjects, timetable and grading for ${tenant.tenantName}. Only an administrator can change this.`
+              : `The school year, classes, subjects, timetable and grading for ${tenant.tenantName}. Nothing here is ever deleted — old items are archived.`
         }
       />
       <SectionNav schoolCode={tenant.tenantCode} current={section} />
@@ -52,9 +58,17 @@ export default async function AcademicsPage({
         {section === "timetable" && <TimetablePanel schoolCode={tenant.tenantCode} readOnly={readOnly} />}
         {section === "attendance" && <AttendancePanel schoolCode={tenant.tenantCode} readOnly={readOnly} />}
         {section === "sessions" && (
-          <SessionsPanel schoolCode={tenant.tenantCode} campuses={campuses} schoolType={tenant.schoolType} readOnly={readOnly} />
+          <SessionsPanel
+            schoolCode={tenant.tenantCode}
+            campuses={campuses}
+            schoolType={tenant.schoolType}
+            readOnly={readOnly && !campusAdmin}
+            ownCampusId={ownCampusId}
+          />
         )}
-        {section === "classes" && <ClassesPanel schoolCode={tenant.tenantCode} campuses={campuses} readOnly={readOnly} />}
+        {section === "classes" && (
+          <ClassesPanel schoolCode={tenant.tenantCode} campuses={campuses} readOnly={readOnly && !campusAdmin} ownCampusId={ownCampusId} />
+        )}
         {section === "assessment" && <AssessmentPanel schoolCode={tenant.tenantCode} readOnly={readOnly} />}
         {section === "grading" && <GradingPanel schoolCode={tenant.tenantCode} readOnly={readOnly} />}
       </div>
