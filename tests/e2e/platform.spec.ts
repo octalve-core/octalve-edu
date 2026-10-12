@@ -129,6 +129,22 @@ test.describe("the platform page", () => {
     await expect(row(page, "Existing E2E School")).toContainText("Vocational");
   });
 
+  test("the platform page and its dialogs have no accessibility violations in the LIGHT theme either (dark is the default and is covered above)", async ({
+    page,
+  }) => {
+    await createTenant({ name: "Light Theme School" });
+    await page.context().addCookies([{ name: "theme", value: "light", url: SAAS_URL }]);
+    await signIn(page, await platformAdmin());
+    await page.goto("/platform");
+    await expect(row(page, "Light Theme School")).toBeVisible();
+    await expectAccessible(page, "/platform (light)");
+    await page.getByRole("button", { name: "Create a school" }).click();
+    await expectAccessible(page, "/platform create dialog (light)");
+    await dialog(page).getByRole("button", { name: "Cancel" }).click();
+    await page.getByRole("button", { name: "Invite an administrator for Light Theme School" }).click();
+    await expectAccessible(page, "/platform invite dialog (light)");
+  });
+
   test("a platform administrator without two-step verification is asked to turn it on, and sees no school", async ({ page }) => {
     const existing = await createTenant({ name: "Hidden Until Two-Step School" });
     await signIn(page, await platformAdmin({ mfa: false }));

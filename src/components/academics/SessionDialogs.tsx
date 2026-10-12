@@ -28,6 +28,7 @@ export function SessionFormDialog({
   onClose,
   schoolCode,
   campuses,
+  ownCampusId = null,
   session,
   onDone,
 }: {
@@ -35,6 +36,8 @@ export function SessionFormDialog({
   onClose: () => void;
   schoolCode: string;
   campuses: CampusOption[];
+  /// A campus administrator's campus: the new session belongs to it and there is no choice to make.
+  ownCampusId?: string | null;
   session: SessionView | null;
   onDone: (reply: Reply) => void;
 }) {
@@ -51,7 +54,12 @@ export function SessionFormDialog({
     if (Object.keys(errors).length > 0) return { errors };
     return session
       ? sendJson(`${base(schoolCode)}/sessions/${session.id}`, "PATCH", { label: label.trim(), startDate, endDate })
-      : sendJson(`${base(schoolCode)}/sessions`, "POST", { label: label.trim(), startDate, endDate, campusId: campusId || null });
+      : sendJson(`${base(schoolCode)}/sessions`, "POST", {
+          label: label.trim(),
+          startDate,
+          endDate,
+          campusId: ownCampusId ?? (campusId || null),
+        });
   }
 
   return (
@@ -100,7 +108,7 @@ export function SessionFormDialog({
               disabled={pending}
             />
           </div>
-          {!session && (
+          {!session && ownCampusId === null && (
             <SelectField
               label="Applies to"
               value={campusId}

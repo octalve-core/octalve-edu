@@ -19,11 +19,17 @@ export function ClassesPanel({
   schoolCode,
   campuses,
   readOnly = false,
+  ownCampusId = null,
 }: {
   schoolCode: string;
   campuses: CampusOption[];
   readOnly?: boolean;
+  /// Set for a CAMPUS administrator (ADR 0016): new classes belong to their campus (no picker), only their campus's classes can be changed, a class the whole
+  /// school owns is shown with a note and no controls, and the school's subjects are read-only. The API enforces the same.
+  ownCampusId?: string | null;
 }) {
+  const mayChange = (group: ClassGroupView) => !readOnly && (ownCampusId === null || group.campusId === ownCampusId);
+  const subjectsReadOnly = readOnly || ownCampusId !== null;
   const root = `/api/v1/schools/${schoolCode}/academics`;
   const [groupPage, setGroupPage] = useState(1);
   const groups = useApi(`${root}/class-groups?limit=20&page=${groupPage}`);
@@ -98,9 +104,10 @@ export function ClassesPanel({
                     <h3 className="text-base font-semibold break-words text-fg">{group.name}</h3>
                     <p className="text-xs text-fg-muted">
                       {group.campusName ?? "Whole school"} · {group.subjectCount} {group.subjectCount === 1 ? "subject" : "subjects"}
+                      {!readOnly && !mayChange(group) && " · Set by the school"}
                     </p>
                   </div>
-                  {!readOnly && (
+                  {mayChange(group) && (
                     <div className="flex flex-wrap gap-2">
                       <Button
                         variant="secondary"
@@ -141,7 +148,7 @@ export function ClassesPanel({
                           <span className="font-medium">{arm.name}</span>
                           <span className="ml-2 text-xs text-fg-muted">{arm.capacity ? `Up to ${arm.capacity} pupils` : "No limit"}</span>
                         </p>
-                        {!readOnly && (
+                        {mayChange(group) && (
                           <div className="flex gap-2">
                             <Button
                               variant="ghost"
@@ -183,9 +190,10 @@ export function ClassesPanel({
             </h2>
             <p className="mt-1 text-sm text-fg-muted">
               The subjects the school teaches. Choose which classes study each one from the class above.
+              {ownCampusId !== null && " Subjects are set by the school administrator."}
             </p>
           </div>
-          {!readOnly && (
+          {!subjectsReadOnly && (
             <Button onClick={() => (setNotice(null), subjectForm.show({ subject: null }))}>
               <PlusIcon className="h-4 w-4" />
               New subject
@@ -216,7 +224,7 @@ export function ClassesPanel({
                 <p className="text-sm font-semibold break-words text-fg">
                   {subject.name} {subject.code && <StatusPill tone="neutral">{subject.code}</StatusPill>}
                 </p>
-                {!readOnly && (
+                {!subjectsReadOnly && (
                   <div className="flex gap-2">
                     <Button
                       variant="secondary"
@@ -248,6 +256,7 @@ export function ClassesPanel({
           onClose={groupForm.hide}
           schoolCode={schoolCode}
           campuses={campuses}
+          ownCampusId={ownCampusId}
           group={groupForm.value!.group}
           onDone={done(groupForm.hide, (a) => `Saved ${(a.data?.classGroup as ClassGroupView).name}.`)}
         />

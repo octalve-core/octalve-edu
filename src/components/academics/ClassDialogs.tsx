@@ -24,6 +24,7 @@ export function ClassGroupDialog({
   onClose,
   schoolCode,
   campuses,
+  ownCampusId = null,
   group,
   onDone,
 }: {
@@ -31,6 +32,8 @@ export function ClassGroupDialog({
   onClose: () => void;
   schoolCode: string;
   campuses: CampusOption[];
+  /// A campus administrator's campus: the new class belongs to it and there is no choice to make.
+  ownCampusId?: string | null;
   group: ClassGroupView | null;
   onDone: (reply: Reply) => void;
 }) {
@@ -51,7 +54,7 @@ export function ClassGroupDialog({
         })
       : sendJson(`${base(schoolCode)}/class-groups`, "POST", {
           name: name.trim(),
-          campusId: campusId || null,
+          campusId: ownCampusId ?? (campusId || null),
           ...(order === undefined ? {} : { sortOrder: order }),
         });
   }
@@ -89,7 +92,7 @@ export function ClassGroupDialog({
             autoComplete="off"
             disabled={pending}
           />
-          {!group && (
+          {!group && ownCampusId === null && (
             <SelectField
               label="Belongs to"
               value={campusId}

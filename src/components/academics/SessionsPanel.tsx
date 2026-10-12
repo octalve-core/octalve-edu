@@ -54,12 +54,16 @@ export function SessionsPanel({
   campuses,
   schoolType,
   readOnly = false,
+  ownCampusId = null,
 }: {
   schoolCode: string;
   campuses: CampusOption[];
   schoolType: SchoolType;
   /// Staff may look at the calendar but not change it (plan 1.2, decision P9): every control that writes is simply not drawn. The API refuses a write from them anyway.
   readOnly?: boolean;
+  /// Set for a CAMPUS administrator (ADR 0016): their campus is fixed - no picker - and only that campus's own sessions can be changed; a session the whole
+  /// school owns is shown with a note and no controls. The API enforces the same.
+  ownCampusId?: string | null;
 }) {
   const words = periodWords(schoolType);
   const [status, setStatus] = useState("live");
@@ -83,6 +87,7 @@ export function SessionsPanel({
   const copying = useDialog<SessionView>();
 
   const scopeName = (session: SessionView) => session.campusName ?? "Whole school";
+  const mayChange = (session: SessionView) => !readOnly && (ownCampusId === null || session.campusId === ownCampusId);
   const filtered = status !== "live" || campusId !== "";
 
   function done(close: () => void, text: string | ((reply: Reply) => string)) {
@@ -98,7 +103,7 @@ export function SessionsPanel({
       <TermsView
         schoolCode={schoolCode}
         schoolType={schoolType}
-        viewOnly={readOnly}
+        viewOnly={!mayChange(detail)}
         sessionId={detail.id}
         fallback={detail}
         onBack={() => {
@@ -146,7 +151,7 @@ export function SessionsPanel({
             { value: "all", label: "Everything" },
           ]}
         />
-        {campuses.length > 0 && (
+        {campuses.length > 0 && ownCampusId === null && (
           <SelectField
             label="Campus"
             value={campusId}
@@ -189,12 +194,15 @@ export function SessionsPanel({
                     </p>
                   </div>
                   <p className="text-sm text-fg-2">{formatRange(session.startDate, session.endDate)}</p>
-                  <p>{statusPill(session)}</p>
+                  <p>
+                    {statusPill(session)}
+                    {!readOnly && !mayChange(session) && <span className="ml-2 text-xs text-fg-muted">Set by the school</span>}
+                  </p>
                   <div className="flex flex-wrap gap-2 md:w-80 md:justify-end">
                     <Button variant="secondary" aria-label={`${words.Many} of ${session.label}`} onClick={() => setDetail(session)}>
                       {words.Many}
                     </Button>
-                    {!readOnly && editable && (
+                    {mayChange(session) && editable && (
                       <Button
                         variant="secondary"
                         aria-label={`Edit ${session.label}`}
@@ -203,12 +211,12 @@ export function SessionsPanel({
                         Edit
                       </Button>
                     )}
-                    {!readOnly && !session.archived && session.status === "PLANNED" && (
+                    {mayChange(session) && !session.archived && session.status === "PLANNED" && (
                       <Button aria-label={`Open ${session.label}`} onClick={() => (setNotice(null), activating.show(session))}>
                         Open
                       </Button>
                     )}
-                    {!readOnly && !session.archived && session.status === "ACTIVE" && !session.closeAt && (
+                    {mayChange(session) && !session.archived && session.status === "ACTIVE" && !session.closeAt && (
                       <Button
                         variant="secondary"
                         aria-label={`Close ${session.label}`}
@@ -217,7 +225,7 @@ export function SessionsPanel({
                         Close…
                       </Button>
                     )}
-                    {!readOnly && !session.archived && session.status === "ACTIVE" && session.closeAt && (
+                    {mayChange(session) && !session.archived && session.status === "ACTIVE" && session.closeAt && (
                       <>
                         <Button
                           variant="secondary"
@@ -237,7 +245,7 @@ export function SessionsPanel({
                         )}
                       </>
                     )}
-                    {!readOnly && !session.archived && session.status === "CLOSED" && (
+                    {mayChange(session) && !session.archived && session.status === "CLOSED" && (
                       <Button
                         variant="secondary"
                         aria-label={`Reopen ${session.label}`}
@@ -246,7 +254,7 @@ export function SessionsPanel({
                         Reopen…
                       </Button>
                     )}
-                    {!readOnly && !session.archived && (
+                    {mayChange(session) && !session.archived && (
                       <Button
                         variant="ghost"
                         aria-label={`Copy ${session.label} to next year`}
@@ -255,7 +263,7 @@ export function SessionsPanel({
                         Copy forward
                       </Button>
                     )}
-                    {!readOnly && !session.archived && session.status !== "ACTIVE" && (
+                    {mayChange(session) && !session.archived && session.status !== "ACTIVE" && (
                       <Button
                         variant="ghost"
                         aria-label={`Archive ${session.label}`}
@@ -280,6 +288,7 @@ export function SessionsPanel({
           onClose={form.hide}
           schoolCode={schoolCode}
           campuses={campuses}
+          ownCampusId={ownCampusId}
           session={form.value!.session}
           onDone={done(form.hide, (answer) => `Saved ${(answer.data?.session as SessionView).label}.`)}
         />

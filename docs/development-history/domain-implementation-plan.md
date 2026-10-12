@@ -2851,3 +2851,10 @@ Record: task `0010`, branch `claude/platform-followups`; migrations `20261023090
 - **F4 public verification:** `studentName` in full, no admission number, `X-Robots-Tag: noindex, nofollow` on every response.
 - **F5 (Academic setup editing for a campus administrator)** is NOT built here; it is its own PR.
 - **Tests:** integration `platform-stats`, `platform-first-admin`, `invite-first-admin-script`; API `platform` (counters, re-invite), `attendance-access`, `results` (verification); e2e `platform`, `attendance`. Mutation pass: **NOT RUN — pending, end of Phase 2.**
+
+##### As built — F5, Academic setup editing for a campus administrator (2026-10-11/12)
+Record: task `0010`, branch `claude/campus-admin-setup-controls`. UI only, no migration, no API change (the API already allowed it).
+- The page lets a campus administrator into the **Sessions & terms** and **Classes & subjects** sections with controls; every other section stays read-only for them. Their campus is fixed (`ownCampusId`): no campus filter, no "Applies to" / "Belongs to" picker, new rows are created in their campus. A session or class the whole school owns shows "Set by the school" and no controls (and its terms view is view-only); subjects stay read-only with a note.
+- **Not done, on purpose:** timetable and attendance remain read-only in the UI for a campus administrator although their API is open to them. **Found, not changed:** `readOnly` is true for every non-ADMIN, so a teacher also sees the roll call read-only in the UI even though the API lets them take it - needs a decision.
+- **Tests:** `tests/e2e/campus-admin-setup.spec.ts`: sessions and classes in the dark and the light theme with axe, desktop and phone.
+
