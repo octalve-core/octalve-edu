@@ -1,7 +1,7 @@
 # [0010]: Platform follow-ups - counters, first-administrator re-invite, teachers' attendance scoping, public verification, campus-admin setup controls
 
 - **Period / Focus:** 2026-10-11 to (open) - the backlog the maintainer approved after TASK-0009 ("go on with all your recommendations")
-- **Status:** In Progress - F1-F4 built and committed; the full suite is **(running)**; F5 not started
+- **Status:** In Progress - F1-F4 built and committed; full suite run (below); F5 not started
 - **Priority:** High
 - **Assignee:** Claude Agent / Maintainer
 - **Target Branch / PR:** `claude/platform-followups` -> octalve-core `dev` (F5 in its own PR)
@@ -45,6 +45,7 @@ Close what TASK-0009 left open: the platform page shows coarse counters and whic
 - [ ] e2e + axe both themes first; UI
 
 ## 4. Verification
+**Full one-lane suite (`pnpm build`, `TEST_LANE=1 TEST_TIMEOUT_SCALE=3`, 2026-10-11/12, 1.4 h) on the F1-F4 build: 1927 passed, 1 failed, 23 skipped.** The one failure is `tests/e2e/shell.spec.ts:226` (phone, "a tap outside the sheet (on the dimmed page) closes it"): `More` was clicked straight after sign-in and the sheet never opened - the same click-before-hydration family as the "Sign out from the More sheet" flake that also fails on unchanged `dev` (task 0009 §6). Run alone afterwards: 5 of 5 passed (6 with the setup test). Not proven to be the same cause; no test was changed or loosened. The `signedInAs` helper fix is still to do.
 Gate order: typecheck -> lint -> format:check -> build -> tests. Results are recorded here as they happen. Mutation passes: NOT RUN - pending, end of Phase 2.
 
 ## 5. Not decided / waiting on the maintainer
