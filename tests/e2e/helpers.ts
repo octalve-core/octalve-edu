@@ -34,6 +34,16 @@ export async function signInThroughUi(page: Page, user: { email: string; passwor
   await expect(page).toHaveURL(HOME_URL);
 }
 
+/// Resolves once React has hydrated the page: a button that is clickable but not yet hydrated swallows the click (the More sheet "never opens",
+/// the account menu does nothing) - the cause of an intermittent failure in tests that click straight after sign-in. React attaches its props to
+/// every hydrated DOM node under a `__reactProps$…` key, so the signal is a real one, not a sleep.
+export async function waitForHydration(page: Page) {
+  await page.waitForFunction(() => {
+    const button = document.querySelector("button");
+    return button !== null && Object.keys(button).some((key) => key.startsWith("__reactProps$"));
+  });
+}
+
 /// Signs out through whatever this repo's signed-in screens offer: a "Sign out" button in the header
 /// (Octalve Edu, until its app shell arrives with §0.5.2) or the account menu of the app shell
 /// (AlEemaan; on a phone too — the avatar menu is in the top bar at every width).
