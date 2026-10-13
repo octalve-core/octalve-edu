@@ -23,5 +23,5 @@ export const GET = withAuth(
     const { guardians, total } = await listGuardians(auth.tenant, filters, page);
     return ok({ guardians }, offsetMeta({ page: page.page, limit: page.limit, total }));
   }),
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "people", roles: READ_ROLES },
 );

@@ -96,7 +96,9 @@ test.describe("the page", () => {
     const response = await page.goto(`/schools/${school.code}/academics?section=sessions`);
     expect(response?.status()).toBe(200);
     await expect(page.getByRole("heading", { level: 1, name: "Academic setup" })).toBeVisible();
-    await expect(page.getByText("Only an administrator can change this.")).toBeVisible();
+    await expect(
+      page.getByText("You can take the roll for the classes you are assigned to; the rest is set by an administrator."),
+    ).toBeVisible();
     await expect(page.getByRole("heading", { level: 2, name: "Sessions" })).toBeVisible();
     await expect(item(page, "2026/2027")).toBeVisible();
     await expect(page.getByRole("button", { name: "New session" })).toHaveCount(0);

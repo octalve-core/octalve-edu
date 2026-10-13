@@ -20,7 +20,7 @@ export const GET = withAuth(
     const result = await getClassGroup(auth.tenant, id);
     return result.ok ? ok({ classGroup: result.group }) : academicFailure(result.reason, result.detail, "class");
   },
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "academics", roles: READ_ROLES },
 );
 
 export const PATCH = withAuth(

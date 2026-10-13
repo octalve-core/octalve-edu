@@ -27,7 +27,7 @@ export const GET = withAuth(
       ? ok({ guardian: result.guardian, students: result.students })
       : peopleFailure(result.reason, result.detail, "guardian");
   },
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "people", roles: READ_ROLES },
 );
 
 export const PATCH = withAuth(

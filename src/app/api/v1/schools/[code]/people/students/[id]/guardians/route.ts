@@ -36,7 +36,7 @@ export const GET = withAuth(
     const result = await listLinks(auth.tenant, id);
     return result.ok ? ok({ guardians: result.links }) : peopleFailure(result.reason, result.detail);
   },
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "people", roles: READ_ROLES },
 );
 
 export const POST = withAuth(

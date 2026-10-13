@@ -24,10 +24,10 @@ export default async function PeoplePage({
 }) {
   const { code } = await params;
   const { section: asked } = await searchParams;
-  const { tenant } = await requireTenantPage(code);
+  const { tenant } = await requireTenantPage(code, "people");
   if (tenant.role !== "ADMIN" && tenant.role !== "CAMPUS_ADMIN" && tenant.role !== "TEACHING_STAFF" && tenant.role !== "NON_TEACHING_STAFF")
     forbidden();
-  const canEdit = isAdministrator(tenant.role);
+  const canEdit = isAdministrator(tenant.role) && !tenant.support; // a support view only reads
 
   const section = isSection(asked) ? asked : "students";
   const campuses = await tenant.run((tx) =>

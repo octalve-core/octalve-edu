@@ -14,5 +14,5 @@ export const GET = withAuth(
     const result = await armOccupancy(auth.tenant, input.sessionId);
     return result.ok ? ok({ counts: result.counts }) : peopleFailure(result.reason, result.detail, "session");
   }),
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "people", roles: READ_ROLES },
 );

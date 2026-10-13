@@ -29,7 +29,7 @@ export const GET = withAuth(
       ? ok({ staff: result.staff, assignments: result.assignments })
       : peopleFailure(result.reason, result.detail, "staff member");
   },
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "people", roles: READ_ROLES },
 );
 
 export const PATCH = withAuth(

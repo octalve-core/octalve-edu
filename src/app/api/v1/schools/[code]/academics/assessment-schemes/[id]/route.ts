@@ -37,7 +37,7 @@ export const GET = withAuth(
       ? ok({ assessmentScheme: result.scheme, snapshot: result.snapshot })
       : academicFailure(result.reason, result.detail, "scheme");
   },
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "academics", roles: READ_ROLES },
 );
 
 export const PATCH = withAuth(

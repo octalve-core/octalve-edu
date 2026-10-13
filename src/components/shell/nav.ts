@@ -71,6 +71,7 @@ const SCHOOL_PAGES: Record<string, string> = {
   academics: "Academics",
   people: "People",
   settings: "Settings",
+  support: "Support access",
 };
 const GLOBAL_PAGES: Record<string, string> = { "/dashboard": "Your schools", "/account": "Account", "/platform": "Platform" };
 

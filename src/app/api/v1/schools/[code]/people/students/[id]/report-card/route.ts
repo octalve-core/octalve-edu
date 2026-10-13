@@ -31,5 +31,5 @@ export const GET = withAuth(
 
     return ok(res.data);
   }),
-  { tenant: true, roles: ["ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF", "STUDENT", "PARENT"] },
+  { tenant: true, area: "results", roles: ["ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF", "STUDENT", "PARENT"] },
 );

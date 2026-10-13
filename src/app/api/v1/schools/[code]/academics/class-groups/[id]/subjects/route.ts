@@ -19,7 +19,7 @@ export const GET = withAuth(
     const result = await listOfferings(auth.tenant, id);
     return result.ok ? ok({ subjects: result.subjects }) : academicFailure(result.reason, result.detail, "class");
   },
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "academics", roles: READ_ROLES },
 );
 
 export const PUT = withAuth(

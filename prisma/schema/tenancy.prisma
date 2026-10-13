@@ -25,6 +25,8 @@ model Tenant {
   campuses             Campus[]
   memberships          TenantMembership[]
   stats                TenantStats?
+  supportGrants        SupportGrant[]
+  supportSessions      Session[]
   invitations          Invitation[]
   /// Exactly one row, created by the database when the tenant is (a trigger — see the phase 1.0 migration).
   settings             SchoolSettings?

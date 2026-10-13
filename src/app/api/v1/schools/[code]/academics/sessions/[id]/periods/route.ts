@@ -34,7 +34,7 @@ export const GET = withAuth(
     const result = await listPeriods(auth.tenant, id, { includeArchived: q.archived === "true" });
     return result.ok ? ok({ periods: result.periods }) : academicFailure(result.reason, result.detail);
   }),
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "academics", roles: READ_ROLES },
 );
 
 export const POST = withAuth(

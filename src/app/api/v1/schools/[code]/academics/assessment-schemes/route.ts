@@ -41,7 +41,7 @@ export const GET = withAuth(
     const { schemes, total } = await listSchemes(auth.tenant, filters, page);
     return ok({ assessmentSchemes: schemes }, offsetMeta({ page: page.page, limit: page.limit, total }));
   }),
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "academics", roles: READ_ROLES },
 );
 
 export const POST = withAuth(

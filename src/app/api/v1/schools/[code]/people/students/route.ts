@@ -42,7 +42,7 @@ export const GET = withAuth(
     const { students, total } = await listStudents(auth.tenant, { ...filters, notEnrolled: filters.notEnrolled === "true" }, page);
     return ok({ students }, offsetMeta({ page: page.page, limit: page.limit, total }));
   }),
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "people", roles: READ_ROLES },
 );
 
 export const POST = withAuth(

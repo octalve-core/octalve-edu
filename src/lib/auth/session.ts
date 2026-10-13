@@ -49,7 +49,9 @@ const COOKIE_OPTIONS = {
 };
 
 export type SessionUser = { id: string; name: string | null; email: string | null };
-export type ResolvedSession = { sessionId: string; userId: string; user: SessionUser };
+/// The support view this sign-in has open, if any (ADR 0017): which school and since when. Only the RECORD - whether it is still allowed is decided per request.
+export type SessionSupport = { tenantId: string; openedAt: Date };
+export type ResolvedSession = { sessionId: string; userId: string; user: SessionUser; support?: SessionSupport };
 
 function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -185,7 +187,11 @@ async function resolveToken(token: string): Promise<ResolvedSession | null> {
     await prisma.session.update({ where: { id: session.id }, data: { lastUsedAt: now, expires: idleExpiry } }).catch(() => undefined);
   }
 
-  return { sessionId: session.id, userId: session.userId, user: session.user };
+  const support =
+    session.supportTenantId && session.supportOpenedAt
+      ? { tenantId: session.supportTenantId, openedAt: session.supportOpenedAt }
+      : undefined;
+  return { sessionId: session.id, userId: session.userId, user: session.user, ...(support ? { support } : {}) };
 }
 
 /// `expires` null → a browser-session cookie (no Expires / Max-Age attribute): the

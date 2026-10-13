@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 // caller may not see — unknown, another school's, another campus's — is the same 404 page for all three (the read below goes through the caller's campus scope).
 export default async function StudentPage({ params }: { params: Promise<{ code: string; id: string }> }) {
   const { code, id } = await params;
-  const { tenant } = await requireTenantPage(code);
+  const { tenant } = await requireTenantPage(code, "people");
   if (tenant.role !== "ADMIN" && tenant.role !== "CAMPUS_ADMIN" && tenant.role !== "TEACHING_STAFF" && tenant.role !== "NON_TEACHING_STAFF")
     forbidden();
   if (!isPlausibleId(id)) notFound();
@@ -33,7 +33,7 @@ export default async function StudentPage({ params }: { params: Promise<{ code: 
           schoolCode={tenant.tenantCode}
           studentId={id}
           campuses={campuses}
-          canEdit={isAdministrator(tenant.role)}
+          canEdit={isAdministrator(tenant.role) && !tenant.support}
           fallbackName={fullName(found.student)}
         />
       </div>

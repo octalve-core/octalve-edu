@@ -29,7 +29,7 @@ export const GET = withAuth(
     const result = await getScale(auth.tenant, id);
     return result.ok ? ok({ gradeScale: result.scale }) : academicFailure(result.reason, result.detail, "scale");
   },
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "academics", roles: READ_ROLES },
 );
 
 export const PATCH = withAuth(

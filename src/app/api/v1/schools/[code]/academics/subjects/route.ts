@@ -32,7 +32,7 @@ export const GET = withAuth(
     const { subjects, total } = await listSubjects(auth.tenant, filters, page);
     return ok({ subjects }, offsetMeta({ page: page.page, limit: page.limit, total }));
   }),
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "academics", roles: READ_ROLES },
 );
 
 export const POST = withAuth(

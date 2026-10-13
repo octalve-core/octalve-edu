@@ -32,7 +32,7 @@ export const GET = withAuth(
     const { invitations, total } = await listOpenInvitations(auth.tenant, page);
     return ok({ invitations }, offsetMeta({ page: page.page, limit: page.limit, total }));
   },
-  { tenant: true, roles: ["ADMIN", "CAMPUS_ADMIN"] },
+  { tenant: true, area: "people", roles: ["ADMIN", "CAMPUS_ADMIN"] },
 );
 
 export const POST = withAuth(

@@ -27,10 +27,11 @@ export default async function AcademicsPage({
 }) {
   const { code } = await params;
   const { section: asked } = await searchParams;
-  const { tenant } = await requireTenantPage(code);
+  // The attendance section is its own support area; everything else here is academic setup (ADR 0017).
+  const { tenant } = await requireTenantPage(code, asked === "attendance" ? "attendance" : "academics");
   if (tenant.role !== "ADMIN" && tenant.role !== "CAMPUS_ADMIN" && tenant.role !== "TEACHING_STAFF" && tenant.role !== "NON_TEACHING_STAFF")
     forbidden();
-  const readOnly = tenant.role !== "ADMIN";
+  const readOnly = tenant.role !== "ADMIN" || Boolean(tenant.support); // a support view only reads
   // A campus administrator (ADR 0016) builds their own campus's calendar and classes; everything else here stays read-only for them, and a row the whole
   // school owns is shown read-only too. The academics API enforces the same rules again.
   const campusAdmin = tenant.role === "CAMPUS_ADMIN" && tenant.campusId !== null;
@@ -38,7 +39,7 @@ export default async function AcademicsPage({
 
   // Taking the roll is open to the people the attendance API admits (lib/attendance/http.ts WRITE_ROLES): administrators and teachers. Which ARMS a teacher
   // or campus administrator may take is decided by the API and the list it offers (ISS-0013); registrars (non-teaching staff) only look.
-  const canTakeRoll = tenant.role === "ADMIN" || tenant.role === "CAMPUS_ADMIN" || tenant.role === "TEACHING_STAFF";
+  const canTakeRoll = !tenant.support && (tenant.role === "ADMIN" || tenant.role === "CAMPUS_ADMIN" || tenant.role === "TEACHING_STAFF");
 
   const section = isSection(asked) ? asked : "timetable";
   const campuses = await tenant.run((tx) =>

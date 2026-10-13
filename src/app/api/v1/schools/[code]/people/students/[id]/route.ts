@@ -27,7 +27,7 @@ export const GET = withAuth(
     const result = await getStudent(auth.tenant, id);
     return result.ok ? ok({ student: result.student, enrolments: result.enrolments }) : peopleFailure(result.reason, result.detail);
   },
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "people", roles: READ_ROLES },
 );
 
 export const PATCH = withAuth(

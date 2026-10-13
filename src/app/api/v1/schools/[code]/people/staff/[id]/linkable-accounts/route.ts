@@ -17,5 +17,5 @@ export const GET = withAuth(
     const result = await linkableAccounts(auth.tenant, id);
     return result.ok ? ok({ accounts: result.accounts }) : peopleFailure(result.reason, result.detail, "staff member");
   },
-  { tenant: true, roles: CAMPUS_WRITE_ROLES },
+  { tenant: true, area: "people", roles: CAMPUS_WRITE_ROLES },
 );
