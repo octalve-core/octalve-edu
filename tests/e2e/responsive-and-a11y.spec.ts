@@ -1316,7 +1316,9 @@ test.describe("people (SaaS-mode server)", () => {
     await checkScreen(page, "/people staff record (read-only)", isMobile);
     for (const section of ["sessions", "classes", "assessment", "grading"]) {
       await page.goto(`/schools/${school.code}/academics?section=${section}`);
-      await expect(page.getByText("Only an administrator can change this.")).toBeVisible();
+      await expect(
+        page.getByText("You can take the roll for the classes you are assigned to; the rest is set by an administrator."),
+      ).toBeVisible();
       await checkScreen(page, `/academics ${section} (read-only)`, isMobile);
     }
   });
