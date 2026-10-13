@@ -25,7 +25,7 @@ export const GET = withAuth(
     const { scales, total } = await listScales(auth.tenant, filters, page);
     return ok({ gradeScales: scales }, offsetMeta({ page: page.page, limit: page.limit, total }));
   }),
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "academics", roles: READ_ROLES },
 );
 
 export const POST = withAuth(

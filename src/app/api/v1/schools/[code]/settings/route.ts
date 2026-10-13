@@ -16,7 +16,7 @@ export const GET = withAuth(
       return fail(message, 500);
     }
   },
-  { tenant: true, roles: [Role.ADMIN] },
+  { tenant: true, area: "settings", roles: [Role.ADMIN] },
 );
 
 // PATCH /api/v1/schools/[code]/settings

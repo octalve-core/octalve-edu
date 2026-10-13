@@ -4,6 +4,8 @@ import { fail, noStore } from "@/lib/api/envelope";
 import { isAuthorized } from "@/lib/auth/authorize";
 import { validateCSRF } from "@/lib/auth/csrf";
 import { getSessionFromRequest, type ResolvedSession } from "@/lib/auth/session";
+import { recordSupport } from "@/lib/support/session";
+import type { SupportArea } from "@/lib/support/areas";
 import { forTenant, type Tx } from "@/lib/tenant/for-tenant";
 import { resolveTenant, type TenantContext } from "@/lib/tenant/resolve-tenant";
 
@@ -40,7 +42,9 @@ export type TenantAuthContext = AuthContext & {
 export type TenantRouteContext = { params: Promise<{ code: string }> };
 
 export type PlainOptions = { tenant?: false; roles?: never; permissions?: never };
-export type TenantOptions = { tenant: true; roles?: readonly Role[]; permissions?: readonly Permission[] };
+/// `area` is the part of the school this route belongs to (ADR 0017). It matters ONLY inside a platform administrator's support view, which is read-only
+/// and limited to the areas the school granted: a route that declares none is not reachable from a support view at all.
+export type TenantOptions = { tenant: true; roles?: readonly Role[]; permissions?: readonly Permission[]; area?: SupportArea };
 export type WithAuthOptions = PlainOptions | TenantOptions;
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -103,7 +107,7 @@ export function withAuth(
     if (tenantOptions) {
       // The URL's `[code]` is a lookup key and nothing more; the membership decides.
       const params = await (routeContext as TenantRouteContext | undefined)?.params;
-      const resolved = await resolveTenant({ userId: session.userId, code: params?.code ?? "" });
+      const resolved = await resolveTenant({ userId: session.userId, code: params?.code ?? "", support: session.support });
       if (!resolved.ok) {
         return noStore(
           resolved.status === 500
@@ -116,6 +120,19 @@ export function withAuth(
       // whichever way it refuses, so the response never says whether a role or a permission was the problem.
       if (!isAuthorized(tenant, { roles: tenantOptions.roles, permissions: tenantOptions.permissions })) {
         return noStore(fail(NO_ACCESS, 403, "FORBIDDEN"));
+      }
+      // A support view (ADR 0017): read-only, only the granted areas, and every request leaves a row in the school's log and the platform's. The same
+      // one 403 body as any refusal - and a request the database cannot tie to a LIVE grant (just revoked, just expired) is refused too.
+      if (tenant.support) {
+        const area = tenantOptions.area;
+        if (!SAFE_METHODS.has(req.method) || !area || !tenant.support.areas.includes(area))
+          return noStore(fail(NO_ACCESS, 403, "FORBIDDEN"));
+        const recorded = await recordSupport(session.userId, tenant.tenantId, tenant.support.grantId, "SUPPORT_ACCESS", {
+          method: req.method,
+          path: req.nextUrl.pathname,
+          area,
+        });
+        if (!recorded) return noStore(fail(NO_ACCESS, 403, "FORBIDDEN"));
       }
       auth = { ...session, tenant: { ...tenant, run: (fn) => forTenant(tenant.tenantId).transaction(fn) } };
     }

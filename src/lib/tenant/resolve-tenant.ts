@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { assertRlsEnforced } from "@/lib/tenant/assert-rls";
 import { forUser } from "@/lib/tenant/for-tenant";
 import { isValidTenantCode } from "@/lib/tenant/validate-code";
+import { liveSupportView, type SupportView } from "@/lib/support/session";
 import { trustedTenantId, type VerifiedTenantId } from "@/lib/tenant/verified-tenant";
 
 // The tenant trust boundary (domain-implementation-plan.md §0.5.2, "`resolveTenant`"). The URL's `[code]` segment
@@ -24,6 +25,9 @@ export type TenantContext = {
   /// The extra capabilities the caller holds IN THIS TENANT (plan §1.7). Empty for an ADMIN (who implies them all — see
   /// lib/auth/authorize.ts) and for anyone not granted any. Read from the same membership row as the role, on every request.
   permissions: readonly Permission[];
+  /// Present ONLY inside a platform administrator's support view of this school (ADR 0017): the role above is ADMIN so the school's own screens read normally,
+  /// but the view is read-only and limited to these areas until `endsAt` - lib/auth/with-auth.ts and requireTenantPage enforce that.
+  support?: SupportView;
 };
 
 export type ResolveResult =
@@ -52,7 +56,12 @@ async function soloTenant(): Promise<{ id: string; code: string; name: string } 
   return rows[0];
 }
 
-export async function resolveTenant(input: { userId: string; code: string }): Promise<ResolveResult> {
+export async function resolveTenant(input: {
+  userId: string;
+  code: string;
+  /// The support view this sign-in has open (session.support). Only consulted when the person has NO membership in the school: a real member is a member.
+  support?: { tenantId: string; openedAt: Date };
+}): Promise<ResolveResult> {
   const code = typeof input.code === "string" ? input.code.trim().toLowerCase() : "";
   if (!isValidTenantCode(code)) return FORBIDDEN;
 
@@ -86,7 +95,28 @@ export async function resolveTenant(input: { userId: string; code: string }): Pr
       select: { role: true, campusId: true, permissions: true, tenant: { select: { id: true, code: true, name: true, schoolType: true } } },
     }),
   );
-  if (!membership) return FORBIDDEN;
+  if (!membership) {
+    if (!input.support) return FORBIDDEN;
+    const school = await prisma.tenant.findFirst({
+      where: { ...tenantFilter, id: input.support.tenantId, suspendedAt: null },
+      select: { id: true, code: true, name: true, schoolType: true },
+    });
+    const view = school ? await liveSupportView(input.userId, school.id, input.support.openedAt) : null;
+    if (!school || !view) return FORBIDDEN;
+    return {
+      ok: true,
+      tenant: {
+        tenantId: trustedTenantId(school.id), // verified: the database function has just named a live grant for exactly this school
+        tenantCode: school.code,
+        tenantName: school.name,
+        schoolType: school.schoolType,
+        role: "ADMIN",
+        campusId: null,
+        permissions: [],
+        support: view,
+      },
+    };
+  }
 
   return {
     ok: true,

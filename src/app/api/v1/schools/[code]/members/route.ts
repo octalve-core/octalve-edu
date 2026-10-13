@@ -39,5 +39,5 @@ export const GET = withAuth(
     const { members, total } = await listMembers(auth.tenant, filters, page);
     return ok({ members }, offsetMeta({ page: page.page, limit: page.limit, total }));
   }),
-  { tenant: true, roles: ["ADMIN", "CAMPUS_ADMIN"] },
+  { tenant: true, area: "people", roles: ["ADMIN", "CAMPUS_ADMIN"] },
 );

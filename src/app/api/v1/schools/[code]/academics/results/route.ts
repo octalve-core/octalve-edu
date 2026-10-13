@@ -19,7 +19,7 @@ export const GET = withAuth(
 
     return ok({ results });
   }),
-  { tenant: true, roles: STAFF_READ_ROLES },
+  { tenant: true, area: "results", roles: STAFF_READ_ROLES },
 );
 
 // POST /api/v1/schools/[code]/academics/results

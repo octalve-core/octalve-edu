@@ -61,7 +61,7 @@ export const GET = withAuth(
     );
     return ok({ campuses }, offsetMeta({ page: page.page, limit: page.limit, total }));
   },
-  { tenant: true },
+  { tenant: true, area: "settings" },
 );
 
 export const POST = withAuth(

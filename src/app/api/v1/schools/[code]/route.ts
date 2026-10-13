@@ -31,5 +31,5 @@ export const GET = withAuth(
       campuses,
     });
   },
-  { tenant: true },
+  { tenant: true, area: "settings" },
 );

@@ -41,7 +41,7 @@ export const GET = withAuth(
 
     return ok(result.data);
   }),
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "attendance", roles: READ_ROLES },
 );
 
 // POST /api/v1/schools/[code]/academics/arms/[id]/attendance

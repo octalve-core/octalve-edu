@@ -39,7 +39,7 @@ export const GET = withAuth(
     const { staff, total } = await listStaff(auth.tenant, filters, page);
     return ok({ staff }, offsetMeta({ page: page.page, limit: page.limit, total }));
   }),
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "people", roles: READ_ROLES },
 );
 
 export const POST = withAuth(

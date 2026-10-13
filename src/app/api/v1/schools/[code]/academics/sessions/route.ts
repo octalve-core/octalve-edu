@@ -35,7 +35,7 @@ export const GET = withAuth(
     const { sessions, total } = await listSessions(auth.tenant, filters, page);
     return ok({ sessions }, offsetMeta({ page: page.page, limit: page.limit, total }));
   }),
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "academics", roles: READ_ROLES },
 );
 
 export const POST = withAuth(

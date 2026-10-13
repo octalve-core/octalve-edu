@@ -66,7 +66,12 @@ model Session {
   lastUsedAt DateTime @default(now())
   userAgent  String?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// A platform administrator's open support view (ADR 0017): which school and since when. Whether it is still allowed is decided from the grant on every request.
+  supportTenantId String?
+  supportOpenedAt DateTime?
+
+  supportTenant Tenant? @relation(fields: [supportTenantId], references: [id], onDelete: SetNull)
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }

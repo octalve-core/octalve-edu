@@ -11,5 +11,5 @@ export const GET = withAuth(
     const arms = await listRollCallArms(auth);
     return ok({ arms });
   },
-  { tenant: true, roles: READ_ROLES },
+  { tenant: true, area: "attendance", roles: READ_ROLES },
 );
