@@ -2858,16 +2858,16 @@ Record: task `0010`, branch `claude/campus-admin-setup-controls`. UI only, no mi
 - **Not done, on purpose:** timetable and attendance remain read-only in the UI for a campus administrator although their API is open to them. **Found, not changed:** `readOnly` is true for every non-ADMIN, so a teacher also sees the roll call read-only in the UI even though the API lets them take it - needs a decision.
 - **Tests:** `tests/e2e/campus-admin-setup.spec.ts`: sessions and classes in the dark and the light theme with axe, desktop and phone.
 
-#### Build design — audited support access (2026-10-13, written before any code; ADR 0017 Proposed; awaiting the maintainer's go-ahead)
+#### Build design — audited support access (2026-10-13, written before any code; ADR 0017 Accepted the same day)
 Record: ADR 0017. Task `0011` will carry the build.
 
 **Why.** ADR 0016 left the platform administrator with no view of school data; support still needs one for the rare "look at my timetable" case, without a standing key and without an RLS bypass.
 
 **S1 — the grant.** Table `SupportGrant(id, tenantId, granteeUserId?, areas[], reason, expiresAt, revokedAt, createdById, createdAt)` under the school's RLS (read/insert/update by that school only; no delete). Only a school `ADMIN` creates one (4 h default, 24 h max, areas none by default); revoking sets `revokedAt`. A platform administrator learns which schools granted through a narrow definer function `platform_support_grants()` (grants addressed to them or to anyone, live only: school id, areas, expiry — no reason text, no people).
 **S2 — the session.** `resolveTenant` gains one branch: a platform administrator (flag, two-step on, password proof within the last 15 minutes) with a live grant gets `{ role: "SUPPORT", areas }`; the school context is set as for a member. `withAuth` refuses every non-safe method for `SUPPORT`, and refuses a route whose declared area is not in `areas`. A suspended school is refused.
-**S3 — areas.** Each route file declares one area (settings, academics, people, attendance, results, finance, or `none` for routes a support view never reaches); `tests/unit/route-area-guard.spec.ts` fails an undeclared route. Pages that fetch several areas simply show what the API gives them.
+**S3 — areas.** Each route file declares one area (settings, academics, people, attendance, results, `finance` (declared but never grantable), or `none` for routes a support view never reaches); `tests/unit/route-area-guard.spec.ts` fails an undeclared route. Pages that fetch several areas simply show what the API gives them.
 **S4 — audit.** Every `SUPPORT` request writes `AuditLog` (`SUPPORT_ACCESS`: actor, route pattern, area) in the school and a `PlatformAuditLog` row; grant creation, revocation and expiry are audited. The school's **Support access** page (ADMIN only) lists them.
 **S5 — UI.** Grant dialog (areas, duration, reason) on the Support access page; on the platform page "Open support view" for a school with a live grant; a persistent read-only banner with the expiry; no write controls are drawn for `SUPPORT`.
 **Tests first (planned):** integration + API matrix (no/expired/revoked/other-area/other-school grant; non-GET; suspended; campus administrator and teacher cannot grant; both audit rows; secrets never present), source guard, e2e with axe in both themes.
-**Open for the maintainer:** the area list, default and maximum duration, whether finance is grantable at all, whether to add break-glass later.
+**Decided 2026-10-13:** areas = settings, academics, people, attendance, results (finance is NOT grantable); 4 h default, 24 h maximum; no break-glass for now.
 

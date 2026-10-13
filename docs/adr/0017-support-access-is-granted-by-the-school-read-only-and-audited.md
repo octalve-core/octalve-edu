@@ -1,7 +1,7 @@
 # 0017 — A platform administrator sees a school's data only when the school grants it: read-only, time-limited, scoped and audited
 
-Status: Proposed
-Decided by: <the maintainer — to accept or modify> · Date: —
+Status: Accepted
+Decided by: the maintainer — accepted 2026-10-13 with the recommendations below ("I'll go with your suggestions and recommendations") · Date: 2026-10-13
 Recorded: 2026-10-13 (drafted by an agent; the maintainer asked for audited support access "later, design first" on 2026-10-11)
 
 ## Context
@@ -10,13 +10,18 @@ ADR 0016 gave the platform administrator the schools, four counters and the audi
 
 ## Decision
 
-- **The school grants access; the platform cannot take it.** A school `ADMIN` (not a campus administrator) creates a **support grant**: who (a named platform administrator, or any), **which areas** (a checklist: settings, academics, people, attendance, results, finance — none ticked by default), **how long** (default 4 hours, at most 24, never open-ended), and a **reason** (a ticket or sentence). The grant is a row in the school's own data (`SupportGrant`, under the school's row-level security), so the school sees it and can **revoke it at any moment**. A platform administrator cannot create, extend or widen one.
+- **The school grants access; the platform cannot take it.** A school `ADMIN` (not a campus administrator) creates a **support grant**: who (a named platform administrator, or any), **which areas** (a checklist: settings, academics, people, attendance, results — none ticked by default; **finance is not grantable**), **how long** (default 4 hours, at most 24, never open-ended), and a **reason** (a ticket or sentence). The grant is a row in the school's own data (`SupportGrant`, under the school's row-level security), so the school sees it and can **revoke it at any moment**. A platform administrator cannot create, extend or widen one.
 - **While a grant is live the platform administrator gets a read-only view of the granted areas through the school's own screens**, as a virtual `SUPPORT` role in the tenant resolver: only `GET` requests, only routes whose declared area is in the grant, every other request is refused with the same 403 a stranger gets. Reads still run under the school's tenant context and its row-level security (the app sets it after verifying the grant, as for any member) — **there is no BYPASSRLS and no database role change**. Secrets are never in any response (password hashes, MFA secrets, tokens are not selected by any route today; a test keeps it so).
 - **Every request is audited on both sides**: a row in the school's `AuditLog` (`SUPPORT_ACCESS`: who, route, area, time — never bodies or query values) and one in the platform's `PlatformAuditLog`. The school's administrators have a **Support access** page listing grants (live, expired, revoked) and what was looked at. Creating and revoking a grant are audited too.
 - **The platform administrator needs the same step-up as for any platform change** (two-step verification on, the password re-typed to open a support session) and sees a persistent **"Support view of <school> — read-only, expires <time>"** banner. A suspended school cannot be entered.
 - **Never writes.** There is no grant that allows a change; a platform administrator who must change something asks the school's administrator to. Revisit separately, as its own ADR, if that proves impossible.
 - **A school with no active administrator cannot grant.** That case is the first-administrator re-invite of ADR 0016's amendment, not support access.
 - **Each route declares its area.** A source-level test (like the route-role guard) fails a school route that declares no area, so a new feature cannot be reachable in a support view by accident.
+
+## Decisions taken at acceptance (2026-10-13)
+- **Areas:** settings, academics, people, attendance, results. **Finance is not grantable** (payment data stays out of any support view); revisit with its own ADR if a real case appears.
+- **Duration:** 4 hours by default, 24 at most.
+- **No break-glass** for now: a school that cannot be asked and has no administrator gets the first-administrator re-invite; anything else waits for a real case and its own ADR.
 
 ## Alternatives Considered
 
