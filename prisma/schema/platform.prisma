@@ -30,3 +30,24 @@ model TenantStats {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
+
+/// A school's grant of read-only support access to a platform administrator (task 0011, ADR 0017). A row in the SCHOOL's own data (row-level
+/// security); the database limits it to the grantable areas and 24 hours and lets it only be revoked, never edited or deleted. `granteeUserId` null
+/// = any platform administrator. The platform sees live grants only through `platform_support_grants()`.
+model SupportGrant {
+  id            String    @id @default(cuid())
+  tenantId      String
+  granteeUserId String?
+  areas         String[]
+  reason        String
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  createdById   String?
+  createdAt     DateTime  @default(now())
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  grantee   User?  @relation("SupportGrantee", fields: [granteeUserId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation("SupportGrantCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+}

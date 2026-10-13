@@ -28,15 +28,17 @@ model User {
   /// school's data (no RLS bypass). Set by `pnpm platform-admin:make`, never by a request (plan C5).
   isPlatformAdmin Boolean   @default(false)
 
-  sessions            Session[]
-  resetTokens         PasswordResetToken[]
-  emailChangeTokens   EmailChangeToken[]
-  memberships         TenantMembership[]
-  invitationsSent     Invitation[]         @relation("InvitationsSent")
-  invitationsAccepted Invitation[]         @relation("InvitationsAccepted")
-  mfaCredential       MfaCredential?
-  mfaRecoveryCodes    MfaRecoveryCode[]
-  mfaChallenges       MfaChallenge[]
+  sessions              Session[]
+  supportGrantsReceived SupportGrant[]       @relation("SupportGrantee")
+  supportGrantsCreated  SupportGrant[]       @relation("SupportGrantCreator")
+  resetTokens           PasswordResetToken[]
+  emailChangeTokens     EmailChangeToken[]
+  memberships           TenantMembership[]
+  invitationsSent       Invitation[]         @relation("InvitationsSent")
+  invitationsAccepted   Invitation[]         @relation("InvitationsAccepted")
+  mfaCredential         MfaCredential?
+  mfaRecoveryCodes      MfaRecoveryCode[]
+  mfaChallenges         MfaChallenge[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

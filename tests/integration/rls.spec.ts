@@ -1253,6 +1253,7 @@ test.describe("catalog guard", () => {
       "StudentRecord",
       "Subject",
       "SubjectOffering",
+      "SupportGrant",
       "TenantMembership",
       "TenantStats",
       "TimetableSlot",
