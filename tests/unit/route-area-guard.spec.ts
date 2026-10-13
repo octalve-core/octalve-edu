@@ -19,6 +19,7 @@ const OUT_OF_REACH: Record<string, string> = {
   "finance/payments/[ref]/status/route.ts": "finance is not a grantable area (ADR 0017)",
   "announcements/route.ts": "not a grantable area: notices are the school's own words to its families",
   "announcements/[id]/route.ts": "not a grantable area: notices are the school's own words to its families",
+  "support-grants/activity/route.ts": "the school's own record of who looked: a support view must never read it",
   "support-grants/route.ts": "the school's own control over who may look: a support view must never read or change it",
   "people/students/export/route.ts": "a bulk download of every student's details is an export, not a view",
 };

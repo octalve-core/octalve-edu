@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 // say a role was the problem. The list itself comes from the members API, which enforces the same rule again.
 export default async function UsersPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
-  const { session, tenant } = await requireTenantPage(code);
+  const { session, tenant } = await requireTenantPage(code, "people");
   if (tenant.role !== "ADMIN" && tenant.role !== "CAMPUS_ADMIN") forbidden();
 
   // A campus administrator is shown their own campus only; the API enforces the same.
@@ -30,13 +30,16 @@ export default async function UsersPage({ params }: { params: Promise<{ code: st
         title="Users"
         description={`The people who can sign in to ${tenant.tenantName}, and the invitations still waiting for an answer.`}
       />
-      <UsersPanel
-        schoolCode={tenant.tenantCode}
-        schoolName={tenant.tenantName}
-        campuses={campuses}
-        currentUserId={session.userId}
-        actorRole={tenant.role}
-      />
+      {/* A support view only reads: every control is switched off (a disabled fieldset disables everything inside it). The API refuses a write anyway. */}
+      <fieldset disabled={Boolean(tenant.support)} className="min-w-0">
+        <UsersPanel
+          schoolCode={tenant.tenantCode}
+          schoolName={tenant.tenantName}
+          campuses={campuses}
+          currentUserId={session.userId}
+          actorRole={tenant.role}
+        />
+      </fieldset>
     </div>
   );
 }

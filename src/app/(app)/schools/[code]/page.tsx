@@ -14,7 +14,7 @@ import { AnnouncementsFeed } from "@/components/announcements/AnnouncementsFeed"
 
 export default async function SchoolPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
-  const { session, tenant } = await requireTenantPage(code);
+  const { session, tenant } = await requireTenantPage(code, "settings");
   const displayName = session.user.name?.trim() || session.user.email || "there";
   const firstName = displayName.split(/\s+/)[0];
 
@@ -65,13 +65,16 @@ export default async function SchoolPage({ params }: { params: Promise<{ code: s
         )}
       </section>
 
-      <AnnouncementsFeed
-        schoolCode={tenant.tenantCode}
-        userRole={tenant.role}
-        userId={session.user.id}
-        campusId={tenant.campusId}
-        campuses={campuses}
-      />
+      {/* Notices are the school's own words to its families: not an area a support grant can name, so a support view does not show them. */}
+      {!tenant.support && (
+        <AnnouncementsFeed
+          schoolCode={tenant.tenantCode}
+          userRole={tenant.role}
+          userId={session.user.id}
+          campusId={tenant.campusId}
+          campuses={campuses}
+        />
+      )}
     </div>
   );
 }

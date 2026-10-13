@@ -9,6 +9,7 @@ import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
 import { NETWORK_ERROR, RATE_LIMITED, SESSION_ENDED, problemFor, sendJson, type Reply } from "@/components/auth/postJson";
 import { useApi } from "@/components/academics/useApi";
+import { SUPPORT_AREA_LABELS, type SupportArea } from "@/lib/support/areas";
 
 // The platform page (plan C5, ADR 0016): the schools of the installation, seen as identity data and four coarse counters - code, name, type, created, whether suspended, how many members, students and campuses, whether anyone administers it -
 // and the four things a platform administrator does: create a school (with its first administrator's invitation), suspend, reinstate, change the type.
@@ -47,7 +48,11 @@ const ACTION_LABELS: Record<string, string> = {
   SCHOOL_TYPE_CHANGED: "School type changed",
   PLATFORM_ADMIN_GRANTED: "Platform administrator added",
   FIRST_ADMIN_REINVITED: "First administrator invited again",
+  SUPPORT_OPENED: "Support view opened",
+  SUPPORT_ACCESS: "Support view: a page was read",
+  SUPPORT_CLOSED: "Support view closed",
 };
+type Openable = { code: string; name: string; areas: SupportArea[]; expiresAt: string };
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const countsLine = (c: SchoolCounts) =>
   [plural(c.members, "member", "members"), plural(c.students, "student", "students"), plural(c.campuses, "campus", "campuses")].join(" · ");
@@ -65,6 +70,8 @@ function describe(reply: Reply, fallback: string): string {
 export function PlatformPanel() {
   const schoolsApi = useApi("/api/v1/platform/schools");
   const auditApi = useApi("/api/v1/platform/audit?limit=20");
+  const supportApi = useApi("/api/v1/platform/support/grants");
+  const [supporting, setSupporting] = useState<Openable | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
   const [creating, setCreating] = useState(false);
   const [createKey, setCreateKey] = useState(0);
@@ -74,6 +81,7 @@ export function PlatformPanel() {
   const [inviting, setInviting] = useState<School | null>(null);
 
   const schools = (schoolsApi.reply?.data?.schools as School[] | undefined) ?? null;
+  const openable = new Map(((supportApi.reply?.data?.grants as Openable[] | undefined) ?? []).map((g) => [g.code, g]));
   const entries = (auditApi.reply?.data?.entries as AuditEntry[] | undefined) ?? null;
   const refresh = async () => {
     await Promise.all([schoolsApi.reload(), auditApi.reload()]);
@@ -148,6 +156,15 @@ export function PlatformPanel() {
                       aria-label={`Invite an administrator for ${school.name}`}
                     >
                       Invite administrator
+                    </Button>
+                  )}
+                  {openable.has(school.code) && !school.suspendedAt && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => setSupporting(openable.get(school.code)!)}
+                      aria-label={`Open a support view of ${school.name}`}
+                    >
+                      Open support view
                     </Button>
                   )}
                   <Button variant="secondary" onClick={() => setTyping(school)} aria-label={`Change the type of ${school.name}`}>
@@ -227,6 +244,7 @@ export function PlatformPanel() {
           done(`An invitation was sent to ${email}. ${school.name} gets an administrator when they accept it.`, () => setInviting(null))
         }
       />
+      <SupportDialog school={supporting} onClose={() => setSupporting(null)} />
       <TypeDialog
         school={typing}
         onClose={() => setTyping(null)}
@@ -530,6 +548,44 @@ function InviteAdminBody({
       />
       {change.formError && <Alert variant="error">{change.formError}</Alert>}
       <Actions pending={change.pending} label="Send invitation" onClose={onClose} />
+    </form>
+  );
+}
+
+function SupportDialog({ school, onClose }: { school: Openable | null; onClose: () => void }) {
+  return (
+    <Dialog open={school !== null} onClose={onClose} title={school ? `Open a support view of ${school.name}` : "Open a support view"}>
+      {school && <SupportBody key={school.code} school={school} onClose={onClose} />}
+    </Dialog>
+  );
+}
+function SupportBody({ school, onClose }: { school: Openable; onClose: () => void }) {
+  const change = useChange("/api/v1/platform/support/open", "POST");
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const reply = await change.send({ code: school.code }, []);
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- a FULL load on purpose: the layout (and its banner) must be drawn again
+    if (reply) window.location.href = `/schools/${school.code}`; // a full load: the layout (and its banner) must be drawn again
+  }
+  return (
+    <form onSubmit={submit} noValidate className="space-y-4">
+      <p className="text-sm text-fg-2">
+        The school&apos;s administrator allowed you to look at:{" "}
+        <strong>{school.areas.map((a) => SUPPORT_AREA_LABELS[a]).join(", ")}</strong>. You can only read, never change anything. The view
+        lasts at most an hour (the permission ends {when(school.expiresAt)}), and every page you open is written to the school&apos;s own
+        history and to the platform&apos;s.
+      </p>
+      <PasswordField
+        label="Your password"
+        name="password"
+        value={change.password}
+        onChange={(e) => change.setPassword(e.target.value)}
+        error={change.passwordError}
+        autoComplete="current-password"
+        disabled={change.pending}
+      />
+      {change.formError && <Alert variant="error">{change.formError}</Alert>}
+      <Actions pending={change.pending} label="Open the school" onClose={onClose} />
     </form>
   );
 }

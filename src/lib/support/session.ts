@@ -110,3 +110,18 @@ export async function listOpenableSchools(userId: string): Promise<OpenableSchoo
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
+
+export type SupportBannerData = { code: string; name: string; areas: SupportArea[]; endsAt: string };
+
+/// What the shell's banner shows for a sign-in that has a support view open: the school, what is allowed and when it ends - or null when none is open or it is no
+/// longer allowed (display only: the pages and routes decide access themselves).
+export async function supportBanner(
+  userId: string,
+  support: { tenantId: string; openedAt: Date } | undefined,
+): Promise<SupportBannerData | null> {
+  if (!support) return null;
+  const view = await liveSupportView(userId, support.tenantId, support.openedAt);
+  if (!view) return null;
+  const school = await prisma.tenant.findUnique({ where: { id: support.tenantId }, select: { code: true, name: true } });
+  return school ? { code: school.code, name: school.name, areas: [...view.areas], endsAt: view.endsAt.toISOString() } : null;
+}

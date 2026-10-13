@@ -101,3 +101,44 @@ export async function revokeGrant(tenant: Tenant, actorUserId: string, id: strin
     return view(await tx.supportGrant.findUniqueOrThrow({ where: { id }, select: SELECT }));
   });
 }
+
+export type SupportActivityView = {
+  id: string;
+  action: "SUPPORT_OPENED" | "SUPPORT_ACCESS" | "SUPPORT_CLOSED";
+  at: string;
+  who: string | null;
+  detail: string;
+};
+
+/// What platform support did in this school: opening a view, each page or list it read, closing it - newest first, the last 100. Written by the database
+/// function platform_support_record (migration 20261024100000); this only reads the school's own log.
+export async function listSupportActivity(tenant: Tenant): Promise<SupportActivityView[]> {
+  const rows = await tenant.run(async (tx) => {
+    const logs = await tx.auditLog.findMany({
+      where: { tenantId: tenant.tenantId, action: { in: ["SUPPORT_OPENED", "SUPPORT_ACCESS", "SUPPORT_CLOSED"] } },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: { id: true, action: true, createdAt: true, actorUserId: true, afterValue: true },
+    });
+    const people = await tx.user.findMany({
+      where: { id: { in: [...new Set(logs.map((l) => l.actorUserId))] } },
+      select: { id: true, name: true },
+    });
+    return { logs, names: new Map(people.map((p) => [p.id, p.name])) };
+  });
+  return rows.logs.map((l) => {
+    const d = (l.afterValue ?? {}) as { method?: string; path?: string; areas?: string };
+    return {
+      id: l.id,
+      action: l.action as SupportActivityView["action"],
+      at: l.createdAt.toISOString(),
+      who: rows.names.get(l.actorUserId) ?? null,
+      detail:
+        l.action === "SUPPORT_ACCESS"
+          ? `${d.method ?? "GET"} ${d.path ?? ""}`.trim()
+          : l.action === "SUPPORT_OPENED"
+            ? `Allowed: ${d.areas ?? ""}`
+            : "",
+    };
+  });
+}

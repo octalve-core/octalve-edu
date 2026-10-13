@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 // One member of staff (plan "Build design — Phase 1.2", decision P9). Same rule as the People page; an unknown, foreign or other-campus record is one 404 page.
 export default async function StaffPage({ params }: { params: Promise<{ code: string; id: string }> }) {
   const { code, id } = await params;
-  const { tenant } = await requireTenantPage(code);
+  const { tenant } = await requireTenantPage(code, "people");
   if (tenant.role !== "ADMIN" && tenant.role !== "CAMPUS_ADMIN" && tenant.role !== "TEACHING_STAFF" && tenant.role !== "NON_TEACHING_STAFF")
     forbidden();
   if (!isPlausibleId(id)) notFound();
@@ -32,7 +32,7 @@ export default async function StaffPage({ params }: { params: Promise<{ code: st
           schoolCode={tenant.tenantCode}
           staffId={id}
           campuses={campuses}
-          canEdit={isAdministrator(tenant.role)}
+          canEdit={isAdministrator(tenant.role) && !tenant.support}
           fallbackName={fullName(found.staff)}
         />
       </div>
