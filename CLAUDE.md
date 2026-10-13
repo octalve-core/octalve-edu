@@ -171,6 +171,10 @@ one-off pattern sources, referenced once for a specific technique and then done:
    through the `platform_*` definer functions, needs two-step verification and the password again for every change, and has **no RLS bypass and no
    "act as a school" mode**; `pnpm platform-admin:make` is the only way to make one. Never call `app_grant_runtime_privileges()` in a new migration
    (it re-grants UPDATE/DELETE on append-only tables).
+   **The one exception to "no act as a school" is a support view the SCHOOL grants (ADR 0017):** read-only, time-limited, limited to areas
+   (settings, academics, people, attendance, results — never finance), recorded in both audit logs. Every school GET route declares
+   `area: "…"` in its `withAuth` options or is on the out-of-reach list with a reason in `tests/unit/route-area-guard.spec.ts`; a route with no
+   area is unreachable from a support view; a state-changing handler never declares one. New school pages call `requireTenantPage(code, area)`.
 
 ## Current state, as of 2026-10-06 (verify against `octalve_edu_progress.md` — it may have moved since)
 
