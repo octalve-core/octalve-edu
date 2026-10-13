@@ -2,7 +2,7 @@ import { test, expect } from "../support/fixtures";
 import type { Page } from "@playwright/test";
 import { Role, addMembership, createTenant, createUser, removeCreatedTenants, seedInstance, type TestTenant } from "../support/db";
 import { SAAS_URL } from "../support/env";
-import { signInThroughUi } from "./helpers";
+import { signInThroughUi, waitForHydration } from "./helpers";
 
 // The app shell in a real browser (domain-implementation-plan.md §0.5.2-H): the school-aware sidebar, top bar, account
 // menu, school switcher and — on a phone — the tab bar and "More" sheet. Several schools share the database, so this runs on
@@ -30,6 +30,7 @@ async function signedInAs(page: Page, role: Role, opts: { name?: string; also?: 
   await addMembership(user.id, a.id, role, role === Role.ADMIN ? null : a.campuses[0].id);
   if (opts.also) await addMembership(user.id, b.id, opts.also, opts.also === Role.ADMIN ? null : b.campuses[0].id);
   await signInThroughUi(page, user);
+  await waitForHydration(page); // the tests click straight away: an un-hydrated button swallows the click
   return user;
 }
 
