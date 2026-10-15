@@ -1,12 +1,12 @@
 # [0011]: Audited support access (build of ADR 0017)
 
 - **Period / Focus:** 2026-10-13 to (open) - the SCHOOL grants a platform administrator a read-only, time-limited, area-scoped view; audited on both sides; no RLS bypass
-- **Status:** In Progress - slice A built and committed; slices B-E not started
+- **Status:** Completed (slices A-E built; landed in octalve-core `dev` as PR #14; follow-ups and the production steps below are open)
 - **Priority:** High
 - **Assignee:** Claude Agent / Maintainer
-- **Target Branch / PR:** `claude/support-access-build` -> octalve-core `dev`
+- **Target Branch / PR:** `claude/support-access-build` -> octalve-core `dev` (merged: PR #14)
 - **Started:** 2026-10-13 UTC
-- **Ended:** -
+- **Ended:** 2026-10-14 UTC
 - **Duration:** -
 
 > **How to tick:** change `[ ]` to `[x]`. The table shows the characters, not a clickable box.
@@ -45,3 +45,14 @@ A school `ADMIN` can grant support access (areas, duration, reason) and revoke i
 
 ## 4. Verification
 Recorded per slice. Mutation passes: NOT RUN - pending, end of Phase 2.
+
+## 5. Open follow-ups (not built; each is additive and none blocks using the feature)
+- [ ] **A named grantee.** `granteeUserId` exists on `SupportGrant` but the API refuses to set it: a grant is open to ANY platform administrator. Decide whether a school should be able to name one person.
+- [ ] **Notify the school's administrators** when a support view opens (today the school sees it in its activity list and audit log, but is not told).
+- [ ] **A cap on audit rows per view.** Every allowed request writes a row on both sides; a long view writes many. Decide a cap or a per-minute collapse.
+- [ ] **The light theme for the platform flow's e2e.** The school's page is tested in both themes; the platform administrator's full flow only in the default dark theme.
+
+## 6. Before this ships to production (run order matters)
+- [ ] Run the two migrations on the production database **before** deploying the code (rule: migrations run before the code; both are additive): `20261024090000_support_grants` and `20261024100000_support_session` (adds `Session.supportTenantId` / `supportOpenedAt` and the `platform_support_record` function). Old code ignores the new columns.
+- [ ] Do not call `app_grant_runtime_privileges()` in these or any new migration (rule 9 of `CLAUDE.md`).
+- [ ] Per live school, run `pnpm teachers:unassigned` before the teacher-attendance rule ships (task 0010).
