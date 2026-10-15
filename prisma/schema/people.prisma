@@ -103,6 +103,7 @@ model StudentRecord {
   attendanceRecords AttendanceRecord[]
   results           Result[]
   invoices          Invoice[]
+  guardianLinkTokens GuardianLinkToken[]
 
   @@unique([tenantId, id])
   @@index([tenantId])
@@ -135,6 +136,7 @@ model GuardianRecord {
   tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   membership TenantMembership? @relation(fields: [userId, tenantId], references: [userId, tenantId], onDelete: NoAction)
   links      GuardianLink[]
+  guardianLinkTokens GuardianLinkToken[]
 
   @@unique([tenantId, id])
   @@index([tenantId])

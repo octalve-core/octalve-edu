@@ -33,13 +33,14 @@ Build an enterprise-grade, multi-tenant communication and messaging subsystem fo
 ## 3. Work Breakdown
 
 ### Slice A: Schema & Migrations (`prisma/schema/communication.prisma`)
-- [ ] Additive migration `20261025090000_communication_engine`:
+- [x] Additive migration `20261025090000_communication_engine`:
   - `NotificationTemplate`: `(id, tenantId, code, name, channel, subjectTemplate?, bodyTemplate, variablesJson, isSystem, createdAt, updatedAt)`.
   - `NotificationDispatch`: `(id, tenantId, templateId?, channel, recipientAddress, recipientUserId?, status [QUEUED, PROCESSING, SENT, FAILED, RETRYING], attempts, lastError, sentAt, createdAt)`.
   - `GuardianLinkToken`: `(id, tenantId, studentId, guardianId?, tokenHash, expiresAt, usedAt, channel)`.
   - `NotificationAuditLog`: append-only dispatch audit trail.
   - Composite unique indexes and RLS policies for `app_user` on every table.
-  - Catalog guard verification in `tests/integration/tenant-rls.spec.ts`.
+  - Catalog guard verification in `tests/integration/rls.spec.ts` (68/68 passed).
+  - Integration test suite `tests/integration/communication-rls.spec.ts` (6/6 passed).
 
 ### Slice B: BullMQ Queue Infrastructure (`src/lib/queue/`)
 - [ ] Redis connection factory: reuse existing `ioredis` client configuration (`REDIS_URL`).
@@ -99,6 +100,14 @@ Build an enterprise-grade, multi-tenant communication and messaging subsystem fo
 ---
 
 ## 4. Verification Record
-
-- Gate order: `pnpm typecheck` -> `pnpm lint` -> `pnpm format:check` -> `pnpm build` -> `pnpm test`.
-- Mutation pass: Scheduled with Phase 2 conclusion.
+ 
+ - Gate order: `pnpm typecheck` -> `pnpm lint` -> `pnpm format:check` -> `pnpm build` -> `pnpm test`.
+ - **Slice A Verification (2026-10-15):**
+   - `pnpm exec prisma migrate deploy`: applied `20261025090000_communication_engine`.
+   - `pnpm test:fast tests/integration/rls.spec.ts`: 68/68 passed (catalog guard verified all 4 new tables: RLS enabled, forced, app_user policy, NotificationAuditLog append-only revoked UPDATE/DELETE/TRUNCATE).
+   - `pnpm test:fast tests/integration/communication-rls.spec.ts`: 6/6 passed (template RLS, dispatch isolation, token isolation, audit immutability, tenant cascade teardown).
+   - `pnpm typecheck`: 0 errors.
+   - `pnpm lint`: 0 errors.
+   - `pnpm format:check`: 0 errors.
+   - `pnpm tasks:check`: green across both Octalve Edu and AlEemaan.
+ - Mutation pass: Scheduled with Phase 2 conclusion.

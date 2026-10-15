@@ -39,6 +39,7 @@ model User {
   mfaCredential         MfaCredential?
   mfaRecoveryCodes      MfaRecoveryCode[]
   mfaChallenges         MfaChallenge[]
+  notificationDispatches NotificationDispatch[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
