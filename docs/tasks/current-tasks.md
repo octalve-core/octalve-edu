@@ -22,6 +22,7 @@
 | 9 | [TASK-0009](0009-campus-admins-and-platform-superadmin.md) | Campus administrators and the platform superadmin (C1–C8) | [x] Completed (landed in octalve-core `dev`; full suite 1842 passed / 3 failed (shell e2e: the phone one is a pre-existing flake on `dev` too; the two desktop ones unexplained) / 23 skipped) | 2026-10-11 UTC | 2026-10-11 UTC | [PR #7](https://github.com/octalve-core/octalve-edu/pull/7) |
 | 10 | [TASK-0010](0010-platform-followups.md) | Platform follow-ups: counters, first-admin re-invite, teachers' attendance scoping, public verification, campus-admin setup controls | [x] Completed (F1-F4 landed in octalve-core `dev` as PR #8, full suite 1927 passed / 1 failed (phone shell flake, family known) / 23 skipped; F5 in `claude/campus-admin-setup-controls`) | 2026-10-11 UTC | — | `claude/platform-followups` |
 | 11 | [TASK-0011](0011-audited-support-access.md) | Audited support access (ADR 0017) | [x] Completed (slices A-E; full suite 1972 passed / 4 failed - 2 stale assertions of mine, fixed; landed in octalve-core `dev` as PR #14). Open: 4 follow-ups and the production run order, see the task file §5-6 | 2026-10-13 UTC | 2026-10-14 UTC | `claude/support-access-build` |
+| 12 | [TASK-0012](0012-phase-2-communication-and-messaging.md) | Phase 2: Communication & Multi-Channel Messaging Engine (Templates, BullMQ on Redis, Resend/Termii) | [~] In Progress (Architecture specified; implementation commencing) | 2026-10-15 UTC | — | `claude/phase-2-communication` |
 ---
 
 ## Detailed Milestone Checklist
@@ -135,8 +136,36 @@
 - [x] Stack landed in octalve-core `dev` (one PR from the fork's stack branch); `dev` → `master` (staging) still needs the maintainer's approval
 
 ### TASK-0009: Campus administrators and the platform superadmin
-- **Status:** In Progress — see the task file for the slices
+- **Status:** Completed — landed in octalve-core `dev` (PR #7); full suite 1842 passed / 3 failed (shell e2e flakes) / 23 skipped
 - [x] Slice A: migrations (`CAMPUS_ADMIN`, CHECK, `isPlatformAdmin`, `suspendedAt`, `PlatformAuditLog`, `platform_*` functions), `canAdminister`, tests
-- [ ] Slices B1–B4: campus-capable routes (people; academics + attendance + announcements + timetable; finance; members/invitations), enabling the role last
-- [ ] Slice C: suspension in the resolver, `make-platform-admin` script, platform API and page
-- [ ] Slice D: route-role guard test, ADR 0016 (Proposed), docs, full suite, PR
+- [x] Slices B1–B4: campus-capable routes (people, academics of a campus, attendance, announcements, timetable, finance, members/invitations)
+- [x] Slice C: suspension in the resolver, `make-platform-admin` script, platform API and page
+- [x] Slice D: route-role guard test, ADR 0016 (Accepted), docs, full suite, PR
+
+### TASK-0010: Platform follow-ups: counters, first-admin re-invite, attendance scoping, verification
+- **Status:** Completed — F1-F4 landed in octalve-core `dev` as PR #8 (full suite 1927 passed); F5 merged
+- [x] F1: platform counters via `TenantStats` delta triggers and recount functions
+- [x] F2: re-invite the first administrator via platform action and operator script (`scripts/invite-first-admin.mjs`)
+- [x] F3: teachers' attendance scoping at campus level and arm level (`lib/attendance/access.ts`)
+- [x] F4: public verification privacy: full name displayed, admission number excluded, `noindex, nofollow` headers
+- [x] F5: academic setup editing controls for campus administrators
+
+### TASK-0011: Audited support access (ADR 0017)
+- **Status:** Completed — slices A-E landed in octalve-core `dev` as PR #14 (full suite 1972 passed, 2 assertions updated); PR #15 status updates
+- [x] Slice A: support grants on the school side (`SupportGrant`, RLS policies, time limits)
+- [x] Slice B: support session on the platform side (`supportTenantId`, `platform_support_record`, read-only enforcement)
+- [x] Slice C: declared areas across 31 school GET routes + source-level area guard
+- [x] Slice D: UI panels (school support page, platform open-view dialog, persistent shell read-only banner)
+- [x] Slice E: full suite verification and production deploy checklist
+
+### TASK-0012: Phase 2 — Communication & Multi-Channel Messaging Engine
+- **Status:** [~] In Progress (Architecture specified; implementation commencing)
+- [ ] Sub-phase A: Schema & migrations (`NotificationTemplate`, `NotificationDispatch`, `GuardianLinkToken`, RLS)
+- [ ] Sub-phase B: BullMQ queue infrastructure with Redis backing (`src/lib/queue/`)
+- [ ] Sub-phase C: Template engine with variable interpolation & standard system templates
+- [ ] Sub-phase D: Multi-channel delivery adapters (Email via Resend, SMS & WhatsApp via Termii, In-App)
+- [ ] Sub-phase E: Guardian-link messaging with cryptographic magic links
+- [ ] Sub-phase F: Automated event hooks (absence notifications, results publishing alert, fee reminders)
+- [ ] Sub-phase G: UI panels (Template Manager, Broadcast Composer, Dispatch Log, Shell nav)
+- [ ] Sub-phase H: Testing & quality gates (Unit, Integration, API, E2E, Axe accessibility)
+
