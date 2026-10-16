@@ -62,6 +62,12 @@ model Tenant {
   notificationDispatches NotificationDispatch[]
   guardianLinkTokens    GuardianLinkToken[]
   notificationAudits    NotificationAuditLog[]
+  assignments           Assignment[]
+  assignmentSubmissions AssignmentSubmission[]
+  learningMaterials     LearningMaterial[]
+  quizzes               Quiz[]
+  quizQuestions         QuizQuestion[]
+  quizAttempts          QuizAttempt[]
 }
 
 /// A branch/campus under one tenant (PRD §7) — distinct from multi-tenancy:
@@ -72,14 +78,17 @@ model Campus {
   tenantId String
   name     String
 
-  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  memberships    TenantMembership[]
-  invitations    Invitation[]
-  sessions       AcademicSession[]
-  classGroups    ClassGroup[]
-  staffRecords   StaffRecord[]
-  studentRecords StudentRecord[]
-  announcements  Announcement[]
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memberships       TenantMembership[]
+  invitations       Invitation[]
+  sessions          AcademicSession[]
+  classGroups       ClassGroup[]
+  staffRecords      StaffRecord[]
+  studentRecords    StudentRecord[]
+  announcements     Announcement[]
+  assignments       Assignment[]
+  learningMaterials LearningMaterial[]
+  quizzes           Quiz[]
 
   /// A school cannot have two campuses of the same name (compared exactly, after the API trims it).
   @@unique([tenantId, name])

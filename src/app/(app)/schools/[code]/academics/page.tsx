@@ -8,6 +8,7 @@ import { GradingPanel } from "@/components/academics/GradingPanel";
 import { SectionNav } from "@/components/academics/SectionNav";
 import { SessionsPanel } from "@/components/academics/SessionsPanel";
 import { TimetablePanel } from "@/components/academics/TimetablePanel";
+import { LmsPanel } from "@/components/lms/LmsPanel";
 import { isSection } from "@/components/academics/model";
 import { requireTenantPage } from "@/lib/tenant/page-tenant";
 
@@ -42,8 +43,12 @@ export default async function AcademicsPage({
   const canTakeRoll = !tenant.support && (tenant.role === "ADMIN" || tenant.role === "CAMPUS_ADMIN" || tenant.role === "TEACHING_STAFF");
 
   const section = isSection(asked) ? asked : "timetable";
-  const campuses = await tenant.run((tx) =>
-    tx.campus.findMany({ where: { tenantId: tenant.tenantId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+  const [campuses, subjects, classGroups] = await tenant.run((tx) =>
+    Promise.all([
+      tx.campus.findMany({ where: { tenantId: tenant.tenantId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+      tx.subject.findMany({ where: { tenantId: tenant.tenantId, archivedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+      tx.classGroup.findMany({ where: { tenantId: tenant.tenantId, archivedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    ]),
   );
 
   return (
@@ -64,6 +69,14 @@ export default async function AcademicsPage({
       <div className="mt-8">
         {section === "timetable" && <TimetablePanel schoolCode={tenant.tenantCode} readOnly={readOnly} />}
         {section === "attendance" && <AttendancePanel schoolCode={tenant.tenantCode} readOnly={!canTakeRoll} />}
+        {section === "lms" && (
+          <LmsPanel
+            schoolCode={tenant.tenantCode}
+            canManage={canTakeRoll}
+            subjects={subjects}
+            classGroups={classGroups}
+          />
+        )}
         {section === "sessions" && (
           <SessionsPanel
             schoolCode={tenant.tenantCode}

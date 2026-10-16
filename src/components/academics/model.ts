@@ -24,6 +24,7 @@ export type PageMeta = { page: number; limit: number; total: number; pages: numb
 export const SECTIONS = [
   { key: "timetable", label: "Timetable" },
   { key: "attendance", label: "Attendance" },
+  { key: "lms", label: "LMS & Assignments" },
   { key: "sessions", label: "Sessions & terms" },
   { key: "classes", label: "Classes & subjects" },
   { key: "assessment", label: "Assessment" },
