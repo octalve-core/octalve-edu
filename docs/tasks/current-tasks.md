@@ -173,7 +173,7 @@
 ---
 
 ### TASK-0013: Phase 3 — Global Quick-Tools Dock & Progressive Web App (PWA)
-- **Status:** [x] Completed (Slices A-F implemented, tested & 100% green)
+- **Status:** [x] Completed (PR #19 open and green, awaiting review)
 - [x] Sub-phase A: PWA Infrastructure & Manifest (`manifest.ts`, dynamic icons, shortcuts, appleWebApp capabilities)
 - [x] Sub-phase B: Floating Tools Trigger & Shell Integration (`QuickToolsTrigger`, `QuickToolsDrawer`, `Cmd+K` & `Alt+T` listener)
 - [x] Sub-phase C: Universal School Calculator (`CalculatorTool`, pure Shunting-Yard math engine, discount presets, history tape)
