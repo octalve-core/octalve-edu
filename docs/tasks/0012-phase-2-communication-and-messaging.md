@@ -43,24 +43,28 @@ Build an enterprise-grade, multi-tenant communication and messaging subsystem fo
   - Integration test suite `tests/integration/communication-rls.spec.ts` (6/6 passed).
 
 ### Slice B: BullMQ Queue Infrastructure (`src/lib/queue/`)
-- [ ] Redis connection factory: reuse existing `ioredis` client configuration (`REDIS_URL`).
-- [ ] Queue definitions:
+- [x] Redis connection factory: reuse existing `ioredis` client configuration (`REDIS_URL`) in `src/lib/queue/redis.ts`.
+- [x] Queue definitions:
   - `notification-dispatch-queue`: prioritized workers for immediate event triggers (e.g., student absence).
   - `bulk-broadcast-queue`: throttled worker queue for school-wide campaigns.
-- [ ] Worker lifecycle & retry engine:
+- [x] Worker lifecycle & retry engine:
   - Exponential backoff (3 retries with jitter).
   - Dead-letter handling: failed dispatches marked `FAILED` with sanitized error message.
+  - Multi-tenant PostgreSQL RLS context enforcement via `forTenant`.
+  - Integration test suite: `tests/integration/communication-queue.spec.ts` (6/6 passed).
 
 ### Slice C: Template Engine & Variable Interpolation (`src/lib/communication/templates.ts`)
-- [ ] Pure template interpolation function:
+- [x] Pure template interpolation function:
   - Safe replacement of tokens (e.g., `{{student_name}}`, `{{class_arm}}`, `{{term_name}}`, `{{date}}`, `{{school_name}}`).
   - Strict escaping to prevent XSS in email and message corruption in SMS.
-- [ ] Standard system templates:
+- [x] Standard system templates:
   - `ATTENDANCE_ABSENCE`: Instant alert when student marked absent.
   - `RESULTS_PUBLISHED`: Term report card available notification with secure link.
   - `FEE_INVOICE_ISSUED`: New invoice billing notification.
   - `FEE_OVERDUE_REMINDER`: Payment reminder before term deadlines.
   - `BROADCAST_ANNOUNCEMENT`: General broadcast message.
+  - Idempotent tenant seeding `ensureSystemTemplates`.
+  - Unit test suite: `tests/unit/communication-templates.spec.ts` (9/9 passed).
 
 ### Slice D: Multi-Channel Gateway Adapters (`src/lib/communication/gateways/`)
 - [ ] Email Adapter:
