@@ -87,12 +87,13 @@ Build an enterprise-grade, multi-tenant communication and messaging subsystem fo
 - [x] Integration test suite: `tests/integration/guardian-link.spec.ts` (4/4 passed).
 
 ### Slice F: Automated Domain Event Triggers
-- [ ] Attendance Event Hook:
+- [x] Attendance Event Hook:
   - Integrated into `src/lib/attendance/service.ts`: marking roll-call with `ABSENT` enqueues notification job if school setting `notifyAbsence` is enabled.
-- [ ] Results Event Hook:
-  - Integrated into `src/lib/academics/results-workflow.ts`: transition to `PUBLISHED` triggers batch notification to guardians.
-- [ ] Finance Event Hook:
-  - Integrated into `src/lib/finance/service.ts`: invoice creation enqueues payment notice.
+- [x] Results Event Hook:
+  - Integrated into `src/lib/results/service.ts`: transition to `PUBLISHED` triggers batch notification to guardians with magic token.
+- [x] Finance Event Hook:
+  - Integrated into `src/lib/finance/service.ts`: invoice creation enqueues payment notice with magic token.
+  - Integration test suite: `tests/integration/communication-event-triggers.spec.ts` (4/4 passed).
 
 ### Slice G: UI Panels & Management Consoles
 - [ ] Template Management Panel: `/schools/[code]/communication/templates` (list, preview, edit templates).
