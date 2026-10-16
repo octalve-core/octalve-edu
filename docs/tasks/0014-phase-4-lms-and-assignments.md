@@ -4,7 +4,7 @@
 - **Status:** Complete
 - **Priority:** High
 - **Assignee:** Antigravity / Engineering Team
-- **Target Branch / PR:** `claude/phase-4-lms-assignments`
+- **Target Branch / PR:** [PR #20](https://github.com/octalve-core/octalve-edu/pull/20) (`claude/phase-4-lms-assignments` -> `dev`)
 - **Started:** 2026-10-16 14:30:00 UTC
 - **Ended:** 2026-10-16 15:45:00 UTC
 - **Duration:** 1h 15m
