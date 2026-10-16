@@ -4,9 +4,9 @@
 - **Status:** [~] In Progress - Architecture & Task Design Specified; Implementation Commencing
 - **Priority:** High
 - **Assignee:** Claude Agent / Maintainer
-- **Target Branch / PR:** `claude/phase-2-communication` -> `dev`
+- **Target Branch / PR:** `claude/phase-2-communication` / [PR #18](https://github.com/octalve-core/octalve-edu/pull/18)
 - **Started:** 2026-10-15 UTC
-- **Ended:** —
+- **Ended:** 2026-10-16 09:03:00 UTC
 - **Duration:** —
 
 > **How to tick:** change `[ ]` to `[x]`. The table shows the characters, not a clickable box.
