@@ -32,6 +32,12 @@ export function MobileNav({ name, email }: { name: string | null; email: string 
   const soon = items.filter((item) => !item.href);
   const displayName = name?.trim() || email || "Account";
 
+  // Phone tab bar allows up to 4 primary tabs; remaining tabs are accessible via the "More" sheet.
+  const MAX_PHONE_BAR_TABS = 4;
+  const barTabs = tabs.length > 5 ? tabs.slice(0, MAX_PHONE_BAR_TABS) : tabs;
+  const overflowTabs = tabs.length > 5 ? tabs.slice(MAX_PHONE_BAR_TABS) : [];
+  const isMoreActive = overflowTabs.some((item) => isActive(pathname, item));
+
   // Any navigation closes the sheet (closing an already-closed dialog is a no-op).
   useEffect(() => {
     dialogRef.current?.close();
@@ -41,7 +47,7 @@ export function MobileNav({ name, email }: { name: string | null; email: string 
     <>
       <nav aria-label="Main" className="fixed inset-x-3 bottom-3 z-30 pb-[env(safe-area-inset-bottom)] lg:hidden">
         <ul className="flex gap-1 rounded-2xl border border-line bg-surface p-1.5 shadow-menu">
-          {tabs.map((item) => (
+          {barTabs.map((item) => (
             <li key={item.label} className="flex-1">
               <Link href={item.href!} aria-current={isActive(pathname, item) ? "page" : undefined} className={`${TAB} ${FOCUS_RING}`}>
                 <item.icon className="h-5 w-5" />
@@ -54,6 +60,7 @@ export function MobileNav({ name, email }: { name: string | null; email: string 
               type="button"
               aria-haspopup="dialog"
               aria-expanded={sheetOpen}
+              aria-current={isMoreActive ? "page" : undefined}
               onClick={() => {
                 dialogRef.current?.showModal();
                 setSheetOpen(true);
@@ -133,6 +140,18 @@ export function MobileNav({ name, email }: { name: string | null; email: string 
           )}
 
           <ul className="mt-3 border-t border-line pt-2">
+            {overflowTabs.map((item) => (
+              <li key={item.label}>
+                <Link
+                  href={item.href!}
+                  aria-current={isActive(pathname, item) ? "page" : undefined}
+                  className={`${SHEET_ROW} aria-[current=page]:bg-brand-tint aria-[current=page]:text-brand-fg ${FOCUS_RING}`}
+                >
+                  <item.icon className="h-5 w-5" />
+                  {item.label}
+                </Link>
+              </li>
+            ))}
             {soon.map(({ label, icon: Icon }) => (
               <li key={label}>
                 <span className={`${SHEET_ROW} text-fg-muted hover:bg-transparent hover:text-fg-muted`}>

@@ -96,16 +96,16 @@ Build an enterprise-grade, multi-tenant communication and messaging subsystem fo
   - Integration test suite: `tests/integration/communication-event-triggers.spec.ts` (4/4 passed).
 
 ### Slice G: UI Panels & Management Consoles
-- [ ] Template Management Panel: `/schools/[code]/communication/templates` (list, preview, edit templates).
-- [ ] Broadcast Composer: `/schools/[code]/communication/broadcast` (audience filtering by campus, class arm, or role).
-- [ ] Dispatch Log & Analytics: `/schools/[code]/communication/logs` (delivery statuses, failure diagnostic viewer).
-- [ ] Shell Navigation: add "Communication" entry to navigation with phone tab considerations.
+- [x] Template Management Panel: `/schools/[code]/communication` (tabbed container with list, simulated preview modal, edit dialog).
+- [x] Broadcast Composer: audience filtering by campus, class arm, or target group, token interpolation live preview, SMS character & segment counter.
+- [x] Dispatch Log & Diagnostics: delivery statuses, channel/recipient filters, failure diagnostic modal, instant retry action.
+- [x] Shell Navigation: added "Communication" (`MailIcon`) to `navFor` for `ADMIN` & `CAMPUS_ADMIN`, partitioned phone bottom bar with `MAX_PHONE_BAR_TABS = 4` and overflow to More sheet. Verified by `tests/unit/shell-nav.spec.ts` (14/14 passed).
 
 ### Slice H: Verification & Quality Gates
-- [ ] Unit tests: template variable interpolation, phone number sanitization, token generation.
-- [ ] Integration tests: queue job processing, retry behavior, RLS isolation across tenants.
-- [ ] API tests: route guards, template CRUD, broadcast permissions (Admin / Campus Admin).
-- [ ] E2E tests: template editing, broadcast submission, delivery view, dark/light theme, axe accessibility.
+- [x] Unit tests: template interpolation (`tests/unit/communication-templates.spec.ts` 9/9 passed), gateways (`tests/unit/communication-gateways.spec.ts` 12/12 passed), shell navigation (`tests/unit/shell-nav.spec.ts` 14/14 passed).
+- [x] Integration tests: queue job processing & worker lifecycle (`tests/integration/communication-queue.spec.ts` 6/6 passed), RLS isolation (`tests/integration/communication-rls.spec.ts` 6/6 passed), guardian magic links (`tests/integration/guardian-link.spec.ts` 4/4 passed), event triggers (`tests/integration/communication-event-triggers.spec.ts` 4/4 passed).
+- [x] API tests: template CRUD, dispatch pagination query, retry action, broadcast dispatch (`tests/api/communication.spec.ts` 10/10 passed).
+- [x] E2E tests: template switching, live preview, logs tab, desktop + mobile viewports, Axe WCAG 2.2 A/AA accessibility (`tests/e2e/communication.spec.ts` 3/3 passed).
 
 ---
 

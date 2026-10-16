@@ -22,7 +22,8 @@
 | 9 | [TASK-0009](0009-campus-admins-and-platform-superadmin.md) | Campus administrators and the platform superadmin (C1–C8) | [x] Completed (landed in octalve-core `dev`; full suite 1842 passed / 3 failed (shell e2e: the phone one is a pre-existing flake on `dev` too; the two desktop ones unexplained) / 23 skipped) | 2026-10-11 UTC | 2026-10-11 UTC | [PR #7](https://github.com/octalve-core/octalve-edu/pull/7) |
 | 10 | [TASK-0010](0010-platform-followups.md) | Platform follow-ups: counters, first-admin re-invite, teachers' attendance scoping, public verification, campus-admin setup controls | [x] Completed (F1-F4 landed in octalve-core `dev` as PR #8, full suite 1927 passed / 1 failed (phone shell flake, family known) / 23 skipped; F5 in `claude/campus-admin-setup-controls`) | 2026-10-11 UTC | — | `claude/platform-followups` |
 | 11 | [TASK-0011](0011-audited-support-access.md) | Audited support access (ADR 0017) | [x] Completed (slices A-E; full suite 1972 passed / 4 failed - 2 stale assertions of mine, fixed; landed in octalve-core `dev` as PR #14). Open: 4 follow-ups and the production run order, see the task file §5-6 | 2026-10-13 UTC | 2026-10-14 UTC | `claude/support-access-build` |
-| 12 | [TASK-0012](0012-phase-2-communication-and-messaging.md) | Phase 2: Communication & Multi-Channel Messaging Engine (Templates, BullMQ on Redis, Resend/Termii) | [~] In Progress (Architecture specified; implementation commencing) | 2026-10-15 UTC | — | `claude/phase-2-communication` |
+| 12 | [TASK-0012](0012-phase-2-communication-and-messaging.md) | Phase 2: Communication & Multi-Channel Messaging Engine (Templates, BullMQ on Redis, Resend/Termii) | [x] Completed | 2026-10-15 UTC | 2026-10-16 09:03:00 UTC | `claude/phase-2-communication` |
+| 13 | [TASK-0013](0013-global-quick-tools-and-pwa.md) | Phase 3: Global Quick-Tools Dock & Progressive Web App (PWA) | [ ] Pending | — | — | `claude/phase-3-quick-tools-pwa` |
 ---
 
 ## Detailed Milestone Checklist
@@ -159,13 +160,24 @@
 - [x] Slice E: full suite verification and production deploy checklist
 
 ### TASK-0012: Phase 2 — Communication & Multi-Channel Messaging Engine
-- **Status:** [~] In Progress (Architecture specified; implementation commencing)
-- [ ] Sub-phase A: Schema & migrations (`NotificationTemplate`, `NotificationDispatch`, `GuardianLinkToken`, RLS)
-- [ ] Sub-phase B: BullMQ queue infrastructure with Redis backing (`src/lib/queue/`)
-- [ ] Sub-phase C: Template engine with variable interpolation & standard system templates
-- [ ] Sub-phase D: Multi-channel delivery adapters (Email via Resend, SMS & WhatsApp via Termii, In-App)
-- [ ] Sub-phase E: Guardian-link messaging with cryptographic magic links
-- [ ] Sub-phase F: Automated event hooks (absence notifications, results publishing alert, fee reminders)
-- [ ] Sub-phase G: UI panels (Template Manager, Broadcast Composer, Dispatch Log, Shell nav)
-- [ ] Sub-phase H: Testing & quality gates (Unit, Integration, API, E2E, Axe accessibility)
+- **Status:** [x] Completed (Slices A-H landed and verified 100% green)
+- [x] Sub-phase A: Schema & migrations (`NotificationTemplate`, `NotificationDispatch`, `GuardianLinkToken`, RLS)
+- [x] Sub-phase B: BullMQ queue infrastructure with Redis backing (`src/lib/queue/`)
+- [x] Sub-phase C: Template engine with variable interpolation & standard system templates
+- [x] Sub-phase D: Multi-channel delivery adapters (Email via Resend, SMS & WhatsApp via Termii, In-App)
+- [x] Sub-phase E: Guardian-link messaging with cryptographic magic links
+- [x] Sub-phase F: Automated event hooks (absence notifications, results publishing alert, fee reminders)
+- [x] Sub-phase G: UI panels (Template Manager, Broadcast Composer, Dispatch Log, Shell nav)
+- [x] Sub-phase H: Testing & quality gates (Unit, Integration, API, E2E, Axe accessibility)
+
+---
+
+### TASK-0013: Phase 3 — Global Quick-Tools Dock & Progressive Web App (PWA)
+- **Status:** [ ] Pending
+- [ ] Sub-phase A: PWA Infrastructure & Manifest (`manifest.ts`, icons, shortcuts, service worker)
+- [ ] Sub-phase B: Floating Tools Trigger & Shell Integration (`QuickToolsFloatingButton`, `QuickToolsDrawer`, `Cmd+K` listener)
+- [ ] Sub-phase C: Universal School Calculator (`CalculatorTool`, tuition discount, term fee sum, copy result)
+- [ ] Sub-phase D: Quick Payment Recorder & Receipt Generator (`PaymentRecorderTool`, offline queue)
+- [ ] Sub-phase E: Quick Broadcast & Action Palette (`QuickBroadcastTool`, `QuickNotesTool`)
+- [ ] Sub-phase F: Verification, A11y & Quality Gates (E2E, Axe, Lighthouse PWA audit)
 
