@@ -63,7 +63,9 @@ Deliver a universally accessible, context-aware **Global Quick-Tools Dock** (acc
 - [x] Implement `src/app/manifest.ts` with standalone display, branding colors, and icons
 - [x] Add dynamic app icons via `ImageResponse` (`src/app/icon.tsx`, `src/app/apple-icon.tsx`)
 - [x] Configure meta tags, viewport settings, and apple mobile web app capabilities in root layout
-- [x] Define `manifest.shortcuts` for direct launcher deep-links
+- [x] Define `manifest.shortcuts` for direct launcher deep-links (calculator, payment-recorder, payment-link, broadcast)
+- [x] Integrate Service Worker (`public/sw.js`) and Offline fallback page (`src/app/offline/page.tsx`)
+- [x] Background sync integration with `ServiceWorkerRegister.tsx`
 
 ### Slice B: Floating Tools Trigger & Shell Integration
 - [x] Create `QuickToolsTrigger.tsx` with responsive positioning (desktop `bottom-6 right-6`, mobile `bottom-20 right-4`)
@@ -87,23 +89,27 @@ Deliver a universally accessible, context-aware **Global Quick-Tools Dock** (acc
   - Fast payment entry: Amount, Payment Method (`CASH`, `POS`, `BANK_TRANSFER`), external reference
   - Submit mutation calling `/api/v1/schools/[code]/finance/invoices/[id]/manual-payment`
   - Instant receipt preview with print/download/share action
+- [x] Offline queuing engine (`src/lib/offline/indexed-db.ts`) with IndexedDB storage and auto-replay when internet reconnects
+- [x] Pending offline payments banner with manual "Sync Now" trigger
 
-### Slice E: Quick Notes Scratchpad
+### Slice E: Quick Actions & Micro-Tools Suite
+- [x] Implement `PaymentLinkTool.tsx` with Paystack checkout authorization and dynamic SVG/PNG QR Code generator
+- [x] Implement `QuickBroadcastTool.tsx` for fast SMS/WhatsApp/Email emergency alerts with urgency presets
 - [x] Implement `QuickNotesTool.tsx` persistent auto-saving scratchpad with `localStorage` backing
 - [x] Copy and clear notes actions
 
 ### Slice F: Verification, A11y & Quality Gates
-- [x] Unit tests for calculator engine, payment recorder validation, and PWA manifest (9/9 passed)
-- [x] E2E tests for floating button click, drawer opening, keyboard shortcut, and calculation flow (3/3 passed)
+- [x] Unit tests for calculator engine, PWA manifest, QR generation, broadcast schema, and discount rules (12/12 passed)
+- [x] E2E tests for floating button click, drawer opening, keyboard shortcut, all tabs, and calculation flow (3/3 passed)
 - [x] Axe accessibility audit across drawer open state, keypad, and mobile viewport (0 violations)
-- [x] Quality gates: `pnpm typecheck` (0 errors), `pnpm lint` (0 errors, 0 warnings)
+- [x] Quality gates: `pnpm typecheck` (0 errors), `pnpm lint` (0 errors, 0 warnings), `pnpm build` clean
 
 ---
 
 ## 4. Unified Verification & Quality Gates
 - [x] `pnpm typecheck` clean (0 errors)
 - [x] `pnpm lint` clean (0 warnings, 0 errors)
-- [x] `pnpm test:fast tests/unit/quick-tools.spec.ts` (9 passed)
+- [x] `pnpm test:fast tests/unit/quick-tools.spec.ts` (12 passed)
 - [x] `pnpm test:fast tests/e2e/quick-tools.spec.ts` (3 passed)
 - [x] Full Axe WCAG 2.2 A/AA compliance verified
 

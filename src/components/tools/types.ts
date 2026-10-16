@@ -1,7 +1,12 @@
 import type { ComponentType } from "react";
 import type { Role } from "@prisma/client";
 
-export type QuickToolId = "calculator" | "payment-recorder" | "broadcast" | "scratchpad";
+export type QuickToolId =
+  | "calculator"
+  | "payment-recorder"
+  | "payment-link"
+  | "broadcast"
+  | "scratchpad";
 
 export interface QuickToolDefinition {
   id: QuickToolId;

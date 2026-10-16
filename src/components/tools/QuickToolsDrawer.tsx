@@ -4,8 +4,17 @@ import { useState, useEffect } from "react";
 import { Role } from "@prisma/client";
 import { CalculatorTool } from "./calculator/CalculatorTool";
 import { PaymentRecorderTool } from "./payments/PaymentRecorderTool";
+import { PaymentLinkTool } from "./payments/PaymentLinkTool";
+import { QuickBroadcastTool } from "./broadcast/QuickBroadcastTool";
 import { QuickNotesTool } from "./QuickNotesTool";
-import { CalculatorIcon, ReceiptIcon, FileTextIcon, XIcon } from "@/components/ui/icons";
+import {
+  CalculatorIcon,
+  ReceiptIcon,
+  QrCodeIcon,
+  MegaphoneIcon,
+  FileTextIcon,
+  XIcon,
+} from "@/components/ui/icons";
 import type { QuickToolId } from "./types";
 
 interface QuickToolsDrawerProps {
@@ -25,9 +34,21 @@ export function QuickToolsDrawer({
 }: QuickToolsDrawerProps) {
   const canRecordPayments =
     userRole === Role.ADMIN || userRole === Role.CAMPUS_ADMIN;
+  const canSendBroadcast =
+    userRole === Role.ADMIN || userRole === Role.CAMPUS_ADMIN;
+  const canGeneratePaymentLinks =
+    userRole === Role.ADMIN ||
+    userRole === Role.CAMPUS_ADMIN ||
+    userRole === Role.TEACHING_STAFF;
 
-  const resolvedInitialTool =
-    initialTool === "payment-recorder" && !canRecordPayments ? "calculator" : initialTool;
+  let resolvedInitialTool = initialTool;
+  if (initialTool === "payment-recorder" && !canRecordPayments) {
+    resolvedInitialTool = "calculator";
+  } else if (initialTool === "broadcast" && !canSendBroadcast) {
+    resolvedInitialTool = "calculator";
+  } else if (initialTool === "payment-link" && !canGeneratePaymentLinks) {
+    resolvedInitialTool = "calculator";
+  }
 
   const [selectedTool, setSelectedTool] = useState<QuickToolId | null>(null);
   const activeTool = selectedTool ?? resolvedInitialTool;
@@ -44,6 +65,18 @@ export function QuickToolsDrawer({
       name: "Record Payment",
       icon: ReceiptIcon,
       available: canRecordPayments,
+    },
+    {
+      id: "payment-link" as const,
+      name: "Pay Link & QR",
+      icon: QrCodeIcon,
+      available: canGeneratePaymentLinks,
+    },
+    {
+      id: "broadcast" as const,
+      name: "Quick Alert",
+      icon: MegaphoneIcon,
+      available: canSendBroadcast,
     },
     {
       id: "scratchpad" as const,
@@ -129,6 +162,12 @@ export function QuickToolsDrawer({
           {activeTool === "calculator" && <CalculatorTool />}
           {activeTool === "payment-recorder" && (
             <PaymentRecorderTool schoolCode={schoolCode} />
+          )}
+          {activeTool === "payment-link" && (
+            <PaymentLinkTool schoolCode={schoolCode} />
+          )}
+          {activeTool === "broadcast" && (
+            <QuickBroadcastTool schoolCode={schoolCode} />
           )}
           {activeTool === "scratchpad" && <QuickNotesTool />}
         </div>

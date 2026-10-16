@@ -1,4 +1,6 @@
 import { test, expect } from "@playwright/test";
+import manifest from "@/app/manifest";
+import { createBroadcastSchema } from "@/lib/communication/http";
 import {
   evaluateArithmetic,
   formatCalculation,
@@ -66,3 +68,57 @@ test.describe("Universal School Calculator — Pure Arithmetic Engine", () => {
     expect(applyTaxSurcharge(50000, 7.5)).toBe(53750);
   });
 });
+
+test.describe("PWA Web App Manifest Configuration", () => {
+  test("manifest provides standalone display, metadata and launcher shortcuts", () => {
+    const mf = manifest();
+
+    expect(mf.display).toBe("standalone");
+    expect(mf.theme_color).toBe("#0f172a");
+    expect(mf.shortcuts).toBeDefined();
+    expect(mf.shortcuts?.length).toBeGreaterThanOrEqual(4);
+
+    const shortcutUrls = mf.shortcuts?.map((s) => s.url);
+    expect(shortcutUrls).toContain("/dashboard?tool=calculator");
+    expect(shortcutUrls).toContain("/dashboard?tool=payment-recorder");
+    expect(shortcutUrls).toContain("/dashboard?tool=payment-link");
+    expect(shortcutUrls).toContain("/dashboard?tool=broadcast");
+  });
+});
+
+test.describe("PWA QR Code Generation Engine", () => {
+  test("generates valid base64 data URL for checkout authorization links", async () => {
+    const qrcodeMod = await import("qrcode");
+    const testUrl = "https://checkout.paystack.com/0013-test-auth-url";
+
+    const dataUrl = await (qrcodeMod.default ?? qrcodeMod).toDataURL(testUrl, {
+      errorCorrectionLevel: "M",
+      margin: 2,
+      width: 200,
+    });
+
+    expect(dataUrl).toMatch(/^data:image\/png;base64,/);
+    expect(dataUrl.length).toBeGreaterThan(100);
+  });
+});
+
+test.describe("Quick Broadcast Schema Validation", () => {
+  test("validates audience and channels for emergency alerts", () => {
+    const validPayload = {
+      channel: "SMS",
+      audienceRole: "GUARDIAN",
+      body: "Emergency school dismissal at 1 PM due to weather.",
+    };
+
+    const parsed = createBroadcastSchema.safeParse(validPayload);
+    expect(parsed.success).toBe(true);
+
+    const emptyBody = {
+      channel: "SMS",
+      audienceRole: "GUARDIAN",
+      body: "",
+    };
+    expect(createBroadcastSchema.safeParse(emptyBody).success).toBe(false);
+  });
+});
+

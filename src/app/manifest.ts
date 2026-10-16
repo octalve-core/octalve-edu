@@ -51,6 +51,12 @@ export default function manifest(): MetadataRoute.Manifest {
         description: "Send urgent SMS or notice",
         url: "/dashboard?tool=broadcast",
       },
+      {
+        name: "Payment Link & QR",
+        short_name: "Pay Link",
+        description: "Generate instant Paystack checkout link or QR code",
+        url: "/dashboard?tool=payment-link",
+      },
     ],
   };
 }

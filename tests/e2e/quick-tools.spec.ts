@@ -62,6 +62,8 @@ test.describe("Global Quick Tools Floating Dock & PWA Shortcuts", () => {
     await expect(drawer).toBeVisible();
     await expect(drawer.getByRole("button", { name: "Calculator" })).toBeVisible();
     await expect(drawer.getByRole("button", { name: "Record Payment" })).toBeVisible();
+    await expect(drawer.getByRole("button", { name: "Pay Link & QR" })).toBeVisible();
+    await expect(drawer.getByRole("button", { name: "Quick Alert" })).toBeVisible();
     await expect(drawer.getByRole("button", { name: "Scratchpad" })).toBeVisible();
 
     // 4. Test Calculator Tool Interactions

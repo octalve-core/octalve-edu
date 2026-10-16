@@ -7,6 +7,12 @@ import { TextField } from "@/components/ui/TextField";
 import { SelectField } from "@/components/ui/SelectField";
 import { CheckCircle2Icon, ReceiptIcon, RefreshCwIcon } from "@/components/ui/icons";
 import { getJson, sendJson } from "@/components/auth/postJson";
+import {
+  queueOfflinePayment,
+  getPendingPayments,
+  syncPendingPayments,
+  type PendingPaymentRecord,
+} from "@/lib/offline/indexed-db";
 
 interface StudentApiItem {
   id: string;
@@ -49,6 +55,7 @@ interface ReceiptSummary {
   receiptNo: string;
   newBalance: number;
   recordedAt: string;
+  isOfflineQueued?: boolean;
 }
 
 export function PaymentRecorderTool({ schoolCode }: { schoolCode?: string }) {
@@ -70,7 +77,73 @@ export function PaymentRecorderTool({ schoolCode }: { schoolCode?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<ReceiptSummary | null>(null);
 
+  const [pendingPayments, setPendingPayments] = useState<PendingPaymentRecord[]>([]);
+  const [syncingOffline, setSyncingOffline] = useState(false);
+
   const visibleStudents = searchQuery.trim().length >= 2 ? students : [];
+
+  // Listen to offline pending payments changes
+  useEffect(() => {
+    if (!schoolCode) return;
+    let active = true;
+    const loadPending = () => {
+      getPendingPayments(schoolCode)
+        .then((items) => {
+          if (active) setPendingPayments(items);
+        })
+        .catch(() => {});
+    };
+    loadPending();
+    window.addEventListener("octalve-offline-sync-changed", loadPending);
+    return () => {
+      active = false;
+      window.removeEventListener("octalve-offline-sync-changed", loadPending);
+    };
+  }, [schoolCode]);
+
+  const handleManualSync = async () => {
+    if (!schoolCode || syncingOffline) return;
+    setSyncingOffline(true);
+    try {
+      await syncPendingPayments(schoolCode);
+      const remaining = await getPendingPayments(schoolCode);
+      setPendingPayments(remaining);
+    } finally {
+      setSyncingOffline(false);
+    }
+  };
+
+  const handleQueueOffline = async (parsedAmount: number) => {
+    if (!schoolCode || !selectedInvoice || !selectedStudent) return;
+    try {
+      const queued = await queueOfflinePayment({
+        schoolCode,
+        invoiceId: selectedInvoice.id,
+        studentId: selectedStudent.id,
+        studentName: selectedStudent.name,
+        invoiceNo: selectedInvoice.invoiceNo,
+        amount: parsedAmount,
+        channel,
+        receiptNo: receiptNo.trim(),
+        note: note.trim() || undefined,
+      });
+
+      setSubmitting(false);
+      setReceipt({
+        paymentId: queued.id,
+        invoiceNo: selectedInvoice.invoiceNo,
+        amount: parsedAmount,
+        channel,
+        receiptNo: receiptNo.trim(),
+        newBalance: Math.max(0, selectedInvoice.balance - parsedAmount),
+        recordedAt: new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }),
+        isOfflineQueued: true,
+      });
+    } catch (err) {
+      setSubmitting(false);
+      setError(err instanceof Error ? err.message : "Failed to record payment offline.");
+    }
+  };
 
   // Search students with debounce
   useEffect(() => {
@@ -165,6 +238,12 @@ export function PaymentRecorderTool({ schoolCode }: { schoolCode?: string }) {
     setError(null);
     setSubmitting(true);
 
+    // If offline, queue immediately
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      await handleQueueOffline(parsedAmount);
+      return;
+    }
+
     const payload = {
       amount: parsedAmount,
       channel,
@@ -172,30 +251,39 @@ export function PaymentRecorderTool({ schoolCode }: { schoolCode?: string }) {
       note: note.trim() || undefined,
     };
 
-    const res = await sendJson(
-      `/api/v1/schools/${schoolCode}/finance/invoices/${selectedInvoice.id}/manual-payment`,
-      "POST",
-      payload,
-    );
+    try {
+      const res = await sendJson(
+        `/api/v1/schools/${schoolCode}/finance/invoices/${selectedInvoice.id}/manual-payment`,
+        "POST",
+        payload,
+      );
 
-    setSubmitting(false);
+      setSubmitting(false);
 
-    if (!res.ok) {
-      setError(res.message || "Failed to record manual payment.");
-      return;
+      if (!res.ok) {
+        if (res.message && res.message.toLowerCase().includes("network")) {
+          await handleQueueOffline(parsedAmount);
+          return;
+        }
+        setError(res.message || "Failed to record manual payment.");
+        return;
+      }
+
+      const data = res.data as { payment?: { id: string }; newBalance?: number } | undefined;
+
+      setReceipt({
+        paymentId: data?.payment?.id || Math.random().toString(36).substring(2, 9),
+        invoiceNo: selectedInvoice.invoiceNo,
+        amount: parsedAmount,
+        channel,
+        receiptNo: receiptNo.trim(),
+        newBalance: data?.newBalance ?? Math.max(0, selectedInvoice.balance - parsedAmount),
+        recordedAt: new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }),
+        isOfflineQueued: false,
+      });
+    } catch {
+      await handleQueueOffline(parsedAmount);
     }
-
-    const data = res.data as { payment?: { id: string }; newBalance?: number } | undefined;
-
-    setReceipt({
-      paymentId: data?.payment?.id || Math.random().toString(36).substring(2, 9),
-      invoiceNo: selectedInvoice.invoiceNo,
-      amount: parsedAmount,
-      channel,
-      receiptNo: receiptNo.trim(),
-      newBalance: data?.newBalance ?? Math.max(0, selectedInvoice.balance - parsedAmount),
-      recordedAt: new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }),
-    });
   };
 
   const resetAll = () => {
@@ -224,14 +312,32 @@ export function PaymentRecorderTool({ schoolCode }: { schoolCode?: string }) {
     return (
       <div className="space-y-5 py-2">
         <div className="flex flex-col items-center justify-center text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+          <div
+            className={`flex h-12 w-12 items-center justify-center rounded-full ${
+              receipt.isOfflineQueued
+                ? "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400"
+                : "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400"
+            }`}
+          >
             <CheckCircle2Icon className="h-7 w-7" />
           </div>
-          <h3 className="mt-3 text-base font-bold text-fg">Payment Recorded Successfully</h3>
-          <p className="text-xs text-fg-muted">Receipt #{receipt.receiptNo} logged into school accounts.</p>
+          <h3 className="mt-3 text-base font-bold text-fg">
+            {receipt.isOfflineQueued ? "Payment Logged Offline" : "Payment Recorded Successfully"}
+          </h3>
+          <p className="text-xs text-fg-muted">
+            {receipt.isOfflineQueued
+              ? `Receipt #${receipt.receiptNo} saved in browser storage. Will automatically sync when connection returns.`
+              : `Receipt #${receipt.receiptNo} logged into school accounts.`}
+          </p>
         </div>
 
         <div className="rounded-2xl border border-line bg-canvas p-4 text-xs space-y-2.5 font-mono">
+          {receipt.isOfflineQueued && (
+            <div className="flex justify-between border-b border-line pb-2 font-semibold text-amber-600 dark:text-amber-400">
+              <span>Status:</span>
+              <span>Queued Locally (Offline)</span>
+            </div>
+          )}
           <div className="flex justify-between border-b border-line pb-2">
             <span className="text-fg-muted">Student:</span>
             <span className="font-semibold text-fg">{selectedStudent?.name}</span>
@@ -278,6 +384,26 @@ export function PaymentRecorderTool({ schoolCode }: { schoolCode?: string }) {
 
   return (
     <div className="space-y-4">
+      {/* Offline Pending Payments Banner */}
+      {pendingPayments.length > 0 && (
+        <div className="flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-300">
+          <div className="flex items-center gap-1.5">
+            <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+            <span>
+              {pendingPayments.length} offline payment{pendingPayments.length > 1 ? "s" : ""} queued
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleManualSync}
+            disabled={syncingOffline}
+            className="rounded-lg bg-amber-500/20 px-2.5 py-1 text-[11px] font-semibold hover:bg-amber-500/30 transition-colors"
+          >
+            {syncingOffline ? "Syncing..." : "Sync Now"}
+          </button>
+        </div>
+      )}
+
       {error && (
         <Alert variant="error">
           <span>{error}</span>

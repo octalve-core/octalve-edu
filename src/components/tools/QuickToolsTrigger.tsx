@@ -7,6 +7,8 @@ import { WrenchIcon } from "@/components/ui/icons";
 import { QuickToolsDrawer } from "./QuickToolsDrawer";
 import type { QuickToolId } from "./types";
 
+import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
+
 export function QuickToolsTrigger() {
   const { school } = useShell();
   const userRole = school?.role;
@@ -17,6 +19,8 @@ export function QuickToolsTrigger() {
   const isPwaTool =
     requestedTool === "calculator" ||
     requestedTool === "payment-recorder" ||
+    requestedTool === "payment-link" ||
+    requestedTool === "broadcast" ||
     requestedTool === "scratchpad";
 
   const [open, setOpen] = useState(isPwaTool);
@@ -64,6 +68,8 @@ export function QuickToolsTrigger() {
         schoolCode={schoolCode}
         initialTool={initialTool}
       />
+
+      <ServiceWorkerRegister schoolCode={schoolCode} />
     </>
   );
 }
