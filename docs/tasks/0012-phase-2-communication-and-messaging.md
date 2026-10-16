@@ -67,19 +67,24 @@ Build an enterprise-grade, multi-tenant communication and messaging subsystem fo
   - Unit test suite: `tests/unit/communication-templates.spec.ts` (9/9 passed).
 
 ### Slice D: Multi-Channel Gateway Adapters (`src/lib/communication/gateways/`)
-- [ ] Email Adapter:
-  - Resend REST integration with batch send support.
-- [ ] Termii SMS & WhatsApp Adapter:
+- [x] Email Adapter (`src/lib/communication/gateways/email.ts`):
+  - Resend REST integration with batch send support and dev inbox fallback.
+- [x] Termii SMS & WhatsApp Adapter (`src/lib/communication/gateways/termii.ts`):
   - Pure HTTP client communicating with Termii API.
   - Dual-mode architecture: real API in production, mock adapter when `TERMII_API_KEY` is unset or in test environments.
-  - Phone number normalization (E.164 formatting for Nigerian MSISDNs: `+234...`).
-- [ ] In-App Notification Feed:
-  - User notification state table (`readAt`, `dismissedAt`).
+  - Nigerian phone number normalization (`normalizeNigerianPhoneNumber` -> `234...`).
+- [x] In-App Notification Feed (`src/lib/communication/gateways/in-app.ts`):
+  - Delivery and retrieval for user feeds under tenant RLS.
+- [x] Unified dispatcher (`src/lib/communication/gateways/dispatcher.ts`):
+  - Universal routing by channel.
+  - Unit test suite: `tests/unit/communication-gateways.spec.ts` (11/11 passed).
 
 ### Slice E: Guardian-Link Messaging Engine (`src/lib/communication/guardian-link.ts`)
-- [ ] Single-use, cryptographically signed magic links for guardians.
-- [ ] Allows guardians to view specific student notices, daily attendance summaries, or invoice payment pages without friction.
-- [ ] Token expiry enforcement (e.g., 72-hour window) and tamper-proof SHA-256 HMAC verification.
+- [x] Single-use, cryptographically signed magic links for guardians (`GuardianLinkToken`).
+- [x] Allows guardians to view specific student notices, daily attendance summaries, or invoice payment pages without friction.
+- [x] Token expiry enforcement (configurable, default 72-hour window) and tamper-proof SHA-256 HMAC verification.
+- [x] Multi-tenant isolation verified under RLS.
+- [x] Integration test suite: `tests/integration/guardian-link.spec.ts` (4/4 passed).
 
 ### Slice F: Automated Domain Event Triggers
 - [ ] Attendance Event Hook:
