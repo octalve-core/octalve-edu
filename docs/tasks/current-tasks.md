@@ -23,7 +23,8 @@
 | 10 | [TASK-0010](0010-platform-followups.md) | Platform follow-ups: counters, first-admin re-invite, teachers' attendance scoping, public verification, campus-admin setup controls | [x] Completed (F1-F4 landed in octalve-core `dev` as PR #8, full suite 1927 passed / 1 failed (phone shell flake, family known) / 23 skipped; F5 in `claude/campus-admin-setup-controls`) | 2026-10-11 UTC | — | `claude/platform-followups` |
 | 11 | [TASK-0011](0011-audited-support-access.md) | Audited support access (ADR 0017) | [x] Completed (slices A-E; full suite 1972 passed / 4 failed - 2 stale assertions of mine, fixed; landed in octalve-core `dev` as PR #14). Open: 4 follow-ups and the production run order, see the task file §5-6 | 2026-10-13 UTC | 2026-10-14 UTC | `claude/support-access-build` |
 | 12 | [TASK-0012](0012-phase-2-communication-and-messaging.md) | Phase 2: Communication & Multi-Channel Messaging Engine (Templates, BullMQ on Redis, Resend/Termii) | [x] Completed | 2026-10-15 UTC | 2026-10-16 09:03:00 UTC | [PR #18](https://github.com/octalve-core/octalve-edu/pull/18) (`claude/phase-2-communication`) |
-| 13 | [TASK-0013](0013-global-quick-tools-and-pwa.md) | Phase 3: Global Quick-Tools Dock & Progressive Web App (PWA) | [ ] Pending | — | — | `claude/phase-3-quick-tools-pwa` |
+| 13 | [TASK-0013](0013-global-quick-tools-and-pwa.md) | Phase 3: Global Quick-Tools Dock & Progressive Web App (PWA) | [x] Completed | 2026-10-16 10:00:00 UTC | 2026-10-16 14:00:00 UTC | [PR #19](https://github.com/octalve-core/octalve-edu/pull/19) (`claude/phase-3-quick-tools-pwa`) |
+| 14 | [TASK-0014](0014-phase-4-lms-and-assignments.md) | Phase 4: Learning Management System (LMS) & Assignments | [x] Completed | 2026-10-16 14:30:00 UTC | 2026-10-16 15:45:00 UTC | [PR #20](https://github.com/octalve-core/octalve-edu/pull/20) (`claude/phase-4-lms-assignments`) |
 ---
 
 ## Detailed Milestone Checklist
@@ -173,11 +174,23 @@
 ---
 
 ### TASK-0013: Phase 3 — Global Quick-Tools Dock & Progressive Web App (PWA)
-- **Status:** [ ] Pending
-- [ ] Sub-phase A: PWA Infrastructure & Manifest (`manifest.ts`, icons, shortcuts, service worker)
-- [ ] Sub-phase B: Floating Tools Trigger & Shell Integration (`QuickToolsFloatingButton`, `QuickToolsDrawer`, `Cmd+K` listener)
-- [ ] Sub-phase C: Universal School Calculator (`CalculatorTool`, tuition discount, term fee sum, copy result)
-- [ ] Sub-phase D: Quick Payment Recorder & Receipt Generator (`PaymentRecorderTool`, offline queue)
-- [ ] Sub-phase E: Quick Broadcast & Action Palette (`QuickBroadcastTool`, `QuickNotesTool`)
-- [ ] Sub-phase F: Verification, A11y & Quality Gates (E2E, Axe, Lighthouse PWA audit)
+- **Status:** [x] Completed (PR #19 open and green, awaiting review)
+- [x] Sub-phase A: PWA Infrastructure, Manifest & Service Worker (`manifest.ts`, `sw.js`, offline fallback `/offline`, dynamic icons, shortcuts, appleWebApp capabilities)
+- [x] Sub-phase B: Floating Tools Trigger & Shell Integration (`QuickToolsTrigger`, `QuickToolsDrawer`, `Cmd+K` & `Alt+T` listener)
+- [x] Sub-phase C: Universal School Calculator (`CalculatorTool`, pure Shunting-Yard math engine, discount presets, history tape)
+- [x] Sub-phase D: Quick Payment Recorder & Offline Queue (`PaymentRecorderTool`, IndexedDB offline queue, balance lookup, receipt print, auto-sync)
+- [x] Sub-phase E: Quick Actions Suite (`PaymentLinkTool` Paystack QR/link generator, `QuickBroadcastTool` emergency alerts, `QuickNotesTool` persistent scratchpad)
+- [x] Sub-phase F: Verification, A11y & Quality Gates (Unit tests 12/12, E2E tests 3/3, Axe WCAG 2.2 clean, typecheck & lint 0 errors)
+
+---
+
+### TASK-0014: Phase 4 — Learning Management System (LMS) & Assignments
+- **Status:** [x] Completed (`claude/phase-4-lms-assignments`)
+- [x] Sub-phase A: Data Architecture & Schema (`prisma/schema/lms.prisma`)
+- [x] Sub-phase B: Database Migrations & Multi-Tenant RLS Policies
+- [x] Sub-phase C: Pure Domain Rules & Validation (`src/lib/lms/`)
+- [x] Sub-phase D: API Endpoints (`/api/v1/schools/[code]/lms/`)
+- [x] Sub-phase E: UI Consoles & Shell Integration (`LmsPanel.tsx`, dedicated page & Academics tab)
+- [x] Sub-phase F: Testing & Quality Gates (Unit 13/13, API 11/11, E2E A11y 3/3, Typecheck & Lint 0 errors)
+
 

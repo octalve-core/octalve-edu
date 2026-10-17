@@ -12,6 +12,7 @@ import { ShellProvider } from "./ShellProvider";
 import { SidebarNav } from "./SidebarNav";
 import { SupportBanner } from "./SupportBanner";
 import { SidebarPerson } from "./SidebarPerson";
+import { QuickToolsTrigger } from "@/components/tools/QuickToolsTrigger";
 import type { ShellSchool } from "./nav";
 
 export type ShellUser = { name: string | null; email: string | null };
@@ -98,6 +99,7 @@ export function AppShell({
         </div>
 
         <MobileNav name={user.name} email={user.email} />
+        <QuickToolsTrigger />
       </div>
     </ShellProvider>
   );
