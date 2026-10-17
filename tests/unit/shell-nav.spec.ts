@@ -14,32 +14,42 @@ test.describe("navFor", () => {
     expect(navFor(null)).toMatchObject([{ label: "Your schools", href: "/dashboard" }]);
   });
 
-  test("an ADMIN of a school: Overview, Academics, People, Users, and Settings (now active)", () => {
+  test("an ADMIN of a school: Overview, Academics, People, Communication, Users, and Settings (now active)", () => {
     const items = navFor(admin);
-    expect(items.map((i) => i.label)).toEqual(["Overview", "Academics", "People", "Users", "Settings"]);
+    expect(items.map((i) => i.label)).toEqual(["Overview", "Academics", "People", "Communication", "Users", "Settings"]);
     expect(items[0].href).toBe("/schools/riverside");
     expect(items[1].href).toBe("/schools/riverside/academics");
     expect(items[2].href).toBe("/schools/riverside/people");
-    expect(items[3].href).toBe("/schools/riverside/users");
-    expect(items[4].href).toBe("/schools/riverside/settings");
+    expect(items[3].href).toBe("/schools/riverside/communication");
+    expect(items[4].href).toBe("/schools/riverside/users");
+    expect(items[5].href).toBe("/schools/riverside/settings");
     expect(items.filter((i) => i.href === null)).toEqual([]);
   });
 
   test("a platform administrator also gets a Platform link - inside a school and outside any; nobody else does", () => {
     expect(navFor(null, true).map((i) => i.label)).toEqual(["Your schools", "Platform"]);
-    expect(navFor(admin, true).map((i) => i.label)).toEqual(["Overview", "Academics", "People", "Users", "Settings", "Platform"]);
+    expect(navFor(admin, true).map((i) => i.label)).toEqual([
+      "Overview",
+      "Academics",
+      "People",
+      "Communication",
+      "Users",
+      "Settings",
+      "Platform",
+    ]);
     expect(navFor(admin, true).at(-1)).toMatchObject({ href: "/platform" });
     expect(navFor(admin).map((i) => i.label)).not.toContain("Platform");
     expect(navFor(null).map((i) => i.label)).not.toContain("Platform");
   });
 
-  test("a CAMPUS_ADMIN sees Overview, Academics, People and Users - never the school's Settings", () => {
+  test("a CAMPUS_ADMIN sees Overview, Academics, People, Communication and Users - never the school's Settings", () => {
     const items = navFor({ ...admin, role: "CAMPUS_ADMIN" });
-    expect(items.map((i) => i.label)).toEqual(["Overview", "Academics", "People", "Users"]);
+    expect(items.map((i) => i.label)).toEqual(["Overview", "Academics", "People", "Communication", "Users"]);
     expect(items.map((i) => i.href)).toEqual([
       "/schools/riverside",
       "/schools/riverside/academics",
       "/schools/riverside/people",
+      "/schools/riverside/communication",
       "/schools/riverside/users",
     ]);
   });
@@ -123,6 +133,8 @@ test.describe("pageLabel and isActive", () => {
     expect(pageLabel("/account")).toBe("Account");
     expect(pageLabel("/account/")).toBe("Account");
     expect(pageLabel("/schools/riverside")).toBe("Overview");
+    expect(pageLabel("/schools/riverside/communication")).toBe("Communication");
+    expect(pageLabel("/schools/riverside/communication/broadcast")).toBe("Communication");
     expect(pageLabel("/schools/riverside/users")).toBe("Users");
     expect(pageLabel("/schools/riverside/users/")).toBe("Users");
     expect(pageLabel("/schools/riverside/academics")).toBe("Academics");

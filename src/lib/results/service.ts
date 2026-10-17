@@ -5,6 +5,7 @@ import { gradeFor } from "@/lib/academics/scoring";
 import { canTransitionResult, validateComponentScores, generateVerificationToken, calculateVerificationHash } from "./rules";
 import { calculateCompetitionRanks, evaluatePromotion } from "./ranking";
 import type { RecordResultsInput, TransitionStatusInput, ResultFailure } from "./http";
+import { triggerResultsPublishedAlerts } from "@/lib/communication/event-triggers";
 
 export type ServiceResult<T> = { ok: true; data: T } | { ok: false; failure: ResultFailure; message?: string };
 
@@ -243,6 +244,15 @@ export async function transitionResultStatuses(
         toScore: res.score,
         reason: input.reason ?? null,
       },
+    });
+  }
+
+  // Automated communication trigger for published results
+  if (input.toStatus === ResultStatus.PUBLISHED) {
+    await triggerResultsPublishedAlerts(tx, {
+      tenantId,
+      resultIds: requested,
+      actorUserId,
     });
   }
 

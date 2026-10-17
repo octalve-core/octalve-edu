@@ -2,6 +2,7 @@ import { SessionStatus, Prisma } from "@prisma/client";
 import type { Tx } from "@/lib/tenant/for-tenant";
 import { isFutureDate, canEditAttendance, calculateAttendanceSummary, AttendanceStatus, type AttendanceCountSummary } from "./rules";
 import type { BulkMarkAttendanceInput, AttendanceFailure } from "./http";
+import { triggerAttendanceAbsenceAlerts } from "@/lib/communication/event-triggers";
 
 export type ServiceResult<T> = { ok: true; data: T } | { ok: false; failure: AttendanceFailure; detail?: Record<string, unknown> };
 
@@ -224,6 +225,19 @@ export async function markArmAttendance(
       } as Prisma.InputJsonValue,
     },
   });
+
+  // 5. Automated communication trigger for student absences
+  const absentStudentIds = input.records.filter((r) => r.status === AttendanceStatus.ABSENT).map((r) => r.studentId);
+
+  if (absentStudentIds.length > 0) {
+    await triggerAttendanceAbsenceAlerts(tx, {
+      tenantId,
+      classArmId,
+      dateStr: input.date,
+      absentStudentIds,
+      actorUserId,
+    });
+  }
 
   const summary = calculateAttendanceSummary(
     input.records.map((r) => ({ status: r.status })),

@@ -13,6 +13,7 @@ import {
 } from "./rules";
 import { verifyPaystackSignature, computePayloadHash } from "./crypto";
 import { getPaystackClient, MockPaystackGateway } from "./paystack";
+import { triggerInvoiceIssuedAlerts } from "@/lib/communication/event-triggers";
 
 export interface FeeStructureInput {
   name: string;
@@ -156,6 +157,7 @@ export async function generateInvoicesForPeriod(
 
     let created = 0;
     let skipped = 0;
+    const createdInvoiceIds: string[] = [];
     const year = new Date().getFullYear();
 
     for (const enrollment of enrollments) {
@@ -196,7 +198,7 @@ export async function generateInvoicesForPeriod(
       const count = await tx.invoice.count({ where: { tenantId } });
       const invoiceNo = generateInvoiceNumber(schoolCode, year, count + 1);
 
-      await tx.invoice.create({
+      const createdInvoice = await tx.invoice.create({
         data: {
           tenantId,
           studentId: enrollment.studentId,
@@ -210,7 +212,16 @@ export async function generateInvoicesForPeriod(
         },
       });
 
+      createdInvoiceIds.push(createdInvoice.id);
       created++;
+    }
+
+    if (createdInvoiceIds.length > 0) {
+      await triggerInvoiceIssuedAlerts(tx, {
+        tenantId,
+        invoiceIds: createdInvoiceIds,
+        actorUserId: options?.actorUserId || "system",
+      });
     }
 
     if (options?.actorUserId && created > 0) {

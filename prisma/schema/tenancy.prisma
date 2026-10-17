@@ -58,6 +58,10 @@ model Tenant {
   announcements        Announcement[]
   timetableSlots       TimetableSlot[]
   settingsChangeAudits SettingsChangeAudit[]
+  notificationTemplates NotificationTemplate[]
+  notificationDispatches NotificationDispatch[]
+  guardianLinkTokens    GuardianLinkToken[]
+  notificationAudits    NotificationAuditLog[]
 }
 
 /// A branch/campus under one tenant (PRD §7) — distinct from multi-tenancy:

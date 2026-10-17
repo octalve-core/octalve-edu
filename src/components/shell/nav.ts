@@ -1,6 +1,6 @@
 import type { ComponentType, SVGProps } from "react";
 import type { Role } from "@prisma/client";
-import { BuildingIcon, CalendarIcon, GraduationCapIcon, HomeIcon, SlidersIcon, UsersIcon } from "@/components/ui/icons";
+import { BuildingIcon, CalendarIcon, GraduationCapIcon, HomeIcon, MailIcon, SlidersIcon, UsersIcon } from "@/components/ui/icons";
 import { isValidTenantCode } from "@/lib/tenant/validate-code";
 
 /// A school the signed-in person belongs to, as the shell needs it. Display data only (see lib/auth/page-session.ts).
@@ -28,6 +28,7 @@ export function navFor(school: ShellSchool | null, platform = false): NavItem[] 
     items.push(
       { label: "Academics", href: `/schools/${school.code}/academics`, icon: CalendarIcon },
       { label: "People", href: `/schools/${school.code}/people`, icon: GraduationCapIcon },
+      { label: "Communication", href: `/schools/${school.code}/communication`, icon: MailIcon },
       { label: "Users", href: `/schools/${school.code}/users`, icon: UsersIcon },
       { label: "Settings", href: `/schools/${school.code}/settings`, icon: SlidersIcon },
     );
@@ -36,6 +37,7 @@ export function navFor(school: ShellSchool | null, platform = false): NavItem[] 
     items.push(
       { label: "Academics", href: `/schools/${school.code}/academics`, icon: CalendarIcon },
       { label: "People", href: `/schools/${school.code}/people`, icon: GraduationCapIcon },
+      { label: "Communication", href: `/schools/${school.code}/communication`, icon: MailIcon },
       { label: "Users", href: `/schools/${school.code}/users`, icon: UsersIcon },
     );
   } else if (school.role === "TEACHING_STAFF" || school.role === "NON_TEACHING_STAFF") {
@@ -70,6 +72,7 @@ const SCHOOL_PAGES: Record<string, string> = {
   users: "Users",
   academics: "Academics",
   people: "People",
+  communication: "Communication",
   settings: "Settings",
   support: "Support access",
 };
@@ -81,7 +84,10 @@ export function pageLabel(pathname: string): string | null {
   const match = /^\/schools\/[^/]+(?:\/([^/]+))?\/?$/.exec(pathname);
   if (match) return SCHOOL_PAGES[match[1] ?? ""] ?? null;
   // A person's own page under People (a student or a member of staff) is still "People" in the breadcrumb.
-  return /^\/schools\/[^/]+\/people\/(?:students|staff)\/[^/]+\/?$/.test(pathname) ? "People" : null;
+  if (/^\/schools\/[^/]+\/people\/(?:students|staff)\/[^/]+\/?$/.test(pathname)) return "People";
+  // Sub-pages under Communication are still "Communication" in the breadcrumb.
+  if (/^\/schools\/[^/]+\/communication(?:\/.*)?$/.test(pathname)) return "Communication";
+  return null;
 }
 
 export const isActive = (pathname: string, item: Pick<NavItem, "href" | "exact">): boolean => {
