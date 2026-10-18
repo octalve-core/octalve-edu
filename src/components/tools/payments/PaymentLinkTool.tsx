@@ -75,9 +75,7 @@ export function PaymentLinkTool({ schoolCode }: { schoolCode?: string }) {
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await getJson(
-          `/api/v1/schools/${schoolCode}/people/students?q=${encodeURIComponent(searchQuery.trim())}&status=live`,
-        );
+        const res = await getJson(`/api/v1/schools/${schoolCode}/people/students?q=${encodeURIComponent(searchQuery.trim())}&status=live`);
         if (res.ok && res.data && typeof res.data === "object" && "students" in res.data) {
           const rawStudents = (res.data as { students: StudentApiItem[] }).students;
           setStudents(
@@ -106,9 +104,7 @@ export function PaymentLinkTool({ schoolCode }: { schoolCode?: string }) {
     }
 
     let active = true;
-    getJson(
-      `/api/v1/schools/${schoolCode}/finance/invoices?studentId=${selectedStudent.id}`,
-    )
+    getJson(`/api/v1/schools/${schoolCode}/finance/invoices?studentId=${selectedStudent.id}`)
       .then((res) => {
         if (!active) return;
         if (res.ok && res.data && typeof res.data === "object" && "items" in res.data) {
@@ -153,11 +149,9 @@ export function PaymentLinkTool({ schoolCode }: { schoolCode?: string }) {
     setGenerating(true);
 
     try {
-      const res = await sendJson(
-        `/api/v1/schools/${schoolCode}/finance/invoices/${selectedInvoice.id}/pay`,
-        "POST",
-        { amount: parsedAmount },
-      );
+      const res = await sendJson(`/api/v1/schools/${schoolCode}/finance/invoices/${selectedInvoice.id}/pay`, "POST", {
+        amount: parsedAmount,
+      });
 
       if (!res.ok) {
         setError(res.message || "Failed to initialize payment gateway link.");
@@ -228,9 +222,7 @@ export function PaymentLinkTool({ schoolCode }: { schoolCode?: string }) {
             <QrCodeIcon className="h-5 w-5" />
           </div>
           <h3 className="mt-2 text-sm font-bold text-fg">Payment Link & QR Ready</h3>
-          <p className="text-[11px] text-fg-muted">
-            Scan to pay instantly on mobile or share the link with the guardian.
-          </p>
+          <p className="text-[11px] text-fg-muted">Scan to pay instantly on mobile or share the link with the guardian.</p>
         </div>
 
         {/* QR Code Container */}
@@ -241,9 +233,7 @@ export function PaymentLinkTool({ schoolCode }: { schoolCode?: string }) {
             alt="Scan QR Code to pay fee"
             className="h-44 w-44 rounded-xl border border-line/60 bg-white p-2 shadow-xs"
           />
-          <p className="mt-2 text-[10px] text-fg-muted font-mono">
-            Ref: {paymentResult.reference}
-          </p>
+          <p className="mt-2 text-[10px] text-fg-muted font-mono">Ref: {paymentResult.reference}</p>
           <p className="text-xs font-bold text-fg mt-1">
             Amount: ₦{Number(amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </p>
@@ -322,9 +312,7 @@ export function PaymentLinkTool({ schoolCode }: { schoolCode?: string }) {
               className="w-full rounded-xl border border-line bg-canvas px-4 py-2.5 text-xs text-fg placeholder:text-fg-muted focus:border-brand-strong focus:outline-none"
               autoFocus
             />
-            {searching && (
-              <span className="absolute right-3 top-3 text-[11px] text-fg-muted">Searching...</span>
-            )}
+            {searching && <span className="absolute right-3 top-3 text-[11px] text-fg-muted">Searching...</span>}
           </div>
 
           {visibleStudents.length > 0 && (
@@ -345,11 +333,7 @@ export function PaymentLinkTool({ schoolCode }: { schoolCode?: string }) {
                     <p className="font-semibold text-fg">{s.name}</p>
                     {s.admissionNo && <p className="text-[11px] font-mono text-fg-muted">{s.admissionNo}</p>}
                   </div>
-                  {s.campusName && (
-                    <span className="rounded-md bg-surface-2 px-2 py-0.5 text-[10px] text-fg-muted">
-                      {s.campusName}
-                    </span>
-                  )}
+                  {s.campusName && <span className="rounded-md bg-surface-2 px-2 py-0.5 text-[10px] text-fg-muted">{s.campusName}</span>}
                 </button>
               ))}
             </div>
@@ -428,9 +412,7 @@ export function PaymentLinkTool({ schoolCode }: { schoolCode?: string }) {
                   required
                 />
                 {selectedInvoice && (
-                  <p className="mt-1 text-[11px] text-fg-muted">
-                    Total invoice balance: ₦{selectedInvoice.balance.toLocaleString()}
-                  </p>
+                  <p className="mt-1 text-[11px] text-fg-muted">Total invoice balance: ₦{selectedInvoice.balance.toLocaleString()}</p>
                 )}
               </div>
 

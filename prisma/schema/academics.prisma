@@ -71,6 +71,8 @@ model AcademicPeriod {
   results       Result[]
   feeStructures FeeStructure[]
   invoices      Invoice[]
+  courseRegistrations CourseRegistration[]
+  certificates        Certificate[]
 
   @@unique([tenantId, id])
   @@index([tenantId, sessionId])

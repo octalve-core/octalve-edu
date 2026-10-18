@@ -1,0 +1,99 @@
+// --- Higher Education & Vocational Academies (Phase 5) ---
+
+model Department {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  code        String   // e.g. "CSC", "ENG", "MTH"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  courses     Course[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+model Course {
+  id           String               @id @default(cuid())
+  tenantId     String
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  departmentId String
+  department   Department           @relation(fields: [tenantId, departmentId], references: [tenantId, id], onDelete: Cascade)
+  code         String               // e.g. "CSC 101"
+  title        String               // e.g. "Introduction to Computer Science"
+  creditUnits  Int                  @default(3) // 1 to 6 credits
+  level        Int                  @default(100) // 100, 200, 300, 400, 500
+  semester     Int                  @default(1) // 1 = First Semester, 2 = Second Semester
+  description  String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @default(now()) @updatedAt
+
+  registrations CourseRegistration[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([departmentId])
+}
+
+enum CourseRegStatus {
+  REGISTERED
+  DROPPED
+  COMPLETED
+}
+
+model CourseRegistration {
+  id          String          @id @default(cuid())
+  tenantId    String
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  studentId   String
+  student     StudentRecord   @relation(fields: [tenantId, studentId], references: [tenantId, id], onDelete: Cascade)
+  courseId    String
+  course      Course          @relation(fields: [tenantId, courseId], references: [tenantId, id], onDelete: Cascade)
+  periodId    String
+  period      AcademicPeriod  @relation(fields: [tenantId, periodId], references: [tenantId, id], onDelete: Cascade)
+  status      CourseRegStatus @default(REGISTERED)
+  creditUnits Int
+  score       Decimal?        @db.Decimal(5, 2)
+  grade       String?         // "A", "B", "C", "D", "E", "F"
+  gradePoint  Decimal?        @db.Decimal(3, 2) // 5.0, 4.0, 3.0, 2.0, 1.0, 0.0
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @default(now()) @updatedAt
+
+  @@unique([tenantId, studentId, courseId, periodId])
+  @@index([tenantId])
+  @@index([studentId])
+  @@index([courseId])
+  @@index([periodId])
+}
+
+enum CertificateStatus {
+  DRAFT
+  ISSUED
+  REVOKED
+}
+
+model Certificate {
+  id               String            @id @default(cuid())
+  tenantId         String
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  studentId        String
+  student          StudentRecord     @relation(fields: [tenantId, studentId], references: [tenantId, id], onDelete: Cascade)
+  periodId         String?
+  period           AcademicPeriod?   @relation(fields: [tenantId, periodId], references: [tenantId, id], onDelete: SetNull)
+  title            String            // e.g. "Certificate in Advanced Full-Stack Web Development"
+  certificateNo    String            @unique // e.g. "OCT-VOC-2026-0042"
+  issueDate        DateTime          @default(now())
+  verificationHash String            // SHA-256 fingerprint for tamper-proofing
+  metadata         Json?             // skills mastered, grade, honors, issuer remarks
+  status           CertificateStatus @default(ISSUED)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @default(now()) @updatedAt
+
+  @@index([tenantId])
+  @@index([studentId])
+  @@index([verificationHash])
+}

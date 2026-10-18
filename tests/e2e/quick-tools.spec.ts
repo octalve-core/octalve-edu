@@ -2,14 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { test, expect } from "../support/fixtures";
 import { SAAS_URL } from "../support/env";
-import {
-  Role,
-  addMembership,
-  createTenant,
-  createUser,
-  removeCreatedTenants,
-  type TestTenant,
-} from "../support/db";
+import { Role, addMembership, createTenant, createUser, removeCreatedTenants, type TestTenant } from "../support/db";
 import { signInThroughUi } from "./helpers";
 
 test.use({ baseURL: SAAS_URL });
@@ -21,9 +14,7 @@ async function expectAccessible(page: Page, what: string) {
   const report = results.violations.map(
     (v) =>
       `${v.id} [${v.impact}] ${v.help}\n      ` +
-      v.nodes
-        .map((n) => `${n.target.join(" ")} ::   ${n.failureSummary ?? ""}`)
-        .join("\n      "),
+      v.nodes.map((n) => `${n.target.join(" ")} ::   ${n.failureSummary ?? ""}`).join("\n      "),
   );
   expect(report, `accessibility violations on ${what}`).toEqual([]);
 }
@@ -39,9 +30,7 @@ test.describe("Global Quick Tools Floating Dock & PWA Shortcuts", () => {
     await removeCreatedTenants();
   });
 
-  test("admin opens floating Quick Tools, uses calculator, tests scratchpad, and verifies Axe accessibility", async ({
-    page,
-  }) => {
+  test("admin opens floating Quick Tools, uses calculator, tests scratchpad, and verifies Axe accessibility", async ({ page }) => {
     const adminUser = await createUser({ name: "Farooq Bello" });
     await addMembership(adminUser.id, school.id, Role.ADMIN);
 

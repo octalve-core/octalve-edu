@@ -8,9 +8,7 @@ interface ServiceWorkerRegisterProps {
 }
 
 export function ServiceWorkerRegister({ schoolCode }: ServiceWorkerRegisterProps) {
-  const [isOffline, setIsOffline] = useState(
-    typeof navigator !== "undefined" ? !navigator.onLine : false,
-  );
+  const [isOffline, setIsOffline] = useState(typeof navigator !== "undefined" ? !navigator.onLine : false);
 
   useEffect(() => {
     // 1. Register Service Worker in browser

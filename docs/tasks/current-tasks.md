@@ -25,6 +25,7 @@
 | 12 | [TASK-0012](0012-phase-2-communication-and-messaging.md) | Phase 2: Communication & Multi-Channel Messaging Engine (Templates, BullMQ on Redis, Resend/Termii) | [x] Completed | 2026-10-15 UTC | 2026-10-16 09:03:00 UTC | [PR #18](https://github.com/octalve-core/octalve-edu/pull/18) (`claude/phase-2-communication`) |
 | 13 | [TASK-0013](0013-global-quick-tools-and-pwa.md) | Phase 3: Global Quick-Tools Dock & Progressive Web App (PWA) | [x] Completed | 2026-10-16 10:00:00 UTC | 2026-10-16 14:00:00 UTC | [PR #19](https://github.com/octalve-core/octalve-edu/pull/19) (`claude/phase-3-quick-tools-pwa`) |
 | 14 | [TASK-0014](0014-phase-4-lms-and-assignments.md) | Phase 4: Learning Management System (LMS) & Assignments | [x] Completed | 2026-10-16 14:30:00 UTC | 2026-10-16 15:45:00 UTC | [PR #20](https://github.com/octalve-core/octalve-edu/pull/20) (`claude/phase-4-lms-assignments`) |
+| 15 | [TASK-0015](0015-phase-5-expansion-higher-ed-and-domains.md) | Phase 5: Higher-Ed Credit Unit System, Custom Domains & Vocational Certifications | [x] Completed | 2026-10-18 01:00:00 UTC | 2026-10-18 01:30:00 UTC | `claude/phase-5-expansion` |
 ---
 
 ## Detailed Milestone Checklist
@@ -192,5 +193,20 @@
 - [x] Sub-phase D: API Endpoints (`/api/v1/schools/[code]/lms/`)
 - [x] Sub-phase E: UI Consoles & Shell Integration (`LmsPanel.tsx`, dedicated page & Academics tab)
 - [x] Sub-phase F: Testing & Quality Gates (Unit 13/13, API 11/11, E2E A11y 3/3, Typecheck & Lint 0 errors)
+
+---
+
+### TASK-0015: Phase 5 — Higher-Ed Credit Unit System, Custom Domains & Vocational Certifications
+- **Status:** [x] Completed (`claude/phase-5-expansion`)
+- [x] Architectural Guard Fixes & Baseline Green (365/365 unit tests passing)
+- [x] Sub-phase A: Data Architecture & Prisma Schema (`tenancy.prisma`, `higher_ed.prisma`)
+- [x] Sub-phase B: Database Migrations & Multi-Tenant RLS Policies (`20261027090000_phase_5_expansion/migration.sql`)
+- [x] Sub-phase C: Pure Domain Rules & Engines (`src/lib/higher-ed/`, `src/lib/domains/`, `src/lib/certificates/`)
+- [x] Sub-phase D: Domain Services (`service.ts` for higher-ed, domains, certificates)
+- [x] Sub-phase E: API Endpoints (`/higher-ed/`, `/domains/`, `/certificates/`)
+- [x] Sub-phase F: UI Consoles & Shell Integration (`HigherEdPanel`, `CustomDomainSettings`, `CertificatesConsole`)
+- [x] Sub-phase G: Testing, Quality Gates & Sync (378/378 unit tests passing, typecheck & prettier clean)
+
+
 
 

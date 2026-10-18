@@ -7,14 +7,7 @@ import { PaymentRecorderTool } from "./payments/PaymentRecorderTool";
 import { PaymentLinkTool } from "./payments/PaymentLinkTool";
 import { QuickBroadcastTool } from "./broadcast/QuickBroadcastTool";
 import { QuickNotesTool } from "./QuickNotesTool";
-import {
-  CalculatorIcon,
-  ReceiptIcon,
-  QrCodeIcon,
-  MegaphoneIcon,
-  FileTextIcon,
-  XIcon,
-} from "@/components/ui/icons";
+import { CalculatorIcon, ReceiptIcon, QrCodeIcon, MegaphoneIcon, FileTextIcon, XIcon } from "@/components/ui/icons";
 import type { QuickToolId } from "./types";
 
 interface QuickToolsDrawerProps {
@@ -25,21 +18,10 @@ interface QuickToolsDrawerProps {
   initialTool?: QuickToolId;
 }
 
-export function QuickToolsDrawer({
-  open,
-  onClose,
-  userRole,
-  schoolCode,
-  initialTool = "calculator",
-}: QuickToolsDrawerProps) {
-  const canRecordPayments =
-    userRole === Role.ADMIN || userRole === Role.CAMPUS_ADMIN;
-  const canSendBroadcast =
-    userRole === Role.ADMIN || userRole === Role.CAMPUS_ADMIN;
-  const canGeneratePaymentLinks =
-    userRole === Role.ADMIN ||
-    userRole === Role.CAMPUS_ADMIN ||
-    userRole === Role.TEACHING_STAFF;
+export function QuickToolsDrawer({ open, onClose, userRole, schoolCode, initialTool = "calculator" }: QuickToolsDrawerProps) {
+  const canRecordPayments = userRole === Role.ADMIN || userRole === Role.CAMPUS_ADMIN;
+  const canSendBroadcast = userRole === Role.ADMIN || userRole === Role.CAMPUS_ADMIN;
+  const canGeneratePaymentLinks = userRole === Role.ADMIN || userRole === Role.CAMPUS_ADMIN || userRole === Role.TEACHING_STAFF;
 
   let resolvedInitialTool = initialTool;
   if (initialTool === "payment-recorder" && !canRecordPayments) {
@@ -144,9 +126,7 @@ export function QuickToolsDrawer({
                   type="button"
                   onClick={() => setSelectedTool(t.id)}
                   className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all ${
-                    selected
-                      ? "bg-surface text-fg shadow-xs ring-1 ring-line"
-                      : "text-fg-muted hover:text-fg"
+                    selected ? "bg-surface text-fg shadow-xs ring-1 ring-line" : "text-fg-muted hover:text-fg"
                   }`}
                 >
                   <Icon className="h-3.5 w-3.5" />
@@ -160,15 +140,9 @@ export function QuickToolsDrawer({
         {/* Active Tool Body */}
         <div className="flex-1 overflow-y-auto p-5">
           {activeTool === "calculator" && <CalculatorTool />}
-          {activeTool === "payment-recorder" && (
-            <PaymentRecorderTool schoolCode={schoolCode} />
-          )}
-          {activeTool === "payment-link" && (
-            <PaymentLinkTool schoolCode={schoolCode} />
-          )}
-          {activeTool === "broadcast" && (
-            <QuickBroadcastTool schoolCode={schoolCode} />
-          )}
+          {activeTool === "payment-recorder" && <PaymentRecorderTool schoolCode={schoolCode} />}
+          {activeTool === "payment-link" && <PaymentLinkTool schoolCode={schoolCode} />}
+          {activeTool === "broadcast" && <QuickBroadcastTool schoolCode={schoolCode} />}
           {activeTool === "scratchpad" && <QuickNotesTool />}
         </div>
       </div>

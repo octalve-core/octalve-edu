@@ -17,17 +17,21 @@ export const GET = withAuth(
   },
   {
     tenant: true,
+    area: "academics",
     roles: [Role.ADMIN, Role.CAMPUS_ADMIN, Role.TEACHING_STAFF, Role.NON_TEACHING_STAFF, Role.STUDENT, Role.PARENT],
   },
 );
 
 // PATCH /api/v1/schools/[code]/lms/assignments/[id]
 export const PATCH = withAuth(
-  validate({ body: updateAssignmentSchema }, async (_req, auth: TenantAuthContext, ctx: { params: Promise<{ code: string; id: string }> }, { body }) => {
-    const { id } = await ctx.params;
-    const updated = await updateAssignment(auth.tenant.tenantId, id, body);
-    return ok(updated);
-  }),
+  validate(
+    { body: updateAssignmentSchema },
+    async (_req, auth: TenantAuthContext, ctx: { params: Promise<{ code: string; id: string }> }, { body }) => {
+      const { id } = await ctx.params;
+      const updated = await updateAssignment(auth.tenant.tenantId, id, body);
+      return ok(updated);
+    },
+  ),
   {
     tenant: true,
     roles: [Role.ADMIN, Role.CAMPUS_ADMIN, Role.TEACHING_STAFF],

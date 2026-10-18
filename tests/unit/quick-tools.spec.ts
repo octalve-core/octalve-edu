@@ -1,12 +1,7 @@
 import { test, expect } from "@playwright/test";
 import manifest from "@/app/manifest";
 import { createBroadcastSchema } from "@/lib/communication/http";
-import {
-  evaluateArithmetic,
-  formatCalculation,
-  applyDiscountWaiver,
-  applyTaxSurcharge,
-} from "@/lib/tools/calculator";
+import { evaluateArithmetic, formatCalculation, applyDiscountWaiver, applyTaxSurcharge } from "@/lib/tools/calculator";
 
 test.describe("Universal School Calculator — Pure Arithmetic Engine", () => {
   test("basic arithmetic operations (+, -, *, /)", () => {
@@ -121,4 +116,3 @@ test.describe("Quick Broadcast Schema Validation", () => {
     expect(createBroadcastSchema.safeParse(emptyBody).success).toBe(false);
   });
 });
-
