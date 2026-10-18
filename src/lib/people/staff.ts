@@ -1,8 +1,19 @@
-import type { Prisma, Role, StaffCategory } from "@prisma/client";
+import type { Gender, Prisma, Role, StaffCategory } from "@prisma/client";
 import type { Tx } from "@/lib/tenant/for-tenant";
 import type { TenantAuthContext } from "@/lib/auth/with-auth";
 import { groupsVisibleTo } from "@/lib/academics/classes";
-import { cleanEmail, cleanOptional, cleanPersonName, cleanPhone } from "@/lib/people/rules";
+import {
+  checkBirthDate,
+  checkEmploymentDate,
+  cleanEmail,
+  cleanOptional,
+  cleanOptionalGender,
+  cleanOptionalName,
+  cleanOptionalText,
+  cleanPersonName,
+  cleanPhone,
+  computeAge,
+} from "@/lib/people/rules";
 import { auditPeople, invalid, refuse, refuseAndRollBack, rollingBack, type PeopleResult } from "@/lib/people/results";
 
 // Staff records and their teaching assignments (plan "Build design — Phase 1.2", reconciliation 2 and decision P5).
@@ -40,9 +51,21 @@ export type StaffView = {
   campusName: string | null;
   category: StaffCategory;
   firstName: string;
+  middleName: string | null;
   lastName: string;
+  gender: Gender | null;
+  dateOfBirth: string | null;
+  age: number | null;
   phone: string | null;
   email: string | null;
+  address: string | null;
+  designation: string | null;
+  qualification: string | null;
+  employmentDate: string | null;
+  nextOfKinName: string | null;
+  nextOfKinRelationship: string | null;
+  nextOfKinPhone: string | null;
+  nextOfKinAddress: string | null;
   archived: boolean;
   account: StaffAccount;
   assignmentCount: number;
@@ -88,9 +111,21 @@ export const toStaff = (row: StaffRow): StaffView => ({
   campusName: row.campus?.name ?? null,
   category: row.category,
   firstName: row.firstName,
+  middleName: row.middleName ?? null,
   lastName: row.lastName,
+  gender: row.gender ?? null,
+  dateOfBirth: row.dateOfBirth ? row.dateOfBirth.toISOString().slice(0, 10) : null,
+  age: row.dateOfBirth ? computeAge(row.dateOfBirth) : null,
   phone: row.phone,
   email: row.email,
+  address: row.address ?? null,
+  designation: row.designation ?? null,
+  qualification: row.qualification ?? null,
+  employmentDate: row.employmentDate ? row.employmentDate.toISOString().slice(0, 10) : null,
+  nextOfKinName: row.nextOfKinName ?? null,
+  nextOfKinRelationship: row.nextOfKinRelationship ?? null,
+  nextOfKinPhone: row.nextOfKinPhone ?? null,
+  nextOfKinAddress: row.nextOfKinAddress ?? null,
   archived: row.archivedAt !== null,
   account: toAccount(row),
   assignmentCount: row._count.assignments,
@@ -197,23 +232,111 @@ export type StaffInput = {
   campusId?: string | null;
   category: unknown;
   firstName: unknown;
+  middleName?: unknown;
   lastName: unknown;
+  gender?: unknown;
+  dateOfBirth?: unknown;
   phone?: unknown;
   email?: unknown;
+  address?: unknown;
+  designation?: unknown;
+  qualification?: unknown;
+  employmentDate?: unknown;
+  nextOfKinName?: unknown;
+  nextOfKinRelationship?: unknown;
+  nextOfKinPhone?: unknown;
+  nextOfKinAddress?: unknown;
 };
-type CleanStaff = { category: StaffCategory; firstName: string; lastName: string; phone: string | null; email: string | null };
+type CleanStaff = {
+  category: StaffCategory;
+  firstName: string;
+  middleName: string | null;
+  lastName: string;
+  gender: Gender | null;
+  dateOfBirth: Date | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  designation: string | null;
+  qualification: string | null;
+  employmentDate: Date | null;
+  nextOfKinName: string | null;
+  nextOfKinRelationship: string | null;
+  nextOfKinPhone: string | null;
+  nextOfKinAddress: string | null;
+};
 
-function cleanStaffFields(input: Omit<StaffInput, "campusId">): { ok: true; value: CleanStaff } | ReturnType<typeof invalid> {
+function cleanStaffFields(
+  input: Omit<StaffInput, "campusId">,
+  now = new Date(),
+): { ok: true; value: CleanStaff } | ReturnType<typeof invalid> {
   if (!isCategory(input.category)) return invalid("category");
   const firstName = cleanPersonName(input.firstName);
   if (!firstName) return invalid("firstName");
+  const middleName = cleanOptionalName(input.middleName);
+  if (middleName === undefined) return invalid("middleName");
   const lastName = cleanPersonName(input.lastName);
   if (!lastName) return invalid("lastName");
+
+  const gender = cleanOptionalGender(input.gender);
+  if (gender === undefined) return invalid("gender");
+
+  let dateOfBirth: Date | null = null;
+  if (input.dateOfBirth !== undefined && input.dateOfBirth !== null && input.dateOfBirth !== "") {
+    const dobProblem = checkBirthDate(input.dateOfBirth, now);
+    if (dobProblem) return invalid("dateOfBirth");
+    dateOfBirth = new Date(`${input.dateOfBirth}T00:00:00.000Z`);
+  }
+
   const phone = cleanOptional(input.phone, cleanPhone);
   if (phone === undefined) return invalid("phone");
   const email = cleanOptional(input.email, cleanEmail);
   if (email === undefined) return invalid("email");
-  return { ok: true, value: { category: input.category, firstName, lastName, phone, email } };
+
+  const address = cleanOptionalText(input.address, 200);
+  if (address === undefined) return invalid("address");
+  const designation = cleanOptionalText(input.designation, 200);
+  if (designation === undefined) return invalid("designation");
+  const qualification = cleanOptionalText(input.qualification, 200);
+  if (qualification === undefined) return invalid("qualification");
+
+  let employmentDate: Date | null = null;
+  if (input.employmentDate !== undefined && input.employmentDate !== null && input.employmentDate !== "") {
+    const empProblem = checkEmploymentDate(input.employmentDate, now);
+    if (empProblem) return invalid("employmentDate");
+    employmentDate = new Date(`${input.employmentDate}T00:00:00.000Z`);
+  }
+
+  const nextOfKinName = cleanOptionalText(input.nextOfKinName, 80);
+  if (nextOfKinName === undefined) return invalid("nextOfKinName");
+  const nextOfKinRelationship = cleanOptionalText(input.nextOfKinRelationship, 80);
+  if (nextOfKinRelationship === undefined) return invalid("nextOfKinRelationship");
+  const nextOfKinPhone = cleanOptional(input.nextOfKinPhone, cleanPhone);
+  if (nextOfKinPhone === undefined) return invalid("nextOfKinPhone");
+  const nextOfKinAddress = cleanOptionalText(input.nextOfKinAddress, 200);
+  if (nextOfKinAddress === undefined) return invalid("nextOfKinAddress");
+
+  return {
+    ok: true,
+    value: {
+      category: input.category,
+      firstName,
+      middleName,
+      lastName,
+      gender,
+      dateOfBirth,
+      phone,
+      email,
+      address,
+      designation,
+      qualification,
+      employmentDate,
+      nextOfKinName,
+      nextOfKinRelationship,
+      nextOfKinPhone,
+      nextOfKinAddress,
+    },
+  };
 }
 
 const emailTaken = async (tx: Tx, tenantId: string, email: string, exceptId?: string) =>
@@ -230,7 +353,7 @@ export async function createStaff(
   input: StaffInput,
   now: Date = new Date(),
 ): Promise<PeopleResult<{ staff: StaffView }>> {
-  const fields = cleanStaffFields(input);
+  const fields = cleanStaffFields(input, now);
   if (!fields.ok) return fields;
   const campusId = input.campusId ?? null;
   const { tenantId } = tenant;
@@ -262,18 +385,67 @@ export async function updateStaff(
       const current = await findStaff(tx, tenant, id, now);
       if (!current) return refuse("NOT_FOUND");
       if (current.archivedAt) return refuse("ARCHIVED");
-      const merged = cleanStaffFields({
-        category: input.category ?? current.category,
-        firstName: input.firstName ?? current.firstName,
-        lastName: input.lastName ?? current.lastName,
-        phone: input.phone === undefined ? current.phone : input.phone,
-        email: input.email === undefined ? current.email : input.email,
-      });
+      const merged = cleanStaffFields(
+        {
+          category: input.category ?? current.category,
+          firstName: input.firstName ?? current.firstName,
+          middleName: input.middleName === undefined ? current.middleName : input.middleName,
+          lastName: input.lastName ?? current.lastName,
+          gender: input.gender === undefined ? current.gender : input.gender,
+          dateOfBirth:
+            input.dateOfBirth === undefined
+              ? current.dateOfBirth
+                ? current.dateOfBirth.toISOString().slice(0, 10)
+                : null
+              : input.dateOfBirth,
+          phone: input.phone === undefined ? current.phone : input.phone,
+          email: input.email === undefined ? current.email : input.email,
+          address: input.address === undefined ? current.address : input.address,
+          designation: input.designation === undefined ? current.designation : input.designation,
+          qualification: input.qualification === undefined ? current.qualification : input.qualification,
+          employmentDate:
+            input.employmentDate === undefined
+              ? current.employmentDate
+                ? current.employmentDate.toISOString().slice(0, 10)
+                : null
+              : input.employmentDate,
+          nextOfKinName: input.nextOfKinName === undefined ? current.nextOfKinName : input.nextOfKinName,
+          nextOfKinRelationship:
+            input.nextOfKinRelationship === undefined ? current.nextOfKinRelationship : input.nextOfKinRelationship,
+          nextOfKinPhone: input.nextOfKinPhone === undefined ? current.nextOfKinPhone : input.nextOfKinPhone,
+          nextOfKinAddress: input.nextOfKinAddress === undefined ? current.nextOfKinAddress : input.nextOfKinAddress,
+        },
+        now,
+      );
       if (!merged.ok) return merged;
       const next = merged.value;
-      const changedFields = (["category", "firstName", "lastName", "phone", "email"] as const).filter(
-        (field) => next[field] !== current[field],
-      );
+      const changedFields = (
+        [
+          "category",
+          "firstName",
+          "middleName",
+          "lastName",
+          "gender",
+          "dateOfBirth",
+          "phone",
+          "email",
+          "address",
+          "designation",
+          "qualification",
+          "employmentDate",
+          "nextOfKinName",
+          "nextOfKinRelationship",
+          "nextOfKinPhone",
+          "nextOfKinAddress",
+        ] as const
+      ).filter((field) => {
+        const n = next[field];
+        const c = current[field];
+        if (n instanceof Date && c instanceof Date) {
+          return n.getTime() !== c.getTime();
+        }
+        return n !== c;
+      });
       if (changedFields.length === 0) return { ok: true as const, staff: toStaff(current), changed: false };
       // A record with a sign-in account keeps its category: the account's role was matched to it, and the Users page is where roles change.
       if (changedFields.includes("category") && current.userId) return refuse("ACCOUNT_MISMATCH", { field: "category" });

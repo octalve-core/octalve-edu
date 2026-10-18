@@ -80,3 +80,49 @@ export function duplicateKey(firstName: string, lastName: string, dateOfBirth: s
 /// The relationship a guardian has to a student.
 export const RELATIONSHIPS = ["MOTHER", "FATHER", "GUARDIAN", "OTHER"] as const;
 export type RelationshipName = (typeof RELATIONSHIPS)[number];
+
+/// Biological sex / gender for statutory education reporting.
+export const GENDERS = ["MALE", "FEMALE"] as const;
+export type GenderName = (typeof GENDERS)[number];
+
+export function cleanOptionalGender(value: unknown): GenderName | null | undefined {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+  if (typeof value === "string" && (GENDERS as readonly string[]).includes(value.toUpperCase().trim())) {
+    return value.toUpperCase().trim() as GenderName;
+  }
+  return undefined;
+}
+
+/// Optional text fields (e.g. address, designation, qualification, occupation) trimmed and length-bounded.
+export function cleanOptionalText(value: unknown, max = 200): string | null | undefined {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  if (trimmed.length > max || /[\u0000-\u001f\u007f]/.test(trimmed)) return undefined;
+  return trimmed;
+}
+
+export type EmploymentDateProblem = "INVALID" | "TOO_EARLY" | "IN_FUTURE";
+
+/// An employment start date must be a valid ISO date, from 1900 up to today.
+export function checkEmploymentDate(value: unknown, now: Date | number = Date.now()): EmploymentDateProblem | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+  if (!isIsoDate(value)) return "INVALID";
+  if (value < EARLIEST_BIRTH_DATE) return "TOO_EARLY";
+  return value > todayIso(now) ? "IN_FUTURE" : null;
+}
+
+/// Computes completed years of age from a date of birth.
+export function computeAge(dateOfBirth: Date | string, now: Date | number = Date.now()): number {
+  const dob = typeof dateOfBirth === "string" ? new Date(dateOfBirth) : dateOfBirth;
+  const today = new Date(now);
+  let age = today.getUTCFullYear() - dob.getUTCFullYear();
+  const monthDiff = today.getUTCMonth() - dob.getUTCMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getUTCDate() < dob.getUTCDate())) {
+    age--;
+  }
+  return Math.max(0, age);
+}
