@@ -156,12 +156,13 @@
 - [x] F5: academic setup editing controls for campus administrators
 
 ### TASK-0011: Audited support access (ADR 0017)
-- **Status:** Completed — slices A-E landed in octalve-core `dev` as PR #14 (full suite 1972 passed, 2 assertions updated); PR #15 status updates
+- **Status:** Completed — slices A-E landed in octalve-core `dev` as PR #14; named grantee & admin email notification follow-ups landed in PR #24
 - [x] Slice A: support grants on the school side (`SupportGrant`, RLS policies, time limits)
 - [x] Slice B: support session on the platform side (`supportTenantId`, `platform_support_record`, read-only enforcement)
 - [x] Slice C: declared areas across 31 school GET routes + source-level area guard
 - [x] Slice D: UI panels (school support page, platform open-view dialog, persistent shell read-only banner)
 - [x] Slice E: full suite verification and production deploy checklist
+- [x] Follow-ups: Named Grantee support (`granteeUserId` / `granteeEmail`) and school administrator email notification on support session open (`PR #24`)
 
 ### TASK-0012: Phase 2 — Communication & Multi-Channel Messaging Engine
 - **Status:** [x] Completed (Slices A-H landed and verified 100% green)
