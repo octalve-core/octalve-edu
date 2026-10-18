@@ -9,6 +9,11 @@ enum StaffCategory {
   NON_TEACHING
 }
 
+enum Gender {
+  MALE
+  FEMALE
+}
+
 enum Relationship {
   MOTHER
   FATHER
@@ -36,19 +41,30 @@ enum EnrollmentStatus {
 /// A member of staff as the SCHOOL knows them — not a sign-in account. userId is null for someone who never signs in (a security guard); when set it must
 /// be a member of this same school (composite FK to TenantMembership) and is unique per school (partial unique index).
 model StaffRecord {
-  id         String        @id @default(cuid())
-  tenantId   String
-  campusId   String?
-  userId     String?
-  category   StaffCategory
-  firstName  String
-  lastName   String
-  phone      String?
+  id                    String                   @id @default(cuid())
+  tenantId              String
+  campusId              String?
+  userId                String?
+  category              StaffCategory
+  firstName             String
+  middleName            String?
+  lastName              String
+  gender                Gender?
+  dateOfBirth           DateTime?                @db.Date
+  phone                 String?
   /// Lower-cased. Unique per school among live records when present.
-  email      String?
-  archivedAt DateTime?
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @default(now()) @updatedAt
+  email                 String?
+  address               String?
+  designation           String?
+  qualification         String?
+  employmentDate        DateTime?                @db.Date
+  nextOfKinName         String?
+  nextOfKinRelationship String?
+  nextOfKinPhone        String?
+  nextOfKinAddress      String?
+  archivedAt            DateTime?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @default(now()) @updatedAt
 
   tenant             Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   campus             Campus?                  @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
@@ -93,6 +109,7 @@ model StudentRecord {
   firstName   String
   middleName  String?
   lastName    String
+  gender      Gender?
   dateOfBirth DateTime  @db.Date
   admissionNo String
   archivedAt  DateTime?
@@ -130,16 +147,19 @@ model AdmissionCounter {
 
 /// A parent/guardian as the school knows them (usually no account yet; one guardian may be linked to several children).
 model GuardianRecord {
-  id         String    @id @default(cuid())
+  id         String            @id @default(cuid())
   tenantId   String
   userId     String?
   firstName  String
+  middleName String?
   lastName   String
   phone      String?
   email      String?
+  address    String?
+  occupation String?
   archivedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @default(now()) @updatedAt
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @default(now()) @updatedAt
 
   tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   membership TenantMembership? @relation(fields: [userId, tenantId], references: [userId, tenantId], onDelete: NoAction)

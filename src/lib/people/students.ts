@@ -1,4 +1,4 @@
-import type { EnrollmentStatus, Prisma } from "@prisma/client";
+import type { EnrollmentStatus, Gender, Prisma } from "@prisma/client";
 import type { Tx } from "@/lib/tenant/for-tenant";
 import type { TenantAuthContext } from "@/lib/auth/with-auth";
 import { cleanReason, currentSessionFor, effectiveStatus, fromIsoDate, toIsoDate } from "@/lib/academics/rules";
@@ -8,6 +8,7 @@ import {
   ADMISSION_RETRY_LIMIT,
   checkBirthDate,
   cleanAdmissionNo,
+  cleanOptionalGender,
   cleanOptionalName,
   cleanPersonName,
   formatAdmissionNo,
@@ -40,6 +41,7 @@ export type StudentView = {
   firstName: string;
   middleName: string | null;
   lastName: string;
+  gender: Gender | null;
   /// `YYYY-MM-DD`.
   dateOfBirth: string;
   admissionNo: string;
@@ -75,6 +77,7 @@ export const toStudent = (row: StudentRow, enrolment: EnrolmentView | null = nul
   firstName: row.firstName,
   middleName: row.middleName,
   lastName: row.lastName,
+  gender: row.gender ?? null,
   dateOfBirth: toIsoDate(row.dateOfBirth),
   admissionNo: row.admissionNo,
   archived: row.archivedAt !== null,
@@ -216,12 +219,19 @@ export type StudentInput = {
   firstName: unknown;
   middleName?: unknown;
   lastName: unknown;
+  gender?: unknown;
   dateOfBirth: unknown;
   admissionNo?: unknown;
   allowDuplicate?: boolean;
 };
 
-type CleanFields = { firstName: string; middleName: string | null; lastName: string; dateOfBirth: string };
+type CleanFields = {
+  firstName: string;
+  middleName: string | null;
+  lastName: string;
+  gender?: Gender | null;
+  dateOfBirth: string;
+};
 
 /// The fields every student has, validated (decision P2's field rules). The first bad field is named.
 export function cleanStudentFields(input: StudentInput, now: Date): { ok: true; value: CleanFields } | ReturnType<typeof invalid> {
@@ -231,8 +241,10 @@ export function cleanStudentFields(input: StudentInput, now: Date): { ok: true; 
   if (!lastName) return invalid("lastName");
   const middleName = cleanOptionalName(input.middleName);
   if (middleName === undefined) return invalid("middleName");
+  const gender = cleanOptionalGender(input.gender);
+  if (gender === undefined) return invalid("gender");
   if (checkBirthDate(input.dateOfBirth, now)) return invalid("dateOfBirth");
-  return { ok: true, value: { firstName, middleName, lastName, dateOfBirth: input.dateOfBirth as string } };
+  return { ok: true, value: { firstName, middleName, lastName, gender, dateOfBirth: input.dateOfBirth as string } };
 }
 
 const admissionTaken = async (tx: Tx, tenantId: string, admissionNo: string, exceptId?: string) =>
@@ -314,6 +326,7 @@ export async function insertStudent(
       firstName: fields.firstName,
       middleName: fields.middleName,
       lastName: fields.lastName,
+      gender: fields.gender,
       dateOfBirth: fromIsoDate(fields.dateOfBirth),
       admissionNo,
     },
@@ -381,6 +394,7 @@ export async function updateStudent(
           firstName: input.firstName ?? current.firstName,
           middleName: input.middleName === undefined ? current.middleName : input.middleName,
           lastName: input.lastName ?? current.lastName,
+          gender: input.gender === undefined ? current.gender : input.gender,
           dateOfBirth: input.dateOfBirth ?? toIsoDate(current.dateOfBirth),
         },
         now,
@@ -397,6 +411,7 @@ export async function updateStudent(
         fields.firstName !== current.firstName && "firstName",
         fields.middleName !== current.middleName && "middleName",
         fields.lastName !== current.lastName && "lastName",
+        fields.gender !== current.gender && "gender",
         fields.dateOfBirth !== toIsoDate(current.dateOfBirth) && "dateOfBirth",
         admissionNo !== current.admissionNo && "admissionNo",
       ].filter((name): name is string => Boolean(name));
@@ -419,6 +434,7 @@ export async function updateStudent(
           firstName: fields.firstName,
           middleName: fields.middleName,
           lastName: fields.lastName,
+          gender: fields.gender,
           dateOfBirth: fromIsoDate(fields.dateOfBirth),
           admissionNo,
         },
@@ -494,6 +510,7 @@ export async function restoreStudent(
           firstName: current.firstName,
           middleName: current.middleName,
           lastName: current.lastName,
+          gender: current.gender,
           dateOfBirth: toIsoDate(current.dateOfBirth),
         },
         id,
