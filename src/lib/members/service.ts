@@ -1,4 +1,4 @@
-import type { Prisma, Role } from "@prisma/client";
+import { Permission, type Prisma, type Role } from "@prisma/client";
 import type { Tx } from "@/lib/tenant/for-tenant";
 import type { TenantAuthContext } from "@/lib/auth/with-auth";
 
@@ -24,7 +24,16 @@ export type PublicMember = {
   campusName: string | null;
   status: MemberStatus;
   joinedAt: Date;
+  /// The extra capabilities granted IN THIS SCHOOL (plan §1.7), in a fixed order. Always empty for an ADMIN (implies them all), a student or a parent.
+  permissions: Permission[];
 };
+
+/// Permissions are meaningful only on these roles (a CHECK constraint in the database says the same).
+export const STAFF_ROLES: readonly Role[] = ["TEACHING_STAFF", "NON_TEACHING_STAFF"];
+const PERMISSION_ORDER = Object.values(Permission);
+/// A canonical set: deduplicated, in enum order — so comparing two sets, auditing one and showing one are all the same string.
+export const normalisePermissions = (list: readonly Permission[]): Permission[] =>
+  PERMISSION_ORDER.filter((permission) => list.includes(permission));
 
 const MEMBER_SELECT = {
   userId: true,
@@ -32,6 +41,7 @@ const MEMBER_SELECT = {
   campusId: true,
   deactivatedAt: true,
   createdAt: true,
+  permissions: true,
   user: { select: { name: true, email: true } },
   campus: { select: { name: true } },
 } satisfies Prisma.TenantMembershipSelect;
@@ -47,20 +57,56 @@ const toPublic = (row: MemberRow): PublicMember => ({
   campusName: row.campus?.name ?? null,
   status: row.deactivatedAt ? "deactivated" : "active",
   joinedAt: row.createdAt,
+  permissions: normalisePermissions(row.permissions),
 });
 
 /// Prisma's `contains` hands the value to `ILIKE` as it is, so `%` and `_` in what someone typed would act as patterns (a search for
 /// "%" listing everyone). Backslash is Postgres' default LIKE escape: escape the three special characters and the search is text.
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, "\\$&");
 
-export async function listMembers(tenant: TenantCtx, filters: MemberFilters, page: { skip: number; take: number }): Promise<{ members: PublicMember[]; total: number }> {
+/// Levels a campus administrator may not create, change or remove (their own level and above), and never grant.
+export const ADMIN_LEVEL_ROLES: readonly Role[] = ["ADMIN", "CAMPUS_ADMIN"];
+
+/// What a CAMPUS_ADMIN may do to a member, decided here in the service so no route can forget it (plan C1-C4, ADR 0016):
+///   • a member of ANOTHER campus - or of no campus (the school's administrators, people not placed on a campus) - is "no such member" (NOT_FOUND)
+///   • a member of their campus at their own level or above is ADMIN_ONLY (403)
+///   • a change that would make someone administrator-level, move them to another campus or to the whole school, or grant a permission is ADMIN_ONLY
+/// Any other actor is not constrained here (the route's `roles` list decided who may call).
+function campusActorRefusal(
+  tenant: TenantCtx,
+  target: { role: Role; campusId: string | null },
+  change?: { role?: Role; campusId?: string | null; permissions?: readonly Permission[] },
+): MemberFailure | null {
+  if (tenant.role !== "CAMPUS_ADMIN") return null;
+  if (!tenant.campusId) return "ADMIN_ONLY";
+  if (target.campusId !== tenant.campusId) return "NOT_FOUND";
+  if (ADMIN_LEVEL_ROLES.includes(target.role)) return "ADMIN_ONLY";
+  if (change?.role !== undefined && ADMIN_LEVEL_ROLES.includes(change.role)) return "ADMIN_ONLY";
+  if (change?.campusId !== undefined && change.campusId !== tenant.campusId) return "ADMIN_ONLY";
+  if (change?.permissions !== undefined) return "ADMIN_ONLY";
+  return null;
+}
+
+export async function listMembers(
+  tenant: TenantCtx,
+  filters: MemberFilters,
+  page: { skip: number; take: number },
+): Promise<{ members: PublicMember[]; total: number }> {
   const where: Prisma.TenantMembershipWhereInput = {
     tenantId: tenant.tenantId,
     ...(filters.role ? { role: filters.role } : {}),
-    ...(filters.campusId ? { campusId: filters.campusId } : {}),
+    // a campus administrator's list is their campus's, whatever the filter says (the route refuses a filter naming another campus)
+    ...(tenant.role === "CAMPUS_ADMIN" ? { campusId: tenant.campusId ?? "none" } : filters.campusId ? { campusId: filters.campusId } : {}),
     ...(filters.status === "active" ? { deactivatedAt: null } : filters.status === "deactivated" ? { deactivatedAt: { not: null } } : {}),
     ...(filters.q
-      ? { user: { OR: [{ name: { contains: escapeLike(filters.q), mode: "insensitive" as const } }, { email: { contains: escapeLike(filters.q), mode: "insensitive" as const } }] } }
+      ? {
+          user: {
+            OR: [
+              { name: { contains: escapeLike(filters.q), mode: "insensitive" as const } },
+              { email: { contains: escapeLike(filters.q), mode: "insensitive" as const } },
+            ],
+          },
+        }
       : {}),
   };
   const [total, rows] = await tenant.run((tx) =>
@@ -86,8 +132,15 @@ export type MemberFailure =
   /// The school's last active administrator cannot be demoted or deactivated: it would leave the school with nobody who can manage it.
   | "LAST_ADMIN"
   | "INVALID_CAMPUS"
+  /// Permissions were asked for a role that cannot hold any (ADMIN implies them all; students and parents never hold one).
+  | "PERMISSIONS_NOT_APPLICABLE"
   /// A deactivated member must be reactivated before anything else about them changes.
-  | "DEACTIVATED";
+  | "DEACTIVATED"
+  /// A campus administrator asked for something that is a school administrator's: a member at their own level or above, an administrator-level role,
+  /// another campus, or a permission grant.
+  | "ADMIN_ONLY"
+  /// A campus administrator needs a campus to administer: the role cannot be given to (or left with) someone who has none.
+  | "CAMPUS_REQUIRED";
 
 export type MemberResult = { ok: true; member: PublicMember; changed: boolean } | { ok: false; reason: MemberFailure };
 
@@ -107,13 +160,15 @@ export async function changeMember(
   tenant: TenantCtx,
   actorUserId: string,
   targetUserId: string,
-  change: { role?: Role; campusId?: string | null },
+  change: { role?: Role; campusId?: string | null; permissions?: readonly Permission[] },
 ): Promise<MemberResult> {
   if (targetUserId === actorUserId) return { ok: false, reason: "SELF" };
   const { tenantId } = tenant;
   return tenant.run(async (tx): Promise<MemberResult> => {
     const current = await find(tx, tenantId, targetUserId);
     if (!current) return { ok: false, reason: "NOT_FOUND" };
+    const refused = campusActorRefusal(tenant, current, change);
+    if (refused) return { ok: false, reason: refused };
     if (current.deactivatedAt) return { ok: false, reason: "DEACTIVATED" };
 
     if (change.campusId) {
@@ -124,7 +179,21 @@ export async function changeMember(
 
     const roleChanged = change.role !== undefined && change.role !== current.role;
     const campusChanged = change.campusId !== undefined && change.campusId !== current.campusId;
-    if (!roleChanged && !campusChanged) return { ok: true, member: toPublic(current), changed: false }; // a no-op writes nothing
+    // A campus administrator exists only on a campus (the database says the same with a CHECK; refusing here is a 400, not a 500)
+    if ((change.role ?? current.role) === "CAMPUS_ADMIN" && (campusChanged ? change.campusId : current.campusId) == null) {
+      return { ok: false, reason: "CAMPUS_REQUIRED" };
+    }
+
+    // Permissions (plan §1.7, decision 6): the FULL desired set, only on a staff role. Moving a member to a role that cannot hold any
+    // (ADMIN, student, parent) clears theirs IN THIS SAME TRANSACTION — a parent must never silently keep CAN_MANAGE_FINANCE.
+    const newRole = change.role ?? current.role;
+    const canHold = STAFF_ROLES.includes(newRole);
+    const asked = change.permissions === undefined ? undefined : normalisePermissions(change.permissions);
+    if (asked && asked.length > 0 && !canHold) return { ok: false, reason: "PERMISSIONS_NOT_APPLICABLE" };
+    const before = normalisePermissions(current.permissions);
+    const after = !canHold ? [] : (asked ?? before);
+    const permissionsChanged = before.length !== after.length || before.some((permission, index) => permission !== after[index]);
+    if (!roleChanged && !campusChanged && !permissionsChanged) return { ok: true, member: toPublic(current), changed: false }; // a no-op writes nothing
 
     if (roleChanged && current.role === "ADMIN" && change.role !== "ADMIN" && !(await hasAnotherActiveAdmin(tx, tenantId))) {
       return { ok: false, reason: "LAST_ADMIN" };
@@ -132,17 +201,51 @@ export async function changeMember(
 
     const updated = await tx.tenantMembership.update({
       where: { id: current.id },
-      data: { ...(roleChanged ? { role: change.role } : {}), ...(campusChanged ? { campusId: change.campusId } : {}) },
+      data: {
+        ...(roleChanged ? { role: change.role } : {}),
+        ...(campusChanged ? { campusId: change.campusId } : {}),
+        ...(permissionsChanged ? { permissions: after } : {}),
+      },
       select: MEMBER_SELECT,
     });
     if (roleChanged) {
       await tx.auditLog.create({
-        data: { tenantId, actorUserId, action: "MEMBER_ROLE_CHANGED", targetType: "User", targetId: targetUserId, beforeValue: { role: current.role }, afterValue: { role: change.role } },
+        data: {
+          tenantId,
+          actorUserId,
+          action: "MEMBER_ROLE_CHANGED",
+          targetType: "User",
+          targetId: targetUserId,
+          beforeValue: { role: current.role },
+          afterValue: { role: change.role },
+        },
       });
     }
     if (campusChanged) {
       await tx.auditLog.create({
-        data: { tenantId, actorUserId, action: "MEMBER_CAMPUS_CHANGED", targetType: "User", targetId: targetUserId, beforeValue: { campusId: current.campusId }, afterValue: { campusId: change.campusId ?? null } },
+        data: {
+          tenantId,
+          actorUserId,
+          action: "MEMBER_CAMPUS_CHANGED",
+          targetType: "User",
+          targetId: targetUserId,
+          beforeValue: { campusId: current.campusId },
+          afterValue: { campusId: change.campusId ?? null },
+        },
+      });
+    }
+    if (permissionsChanged) {
+      await tx.auditLog.create({
+        data: {
+          tenantId,
+          actorUserId,
+          action: "MEMBER_PERMISSIONS_CHANGED",
+          targetType: "User",
+          targetId: targetUserId,
+          beforeValue: { permissions: before },
+          // `clearedByRoleChange` says WHY they went (the role moved to one that cannot hold any), so the trail is not a mystery.
+          afterValue: { permissions: after, ...(roleChanged && !canHold ? { clearedByRoleChange: newRole } : {}) },
+        },
       });
     }
     return { ok: true, member: toPublic(updated), changed: true };
@@ -157,12 +260,25 @@ export async function deactivateMember(tenant: TenantCtx, actorUserId: string, t
   return tenant.run(async (tx): Promise<MemberResult> => {
     const current = await find(tx, tenantId, targetUserId);
     if (!current) return { ok: false, reason: "NOT_FOUND" };
+    const refused = campusActorRefusal(tenant, current);
+    if (refused) return { ok: false, reason: refused };
     if (current.deactivatedAt) return { ok: true, member: toPublic(current), changed: false };
     if (current.role === "ADMIN" && !(await hasAnotherActiveAdmin(tx, tenantId))) return { ok: false, reason: "LAST_ADMIN" };
 
-    const updated = await tx.tenantMembership.update({ where: { id: current.id }, data: { deactivatedAt: new Date() }, select: MEMBER_SELECT });
+    const updated = await tx.tenantMembership.update({
+      where: { id: current.id },
+      data: { deactivatedAt: new Date() },
+      select: MEMBER_SELECT,
+    });
     await tx.auditLog.create({
-      data: { tenantId, actorUserId, action: "MEMBER_DEACTIVATED", targetType: "User", targetId: targetUserId, beforeValue: { role: current.role, campusId: current.campusId } },
+      data: {
+        tenantId,
+        actorUserId,
+        action: "MEMBER_DEACTIVATED",
+        targetType: "User",
+        targetId: targetUserId,
+        beforeValue: { role: current.role, campusId: current.campusId },
+      },
     });
     return { ok: true, member: toPublic(updated), changed: true };
   });
@@ -174,11 +290,20 @@ export async function reactivateMember(tenant: TenantCtx, actorUserId: string, t
   return tenant.run(async (tx): Promise<MemberResult> => {
     const current = await find(tx, tenantId, targetUserId);
     if (!current) return { ok: false, reason: "NOT_FOUND" };
+    const refused = campusActorRefusal(tenant, current);
+    if (refused) return { ok: false, reason: refused };
     if (!current.deactivatedAt) return { ok: true, member: toPublic(current), changed: false };
 
     const updated = await tx.tenantMembership.update({ where: { id: current.id }, data: { deactivatedAt: null }, select: MEMBER_SELECT });
     await tx.auditLog.create({
-      data: { tenantId, actorUserId, action: "MEMBER_REACTIVATED", targetType: "User", targetId: targetUserId, afterValue: { role: current.role, campusId: current.campusId } },
+      data: {
+        tenantId,
+        actorUserId,
+        action: "MEMBER_REACTIVATED",
+        targetType: "User",
+        targetId: targetUserId,
+        afterValue: { role: current.role, campusId: current.campusId },
+      },
     });
     return { ok: true, member: toPublic(updated), changed: true };
   });

@@ -11,10 +11,12 @@ import { fail, type ErrorDetail } from "@/lib/api/envelope";
 // The same schema objects are what the generated API docs (zod-openapi) will describe, so validation and
 // documentation cannot drift apart.
 
-export const MAX_BODY_BYTES = 1024 * 1024; // 1 MiB — nothing in this app takes a bigger JSON body
+export const MAX_BODY_BYTES = 1024 * 1024; // 1 MiB — the default; the student import alone asks for more (below)
 const MAX_DETAILS = 20;
 
-export type Schemas<B, Q> = { body?: ZodType<B>; query?: ZodType<Q> };
+/// `maxBodyBytes` raises the cap for ONE route that has a stated reason (a CSV file of up to 1 MiB grows when it is JSON-escaped: every line break is two characters).
+/// Never lowered below the default, and never global.
+export type Schemas<B, Q> = { body?: ZodType<B>; query?: ZodType<Q>; maxBodyBytes?: number };
 export type Parsed<B, Q> = { body: B; query: Q };
 
 function issuesOf(error: z.ZodError, prefix: string): ErrorDetail[] {
@@ -38,16 +40,22 @@ export async function parseRequest<B = undefined, Q = undefined>(
       raw[key] = values.length === 1 ? values[0] : values;
     }
     const result = schemas.query.safeParse(raw);
-    if (!result.success) return { ok: false, response: fail("Some of the query parameters are not valid.", 400, "VALIDATION", issuesOf(result.error, "query")) };
+    if (!result.success)
+      return {
+        ok: false,
+        response: fail("Some of the query parameters are not valid.", 400, "VALIDATION", issuesOf(result.error, "query")),
+      };
     query = result.data;
   }
 
   let body = undefined as B;
   if (schemas.body) {
+    const cap = Math.max(MAX_BODY_BYTES, schemas.maxBodyBytes ?? 0);
     const declared = Number(req.headers.get("content-length"));
-    if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return { ok: false, response: fail("That request is too large.", 413, "PAYLOAD_TOO_LARGE") };
+    if (Number.isFinite(declared) && declared > cap)
+      return { ok: false, response: fail("That request is too large.", 413, "PAYLOAD_TOO_LARGE") };
     const text = await req.text();
-    if (Buffer.byteLength(text) > MAX_BODY_BYTES) return { ok: false, response: fail("That request is too large.", 413, "PAYLOAD_TOO_LARGE") };
+    if (Buffer.byteLength(text) > cap) return { ok: false, response: fail("That request is too large.", 413, "PAYLOAD_TOO_LARGE") };
     let json: unknown;
     try {
       json = JSON.parse(text);
@@ -55,7 +63,8 @@ export async function parseRequest<B = undefined, Q = undefined>(
       return { ok: false, response: fail("Invalid JSON body", 400, "INVALID_BODY") };
     }
     const result = schemas.body.safeParse(json);
-    if (!result.success) return { ok: false, response: fail("Some of the fields are not valid.", 400, "VALIDATION", issuesOf(result.error, "body")) };
+    if (!result.success)
+      return { ok: false, response: fail("Some of the fields are not valid.", 400, "VALIDATION", issuesOf(result.error, "body")) };
     body = result.data;
   }
   return { ok: true, input: { body, query } };

@@ -1,17 +1,78 @@
 // --- Tenancy (PRD §7) ---
 
+/// What kind of school this is (plan §0.5 → Phase 1.0, decision 1). It decides which kind of academic period a school has
+/// (term / semester / cohort). Additive, with a default, so every existing school migrates as K12.
+enum SchoolType {
+  K12
+  HIGHER_ED
+  VOCATIONAL
+}
+
 model Tenant {
-  id        String   @id @default(cuid())
+  id          String     @id @default(cuid())
   /// URL slug (PRD §7 "Tenant code selection") — unique, reserved-word-checked
   /// and format-validated at the application layer before insert, fixed at
   /// creation for MVP (support-mediated changes only).
-  code      String   @unique
-  name      String
-  createdAt DateTime @default(now())
+  code        String     @unique
+  name        String
+  /// Defaults to K12 because every school that exists today is one; the setup wizard does not ask until the Settings screen exists.
+  schoolType  SchoolType @default(K12)
+  createdAt   DateTime   @default(now())
+  /// Set when the platform suspends the school: its members can no longer reach it (the resolver and the person's school list treat it as
+  /// absent). The data is untouched. Only the `platform_*` functions write it (plan C5).
+  suspendedAt DateTime?
 
-  campuses    Campus[]
-  memberships TenantMembership[]
-  invitations Invitation[]
+  campuses             Campus[]
+  memberships          TenantMembership[]
+  stats                TenantStats?
+  supportGrants        SupportGrant[]
+  supportSessions      Session[]
+  invitations          Invitation[]
+  /// Exactly one row, created by the database when the tenant is (a trigger — see the phase 1.0 migration).
+  settings             SchoolSettings?
+  sessions             AcademicSession[]
+  periods              AcademicPeriod[]
+  classGroups          ClassGroup[]
+  classArms            ClassArm[]
+  subjects             Subject[]
+  offerings            SubjectOffering[]
+  schemes              AssessmentScheme[]
+  components           AssessmentComponent[]
+  gradeScales          GradeScale[]
+  gradeBands           GradeBand[]
+  staffRecords         StaffRecord[]
+  staffAssignments     StaffSubjectAssignment[]
+  studentRecords       StudentRecord[]
+  admissionCounters    AdmissionCounter[]
+  receiptCounters      ReceiptCounter[]
+  guardianRecords      GuardianRecord[]
+  guardianLinks        GuardianLink[]
+  enrollments          StudentEnrollment[]
+  attendanceRecords    AttendanceRecord[]
+  results              Result[]
+  resultAudits         ResultAudit[]
+  feeStructures        FeeStructure[]
+  invoices             Invoice[]
+  payments             Payment[]
+  invoiceDiscounts     InvoiceDiscount[]
+  announcements        Announcement[]
+  timetableSlots       TimetableSlot[]
+  settingsChangeAudits SettingsChangeAudit[]
+  notificationTemplates NotificationTemplate[]
+  notificationDispatches NotificationDispatch[]
+  guardianLinkTokens    GuardianLinkToken[]
+  notificationAudits    NotificationAuditLog[]
+  assignments           Assignment[]
+  assignmentSubmissions AssignmentSubmission[]
+  learningMaterials     LearningMaterial[]
+  quizzes               Quiz[]
+  quizQuestions         QuizQuestion[]
+  quizAttempts          QuizAttempt[]
+  customDomains         CustomDomain[]
+  departments           Department[]
+  courses               Course[]
+  courseRegistrations   CourseRegistration[]
+  certificates          Certificate[]
 }
 
 /// A branch/campus under one tenant (PRD §7) — distinct from multi-tenancy:
@@ -22,21 +83,43 @@ model Campus {
   tenantId String
   name     String
 
-  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  memberships TenantMembership[]
-  invitations Invitation[]
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memberships       TenantMembership[]
+  invitations       Invitation[]
+  sessions          AcademicSession[]
+  classGroups       ClassGroup[]
+  staffRecords      StaffRecord[]
+  studentRecords    StudentRecord[]
+  announcements     Announcement[]
+  assignments       Assignment[]
+  learningMaterials LearningMaterial[]
+  quizzes           Quiz[]
 
   /// A school cannot have two campuses of the same name (compared exactly, after the API trims it).
   @@unique([tenantId, name])
+  /// The target of the composite foreign keys that keep academic rows inside their own school (plan, Phase 1.1 reconciliation 2).
+  @@unique([tenantId, id])
   @@index([tenantId])
 }
 
 enum Role {
   ADMIN
+  /// Administers ONE campus (people, academics, attendance, announcements, timetable, manual payments of that campus); `campusId` is
+  /// REQUIRED on the membership (a CHECK constraint). An ADMIN stays school-wide (plan C1–C3, ADR 0016).
+  CAMPUS_ADMIN
   TEACHING_STAFF
   NON_TEACHING_STAFF
   STUDENT
   PARENT
+}
+
+/// The deliberately small permission set (plan §1.7): an ADMIN implicitly has all of them; the enum exists so a NON-admin staff
+/// membership can be granted one extra capability. No custom roles, no per-record ACLs, no hierarchy.
+enum Permission {
+  CAN_APPROVE_RESULTS
+  CAN_MANAGE_FINANCE
+  CAN_PUBLISH_CONTENT
+  CAN_MANAGE_USERS
 }
 
 /// The verified membership table PRD §7's tenant-trust-boundary check reads:
@@ -44,15 +127,22 @@ enum Role {
 /// app.tenant_id -> RLS". The URL's tenant code is only ever a hint; this
 /// table is the actual authorization source.
 model TenantMembership {
-  id       String  @id @default(cuid())
-  userId   String
-  tenantId String
-  campusId String?
-  role     Role
+  id          String       @id @default(cuid())
+  userId      String
+  tenantId    String
+  campusId    String?
+  role        Role
+  /// Extra capabilities beyond the role. Only staff roles may hold any (a CHECK constraint in the phase 1.0 migration states it:
+  /// `permissions = '{}' OR role IN ('TEACHING_STAFF','NON_TEACHING_STAFF')`); ADMIN implies every permission and holds none stored.
+  permissions Permission[] @default([])
 
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  campus Campus? @relation(fields: [campusId], references: [id], onDelete: SetNull)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus          Campus?          @relation(fields: [campusId], references: [id], onDelete: SetNull)
+  /// The records (at most one each, enforced by partial unique indexes) that name this membership's person as their sign-in account.
+  staffRecords    StaffRecord[]
+  studentRecords  StudentRecord[]
+  guardianRecords GuardianRecord[]
 
   /// Set when an administrator deactivates the person IN THIS SCHOOL. The row stays (history, reactivation) but it is no
   /// longer a membership: every reader treats a deactivated one as absent — the resolver, the person's school list, the
@@ -70,12 +160,14 @@ model TenantMembership {
 /// expiring (expiresAt). Tenant-scoped like every table with a tenantId: row-level security in the same migration, plus ONE
 /// extra read path — by the token's hash — because the invitee is not a member of anything yet when they open the link.
 model Invitation {
-  id       String  @id @default(cuid())
-  tenantId String
+  id            String  @id @default(cuid())
+  tenantId      String
   /// Lower-cased. The invitation is for whoever controls this address; opening the link is the proof.
-  email    String
-  role     Role
-  campusId String?
+  email         String
+  role          Role
+  campusId      String?
+  /// When set, accepting this invitation also links the new member to that staff record (plan 1.2, decision P5).
+  staffRecordId String?
 
   tokenHash String @unique
 
@@ -86,11 +178,34 @@ model Invitation {
   acceptedAt   DateTime?
   revokedAt    DateTime?
 
-  tenant     Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  campus     Campus? @relation(fields: [campusId], references: [id], onDelete: SetNull)
-  invitedBy  User?   @relation("InvitationsSent", fields: [invitedById], references: [id], onDelete: SetNull)
-  acceptedBy User?   @relation("InvitationsAccepted", fields: [acceptedById], references: [id], onDelete: SetNull)
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus      Campus?      @relation(fields: [campusId], references: [id], onDelete: SetNull)
+  staffRecord StaffRecord? @relation(fields: [tenantId, staffRecordId], references: [tenantId, id], onDelete: NoAction)
+  invitedBy   User?        @relation("InvitationsSent", fields: [invitedById], references: [id], onDelete: SetNull)
+  acceptedBy  User?        @relation("InvitationsAccepted", fields: [acceptedById], references: [id], onDelete: SetNull)
 
   @@index([tenantId, email])
   @@index([tenantId, createdAt])
+}
+
+enum DomainStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  FAILED
+}
+
+model CustomDomain {
+  id                String       @id @default(cuid())
+  tenantId          String
+  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  domain            String       @unique
+  status            DomainStatus @default(PENDING_VERIFICATION)
+  verificationToken String
+  verifiedAt        DateTime?
+  sslActive         Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @default(now()) @updatedAt
+
+  @@unique([tenantId, id])
+  @@index([tenantId])
 }

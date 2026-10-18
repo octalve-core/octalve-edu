@@ -1,0 +1,189 @@
+// --- Learning Management System (LMS) & Assignments (Phase 4; PRD §6) ---
+//
+// Tenant-isolated LMS data models: assignments, submissions, course materials, and online quizzes.
+// Every table carries tenantId and composite foreign keys on [tenantId, id].
+// RLS enforced on all tables.
+
+enum AssignmentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SubmissionStatus {
+  PENDING
+  SUBMITTED
+  LATE
+  GRADED
+  RESUBMIT_REQUESTED
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+}
+
+enum QuizStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Assignment {
+  id           String           @id @default(cuid())
+  tenantId     String
+  campusId     String?
+  subjectId    String
+  classGroupId String?
+  classArmId   String?
+  title        String
+  description  String?
+  instructions String?
+  dueDate      DateTime?
+  totalPoints  Int              @default(100)
+  status       AssignmentStatus @default(DRAFT)
+  allowLate    Boolean          @default(true)
+  attachments  Json             @default("[]")
+  createdById  String?
+  archivedAt   DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @default(now()) @updatedAt
+
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus      Campus?                @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  subject     Subject                @relation(fields: [tenantId, subjectId], references: [tenantId, id], onDelete: NoAction)
+  classGroup  ClassGroup?            @relation(fields: [tenantId, classGroupId], references: [tenantId, id], onDelete: NoAction)
+  classArm    ClassArm?              @relation(fields: [tenantId, classArmId], references: [tenantId, id], onDelete: NoAction)
+  creator     StaffRecord?           @relation(fields: [tenantId, createdById], references: [tenantId, id], onDelete: NoAction)
+  submissions AssignmentSubmission[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, subjectId])
+  @@index([tenantId, classGroupId])
+  @@index([tenantId, classArmId])
+  @@index([tenantId, status])
+}
+
+model AssignmentSubmission {
+  id           String           @id @default(cuid())
+  tenantId     String
+  assignmentId String
+  studentId    String
+  content      String?
+  attachments  Json             @default("[]")
+  status       SubmissionStatus @default(PENDING)
+  score        Float?
+  feedback     String?
+  gradedById   String?
+  gradedAt     DateTime?
+  submittedAt  DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @default(now()) @updatedAt
+
+  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignment Assignment    @relation(fields: [tenantId, assignmentId], references: [tenantId, id], onDelete: Cascade)
+  student    StudentRecord @relation(fields: [tenantId, studentId], references: [tenantId, id], onDelete: NoAction)
+  grader     StaffRecord?  @relation(fields: [tenantId, gradedById], references: [tenantId, id], onDelete: NoAction)
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, assignmentId, studentId])
+  @@index([tenantId, assignmentId])
+  @@index([tenantId, studentId])
+  @@index([tenantId, status])
+}
+
+model LearningMaterial {
+  id           String    @id @default(cuid())
+  tenantId     String
+  campusId     String?
+  subjectId    String
+  classGroupId String?
+  title        String
+  description  String?
+  content      String?
+  attachments  Json      @default("[]")
+  createdById  String?
+  archivedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now()) @updatedAt
+
+  tenant     Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus     Campus?      @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  subject    Subject      @relation(fields: [tenantId, subjectId], references: [tenantId, id], onDelete: NoAction)
+  classGroup ClassGroup?  @relation(fields: [tenantId, classGroupId], references: [tenantId, id], onDelete: NoAction)
+  creator    StaffRecord? @relation(fields: [tenantId, createdById], references: [tenantId, id], onDelete: NoAction)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, subjectId])
+  @@index([tenantId, classGroupId])
+}
+
+model Quiz {
+  id               String       @id @default(cuid())
+  tenantId         String
+  campusId         String?
+  subjectId        String
+  classGroupId     String?
+  title            String
+  instructions     String?
+  timeLimitMinutes Int?
+  passingScore     Float?
+  status           QuizStatus   @default(DRAFT)
+  createdById      String?
+  archivedAt       DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @default(now()) @updatedAt
+
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus     Campus?        @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  subject    Subject        @relation(fields: [tenantId, subjectId], references: [tenantId, id], onDelete: NoAction)
+  classGroup ClassGroup?    @relation(fields: [tenantId, classGroupId], references: [tenantId, id], onDelete: NoAction)
+  creator    StaffRecord?   @relation(fields: [tenantId, createdById], references: [tenantId, id], onDelete: NoAction)
+  questions  QuizQuestion[]
+  attempts   QuizAttempt[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, subjectId])
+  @@index([tenantId, status])
+}
+
+model QuizQuestion {
+  id            String       @id @default(cuid())
+  tenantId      String
+  quizId        String
+  prompt        String
+  questionType  QuestionType @default(MULTIPLE_CHOICE)
+  options       Json         @default("[]")
+  correctAnswer String
+  points        Int          @default(1)
+  sortOrder     Int          @default(0)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @default(now()) @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  quiz   Quiz   @relation(fields: [tenantId, quizId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, quizId])
+}
+
+model QuizAttempt {
+  id          String    @id @default(cuid())
+  tenantId    String
+  quizId      String
+  studentId   String
+  answers     Json      @default("[]")
+  score       Float     @default(0)
+  isPassed    Boolean   @default(false)
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  tenant  Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  quiz    Quiz          @relation(fields: [tenantId, quizId], references: [tenantId, id], onDelete: Cascade)
+  student StudentRecord @relation(fields: [tenantId, studentId], references: [tenantId, id], onDelete: NoAction)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, quizId])
+  @@index([tenantId, studentId])
+}

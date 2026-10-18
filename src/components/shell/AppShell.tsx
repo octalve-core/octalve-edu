@@ -3,20 +3,26 @@ import { SessionRevalidator } from "@/components/auth/SessionRevalidator";
 import { GraduationCapIcon } from "@/components/ui/icons";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { brand } from "@/lib/brand";
+import type { SupportBannerData } from "@/lib/support/session";
 import { Breadcrumb } from "./Breadcrumb";
 import { MobileNav } from "./MobileNav";
 import { ProfileMenu } from "./ProfileMenu";
 import { SchoolSwitcher } from "./SchoolSwitcher";
 import { ShellProvider } from "./ShellProvider";
 import { SidebarNav } from "./SidebarNav";
+import { SupportBanner } from "./SupportBanner";
 import { SidebarPerson } from "./SidebarPerson";
+import { QuickToolsTrigger } from "@/components/tools/QuickToolsTrigger";
 import type { ShellSchool } from "./nav";
 
 export type ShellUser = { name: string | null; email: string | null };
 
 function BrandMark({ size }: { size: "sm" | "md" }) {
   return (
-    <span aria-hidden="true" className={`flex shrink-0 items-center justify-center rounded-xl bg-brand text-white ${size === "md" ? "h-10 w-10" : "h-9 w-9"}`}>
+    <span
+      aria-hidden="true"
+      className={`flex shrink-0 items-center justify-center rounded-xl bg-brand text-white ${size === "md" ? "h-10 w-10" : "h-9 w-9"}`}
+    >
       <GraduationCapIcon className="h-5 w-5" />
     </span>
   );
@@ -30,9 +36,23 @@ function BrandMark({ size }: { size: "sm" | "md" }) {
 /// Unlike AlEemaan's, this shell is **school-aware**: the navigation follows the school the path is in (see
 /// `ShellProvider`). A skip link is the first thing in the tab order. Every page inside is still responsible for its own
 /// session and school check; the shell only displays who is signed in and which schools they belong to.
-export function AppShell({ user, schools, children }: { user: ShellUser; schools: readonly ShellSchool[]; children: ReactNode }) {
+export function AppShell({
+  user,
+  schools,
+  platform = false,
+  support = null,
+  children,
+}: {
+  user: ShellUser;
+  schools: readonly ShellSchool[];
+  /// The person is a platform administrator: the navigation gets a "Platform" link (display only).
+  platform?: boolean;
+  /// A support view is open on this sign-in (ADR 0017): the banner is drawn above the page.
+  support?: SupportBannerData | null;
+  children: ReactNode;
+}) {
   return (
-    <ShellProvider schools={schools}>
+    <ShellProvider schools={schools} platform={platform}>
       <div className="min-h-screen bg-canvas text-fg-2">
         <SessionRevalidator />
         <a
@@ -55,6 +75,7 @@ export function AppShell({ user, schools, children }: { user: ShellUser; schools
         </div>
 
         <div className="lg:pl-62">
+          {support && <SupportBanner name={support.name} areas={support.areas} endsAt={support.endsAt} />}
           <header className="sticky top-0 z-20 flex h-15 items-center justify-between gap-4 border-b border-line bg-canvas px-4 sm:px-6">
             <div className="flex items-center gap-2.5 lg:hidden">
               <BrandMark size="sm" />
@@ -78,6 +99,7 @@ export function AppShell({ user, schools, children }: { user: ShellUser; schools
         </div>
 
         <MobileNav name={user.name} email={user.email} />
+        <QuickToolsTrigger />
       </div>
     </ShellProvider>
   );

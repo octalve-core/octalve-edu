@@ -1,0 +1,58 @@
+# [0011]: Audited support access (build of ADR 0017)
+
+- **Period / Focus:** 2026-10-13 to (open) - the SCHOOL grants a platform administrator a read-only, time-limited, area-scoped view; audited on both sides; no RLS bypass
+- **Status:** Completed (slices A-E built; landed in octalve-core `dev` as PR #14; follow-ups and the production steps below are open)
+- **Priority:** High
+- **Assignee:** Claude Agent / Maintainer
+- **Target Branch / PR:** `claude/support-access-build` -> octalve-core `dev` (merged: PR #14)
+- **Started:** 2026-10-13 UTC
+- **Ended:** 2026-10-14 UTC
+- **Duration:** -
+
+> **How to tick:** change `[ ]` to `[x]`. The table shows the characters, not a clickable box.
+
+---
+
+## 1. Objective
+A school `ADMIN` can grant support access (areas, duration, reason) and revoke it; a platform administrator with a live grant can open a read-only support view of the granted areas; every request is audited in the school's log and the platform's log; nothing else changes about tenant isolation.
+
+## 2. Context & Related Docs
+- ADR 0017 (Accepted), plan "Build design - audited support access", ADR 0016. Decisions of 2026-10-13: areas settings / academics / people / attendance / results (finance NOT grantable); 4 h default, 24 h maximum; no break-glass.
+- **How the session is represented (decided while building; the design said "a virtual SUPPORT role"):** NOT a new `Role` value. A support session resolves to the school's tenant context with `role: ADMIN` **plus** `support: { grantId, areas, expiresAt }`; `withAuth` then refuses every non-safe method, every route with no declared `area`, and every area outside the grant, so services that branch on role give admin-level READS (the support view must show what an administrator sees) and writes are impossible. Pages go through the same check (`requireTenantPage` takes the area). Reason: no change to the `Role` enum and its exhaustive uses; the cost is that safety rests on `withAuth` / `requireTenantPage` and the source-level area guard, which is what the guard test is for.
+- A support session is opened by the platform administrator with their password; it is recorded on the sign-in session (`supportTenantId`, `supportOpenedAt`) and ends at the earlier of the grant's expiry and one hour after opening.
+
+## 3. Work Breakdown
+### Slice A: grants (the school's side)
+- [x] tests: `tests/integration/support-grants.spec.ts` (RLS, CHECKs, revoke-only trigger, area list in step with the CHECK, `platform_support_grants()`), `tests/api/support-grants.spec.ts` (who may use them, step-up, defaults/limits, audit, isolation). NOT seen failing first: the integration spec was written with the migration, the API spec before the code but not run before it
+- [x] migration `20261024090000_support_grants` (additive; applied only to the lane-1 test DB so far - run `pnpm exec prisma migrate deploy` on the dev DB), model `SupportGrant`, `lib/support/{areas,grants}.ts`, routes `GET/POST support-grants`, `POST support-grants/[id]/revoke`. Deviation from the design: a grant is open to ANY platform administrator (a named grantee is refused for now)
+- Result: 20 passed (integration + API + route-role guard) after `pnpm build`; typecheck, lint clean. NOT run: the full suite
+### Slice B: the session (the platform's side) - resolver, `withAuth` area rule, `requireTenantPage` area, open/close endpoints, audit rows both sides
+- [x] migration `20261024100000_support_session` (additive; applied to the dev DB): `Session.supportTenantId` / `supportOpenedAt` (both or neither, FK to the school, SET NULL) and `platform_support_record(tenant, grant, action, detail)` - proves the grant is live for the caller, then writes the school's AuditLog row (in that school's context, restored after) AND the PlatformAuditLog row; returns false and writes nothing when not live
+- [x] `lib/support/session.ts` (`liveSupportView`, `recordSupport`, `openSupport`, `closeSupport`, `listOpenableSchools`); `resolveTenant` falls to a support context ONLY when the person has no membership; `withAuth({ area })` refuses (the one 403) a non-GET, a missing area, an area outside the grant, or a request the database cannot tie to a live grant, and records every allowed one; `requireTenantPage(code, area?)` does the same for pages (it records the page as `/schools/<code>` + area - the real path is not known there)
+- [x] routes: `POST platform/support/open` ({code, password}; one 404 for every reason it cannot be), `POST platform/support/close` (no password), `GET platform/support/grants`
+- [x] tests: `tests/api/support-session.spec.ts` (10): opening, read-only + granted areas only, both logs, per-sign-in, revoke, one-hour cap, close, openable list. NOT seen failing first (written after the code)
+### Slice C: areas declared on every school GET route + the source-level area guard
+- [x] `area` declared on 31 school GET handlers (academics 12 incl. timetable, people 11, attendance 3, settings 3, results 2); the other 8 of the 39 GET files are out of reach on purpose and listed with reasons in the guard: finance (4 routes), announcements (2), support-grants, the student export
+- [x] `tests/unit/route-area-guard.spec.ts` (2): every school GET declares a valid area or is on the out-of-reach list; no state-changing handler declares one. **Seen failing** once: with `area` removed from `members/route.ts` the first test failed naming the route; restored
+- Result of B+C: 33 passed (support-session 10, support-grants API 5 + integration 6, area guard 2, route-role guard 9, ...) after `pnpm build`; typecheck, lint, prettier clean. NOT run: the full suite, the existing e2e/API suites against the changed `resolveTenant` / `withAuth` / `requireTenantPage`
+### Slice D: UI - the school's Support access page (grant dialog, list, what was looked at), the platform page's "Open support view", the read-only banner; e2e + axe in both themes
+- [x] school side: page `/schools/[code]/support` (ADMIN only; a support view cannot reach it), `SupportAccessPanel` (allow dialog: areas without finance, hours, reason, password; list with Withdraw; "What support looked at"), `GET support-grants/activity`, a link from Settings (NOT a nav entry: every nav item is a phone tab and the bar is already full for an administrator)
+- [x] platform side: "Open support view" on a school row that has a live grant (dialog names the areas and the end, asks the password, then a FULL page load so the layout draws the banner), `SupportBanner` in the shell (school, read-only, areas, end time, "Leave support view"), the school is added to the shell's school list for as long as the view is live; history labels for the three new actions
+- [x] pages: the school home (area `settings`; notices hidden - not an area), settings (`settings`), users and people and the person pages (`people`), academics (`attendance` for that section, else `academics`); inside a support view the write controls are removed (`canEdit`, `readOnly`) or the whole panel is a disabled `<fieldset>` (settings, users)
+- [x] tests: `tests/e2e/support-access.spec.ts` (3 tests x desktop and phone = 6, plus setup = 7 passed): the school's page in BOTH themes with axe on the page and the dialog; the platform administrator's full flow (wrong password, open, banner, the allowed area, refused areas, leave, closed again, the school sees opened / read / closed) with axe on the dialog, the overview in a support view, and the school's page with activity (default dark theme only for the platform flow). NOT seen failing first
+### Slice E: docs, full suite, PR
+- [x] Full suite (`TEST_LANE=1 TEST_TIMEOUT_SCALE=3`, all projects, 1.5 h) on the branch: **1972 passed, 4 failed, 23 skipped.** The 4 failures were `academics.spec.ts:76` and `responsive-and-a11y.spec.ts:1294`, each on desktop and phone: both signed in as a TEACHING_STAFF member and expected the header "Only an administrator can change this." That header was changed by PR #11 (a teacher is told they can take the roll) - **a regression I merged in PR #11 without re-running these two specs**, not caused by support access. The two assertions were updated to the current wording (the page text was right, the specs were stale); re-run: 5 passed (4 tests + setup). The 23 skips are existing skips, not individually re-examined. Not re-run after the fix: the rest of the suite (it was unaffected - the change is two test strings).
+
+## 4. Verification
+Recorded per slice. Mutation passes: NOT RUN - pending, end of Phase 2.
+
+## 5. Open follow-ups (not built; each is additive and none blocks using the feature)
+- [ ] **A named grantee.** `granteeUserId` exists on `SupportGrant` but the API refuses to set it: a grant is open to ANY platform administrator. Decide whether a school should be able to name one person.
+- [ ] **Notify the school's administrators** when a support view opens (today the school sees it in its activity list and audit log, but is not told).
+- [ ] **A cap on audit rows per view.** Every allowed request writes a row on both sides; a long view writes many. Decide a cap or a per-minute collapse.
+- [ ] **The light theme for the platform flow's e2e.** The school's page is tested in both themes; the platform administrator's full flow only in the default dark theme.
+
+## 6. Before this ships to production (run order matters)
+- [ ] Run the two migrations on the production database **before** deploying the code (rule: migrations run before the code; both are additive): `20261024090000_support_grants` and `20261024100000_support_session` (adds `Session.supportTenantId` / `supportOpenedAt` and the `platform_support_record` function). Old code ignores the new columns.
+- [ ] Do not call `app_grant_runtime_privileges()` in these or any new migration (rule 9 of `CLAUDE.md`).
+- [ ] Per live school, run `pnpm teachers:unassigned` before the teacher-attendance rule ships (task 0010).

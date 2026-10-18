@@ -78,7 +78,7 @@ export type TestUser = { id: string; email: string; name: string; password: stri
 /// (seeded) school; omit it for a user with no school. `password: null` makes
 /// an invited-but-not-activated account (no passwordHash).
 export async function createUser(
-  opts: { email?: string; name?: string; password?: string | null; role?: Role } = {},
+  opts: { email?: string; name?: string; password?: string | null; role?: Role; platformAdmin?: boolean } = {},
 ): Promise<TestUser> {
   const email = opts.email ?? uniqueEmail();
   const password = opts.password === undefined ? DEFAULT_PASSWORD : opts.password;
@@ -86,7 +86,7 @@ export async function createUser(
   const tenant = await seedInstance();
 
   const user = await db.user.create({
-    data: { email, name, passwordHash: password === null ? null : await hashOnce(password) },
+    data: { email, name, passwordHash: password === null ? null : await hashOnce(password), isPlatformAdmin: opts.platformAdmin ?? false },
   });
   if (opts.role) {
     await db.tenantMembership.create({ data: { userId: user.id, tenantId: tenant.id, role: opts.role } });
@@ -159,7 +159,6 @@ export const codeFor = (secret: Buffer, offsetSteps = 0): string => totpAt(secre
 
 /// Simulates time passing between sign-ins: forgets which step was last accepted, so the same current code
 /// is acceptable again. (Tests about replay itself must NOT call this.)
-export const rewindMfa = (userId: string) =>
-  db.mfaCredential.update({ where: { userId }, data: { lastUsedStep: null } });
+export const rewindMfa = (userId: string) => db.mfaCredential.update({ where: { userId }, data: { lastUsedStep: null } });
 
 export { Role };

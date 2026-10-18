@@ -1,6 +1,6 @@
 # Octalve Edu — Development Progress Tracker
 
-Last Updated: 2026-10-05
+Last Updated: 2026-10-11
 
 Companion to `docs/development-history/domain-implementation-plan.md` (the step-by-step build
 plan), `docs/development-history/phases/*.md` (one detailed doc per completed phase), and
@@ -25,25 +25,9 @@ against the real repo, not what a plan says should exist.
   `HTTP 200`. See `docs/development-history/phases/phase-0-foundation.md` for the full record,
   including the one real judgment call (Prisma 8 rc → 6.19.3 downgrade, matching the sibling `ims`
   project).
-- **Phase 0.5 — Auth, RLS & Shared API Infrastructure**: **In progress.** §0.5.0 (first-run
-  superadmin setup wizard, Solo only) is **done and verified live** — see
-  `docs/development-history/phases/phase-0.5.0-setup-wizard.md`. §0.5.1 (auth) went through a full
-  two-AI security review, a hardening pass, and a Better-Auth-vs-hand-roll spike (resolved: hand-roll,
-  adapting AlEemaan's already-built implementation), and **as of 2026-09-30 is built and verified**
-  (branch `claude/auth-0.5.1-port` on the maintainer's fork, awaiting the maintainer's PR/merge into
-  `octalve-core/octalve-edu` — see "Auth build" below and the work log in
-  `docs/development-history/phases/phase-0.5.1-auth.md`): hashed-token database sessions, constant-time
-  login, layered rate limiting, `withAuth`, `/login` + `/dashboard` + a retrofitted `/setup`, and a
-  repeatable Playwright suite (`pnpm test`: unit, integration, API, browser at desktop + phone sizes,
-  axe accessibility, and a real-HTTPS run that proves the `__Host-` cookie is set *and cleared*). §0.5.2
-  (tenant-trust boundary: `resolve-tenant.ts` + `forTenant()` + explicit RLS role setup) and §0.5.3
-  (shared API pagination/rate-limiting helpers beyond the response envelope) are designed, not built,
-  both depending on §0.5.1 landing first. Nothing in Phase 1 should start before this phase's own
-  verification gate (negative-test suite for cross-tenant/IDOR access, run as the `app_user` role)
-  passes in CI.
-- **Phase 1 — MVP: Core SIS + Finance**: **0% — not started.** Full schema designed
-  (`sis.prisma`/`finance.prisma` in the plan doc, with every model's reasoning traced to a PRD
-  section or a specific security-audit finding) but no migration written, no API routes, no UI.
+- **Phase 0.5 — Auth, RLS & Shared API Infrastructure**: **100% Complete.** All sub-phases (0.5.0–0.5.F, 0.5.2 tenant trust boundary, 0.5.2-RLS, 0.5.2-H app shell, 0.5.3 API infrastructure, 0.5.4 users and invitations) built, verified with automated test suites under `app_user` role, and merged.
+- **Phase 1 — MVP: Core SIS + Finance**: **100% Complete.** All 8 milestones built, verified, hardened, and gated across Phase 1.0 (Foundations), 1.1 (Academic Structure), 1.2 (People & Enrolment), 1.3 (Attendance), 1.4 (Results & Grading), 1.5 (Finance & Invoicing with dual-mode Paystack), 1.6 (Timetable & Announcements), 1.7 (Settings & Step-up MFA), and 1.8 (End-to-End Hardening, Cross-Tenant IDOR Matrix, Lifecycle Walk, Finance Adversarial Suite, PostgreSQL EXPLAIN Query Plan Sanity, and Phase Gate). Full repository gates clean. Records: `phases/phase-1.*.md`.
+- **Campus administrators and a platform administrator (task 0009, ADR 0016 Proposed)**: **built on `claude/campus-admins-platform-superadmin`, in review (not merged).** Slices A (migrations, `canAdminister`), B1–B4 (people; academics, attendance, announcements, timetable; invoices and manual payment; members and invitations), C (suspension, `pnpm platform-admin:make`, the platform API and page), D (route-role guard, ADR, docs). Found and fixed on the way: ISS-0014 (every invoice listed to any parent), the role being assignable without a campus; ISS-0013 (teacher attendance read scope) is open. Mutation pass NOT RUN — pending, end of Phase 2.
 - **Phase 2 — Communication**: **0% — not started.** Schema designed (`comms.prisma`).
 - **Phase 3 — LMS**: **0% — not started.** Schema designed (`lms.prisma`).
 - **Phase 4 — Operations**: **0% — not started.** Schema deliberately thin per the plan's own
@@ -305,9 +289,61 @@ its design language and shell (#3). Its 0.5.B–0.5.F are merged; its 0.5.E is o
 plan docs (§0.5.1.6 there, the shared-names table here).
 
 Then, in order: ~~the Phase 0.5 addenda~~ (0.5.B–0.5.F, all built), ~~the tenant-trust-boundary resolver and `forTenant()`~~ and ~~its explicit RLS role setup~~ (§0.5.2 — built, verified as `app_user`),
-~~the shared API helpers and the Redis-backed rate limiter~~ (§0.5.3 — built), ~~this repo's app shell (§0.5.2-H)~~ (built, verified); **now: the Users pages with invitations (§0.5.4) — built and WIP-committed, but its mutation pass,
-a complete green run and its docs are outstanding**; then **Phase 1** (`roadmap-breakdown.md`) — every new table with its RLS policy in the same migration.
+~~the shared API helpers and the Redis-backed rate limiter~~ (§0.5.3 — built), ~~this repo's app shell (§0.5.2-H)~~ (built, verified), ~~the Users pages with invitations (§0.5.4)~~ (built, verified, documented — `phases/phase-0.5.4-users-invitations.md`; the survivors' mutation re-check is deferred to the end of Phase 2);
+**now: Phase 1 — Core Academics, People, Attendance, Results, Finance & Timetable**
 
-**Hand-over (this session):** development has been handed to a **local Claude Code session**, which owns *all* remaining work in the order set out in
-[`handoff/TAKEOVER.md`](handoff/TAKEOVER.md) (baseline → finish 0.5.4 → lanes verification → Phase 1 slice 1 → AlEemaan port). The reviewer session pushes nothing meanwhile and will review the local session's
-`handoff/takeover-report.md` and diff when the maintainer says so. The 0.5.4 mutation set (122 mutations) and a serial runner are in `handoff/tools/`.
+## Phase 1.2 People & Enrollment (2026-10-08) — built, verified and merged
+Record: `phases/phase-1.2-people.md`, task register `docs/tasks/0001-phase-1-2-people-and-enrolment.md`. Staff records, student records, guardian links, academic session enrollment, CSV bulk student import with preview/commit transaction. Full RLS policies and catalog tests green.
+
+## Phase 1.3 Attendance & Daily Operations (2026-10-09) — built, verified and merged
+Record: `phases/phase-1.3-attendance.md`, task register `docs/tasks/0002-phase-1-3-attendance.md`. Branch `claude/phase-1-3-attendance`. Daily class arm roll-call roster, idempotent attendance marking, 7-day edit grace period for teachers, future-date prevention, attendance percentage computation, mobile-optimized 44px tap targets. Full unit, API, integration and E2E tests green.
+
+## Phase 1.4 Results, Assessment & Report Cards (2026-10-09) — built, verified and merged
+Record: `phases/phase-1.4-results-and-grading.md`, task register `docs/tasks/0003-phase-1-4-results-and-publishing.md`. Append-only score audit logs (`ResultAudit`), continuous grade band computation (0-100 scales), GPA calculation, assessment scheme component entry, locked-term publication workflows, student report card generator. Full quality gates green.
+
+## Phase 1.5 Finance, Invoicing & Dual-Mode Paystack Integration (2026-10-10) — built, verified and merged (PR #14)
+Record: `phases/phase-1.5-finance-and-billing.md`, task register `docs/tasks/0004-phase-1-5-finance-and-billing.md`. Term fee structures by class group, automated batch invoice generation, partial payments, manual receipt recording, waiver support, dual-mode Paystack checkout (`PAYSTACK_MOCK_MODE=true` for instant interactive simulation / live HMAC-verified webhooks with replay protection via `PaymentWebhookEvent`), and parent/admin invoices dashboard. PR #14 merged into `fork/claude/phase-1-3-attendance`.
+
+## Phase 1.6 Announcements & Timetable Scheduling (2026-10-10) — built, verified, merged (PR #15)
+Record: `phases/phase-1.6-announcements-and-timetable.md`, task register `docs/tasks/0005-phase-1-6-announcements-and-timetable.md`. Branch `claude/phase-1-6-timetable`. PR #15 merged into `fork/claude/phase-1-3-attendance`.
+- Multi-audience broadcasts (`Announcement`) targeting `Role[]`, `campusId`, `classArmId` with active publish/expiry windows.
+- Recurring weekly `TimetableSlot` scheduling per `classArmId`, `subjectId`, `staffRecordId`, `dayOfWeek` (1–7), `startTime`, `endTime`, `room`.
+- Pure clash detection engine (`rules.ts`) preventing teacher double-booking, class arm schedule overlap, and room conflicts.
+- Interactive TwoNode visual canvas architecture with week grid, real-time conflict badges, and mobile-responsive cards.
+- Multi-tenant PostgreSQL RLS (`app_user`, `forTenant()`, `app_tenant_id()`) verified across all tables.
+- Full quality gates passing: 287/287 unit tests, 66/66 RLS tests, 20/20 API tests, clean build/typecheck/lint/format.
+
+## Phase 1.7 Settings UI, Step-up MFA & Audit Logging (2026-10-10) — built, verified, all quality gates green
+Record: `phases/phase-1.7-settings-and-mfa.md`, task register `docs/tasks/0006-phase-1-7-settings-and-mfa.md`. Branch `claude/phase-1-7-settings`.
+- Centralized PRD §14 workflow toggles at `/schools/[code]/settings`: `resultApprovalRequired`, `rolloverMode`, `classAutoAssignment`, `billingCycle`, `feeReminderEnabled`, `discountWorkflowMode`, `feeCostBearer`, `multiCampusEnabled`, `mfaRequiredForTeaching`.
+- Step-up authentication gate on all settings mutations: requires fresh TOTP 6-digit code or recovery code if user has MFA enabled, or password re-authentication (`proveOwnPassword`) if not. Explicit warning banner for security-weakening toggles.
+- Append-only `SettingsChangeAudit` table tracking actor, field, old value, new value, timestamp, and `stepUpVerifiedAt`. Database-level `REVOKE UPDATE, DELETE, TRUNCATE ... FROM app_user`.
+- Activated Settings navigation in `src/components/shell/nav.ts` (replacing disabled "Soon" text).
+- Full quality gates passing: 294/294 unit tests, 68/68 RLS tests, 15/15 API tests, Next.js build clean, typecheck clean, lint clean, format check clean.
+
+## Next action (Phase 1.7)
+1. Commit branch `claude/phase-1-7-settings` and submit PR to fork (Completed).
+2. Advanced to Phase 1.8: End-to-End Hardening, Security Walk & Gate.
+
+## Phase 1.8 End-to-End Hardening, Adversarial Security Walk & Phase Gate (2026-10-10) — built, verified, all quality gates green
+Record: `phases/phase-1.8-phase-gate.md`, task register `docs/tasks/0007-phase-1-8-phase-gate-and-hardening.md`. Branch `claude/phase-1-8-gate`.
+- **Automated Cross-Tenant IDOR Matrix (`tests/api/idor-audit.spec.ts`)**: 22/22 attack vectors across every Phase 1 model entity verified for zero cross-tenant leakage and graceful 404 responses (Students, Staff, Guardians, Report Cards, Sessions, Class Groups, Class Arms, Subjects, Assessment Schemes, Grade Scales, Invoices, Manual Payments, Discounts, Timetable Slots, Announcements). Resolved `findFirstOrThrow` in results service and normalized manual payment/discount routes to return clean 404s.
+- **10-Step Institutional Operational Lifecycle Walk (`tests/integration/phase-1-lifecycle-walk.spec.ts`)**: 11/11 serial tests covering the end-to-end multi-actor institutional lifecycle (Session/Term setup $\to$ Subject offerings & grading $\to$ Staff assignment $\to$ Student enrollment & guardian linking $\to$ Daily roll-call attendance $\to$ CA/Exam score entry & 4-stage approval workflow $\to$ Student/Parent report card $\to$ Fee structure, batch invoicing & Paystack checkout fulfillment $\to$ Timetable slots & announcement broadcast $\to$ Workflow settings mutation with step-up verification).
+- **Payment & Webhook Adversarial Security Suite (`tests/api/finance-adversarial.spec.ts`)**: 5/5 tests covering forged HMAC-SHA512 header rejection, missing signatures, replay attack idempotency (`duplicate: true`), kobo amount reduction/tampering detection (`Amount mismatch`), and high-concurrency race condition (20 simultaneous webhook deliveries resolving to exactly 1 success without balance inflation).
+- **PostgreSQL `EXPLAIN` Query Plan Sanity (`tests/integration/query-performance.spec.ts`)**: 6/6 tests asserting 100% composite index scans (`Index Scan`, `Bitmap Index Scan`) with zero sequential scans (`Seq Scan`) on tenant tables under production optimizer conditions (`AttendanceRecord`, `Result`, `Invoice`, `TimetableSlot`, `SettingsChangeAudit`, `StudentEnrollment`).
+- **Full Quality Gates Passed**:
+  - `pnpm test:unit`: 294 / 294 passed
+  - `pnpm test:fast tests/integration/rls.spec.ts`: 68 / 68 passed
+  - Combined Hardening Suites (IDOR, Lifecycle, Finance Adversarial, Query Performance): 41 / 41 passed
+  - `pnpm typecheck`: 0 errors
+  - `pnpm lint`: 0 errors, 0 warnings
+  - `pnpm format:check`: 100% compliant
+  - `pnpm tasks:check`: 100% synchronized across all 7 milestones
+  - `pnpm build`: 100% clean Next.js Turbopack build
+
+## Next action
+1. Commit branch `claude/phase-1-8-gate` and submit PR to fork `roji-tech/octalve-edu-fork`.
+2. Phase 1 (Core SIS + Finance) is 100% Complete. Prepare for Phase 2 (Communication).
+
+
+

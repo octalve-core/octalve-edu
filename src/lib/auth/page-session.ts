@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { prisma } from "@/lib/db";
 import { getUserMemberships } from "./memberships";
 import { getSession } from "./session";
 
@@ -13,6 +14,10 @@ import { getSession } from "./session";
 export const requirePageSession = cache(async () => {
   const session = await getSession();
   if (!session) redirect("/login");
-  const memberships = await getUserMemberships(session.userId);
-  return { session, memberships };
+  const [memberships, person] = await Promise.all([
+    getUserMemberships(session.userId),
+    prisma.user.findUnique({ where: { id: session.userId }, select: { isPlatformAdmin: true } }),
+  ]);
+  // Display only (the shell's "Platform" link): the platform pages and API decide access themselves, on every request.
+  return { session, memberships, isPlatformAdmin: Boolean(person?.isPlatformAdmin) };
 });

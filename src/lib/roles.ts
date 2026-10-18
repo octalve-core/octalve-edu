@@ -4,6 +4,7 @@ import type { Role } from "@prisma/client";
 /// authorization identifiers; nobody should ever see "NON_TEACHING_STAFF".
 export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: "Administrator",
+  CAMPUS_ADMIN: "Campus administrator",
   TEACHING_STAFF: "Teaching staff",
   NON_TEACHING_STAFF: "Non-teaching staff",
   STUDENT: "Student",

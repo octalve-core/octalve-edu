@@ -14,6 +14,9 @@
     "prisma:studio": "prisma studio",
     "db:migrate:deploy": "prisma migrate deploy",
     "mfa:reset": "node scripts/mfa-reset.mjs",
+    "platform-admin:make": "node scripts/make-platform-admin.mjs",
+    "platform-admin:invite-first-admin": "node scripts/invite-first-admin.mjs",
+    "teachers:unassigned": "node scripts/unassigned-teachers.mjs",
     "typecheck": "tsc --noEmit",
     "test": "pnpm build && playwright test",
     "test:fast": "playwright test",
@@ -23,7 +26,10 @@
     "test:https": "playwright test --project=https",
     "db:roles": "node scripts/db-roles.mjs",
     "lanes:sync": "node scripts/lanes.mjs sync",
-    "test:lanes": "node scripts/lanes.mjs test"
+    "test:lanes": "node scripts/lanes.mjs test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "tasks:check": "node scripts/tasks-check.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -35,6 +41,7 @@
   "dependencies": {
     "@prisma/client": "6.19.3",
     "bcryptjs": "^3.0.3",
+    "bullmq": "^6.3.15",
     "ioredis": "^6.0.0",
     "next": "16.3.6",
     "qrcode": "1.5.4",
@@ -53,6 +60,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
     "jsqr": "1.4.0",
+    "prettier": "^3.9.9",
     "prisma": "6.19.3",
     "tailwindcss": "^4",
     "typescript": "^5"

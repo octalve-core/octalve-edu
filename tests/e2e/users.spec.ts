@@ -1,6 +1,18 @@
 import { test, expect } from "../support/fixtures";
 import type { Page } from "@playwright/test";
-import { Role, addMembership, createTenant, createUser, db, deactivateMembership, removeCreatedTenants, seedInstance, uniqueEmail, type TestTenant, type TestUser } from "../support/db";
+import {
+  Role,
+  addMembership,
+  createTenant,
+  createUser,
+  db,
+  deactivateMembership,
+  removeCreatedTenants,
+  seedInstance,
+  uniqueEmail,
+  type TestTenant,
+  type TestUser,
+} from "../support/db";
 import { SAAS_URL } from "../support/env";
 import { api, cookieHeader, loginAs } from "../support/http";
 import { waitForMail, tokenFrom } from "../support/outbox";
@@ -46,7 +58,9 @@ async function member(role: Role, name: string, campus: number | null = 0) {
 }
 
 test.describe("the page", () => {
-  test("an administrator sees the school's people — themselves marked 'You' with no actions — and the empty invitations section", async ({ page }) => {
+  test("an administrator sees the school's people — themselves marked 'You' with no actions — and the empty invitations section", async ({
+    page,
+  }) => {
     const tola = await member(Role.TEACHING_STAFF, "Tola Teacher", 0);
     await signedInAdmin(page);
     await expect(page).toHaveTitle(/Users/);
@@ -75,7 +89,9 @@ test.describe("the page", () => {
     await expect(page.getByText(school.campuses[0].name)).toHaveCount(0); // … and nothing of the page
   });
 
-  test("search narrows the list as you type (waiting for a pause), filters combine, 'Clear filters' resets, and an empty result says so", async ({ page }) => {
+  test("search narrows the list as you type (waiting for a pause), filters combine, 'Clear filters' resets, and an empty result says so", async ({
+    page,
+  }) => {
     await member(Role.TEACHING_STAFF, "Tola Teacher", 0);
     await member(Role.PARENT, "Pat Parent", null);
     await signedInAdmin(page);
@@ -102,11 +118,17 @@ test.describe("the page", () => {
     await expect(pages.getByText("Page 1 of 2")).toBeVisible();
     await expect(pages.getByRole("button", { name: "Previous" })).toBeDisabled();
     await expect(page.getByText("23 people")).toBeVisible();
-    const firstPage = await page.getByRole("listitem").filter({ has: page.getByText(/Parent \d\d|Amina/) }).allTextContents();
+    const firstPage = await page
+      .getByRole("listitem")
+      .filter({ has: page.getByText(/Parent \d\d|Amina/) })
+      .allTextContents();
     await pages.getByRole("button", { name: "Next" }).click();
     await expect(pages.getByText("Page 2 of 2")).toBeVisible();
     await expect(pages.getByRole("button", { name: "Next" })).toBeDisabled();
-    const secondPage = await page.getByRole("listitem").filter({ has: page.getByText(/Parent \d\d|Amina/) }).allTextContents();
+    const secondPage = await page
+      .getByRole("listitem")
+      .filter({ has: page.getByText(/Parent \d\d|Amina/) })
+      .allTextContents();
     expect(secondPage.length).toBeGreaterThan(0);
     expect(secondPage.some((text) => firstPage.includes(text))).toBe(false);
     await pages.getByRole("button", { name: "Previous" }).click();
@@ -115,7 +137,9 @@ test.describe("the page", () => {
 });
 
 test.describe("inviting", () => {
-  test("Invite someone: the dialog opens on the email field; mistakes are explained in place; sending announces it, lists it, and mails a link", async ({ page }) => {
+  test("Invite someone: the dialog opens on the email field; mistakes are explained in place; sending announces it, lists it, and mails a link", async ({
+    page,
+  }) => {
     await signedInAdmin(page);
     const trigger = page.getByRole("button", { name: "Invite someone" });
     await trigger.click();
@@ -198,7 +222,9 @@ test.describe("inviting", () => {
 
   test("an expired invitation says so and offers 'Send again'", async ({ page }) => {
     const to = uniqueEmail("late");
-    await db.invitation.create({ data: { tenantId: school.id, email: to, role: Role.PARENT, tokenHash: "f".repeat(64), expiresAt: new Date(Date.now() - 3_600_000) } });
+    await db.invitation.create({
+      data: { tenantId: school.id, email: to, role: Role.PARENT, tokenHash: "f".repeat(64), expiresAt: new Date(Date.now() - 3_600_000) },
+    });
     await signedInAdmin(page);
     const pending = row(page, to);
     await expect(pending).toContainText("Expired");
@@ -207,7 +233,9 @@ test.describe("inviting", () => {
 });
 
 test.describe("changing people", () => {
-  test("Edit: change role and campus; the list and the person's NEXT request follow; Escape and Cancel change nothing", async ({ page }) => {
+  test("Edit: change role and campus; the list and the person's NEXT request follow; Escape and Cancel change nothing", async ({
+    page,
+  }) => {
     const tola = await member(Role.TEACHING_STAFF, "Tola Teacher", 0);
     const tolaCookie = cookieHeader((await loginAs(tola, { baseUrl: SAAS_URL })).token!);
     await signedInAdmin(page);
@@ -237,7 +265,58 @@ test.describe("changing people", () => {
     expect(school_.json.data).toMatchObject({ role: "NON_TEACHING_STAFF", campuses: [{ name: "Alpha South" }] }); // their next request already sees it
   });
 
-  test("Deactivate asks first and says what it does; confirming ends their access at once; Reactivate brings them back", async ({ page }) => {
+  test("Extra permissions: offered to staff only, ticked and saved with the role unchanged, shown in the list, and cleared — with a warning first — when the role moves to one that cannot hold them", async ({
+    page,
+  }) => {
+    const bola = await member(Role.NON_TEACHING_STAFF, "Bola Bursar", 0);
+    await signedInAdmin(page);
+    const edit = row(page, "Bola Bursar").getByRole("button", { name: "Change role or campus for Bola Bursar" });
+
+    await edit.click();
+    const group = dialog(page).getByRole("group", { name: "Extra permissions" });
+    await expect(group.getByRole("checkbox")).toHaveCount(4);
+    await expect(group.getByRole("checkbox", { checked: true })).toHaveCount(0);
+    await expect(group).toContainText("Administrators can do all of these already.");
+    await group.getByLabel("Manage fees and payments").check();
+    await group.getByLabel("Approve results").check();
+    await dialog(page).getByRole("button", { name: "Save changes" }).click();
+    await expect(dialog(page)).toBeHidden();
+    await expect(notice(page)).toContainText(
+      "Saved. Bola Bursar is now Non-teaching staff at Alpha North with extra permissions: approve results, manage fees and payments.",
+    );
+    await expect(row(page, "Bola Bursar")).toContainText("Extra: Approve results, Manage fees and payments");
+    expect((await db.tenantMembership.findFirstOrThrow({ where: { userId: bola.id } })).permissions).toEqual([
+      "CAN_APPROVE_RESULTS",
+      "CAN_MANAGE_FINANCE",
+    ]);
+
+    await edit.click(); // reopened: what they hold is ticked, and nothing else
+    await expect(dialog(page).getByLabel("Manage fees and payments")).toBeChecked();
+    await expect(dialog(page).getByLabel("Approve results")).toBeChecked();
+    await expect(dialog(page).getByLabel("Publish announcements")).not.toBeChecked();
+    await dialog(page).getByRole("button", { name: "Save changes" }).click(); // unchanged → sends nothing
+    await expect(dialog(page)).toBeHidden();
+    expect(await db.auditLog.count({ where: { tenantId: school.id, targetId: bola.id, action: "MEMBER_PERMISSIONS_CHANGED" } })).toBe(1);
+
+    await edit.click();
+    await dialog(page).getByLabel("Role").selectOption("PARENT");
+    await expect(group).toBeHidden();
+    await expect(dialog(page)).toContainText(
+      "Extra permissions can only be given to staff. Saving will remove the extra permissions Bola Bursar has now.",
+    );
+    await dialog(page).getByRole("button", { name: "Save changes" }).click();
+    await expect(dialog(page)).toBeHidden();
+    await expect(row(page, "Bola Bursar")).not.toContainText("Extra:");
+    expect(await db.tenantMembership.findFirstOrThrow({ where: { userId: bola.id } })).toMatchObject({ role: "PARENT", permissions: [] });
+    await edit.click();
+    await dialog(page).getByLabel("Role").selectOption("ADMIN");
+    await expect(dialog(page)).toContainText("Administrators can do everything, so extra permissions don't apply.");
+    await page.keyboard.press("Escape");
+  });
+
+  test("Deactivate asks first and says what it does; confirming ends their access at once; Reactivate brings them back", async ({
+    page,
+  }) => {
     const tola = await member(Role.TEACHING_STAFF, "Tola Teacher", 1);
     const tolaCookie = cookieHeader((await loginAs(tola, { baseUrl: SAAS_URL })).token!);
     await signedInAdmin(page);
@@ -247,6 +326,7 @@ test.describe("changing people", () => {
     const d = dialog(page);
     await expect(d.getByRole("heading", { name: "Deactivate Tola Teacher?" })).toBeVisible();
     await expect(d).toContainText("They lose access to Alpha School on their next request. Nothing they did is deleted");
+    await expect(d.getByRole("button", { name: "Cancel" })).toBeFocused(); // the SAFE choice has focus, so Enter cannot deactivate (found by mutation U5)
     await d.getByRole("button", { name: "Cancel" }).click();
     expect((await api(`/api/v1/schools/${school.code}`, { baseUrl: SAAS_URL, cookie: tolaCookie })).status).toBe(200); // cancelled: nothing happened
 
@@ -276,7 +356,9 @@ test.describe("changing people", () => {
     await expect(page.getByText(/^1 person/)).toBeFocused();
   });
 
-  test("a person deactivated by someone else in the meantime: the Edit that follows is refused with the server's own words", async ({ page }) => {
+  test("a person deactivated by someone else in the meantime: the Edit that follows is refused with the server's own words", async ({
+    page,
+  }) => {
     const tola = await member(Role.TEACHING_STAFF, "Tola Teacher", 0);
     await signedInAdmin(page);
     await page.getByRole("button", { name: "Change role or campus for Tola Teacher" }).click();
@@ -284,5 +366,48 @@ test.describe("changing people", () => {
     await dialog(page).getByLabel("Role").selectOption("PARENT");
     await dialog(page).getByRole("button", { name: "Save changes" }).click();
     await expect(dialog(page).getByRole("alert")).toContainText("This person is deactivated. Reactivate them first.");
+  });
+});
+
+test.describe("a campus administrator (slice B4, ADR 0016)", () => {
+  async function signedInCampusAdmin(page: Page) {
+    const user = await createUser({ name: "Cam Campusadmin" });
+    await addMembership(user.id, school.id, Role.CAMPUS_ADMIN, school.campuses[0].id);
+    await signInThroughUi(page, user);
+    await page.goto(`/schools/${school.code}/users`);
+    await expect(heading(page)).toBeVisible();
+    await expect(page.getByText(/^\d+ (person|people)/)).toBeVisible();
+  }
+
+  test("sees their own campus's people only; has controls for those below their level and none for a colleague at their level; no campus filter", async ({
+    page,
+  }) => {
+    await member(Role.TEACHING_STAFF, "Tola Teacher", 0);
+    await member(Role.TEACHING_STAFF, "Sola Southern", 1);
+    await member(Role.CAMPUS_ADMIN, "Pia Peer", 0);
+    const boss = await createUser({ name: "Ada Boss" });
+    await addMembership(boss.id, school.id, Role.ADMIN);
+    await signedInCampusAdmin(page);
+    await expect(row(page, "Tola Teacher")).toBeVisible();
+    await expect(row(page, "Sola Southern")).toHaveCount(0);
+    await expect(row(page, "Ada Boss")).toHaveCount(0);
+    await expect(row(page, "Tola Teacher").getByRole("button", { name: "Deactivate Tola Teacher" })).toBeVisible();
+    await expect(row(page, "Pia Peer")).toBeVisible();
+    await expect(row(page, "Pia Peer").getByRole("button")).toHaveCount(0); // a colleague at their own level is not theirs to change
+    await expect(page.getByLabel("Campus", { exact: true })).toHaveCount(0); // there is only their own campus to filter by
+    await expect(page.getByRole("link", { name: "Settings" })).toHaveCount(0);
+  });
+
+  test("the invite dialog offers no administrator roles, and the campus is theirs and fixed", async ({ page }) => {
+    await signedInCampusAdmin(page);
+    await page.getByRole("button", { name: "Invite someone" }).click();
+    const d = dialog(page);
+    await expect(d.getByLabel("Role")).toBeVisible();
+    const roles = await d.getByLabel("Role").locator("option").allTextContents();
+    expect(roles).toEqual(expect.arrayContaining(["Teaching staff", "Non-teaching staff", "Student", "Parent"]));
+    expect(roles).not.toContain("Administrator");
+    expect(roles).not.toContain("Campus administrator");
+    await expect(d.getByLabel("Campus")).toBeDisabled();
+    await expect(d.getByLabel("Campus")).toHaveValue(school.campuses[0].id);
   });
 });
