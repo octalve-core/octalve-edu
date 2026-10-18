@@ -28,6 +28,9 @@
 | 15 | [TASK-0015](0015-phase-5-expansion-higher-ed-and-domains.md) | Phase 5: Higher-Ed Credit Unit System, Custom Domains & Vocational Certifications | [x] Completed | 2026-10-18 01:00:00 UTC | 2026-10-18 01:30:00 UTC | [PR #21](https://github.com/octalve-core/octalve-edu/pull/21) |
 | 16 | Release Staging | Release v1.0.0 Staging: Promote `dev` ➔ `master` (Phases 1-5) | [x] Completed | 2026-10-18 05:14:00 UTC | 2026-10-18 05:15:00 UTC | [PR #22](https://github.com/octalve-core/octalve-edu/pull/22) |
 | 17 | Release Production | Release v1.0.0 Production: Promote `master` ➔ `prod` (Tagged `v1.0.0`) | [x] Completed | 2026-10-18 05:15:00 UTC | 2026-10-18 05:16:00 UTC | [PR #23](https://github.com/octalve-core/octalve-edu/pull/23) |
+| 18 | [TASK-0011-Followups](0011-audited-support-access.md) | Audited Support Access Enhancements (Named Grantee & Admin Notice) | [x] Completed | 2026-10-18 05:40:00 UTC | 2026-10-18 06:15:00 UTC | [PR #24](https://github.com/octalve-core/octalve-edu/pull/24) |
+| 19 | Release Staging | Release v1.0.1 Staging: Promote `dev` ➔ `master` | [x] Completed | 2026-10-18 06:33:00 UTC | 2026-10-18 06:33:30 UTC | [PR #25](https://github.com/octalve-core/octalve-edu/pull/25) |
+| 20 | Release Production | Release v1.0.1 Production: Promote `master` ➔ `prod` (Tagged `v1.0.1`) | [x] Completed | 2026-10-18 06:33:40 UTC | 2026-10-18 06:34:00 UTC | [PR #26](https://github.com/octalve-core/octalve-edu/pull/26) |
 ---
 
 ## Detailed Milestone Checklist
@@ -209,6 +212,16 @@
 - [x] Sub-phase E: API Endpoints (`/higher-ed/`, `/domains/`, `/certificates/`)
 - [x] Sub-phase F: UI Consoles & Shell Integration (`HigherEdPanel`, `CustomDomainSettings`, `CertificatesConsole`)
 - [x] Sub-phase G: Testing, Quality Gates & Sync (378/378 unit tests passing, typecheck & prettier clean)
+
+---
+
+### Release v1.0.1: Audited Support Access Enhancements & Test Hardening
+- **Status:** [x] Completed (PR #24 on `dev`, promoted to `master` via [PR #25](https://github.com/octalve-core/octalve-edu/pull/25) and `prod` via [PR #26](https://github.com/octalve-core/octalve-edu/pull/26), tagged `v1.0.1`)
+- [x] Named Grantee Support in Support Access (`granteeUserId` and `granteeEmail` recorded on active sessions).
+- [x] Admin Email Notification dispatched quietly (`supportOpenedNotice`) upon support session opening.
+- [x] Test Setup Privileges Hardening: explicitly revoked `UPDATE`, `DELETE`, and `TRUNCATE` on `SettingsChangeAudit` and `NotificationAuditLog` from `app_user`.
+- [x] Calendar-invariant dynamic date assertions in integration lifecycle tests.
+- [x] RLS table catalog guard updated with 11 Phase 4 & Phase 5 tables.
 
 
 
