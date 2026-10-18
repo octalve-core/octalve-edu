@@ -47,8 +47,8 @@ A school `ADMIN` can grant support access (areas, duration, reason) and revoke i
 Recorded per slice. Mutation passes: NOT RUN - pending, end of Phase 2.
 
 ## 5. Open follow-ups (not built; each is additive and none blocks using the feature)
-- [ ] **A named grantee.** `granteeUserId` exists on `SupportGrant` but the API refuses to set it: a grant is open to ANY platform administrator. Decide whether a school should be able to name one person.
-- [ ] **Notify the school's administrators** when a support view opens (today the school sees it in its activity list and audit log, but is not told).
+- [x] **A named grantee.** Built: `granteeUserId` / `granteeEmail` supported in `createGrant`, `POST /api/v1/schools/[code]/support-grants` validates that grantee is a registered platform administrator, `platform_support_grants()` scopes openable grants, and `SupportAccessPanel` displays grantee info and includes optional specific platform administrator input.
+- [x] **Notify the school's administrators** when a support view opens. Built: `openSupport()` dispatches `supportOpenedNotice` via `sendEmailQuietly` to all active school `ADMIN` members within the tenant boundary.
 - [ ] **A cap on audit rows per view.** Every allowed request writes a row on both sides; a long view writes many. Decide a cap or a per-minute collapse.
 - [ ] **The light theme for the platform flow's e2e.** The school's page is tested in both themes; the platform administrator's full flow only in the default dark theme.
 

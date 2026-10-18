@@ -15,7 +15,10 @@ import {
   type TestUser,
 } from "../support/db";
 import { api, cookieHeader } from "../support/http";
+import { waitForMail } from "../support/outbox";
 import { createSession } from "@/lib/auth/session";
+import { forTenant } from "@/lib/tenant/for-tenant";
+import { trustedTenantId } from "@/lib/tenant/verified-tenant";
 
 // The support session over real HTTP (task 0011 slice B, ADR 0017): a platform administrator opens a school they hold a LIVE grant for and from then on sees
 // only what the school granted, read-only, until the earlier of the grant's end and one hour; every request is written to the school's log and the platform's;
@@ -63,7 +66,9 @@ test.beforeAll(async () => {
   for (const [who, user] of Object.entries({ admin, platform, stranger })) cookie[who] = await sessionFor(user);
 });
 test.beforeEach(async () => {
-  await db.supportGrant.updateMany({ where: { tenantId: school.id, revokedAt: null }, data: { revokedAt: new Date() } }); // none left live from a previous test
+  await forTenant(trustedTenantId(school.id)).transaction((tx) =>
+    tx.supportGrant.updateMany({ where: { tenantId: school.id, revokedAt: null }, data: { revokedAt: new Date() } }),
+  );
   await db.session.updateMany({
     where: { userId: { in: [platform.id, stranger.id] } },
     data: { supportTenantId: null, supportOpenedAt: null },
@@ -96,6 +101,11 @@ test.describe("opening", () => {
     expect(ends).toBeLessThanOrEqual(Date.now() + 60 * 60_000 + 5000); // 6 hours granted, but a support view lasts an hour
     const after = await logs("SUPPORT_OPENED");
     expect([after.school - before.school, after.platform - before.platform]).toEqual([1, 1]);
+
+    const [mail] = await waitForMail(admin.email);
+    expect(mail.subject).toContain("Support view opened");
+    expect(mail.text).toContain("academics, people");
+    expect(mail.text).toContain(school.name);
   });
 
   test("a grant to one school is no way into another, and a person without a live grant stays out", async () => {
@@ -202,5 +212,28 @@ test.describe("the openable list", () => {
     expect(JSON.stringify(res.json)).not.toContain("Ticket 77");
     expect((await api("/api/v1/platform/support/grants", as("admin"))).status).toBe(403);
     expect((await api("/api/v1/platform/support/grants", as("stranger"))).status).toBe(200); // any platform administrator may use an unaddressed grant
+  });
+
+  test("a named grant addressed to one platform administrator is visible only to them", async () => {
+    await api(`${base()}/support-grants`, {
+      ...as("admin"),
+      method: "POST",
+      body: {
+        areas: ["settings"],
+        granteeEmail: platform.email,
+        reason: "Named to platform user",
+        stepUp: { type: "password", value: DEFAULT_PASSWORD },
+      },
+    });
+
+    // stranger does not see it in openable grants and cannot open it
+    const strangerGrants = await api("/api/v1/platform/support/grants", as("stranger"));
+    expect((strangerGrants.json.data.grants as { code: string }[]).some((g) => g.code === school.code)).toBe(false);
+    expect((await open("stranger")).status).toBe(404);
+
+    // platform user sees it in openable grants and can open it
+    const platformGrants = await api("/api/v1/platform/support/grants", as("platform"));
+    expect((platformGrants.json.data.grants as { code: string }[]).some((g) => g.code === school.code)).toBe(true);
+    expect((await open("platform")).status).toBe(200);
   });
 });

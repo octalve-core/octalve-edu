@@ -3,6 +3,7 @@ import { Role } from "@prisma/client";
 import { fail, ok } from "@/lib/api/envelope";
 import { validate } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
+import { prisma } from "@/lib/db";
 import { stepUpProofSchema } from "@/lib/school-settings/http";
 import { verifyStepUpProof } from "@/lib/school-settings/service";
 import { SUPPORT_AREAS, SUPPORT_GRANT_DEFAULT_HOURS, SUPPORT_GRANT_MAX_HOURS } from "@/lib/support/areas";
@@ -10,7 +11,7 @@ import { createGrant, listGrants } from "@/lib/support/grants";
 
 // /api/v1/schools/[code]/support-grants                                                       (task 0011 slice A, ADR 0017)
 //   GET   the school's grants, newest first (live, expired, revoked)
-//   POST  grant support access: which areas, how many hours (1-24, default 4), why; needs the step-up proof. Open to any platform administrator.
+//   POST  grant support access: which areas, how many hours (1-24, default 4), why, optional grantee email; needs the step-up proof.
 // SCHOOL ADMIN only - not a campus administrator, not a platform administrator. Audited in the school's own log. Finance is not a grantable area.
 export const GET = withAuth(async (_req, auth: TenantAuthContext) => ok({ grants: await listGrants(auth.tenant) }), {
   tenant: true,
@@ -29,6 +30,7 @@ const body = z.strictObject({
     .max(SUPPORT_GRANT_MAX_HOURS, `At most ${SUPPORT_GRANT_MAX_HOURS} hours.`)
     .default(SUPPORT_GRANT_DEFAULT_HOURS),
   reason: z.string({ error: "Say why." }).trim().min(1, "Say why.").max(300, "Use at most 300 characters."),
+  granteeEmail: z.string().trim().email("Enter a valid email address.").optional(),
   stepUp: stepUpProofSchema,
 });
 
@@ -40,7 +42,26 @@ export const POST = withAuth(
       if (proof.reason === "INVALID_MFA_CODE") return fail("That code isn't right.", 403, "INVALID_MFA_CODE");
       return fail("That password isn't right.", 403, "WRONG_PASSWORD");
     }
-    const grant = await createGrant(auth.tenant, auth.userId, { areas: input.areas, hours: input.hours, reason: input.reason });
+
+    let granteeUserId: string | null = null;
+    if (input.granteeEmail) {
+      const email = input.granteeEmail.toLowerCase();
+      const grantee = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true, isPlatformAdmin: true },
+      });
+      if (!grantee || !grantee.isPlatformAdmin) {
+        return fail("That email does not belong to a platform administrator.", 400, "INVALID_GRANTEE");
+      }
+      granteeUserId = grantee.id;
+    }
+
+    const grant = await createGrant(auth.tenant, auth.userId, {
+      areas: input.areas,
+      hours: input.hours,
+      reason: input.reason,
+      granteeUserId,
+    });
     return ok({ grant }, {}, 201);
   }),
   { tenant: true, roles: [Role.ADMIN] },
