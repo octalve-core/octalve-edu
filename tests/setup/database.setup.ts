@@ -58,6 +58,25 @@ setup("test database is created, migrated and empty", async () => {
     stdio: "pipe",
   });
 
+  const adminClient = new PrismaClient({ datasourceUrl: TEST_DATABASE_URL });
+  try {
+    await adminClient.$executeRawUnsafe(`
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${APP_DB_ROLE}') THEN
+          IF to_regclass('public."SettingsChangeAudit"') IS NOT NULL THEN
+            REVOKE UPDATE, DELETE, TRUNCATE ON TABLE public."SettingsChangeAudit" FROM ${APP_DB_ROLE};
+          END IF;
+          IF to_regclass('public."NotificationAuditLog"') IS NOT NULL THEN
+            REVOKE UPDATE, DELETE, TRUNCATE ON TABLE public."NotificationAuditLog" FROM ${APP_DB_ROLE};
+          END IF;
+        END IF;
+      END $$;
+    `);
+  } finally {
+    await adminClient.$disconnect();
+  }
+
   // The runtime role must be able to connect and must really be restricted — checked HERE, once, so a broken role setup
   // is one clear failure instead of a hundred confusing ones.
   const app = new PrismaClient({ datasourceUrl: TEST_APP_DATABASE_URL });

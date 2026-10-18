@@ -106,6 +106,9 @@ export function SupportAccessPanel({ schoolCode }: { schoolCode: string }) {
                   <p className="mt-0.5 text-sm text-fg-muted">
                     {grant.reason} · {STATUS[grant.status]}
                     {grant.status === "LIVE" ? ` until ${when(grant.expiresAt)}` : ""}
+                    {grant.granteeEmail
+                      ? ` · for ${grant.granteeName ? `${grant.granteeName} (${grant.granteeEmail})` : grant.granteeEmail}`
+                      : " · for any platform administrator"}
                     {grant.createdByName ? ` · by ${grant.createdByName}` : ""}
                   </p>
                 </div>
@@ -146,7 +149,7 @@ export function SupportAccessPanel({ schoolCode }: { schoolCode: string }) {
                 <p className="font-medium text-fg">
                   {entry.who ?? "A platform administrator"} · {ACTIVITY[entry.action]}
                 </p>
-                <p className="mt-0.5 break-words text-fg-muted">
+                <p className="mt-0.5 wrap-break-word text-fg-muted">
                   {when(entry.at)}
                   {entry.detail ? ` · ${entry.detail}` : ""}
                 </p>
@@ -185,6 +188,7 @@ function GrantDialog({
   const [areas, setAreas] = useState<SupportArea[]>([]);
   const [hours, setHours] = useState(String(SUPPORT_GRANT_DEFAULT_HOURS));
   const [reason, setReason] = useState("");
+  const [granteeEmail, setGranteeEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -207,14 +211,18 @@ function GrantDialog({
       areas,
       hours: hoursNumber,
       reason: reason.trim(),
+      granteeEmail: granteeEmail.trim() ? granteeEmail.trim() : undefined,
       stepUp: { type: "password", value: password },
     });
     setPending(false);
     if (reply.ok) return onDone(hoursNumber);
     const next: Record<string, string> = {};
-    for (const field of ["areas", "hours", "reason"]) {
+    for (const field of ["areas", "hours", "reason", "granteeEmail"]) {
       const problem = problemFor(reply, field);
       if (problem) next[field] = problem;
+    }
+    if (reply.status === 400 && reply.code === "INVALID_GRANTEE") {
+      next.granteeEmail = reply.message ?? "That email does not belong to a platform administrator.";
     }
     setErrors(next);
     if (reply.status === 403 && reply.code === "WRONG_PASSWORD") setPasswordError("That password isn't right.");
@@ -261,6 +269,16 @@ function GrantDialog({
           error={errors.reason}
           maxLength={300}
           hint="For example: the ticket you raised. This is kept with the record."
+          disabled={pending}
+        />
+        <TextField
+          label="Specific platform administrator email (optional)"
+          name="granteeEmail"
+          type="email"
+          value={granteeEmail}
+          onChange={(e) => setGranteeEmail(e.target.value)}
+          error={errors.granteeEmail}
+          hint="Leave blank to allow any platform administrator to assist."
           disabled={pending}
         />
         <PasswordField
