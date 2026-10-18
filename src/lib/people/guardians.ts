@@ -1,7 +1,15 @@
 import type { GuardianLinkStatus, Prisma, Relationship } from "@prisma/client";
 import type { Tx } from "@/lib/tenant/for-tenant";
 import type { TenantAuthContext } from "@/lib/auth/with-auth";
-import { cleanEmail, cleanOptional, cleanPersonName, cleanPhone, RELATIONSHIPS } from "@/lib/people/rules";
+import {
+  cleanEmail,
+  cleanOptional,
+  cleanOptionalName,
+  cleanOptionalText,
+  cleanPersonName,
+  cleanPhone,
+  RELATIONSHIPS,
+} from "@/lib/people/rules";
 import { auditPeople, invalid, refuse, refuseAndRollBack, rollingBack, type PeopleResult } from "@/lib/people/results";
 import { studentsVisibleTo } from "@/lib/people/students";
 
@@ -16,9 +24,12 @@ type TenantCtx = TenantAuthContext["tenant"];
 export type GuardianView = {
   id: string;
   firstName: string;
+  middleName: string | null;
   lastName: string;
   phone: string | null;
   email: string | null;
+  address: string | null;
+  occupation: string | null;
   archived: boolean;
   /// How many students are linked to them now (revoked links do not count).
   studentCount: number;
@@ -47,9 +58,12 @@ const LIVE: Prisma.GuardianLinkWhereInput = { status: { not: "REVOKED" } };
 const GUARDIAN_SELECT = {
   id: true,
   firstName: true,
+  middleName: true,
   lastName: true,
   phone: true,
   email: true,
+  address: true,
+  occupation: true,
   archivedAt: true,
   _count: { select: { links: { where: LIVE } } },
 } satisfies Prisma.GuardianRecordSelect;
@@ -57,9 +71,12 @@ type GuardianRow = Prisma.GuardianRecordGetPayload<{ select: typeof GUARDIAN_SEL
 const toGuardian = (row: GuardianRow): GuardianView => ({
   id: row.id,
   firstName: row.firstName,
+  middleName: row.middleName ?? null,
   lastName: row.lastName,
   phone: row.phone,
   email: row.email,
+  address: row.address ?? null,
+  occupation: row.occupation ?? null,
   archived: row.archivedAt !== null,
   studentCount: row._count.links,
 });
@@ -176,19 +193,41 @@ export async function getGuardian(
 
 // --- writing ------------------------------------------------------------------------------------------------------------------
 
-type ContactInput = { firstName?: unknown; lastName?: unknown; phone?: unknown; email?: unknown };
-type CleanContact = { firstName: string; lastName: string; phone: string | null; email: string | null };
+type ContactInput = {
+  firstName?: unknown;
+  middleName?: unknown;
+  lastName?: unknown;
+  phone?: unknown;
+  email?: unknown;
+  address?: unknown;
+  occupation?: unknown;
+};
+type CleanContact = {
+  firstName: string;
+  middleName: string | null;
+  lastName: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  occupation: string | null;
+};
 
 function cleanContact(input: ContactInput): { ok: true; value: CleanContact } | ReturnType<typeof invalid> {
   const firstName = cleanPersonName(input.firstName);
   if (!firstName) return invalid("firstName");
+  const middleName = cleanOptionalName(input.middleName);
+  if (middleName === undefined) return invalid("middleName");
   const lastName = cleanPersonName(input.lastName);
   if (!lastName) return invalid("lastName");
   const phone = cleanOptional(input.phone, cleanPhone);
   if (phone === undefined) return invalid("phone");
   const email = cleanOptional(input.email, cleanEmail);
   if (email === undefined) return invalid("email");
-  return { ok: true, value: { firstName, lastName, phone, email } };
+  const address = cleanOptionalText(input.address, 200);
+  if (address === undefined) return invalid("address");
+  const occupation = cleanOptionalText(input.occupation, 200);
+  if (occupation === undefined) return invalid("occupation");
+  return { ok: true, value: { firstName, middleName, lastName, phone, email, address, occupation } };
 }
 
 const isRelationship = (value: unknown): value is Relationship =>
@@ -397,13 +436,18 @@ export async function updateGuardian(
       if (current.archivedAt) return refuse("ARCHIVED");
       const merged = cleanContact({
         firstName: input.firstName ?? current.firstName,
+        middleName: input.middleName === undefined ? current.middleName : input.middleName,
         lastName: input.lastName ?? current.lastName,
         phone: input.phone === undefined ? current.phone : input.phone,
         email: input.email === undefined ? current.email : input.email,
+        address: input.address === undefined ? current.address : input.address,
+        occupation: input.occupation === undefined ? current.occupation : input.occupation,
       });
       if (!merged.ok) return merged;
       const next = merged.value;
-      const changedFields = (["firstName", "lastName", "phone", "email"] as const).filter((field) => next[field] !== current[field]);
+      const changedFields = (
+        ["firstName", "middleName", "lastName", "phone", "email", "address", "occupation"] as const
+      ).filter((field) => next[field] !== current[field]);
       const view = async () => toGuardian(await tx.guardianRecord.findUniqueOrThrow({ where: { id }, select: GUARDIAN_SELECT }));
       if (changedFields.length === 0) return { ok: true as const, guardian: await view(), changed: false };
       await tx.guardianRecord.update({ where: { id }, data: next });
