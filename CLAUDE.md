@@ -2,6 +2,12 @@
 
 # Octalve Edu — orientation for whoever (or whatever) picks this up next
 
+> ### 🚨 ACTIVE HANDOVER FOR NEXT AI SESSION (Updated 2026-10-18)
+> - **Primary Repository Handover:** [`docs/HANDOVER.md`](docs/HANDOVER.md) — Read this for current deployment status, database migrations, and landed milestones.
+> - **Operations & Admissions Architecture Blueprint:** [`docs/tasks/0016-phase-4-operations-and-admissions-blueprint.md`](docs/tasks/0016-phase-4-operations-and-admissions-blueprint.md) — Specifications for Extended HR/Payroll, Library, Transport, Inventory, NEMIS, and Admissions CRM.
+> - **Master Cross-Project Handover:** [`/home/rojitech/Desktop/CODEC/out/HANDOFF-FOR-NEXT-AI.md`](/home/rojitech/Desktop/CODEC/out/HANDOFF-FOR-NEXT-AI.md) (Section 17).
+> - **Tasks Register:** [`/home/rojitech/Desktop/CODEC/out/tasks.md`](/home/rojitech/Desktop/CODEC/out/tasks.md).
+
 This file exists so a fresh AI session with access to this repo (and its sibling, AlEemaan) can get
 productive in minutes, not hours. Read this whole file before touching code. It tells you what to
 read next, in what order, which files are living documents you must keep current, and which are
