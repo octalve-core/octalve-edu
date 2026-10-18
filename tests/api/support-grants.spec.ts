@@ -125,4 +125,28 @@ test.describe("creating, listing, revoking", () => {
     const list = await api(route(), as("admin"));
     expect((list.json.data.grants as { reason: string }[]).some((g) => g.reason === "theirs")).toBe(false);
   });
+
+  test("granteeEmail: must be a registered platform administrator; invalid or non-admin email is refused", async () => {
+    const nonAdmin = await createUser({ name: "Not Platform Admin" });
+    const refused = [{ granteeEmail: "not-an-email" }, { granteeEmail: "ghost@example.com" }, { granteeEmail: nonAdmin.email }];
+    for (const bad of refused) {
+      const res = await create("admin", bad);
+      expect(res.status, JSON.stringify(bad)).toBe(400);
+    }
+
+    const res = await create("admin", { granteeEmail: users.platform.email });
+    expect(res.status, res.text).toBe(201);
+    expect(res.json.data.grant).toMatchObject({
+      granteeEmail: users.platform.email,
+      granteeName: users.platform.name,
+      status: "LIVE",
+    });
+
+    const row = await db.supportGrant.findUniqueOrThrow({ where: { id: res.json.data.grant.id } });
+    expect(row.granteeUserId).toBe(users.platform.id);
+
+    const list = await api(route(), as("admin"));
+    const found = (list.json.data.grants as { id: string; granteeEmail: string | null }[]).find((g) => g.id === res.json.data.grant.id);
+    expect(found?.granteeEmail).toBe(users.platform.email);
+  });
 });

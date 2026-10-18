@@ -132,6 +132,10 @@ export async function reactivateMembership(userId: string, tenantId: string) {
 export async function removeCreatedTenants(): Promise<void> {
   const ids = createdTenantIds.splice(0);
   if (ids.length === 0) return;
+  await db.session.updateMany({
+    where: { supportTenantId: { in: ids } },
+    data: { supportTenantId: null, supportOpenedAt: null },
+  });
   await db.auditLog.deleteMany({ where: { tenantId: { in: ids } } });
   await db.tenant.deleteMany({ where: { id: { in: ids } } });
 }

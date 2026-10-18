@@ -195,3 +195,28 @@ export function invitationEmail(input: {
     ].join("\n"),
   };
 }
+
+// --- Support Access (task 0011 §5) -------------------------------------------------------------
+
+export function supportOpenedNotice(input: {
+  to: string;
+  schoolName: string;
+  adminName: string | null;
+  areas: readonly string[];
+  endsAt: Date;
+}) {
+  const school = oneLine(input.schoolName);
+  const admin = input.adminName ? oneLine(input.adminName) : "A platform administrator";
+  return {
+    to: input.to,
+    subject: `Support view opened for ${school} on ${brand.name}`,
+    text: [
+      `${admin} opened a read-only support view of ${school}.`,
+      ``,
+      `Areas allowed: ${input.areas.join(", ")}`,
+      `Session ends at: ${input.endsAt.toUTCString()}`,
+      ``,
+      `The session is strictly read-only and all actions are recorded in your school's activity log. You can withdraw access at any time from your school's Support Access settings.`,
+    ].join("\n"),
+  };
+}

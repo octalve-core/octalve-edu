@@ -1,9 +1,12 @@
 import { prisma } from "@/lib/db";
-import { forUser } from "@/lib/tenant/for-tenant";
+import { forTenant, forUser } from "@/lib/tenant/for-tenant";
+import { trustedTenantId } from "@/lib/tenant/verified-tenant";
 import { isValidTenantCode } from "@/lib/tenant/validate-code";
+import { sendEmailQuietly } from "@/lib/email/transport";
+import { supportOpenedNotice } from "@/lib/email/messages";
 import { SUPPORT_AREAS, type SupportArea } from "./areas";
 
-// The support session (task 0011 slice B, ADR 0017). A platform administrator OPENS a school they hold a live grant for; the Session row remembers which
+// The support session (task 0011 slice B, ADR 0017): A platform administrator OPENS a school they hold a live grant for; the Session row remembers which
 // school and since when. The view ends at the EARLIER of the grant's expiry and one hour after it was opened - and "still allowed" is decided from the
 // grant itself on every request (platform_support_grants), so a revoke, an expiry or a suspension takes effect on the very next request.
 
@@ -71,6 +74,34 @@ export async function openSupport(userId: string, sessionId: string, code: strin
   if (!view) return { ok: false };
   if (!(await recordSupport(userId, school.id, view.grantId, "SUPPORT_OPENED", { areas: view.areas.join(",") }))) return { ok: false };
   await prisma.session.updateMany({ where: { id: sessionId, userId }, data: { supportTenantId: school.id, supportOpenedAt: openedAt } });
+
+  const [admins, platformAdmin] = await Promise.all([
+    forTenant(trustedTenantId(school.id)).transaction((tx) =>
+      tx.tenantMembership.findMany({
+        where: { tenantId: school.id, role: "ADMIN", deactivatedAt: null },
+        select: { user: { select: { email: true } } },
+      }),
+    ),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    }),
+  ]);
+
+  for (const admin of admins) {
+    if (admin.user?.email) {
+      await sendEmailQuietly(
+        supportOpenedNotice({
+          to: admin.user.email,
+          schoolName: school.name,
+          adminName: platformAdmin?.name ?? null,
+          areas: view.areas,
+          endsAt: view.endsAt,
+        }),
+      );
+    }
+  }
+
   return { ok: true, view, school: { code: school.code, name: school.name } };
 }
 
