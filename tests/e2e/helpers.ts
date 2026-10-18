@@ -26,16 +26,22 @@ export async function fillCredentials(page: Page, email: string, password: strin
 
 /// `remember: true` ticks "Keep me signed in" first (a persistent cookie + the long policy);
 /// the default leaves it as the screen does — unchecked (a session cookie + a 12-hour cap).
-export async function signInThroughUi(
-  page: Page,
-  user: { email: string; password: string },
-  opts: { remember?: boolean } = {},
-) {
+export async function signInThroughUi(page: Page, user: { email: string; password: string }, opts: { remember?: boolean } = {}) {
   await page.goto("/login");
   await fillCredentials(page, user.email, user.password);
   if (opts.remember) await keepSignedInBox(page).check();
   await signInButton(page).click();
   await expect(page).toHaveURL(HOME_URL);
+}
+
+/// Resolves once React has hydrated the page: a button that is clickable but not yet hydrated swallows the click (the More sheet "never opens",
+/// the account menu does nothing) - the cause of an intermittent failure in tests that click straight after sign-in. React attaches its props to
+/// every hydrated DOM node under a `__reactProps$…` key, so the signal is a real one, not a sleep.
+export async function waitForHydration(page: Page) {
+  await page.waitForFunction(() => {
+    const button = document.querySelector("button");
+    return button !== null && Object.keys(button).some((key) => key.startsWith("__reactProps$"));
+  });
 }
 
 /// Signs out through whatever this repo's signed-in screens offer: a "Sign out" button in the header

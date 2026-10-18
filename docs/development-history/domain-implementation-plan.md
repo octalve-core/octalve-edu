@@ -166,6 +166,7 @@ one repo maps 1:1 onto the other:
 | Error codes | `INVALID_CREDENTIALS`, `RATE_LIMITED`, `CSRF`, `INVALID_BODY`, `UNAUTHENTICATED` (AlEemaan adds `FORBIDDEN`) |
 | Screens | `/login`, `/dashboard`, `/` (pure router), `/setup`; `components/ui/*`, `components/auth/*` |
 | Tests | `tests/{setup,unit,integration,api,e2e,https}`, `playwright.config.ts`, `pnpm test` — same layout and helpers in both repos (own ports and own `*_test` database each) |
+| Users and invitations (0.5.4; AlEemaan: **0.5.H**) | `lib/invitations/{token,status,service}.ts`, `lib/members/{service,http}.ts`, `POST /api/v1/invitations/{preview,accept}`, `/accept-invite`, audit actions `INVITATION_*`, `MEMBER_*` — AlEemaan **diverges** (ADR 0002 there): members are addressed by *membership* id, `branchId` for `campusId`, no RLS, and deactivating a person's last active membership also deletes their sessions (here the session lives on and resolves to no school) |
 
 Deliberately **not** synced (different concepts, not naming drift): the models `Campus`/`Branch` and
 `TenantMembership`/`Membership` (this repo has a `Tenant` above `Campus`; AlEemaan has no tenant and
@@ -778,6 +779,10 @@ refund, independent keys, concurrent reserves → exactly `limit` succeed, outag
 list/paginate/validate/create/duplicate/forbidden-role/rate-limit/cross-tenant/revoked-session. A Redis server is a test prerequisite (`redis-server`
 on `PATH`; the Playwright config starts it on port 6390).
 
+**Port to AlEemaan (2026-10-06, divergence log — mirrored in its plan §0.5.G "As built"):** pagination, `validate()`, `fail(…, details)`, the breached-password check and the CSRF hardening were ported to AlEemaan by reading this diff. Differences: its `User-Agent` is
+`aleemaan-password-check`; no Redis store (one process); its setup route runs the breach check *after* the setup-token check (here it runs before — an unauthenticated wrong-token request makes this server call out; consider reordering); and its TLS **test** proxy rewrites `Host`, so
+its HTTPS test genuinely needs `TRUST_FORWARDED_HOST=true` — **this repo's test proxy (`tests/support/tls-proxy.mjs`) still passes `Host` through, so the same mutation (drop the setting from the HTTPS server) would survive here; a small follow-up.**
+
 **As built — 0.5.3 (2026-10-05)** — record: `phases/phase-0.5.3-api-infrastructure.md`. As designed, with: Redis keeps the offline queue **on** (the first
 version failed the first commands of a fresh process — found by the conformance test) plus a circuit-breaker cooldown; `Campus (tenantId, name)` is unique
 (one additive migration); the success paths of the breach check are tested over HTTP against a local stand-in for the service. **Not built:** the
@@ -896,6 +901,14 @@ diff after they are proven here — with `branchId` where this has `tenantId`, a
 Safari `relatedTarget` case written once); (b) `forbidden.tsx` moved **into** the `(app)` group so the 403 view renders inside the shell (still a real 403, still naming nothing, and it shows only the person's *own*
 schools); (c) the sidebar's person card is a named group (`Signed in as`) so it can be asserted; (d) `requireTenantPage` now goes through the cached `requirePageSession`. 26 injected bugs: 24 caught, 1 at build time, 1 equivalent.
 **Not built:** the Users and Settings *pages* (visible "Soon" entries) — Users is §0.5.4 below.
+
+**As built — Users and invitations (0.5.4, 2026-10-06)** — record: `phases/phase-0.5.4-users-invitations.md`, branch `claude/app-shell-users`. Designed items 1–6 and 8 are built as written. Differences and additions: (a) the invitation
+accept path is **one transaction through `forInvitation(hash)`**, which sets the tenant context from the row the secret names (the second legitimate `trustedTenantId` site, still forbidden in school code by ESLint); (b) the
+single-use claim is a conditional `updateMany` whose row count decides, and a lost race is now tested **deterministically** (`whileHeld()` in `tests/integration/invitations.spec.ts`) rather than by luck; (c) the member list's order is
+`name, email, id` (the id tiebreak is the design's; the address was added so ties read naturally); (d) `Invitation_tokenHash_key` is unique and `app_invitation_hash()` is `NULLIF`-guarded so a blank setting can never match a row stored
+with an empty hash (both pinned by tests); (e) the harness got two fixes found on the way — a **corrupt mail outbox is now an error, not "no mail"**, and a CSP test that could pass against a report-only policy was made real. **Not built:** the admin-initiated
+email change (design item 7, "0.5.4-F") — still deliberately open. **Mutation testing:** 122 injected bugs, first pass 102 caught / 19 survived / 1 did not compile; the survivors were turned into tests (five are justified-equivalent) and
+their re-check is **deferred by the maintainer to the end of Phase 2**, to run together with Phase 1's passes.
 
 ### Phase 0.5 addenda (2026-09-30, after the auth build)
 
@@ -1812,6 +1825,12 @@ layer for any transition originating from `LOCKED` — the DB column stays nulla
 `DRAFT → SUBMITTED` transition genuinely has no "reason") but the API route for a post-lock
 correction rejects a missing reason before it ever reaches Prisma.
 
+**Public Credential / Report-Card Verification (`out/certificate_or_file_access` & `VerifyCertificateForm`):**
+In addition to internal results viewing, every approved and published term report card and graduation certificate will carry an immutable verification token / hash and QR code. An unauthenticated public verification route (`/schools/[code]/verify` or `/verify/[code]`) adopting the `VerifyCertificateForm` pattern allows external stakeholders (tertiary admissions officers, employers, scholarship committees) to verify credential validity, issue date, student admission number, and honours without exposing internal student records.
+
+**Timetable & Curriculum Visual Canvas (`TwoNode_V2_Design_Canvas.html`):**
+`TimetableSlot` scheduling and subject offering arrangements adopt the interactive visual workflow canvas architecture from `TwoNode_V2_Design_Canvas.html` for real-time drag-and-drop clash resolution (teacher-period-room conflict detection), making schedule composition intuitive on desktop viewports while maintaining compact card views on mobile.
+
 **`TimetableSlot`, `Announcement` — straightforward, no audit-driven decisions.**
 
 ```prisma
@@ -2068,7 +2087,370 @@ model TenantMembership {
   custom roles. If a school needs more granularity than these four permissions later, that's a
   deliberate future phase, not a Phase 1 scope-creep.
 
+#### Build design — Phase 1.0 (foundations) and 1.1 (academic structure) — Slice 1 (2026-10-06, written before any code)
+
+**Scope.** Roadmap sub-phases 1.0 and 1.1 only. (Numbering note: *this plan's* §1.1–§1.7 are the Phase 1 *schema sketches*; the **roadmap's** 1.0–1.8 are the *build
+order*. "1.0 / 1.1" below are the roadmap's.) The sketches in §1.1–§1.3 and §1.7 **predate** row-level security, the shell and the Users pages; where they conflict with the
+rules the project has since learned, **this section wins** and the differences are listed in "Reconciliations" so nobody has to guess. Nothing here starts 1.2 (people).
+
+##### Reconciliations with the earlier sketches (each is a deliberate change)
+1. **Every table gets its own `tenantId`** — the §1.2 sketch gave `ClassArm`, `StaffSubjectAssignment`, … none, which the catalog guard (`tests/integration/rls.spec.ts`) would
+   rightly fail, and a join through the parent is not row-level security. All Slice 1 tables carry `tenantId` and the RLS policy on it.
+2. **Composite foreign keys keep a child in its parent's school.** RLS `WITH CHECK` only inspects the new row's own `tenantId`; a foreign key is checked by the database *without*
+   row-level security, so a school-A row could name a school-B parent id (a guessable-by-leak cuid) and the constraint would be satisfied. Every child therefore references
+   `(tenantId, parentId)` → parent `(tenantId, id)` (parents get `@@unique([tenantId, id])`). The application also reads parents through the tenant context (invisible if foreign) —
+   two independent guards. Relations other than the tenant itself use `onDelete: NoAction` (not `Restrict`, which is checked per row and would break deleting a school); the school
+   cascades to everything (tests remove their schools).
+3. **"Current" is a status, not a boolean.** §1.2's `isCurrent` becomes `SessionStatus { PLANNED, ACTIVE, CLOSED }` + `archivedAt`; the period keeps a single `isCurrent` flag
+   (one per session, partial unique index) because "which term are we in" is genuinely a pointer.
+4. **A session may be school-wide or one campus's** (`campusId` nullable, null = every campus). The brief says "one active session per **campus**, not per school"; §1.2 has no campus on
+   a session. See decision 11 for the rule that makes both coexist.
+5. **`AssessmentConfig` and `GradeScale` are new** (the roadmap names them; §1.2 has only `Result.score/maxScore`). Their shapes are decisions 14–15.
+6. **Subjects are offered *to class groups*** (roadmap 1.1-T4 "subjects per class group") through a link table, rather than `Subject` standing alone as §1.2 sketched; the
+   `StaffSubjectAssignment` of §1.2 is 1.2's, not this slice's.
+7. **Permissions** follow §1.7 exactly, plus two integrity rules §1.7 did not state (decision 6) — a CHECK constraint and clearing on role change.
+
+##### 1.0 — Foundations (migration `…_phase_1_0_foundations`)
+**Decision 1 — `Tenant.schoolType`.** `enum SchoolType { K12 HIGHER_ED VOCATIONAL }`, column `NOT NULL DEFAULT 'K12'`. The default is "K12" because every school that exists today is
+one; it is additive and live-data-safe. The setup wizard does **not** ask yet (no settings UI until roadmap 1.7), so a new school is K12 until support changes the column; the field only
+decides which `PeriodKind` a school's periods have (decision 12). `Tenant` is an identity table (no RLS, no `tenantId`), unchanged in that respect.
+
+**Decision 2 — `SchoolSettings`: one row per school, exactly.** Columns and defaults are §1.3's (all ten: `resultApprovalRequired true`, `rolloverMode ADMIN_CONFIRMED`,
+`classAutoAssignment false`, `billingCycle PER_TERM`, `feeReminderEnabled true`, `discountWorkflowMode MANUAL_OVERRIDE`, `feeCostBearer SCHOOL_ABSORBS`, `multiCampusEnabled false`,
+`mfaRequiredForTeaching true`), primary key `tenantId` (so two rows cannot exist), RLS `"tenantId" = app_tenant_id()` USING + WITH CHECK, `updatedAt`. **No UI and no write path in this
+slice** (roadmap 1.7 adds them, with step-up MFA and `SettingsChangeAudit`); only a read helper `getSchoolSettings(tx)` exists, which **throws** if the row is missing rather than
+inventing defaults — a missing row is a bug to be loud about, not a state. The secure defaults are pinned by a test that spells the values out (not by reading them back).
+
+**Decision 3 — the row is created by the database, so no path can forget it.** An `AFTER INSERT ON "Tenant"` trigger inserts the `SchoolSettings` row. Because the table is under
+`FORCE` RLS and the inserting role has no tenant context yet (the setup wizard creates the tenant *then* sets the context), the trigger function sets `app.tenant_id` to the new id
+**transaction-locally for the one insert and restores the caller's previous value** (never leaves the caller in a different school's context). Every creation path — the setup wizard,
+`tests/support/db.ts#createTenant`, any future signup, a hand-run SQL `INSERT` — gets the row with no code change. The migration also **backfills** existing tenants
+(`INSERT … SELECT … ON CONFLICT DO NOTHING`, idempotent) *before* RLS is enabled on the new table. A catalog test fails if any `Tenant` lacks a row, and a second test creates tenants by
+each real path and asserts the row (the setup route over HTTP, the helper, raw SQL).
+
+**Decision 4 — `Permission` and `TenantMembership.permissions`.** `enum Permission { CAN_APPROVE_RESULTS CAN_MANAGE_FINANCE CAN_PUBLISH_CONTENT CAN_MANAGE_USERS }`,
+`permissions Permission[] NOT NULL DEFAULT '{}'`. No custom roles, no per-record ACLs, no hierarchy (§1.7's non-goals stand). Invitations still carry a role only; permissions are granted
+after joining, by an administrator.
+
+**Decision 5 — `withAuth({ tenant: true, roles?, permissions? })`.** The rule, evaluated on the server from the **membership in the verified school** on every request:
+- neither option → any active member passes (unchanged);
+- `roles` only → the member's role must be listed (unchanged — an `ADMIN` is **not** implicitly in a route's `roles: ["TEACHING_STAFF"]`; today's behaviour and tests stay);
+- `permissions` given (with or without `roles`) → passes if the role is in `roles` **or** the member is an `ADMIN` (ADMIN implies every permission) **or** holds at least one listed
+  permission. *Interpretation to flag:* the brief's "ADMIN implies every permission" is applied to the `permissions` option only, never to `roles` — implying roles would silently open
+  every teacher-only route to administrators and change behaviour that is tested today;
+- `permissions: []` or a non-array is a programming error and throws at construction (a route that lists no permission would otherwise read as "everyone");
+- the refusal is the same single 403 body as every other (`NO_ACCESS`); `TenantContext` gains `permissions` (read by `resolveTenant` from the same membership row, filtered
+  `deactivatedAt: null`, so a deactivated member has none). `tests/unit/with-auth.types.ts` gains the compile-time cases (`permissions` legal only with `tenant: true`; wrong enum value
+  is a type error).
+
+**Decision 6 — granting and revoking permissions (Users page).** `PATCH /api/v1/schools/[code]/members/[userId]` accepts `permissions?: Permission[]` (the **full desired set**, deduplicated,
+validated against the enum, strict body). Rules, in the same transaction as the write, audited as `MEMBER_PERMISSIONS_CHANGED` with `before`/`after`:
+- **only an `ADMIN` of that school** may call the route (it stays `roles: ["ADMIN"]`; **never** `permissions: ["CAN_MANAGE_USERS"]` — a delegable "grant permissions" power is an escalation path, so
+  `CAN_MANAGE_USERS` is *stored* in this slice but consumed by no route yet; when a later slice lets it open parts of the Users page it must still never reach the permission/role endpoints);
+- not yourself (`SELF`, as role changes already are);
+- permissions are meaningful only on staff roles: **`TEACHING_STAFF` / `NON_TEACHING_STAFF`**. Setting any on an `ADMIN` (already implies all), `STUDENT` or `PARENT` is refused
+  (`PERMISSIONS_NOT_APPLICABLE`), and **changing a member's role to a non-staff role or to `ADMIN` clears their permissions in that same transaction** (audited in the same entry) — so a parent
+  can never silently hold `CAN_MANAGE_FINANCE`, and a demoted administrator does not come back with stale grants. A `CHECK` constraint states the invariant in the database:
+  `permissions = '{}' OR role IN ('TEACHING_STAFF','NON_TEACHING_STAFF')`;
+- a no-op (the same set) writes nothing and audits nothing (as the role/campus no-ops already behave); a deactivated member's permissions cannot be edited (as roles can't);
+- the member list and the Edit dialog show/edit them (checkboxes for staff members; plain-language names and one-line meanings; the live region announces the result).
+Invitation acceptance sets none.
+
+**As built — Phase 1.0 (2026-10-06)** — record: `phases/phase-1.0-foundations.md`, migration `20261010090000_phase_1_0_foundations`. Decisions 1–6 are built as designed. Details worth knowing: (a) the trigger `tenant_creates_settings` is plain (not
+`SECURITY DEFINER`) and restores the caller's `app.tenant_id`; (b) `SchoolSettings.updatedAt` has a database default so the trigger can insert; (c) there is **no DELETE policy** on `SchoolSettings`; (d) `withAuth` validates `permissions` at construction (non-empty, real
+values, needs `tenant: true`); (e) the member list's `permissions` is always present and always in enum order; (f) ADMIN-implies-permissions is applied to the `permissions` option only (decision 5's interpretation, now tested). **Mutation pass deferred to the end of
+Phase 2 by the maintainer's decision; the list above stands as the plan for it.**
+
+**As built — Phase 1.1 (2026-10-07)** — record: `phases/phase-1.1-academic-structure.md`; migrations `20261011090000_phase_1_1a_sessions_periods`, `20261012090000_phase_1_1b_classes_subjects`, `20261013090000_phase_1_1c_assessment_grading` (one per family, RLS in the same file as its tables); 34 routes under `/academics/…`; screens at `/schools/[code]/academics`.
+Decisions 7–17 are built as designed. Deviations, all deliberate: (a) **composite foreign keys use `ON DELETE NO ACTION`** (a school delete cascades through `tenantId`); (b) **locks are database triggers** (`assessment_scheme_locked`, `assessment_component_locked`, `grade_scale_locked`, `grade_band_locked`) — not only the service — and `pg_trigger_depth() > 1` lets a whole-school cascade through;
+(c) **a new version archives its predecessor in the same transaction** (decision 14 said "until activated"); (d) **decision 18 narrowed:** the page is administrators-only (the staff read API exists and is tested, no staff screen yet), sections are real links (`?section=`) rather than a tab widget, and the nav label is "Academics"; (e) copy-forward needs a typed name when the label is not a year pair;
+(f) **new rule found by the tests: a refusal that can follow a write must roll the transaction back** (`refuseAndRollBack` / `rollingBack`) — a returned refusal commits what came before it; (g) dates are spelled by a table, not `Intl`. **Mutation pass pending — end of Phase 2** (the "1.1" paragraph of the plan's "Mutation plan" below is the work).
+
+##### Design change — closing a session takes time, and a closed session can be reopened (decided by the maintainer 2026-10-07; written before any code)
+
+**Why.** Slice 1 built `CLOSED` as final and `close` as instant. The maintainer's answer to the open question: **keep it final-ish with a safety net** — closing is *delayed* (so a mistaken click is harmless), can be *forced* only by proving who you are, and a closed session can be *reopened with a reason* while nothing newer is active. Added to the Slice 1 branch and PR (not yet merged) as new commits.
+
+**Decision C1 — closing is scheduled.** `POST …/sessions/[id]/close` (ADMIN, `ACTIVE` session) no longer closes: it **schedules** the close for **24 hours later** (`closeAt = now + 24 h`). Until `closeAt` the session is **fully `ACTIVE`** (editable, current) and shows "Closes at …" with a **Cancel** button. New nullable columns on `AcademicSession` (one additive migration, RLS unchanged): `closeAt TIMESTAMP(3)`, `closeRequestedById TEXT`, `closeForced BOOLEAN NOT NULL DEFAULT false`. Asking again while one is scheduled is a no-op (200, `changed:false`, the existing time kept).
+
+**Decision C2 — forcing it.** The same route with `{ "password": "<the administrator's own password>" }` sets `closeAt = now + 1 minute` (`closeForced = true`) — also when a 24-hour close is already scheduled (the sooner time wins). The password is verified with the same constant-time check as change-password, **rate-limited per account** (5 failures per window, success refunded, same key family), wrong password → 403 with the field error on `body.password` and **no change**. A password is never logged or audited. (MFA accounts: the password is the re-proof, as for change-password.)
+
+**Decision C3 — cancelling.** `POST …/sessions/[id]/close/cancel` (ADMIN) clears `closeAt` while it is still in the future; a close that has already taken effect is `WRONG_STATE` (use reopen). Idempotent on a session with nothing scheduled.
+
+**Decision C4 — the clock, without a scheduler.** No cron is introduced. The close takes effect **lazily and exactly once**: (a) a pure `effectiveStatus(session, now)` returns `CLOSED` for an `ACTIVE` session whose `closeAt <= now`, and **every view and every guard uses it** — a due session is read-only the instant it is due, whether or not anything has written the change; (b) `settleDueClosings(tx, tenantId)` runs at the start of every session service call and inside `currentSessionFor`: it moves due sessions to `CLOSED` with a **conditional update** (`WHERE status='ACTIVE' AND closeAt <= now()`, the row count decides) and writes `SESSION_CLOSED` (`scheduled`/`forced`, actor = who asked) — so two concurrent settlers produce one audit row. The database clock (`now()`) decides, not the application's.
+
+**Decision C5 — switching to the next session.** `activate` with `closeCurrent: true` (the year-end switch) closes the old session **immediately and atomically**, as built, and **now requires the same password proof** (it is the force path with no waiting, because the new session starts in the same transaction). Without `closeCurrent`, activating while another is `ACTIVE` is still refused naming it — a *scheduled* close does not make room (the session is still `ACTIVE` until it takes effect). *(Open question below.)*
+
+**Decision C6 — reopening.** `POST …/sessions/[id]/reopen { reason }` (ADMIN; reason 5–300 characters, trimmed): `CLOSED` → `ACTIVE`, clears `closeAt`, refused (`ANOTHER_ACTIVE`, naming it) if another session of the **same scope is `ACTIVE`** or the session is archived, audited `SESSION_REOPENED` with the reason. It runs under the per-scope advisory lock and the rollback helpers (ADR 0002): a refusal after a write must roll back. A reopened session can be closed again the same way.
+
+**Decision C7 — audit.** `SESSION_CLOSE_REQUESTED` (`closeAt`, `forced`), `SESSION_CLOSE_CANCELLED`, `SESSION_CLOSED` (`scheduled`, `forced`, `requestedBy`), `SESSION_REOPENED` (`reason`) — in the same transaction as the change; never a password.
+
+**Decision C8 — screens.** The Sessions panel: **Close this session…** opens a dialog saying exactly what happens ("Closing starts a 24-hour countdown. Until then nothing changes, and you can cancel."), with a second, plainly separate choice **Close sooner** that asks for "Your password" and says "closes in 1 minute". A scheduled session shows "Closes <date and time>" (absolute, in the viewer's own time zone — the school has no time-zone setting yet) with **Cancel closing** and **Close sooner…**; a closed one offers **Reopen…** (a reason field, with what it does and does not do). No live ticking countdown (accessibility; the text is true when rendered and the list refreshes after every action). Every state through axe in both themes, desktop and phone.
+
+**Decision C9 — tests (with the code).** *unit:* `effectiveStatus` (before / at / after `closeAt`, only `ACTIVE`). *integration:* schedule = 24 h from now; idempotent; force with the right password = 1 minute, with a wrong one = refused + counted + nothing changes; sooner time wins; cancel; a due session reads as `CLOSED` **before** it is settled and its writes are refused (`CLOSED_READONLY`); settling closes exactly once and audits once under **concurrent** settlers; `currentSessionFor` never returns a due session; reopen with reason / without / with another active (refused, nothing written) / archived; `closeCurrent` without the password is refused and **leaves the open session open**; cross-school and cross-campus sameness; RLS. *api:* role matrix (non-admin 403), CSRF, strict bodies, the password never echoed, rate limit. *browser (desktop + phone):* the three dialogs, Cancel, Reopen, axe both themes. *Mutation list (end of Phase 2):* the 24 h / 1 min constants; `effectiveStatus` ignoring `closeAt`; settle without the conditional update (double audit); the password check skipped or its failure not counted; `closeCurrent` without proof; reopen ignoring another active; the rollback helper removed from reopen.
+
+**Decision C10 — ADR.** `docs/adr/0008-closing-a-session-is-delayed-and-reversible.md`.
+
+**Open question for the maintainer.** *Year-end switch (C5):* should `activate … closeCurrent` also wait (e.g. the new session starts when the old one's timer ends), or stay immediate-with-password as designed? Immediate is simpler and is what a school does on the first day of term; a waiting switch would need a "planned to start at" feature we do not have.
+
+**As built — closing a session takes time (2026-10-07)** — Decisions C1–C10 above, on the Slice 1 branch: migration `20261014090000_session_close_timer` (three columns + a CHECK), `closeSession` now schedules (24 h, or 1 min with `{ password }`), new `cancelClose` and `reopenSession`, `settleDueClosings` + `effectiveStatus`, `lib/auth/reauth.ts` (the password proof, shared with `activate … closeCurrent`), routes `…/close` (body `{ password? }`), `…/close/cancel`, `…/reopen`, and the Sessions panel (Close… / Cancel closing / Close sooner… / Reopen…). **Deviations, deliberate:** (a) the **application's clock** (one `new Date()` per call) decides "due", not the database's `now()` — `closeAt` is a `timestamp without time zone` written by the same clock, so comparing it with `now()` would depend on the session time zone; (b) the reopen refusal reuses `SESSION_ALREADY_ACTIVE` (naming the open session) instead of a new `ANOTHER_ACTIVE` code; (c) **`activate … closeCurrent` stays immediate and now needs the password** — the open question in C5 is answered by building the design's default. Mutation pass: not run (pending, end of Phase 2); the list is in C9.
+
+##### 1.1 — Academic structure (migration `…_phase_1_1_academic_structure`)
+All tables below: `tenantId NOT NULL`, `ENABLE`+`FORCE` RLS with `USING` and `WITH CHECK` on `"tenantId" = app_tenant_id()` in the **same migration**, composite FKs (reconciliation 2),
+`createdAt`/`updatedAt`, `archivedAt` where a later phase will reference the row (**archive, never delete**: there is no `DELETE` route for any of them). Added to the catalog guard's
+expected list. Naming/uniqueness rules are **partial unique indexes over non-archived rows** (an archived name can be reused) — Prisma cannot express them, so they live in the migration
+SQL, like `Invitation_one_live_per_address`.
+
+**Decision 7 — who may do what.** Reads: `ADMIN`, `TEACHING_STAFF`, `NON_TEACHING_STAFF` (`STUDENT`/`PARENT` get the one 403). Writes: `ADMIN` only (no permission is defined for academic
+structure, and §1.7 forbids inventing one). **Campus scope:** a non-admin staff member whose membership names a campus sees rows with `campusId IS NULL` (school-wide) or their own campus,
+filtered in the query *and* asserted by a cross-campus test; an `ADMIN` sees every campus. (Rows reference a campus through `(tenantId, campusId)` composite FK to `Campus`.)
+
+**Decision 8 — audit.** One `AuditLog` row per change, written in the same transaction, `action` in a closed set (`SESSION_CREATED|UPDATED|ACTIVATED|CLOSED|ARCHIVED|COPIED_FORWARD`,
+`PERIOD_CREATED|UPDATED|SET_CURRENT|ARCHIVED`, `CLASS_GROUP_*`, `CLASS_ARM_*`, `SUBJECT_*`, `SUBJECT_OFFERING_*`, `ASSESSMENT_SCHEME_*`, `GRADE_SCALE_*`), `afterValue` (and `beforeValue` on
+updates) carrying only the changed fields — no PII exists in this slice, but the habit is the same.
+
+**Decision 9 — `AcademicSession`.** `{ id, tenantId, campusId?, label, startDate @db.Date, endDate @db.Date, status SessionStatus @default(PLANNED), copiedFromId?, archivedAt?, … }`.
+- `endDate > startDate` (CHECK); label 1–40 characters, trimmed, **unique per (school, campus-scope) among non-archived** (partial index on `(tenantId, COALESCE(campusId,''), label)`);
+- **no overlap** between two non-archived sessions of the same scope: validated by a pure function and enforced in the write transaction under a per-(school, scope) advisory lock
+  (an `EXCLUDE` constraint would need the `btree_gist` extension — not worth a new extension for one rule; the lock makes the check-then-write race-free and a two-simultaneous-creates test proves it);
+- `CLOSED` is terminal *(superseded 2026-10-07 — closing is now a countdown and a closed session can be reopened with a reason; see "Design change — closing a session takes time" and ADR 0008)* and a `CLOSED`/archived session's dates and label are read-only (history that results will reference must not move).
+
+**Decision 10 — activating a session.** **One `ACTIVE` session per scope**, guaranteed by a partial unique index `(tenantId, COALESCE(campusId,'')) WHERE status='ACTIVE'`. `POST …/activate`
+runs a **conditional update** (`WHERE id = $1 AND status = 'PLANNED'`, row count decides). If another session in that scope is active the request is **refused with `SESSION_ALREADY_ACTIVE`
+naming it** — nothing is deactivated silently. The explicit alternative is the body `{ closeCurrent: true }`, which closes the active one and opens this one **in one transaction**, audited as
+two entries. (Chosen over "close and open" as the only mode because closing a session is the consequential act: it must be named by the person doing it.)
+
+**Decision 11 — school-wide vs campus sessions.** `campusId IS NULL` means "every campus". A campus's **current session** is its own `ACTIVE` session if it has one, else the school-wide `ACTIVE`
+one, else none — one pure function (`currentSessionFor(campusId, sessions)`), the only definition any later phase may use. A school with one campus (or none) simply uses school-wide sessions.
+*(Open question for the maintainer: is "a campus session shadows the school-wide one" the wanted rule, or should a school choose one mode? The shape supports both; the function is the only place to change.)*
+
+**Decision 12 — `AcademicPeriod`.** `{ id, tenantId, sessionId, kind PeriodKind, ordinal Int, label, startDate, endDate?, isCurrent, archivedAt? }`.
+- `kind` is **derived from the school's `schoolType`** (`K12→TERM`, `HIGHER_ED→SEMESTER`, `VOCATIONAL→COHORT`) on the server and not accepted from the client; `endDate` is required for `TERM`/`SEMESTER`,
+  optional for `COHORT` (a running intake). A period lies inside its session (`COHORT` may extend the session only if it has no end); `TERM`/`SEMESTER` periods of one session do not overlap;
+  `COHORT`s may overlap (concurrent intakes). `ordinal` unique per session among non-archived; label unique per session among non-archived;
+- **at most one current period per session** (partial unique index `(sessionId) WHERE "isCurrent"`); `POST …/current` is a conditional transaction that moves the pointer, only for an `ACTIVE` session,
+  and a period of a closed/archived session cannot become current. Archiving the current period clears the pointer.
+
+**Decision 13 — `ClassGroup`, `ClassArm`, `Subject`, offering.**
+- `ClassGroup { tenantId, campusId?, name, sortOrder, archivedAt? }` — name unique per (school, campus-scope) non-archived. `sortOrder` is the progression order promotion will use in 1.4.
+  A group is **admin-configurable on every campus** (the legacy primary-only inconsistency the AlEemaan audit found does not exist here).
+- `ClassArm { tenantId, classGroupId, name, capacity Int?, archivedAt? }` — `capacity >= 1` (CHECK) or null = uncapped (display-only in the MVP, as §1.2 decided); name unique per group non-archived.
+  An arm cannot be created in an archived group; archiving a group archives nothing silently — it is **refused while it has non-archived arms** (`HAS_ACTIVE_ARMS`), the administrator archives the arms first.
+- `Subject { tenantId, name, code?, archivedAt? }` — name unique per school non-archived; `code` upper-cased, unique per school when present.
+- `SubjectOffering { tenantId, classGroupId, subjectId }` unique `(classGroupId, subjectId)`: "this class group studies this subject". Created/removed by `PUT …/class-groups/[id]/subjects`
+  with the full desired set (idempotent). **Removing an offering is a real delete in this slice** because nothing references it yet; 1.4 must replace that with archive-on-reference
+  (a `// TODO(1.4)` guard is a test: `SubjectOffering` has no inbound FKs yet, asserted by the catalog so the day one appears the test fails and forces the decision).
+
+**Decision 14 — `AssessmentScheme` (the shape results will snapshot).** `{ tenantId, classGroupId?, name, totalMax Decimal(6,2) default 100, examMax Decimal(6,2), version Int, lockedAt?, supersedesId?, archivedAt? }`
+with `AssessmentComponent { tenantId, schemeId, name, maxScore Decimal(6,2), sortOrder }` (e.g. `CA1 10`, `CA2 10`, `Test 20`, `Exam 60`'s 60 being `examMax`).
+- **Rule (one pure function, unit-tested at its boundaries, and re-run by the API inside the write transaction — the scheme and its components are written together, so the sum cannot be a DB constraint):**
+  every `maxScore > 0` and `examMax >= 0`; component names unique (case-insensitive) within the scheme; **`Σ components + examMax = totalMax`** exactly (decimal arithmetic on integers of hundredths — never floats);
+  1–10 components.
+- `classGroupId` null = the school default; at most one **active (non-archived, latest-version)** scheme per class-group scope (partial unique index).
+- **Versioning so history cannot be rewritten.** A scheme is edited **in place only while `lockedAt IS NULL`**. `lockedAt` is set — by a function 1.4 will call, `lockScheme(tx, id)` — the first time a
+  result references it; from then on edits are refused (`SCHEME_LOCKED`) and the only change is `POST …/new-version`, which copies it as `version+1`, `supersedesId` set, and archives nothing until the new
+  one is activated by being the latest. The **snapshot** a result stores is a pure function `snapshotScheme(scheme)` → canonical JSON `{ totalMax, examMax, components:[{name,maxScore}] }` plus its SHA-256, so
+  1.4 can store the JSON on the `Result` and prove later it still matches. Slice 1 builds `snapshotScheme`, `lockScheme` and tests both (lock set directly in the test).
+
+**Decision 15 — `GradeScale` (band → letter → remark, as data).** `GradeScale { tenantId, name, isDefault, version, lockedAt?, supersedesId?, archivedAt? }` with
+`GradeBand { tenantId, scaleId, minScore Decimal(5,2), maxScore Decimal(5,2), letter, remark, sortOrder }`.
+- **Bands are half-open and contiguous:** `[min, max)` except the top band, which is closed at 100. A valid scale **starts at 0, ends at 100, and each band's `min` equals the previous band's `max`** — so there
+  is no gap and no overlap *for any decimal score*, which a "75–100 / 70–74" integer table cannot promise (74.5 would belong to nothing). The UI shows "from 70 up to (not including) 75" and offers whole
+  numbers by default; the legacy A1–F9 table fits exactly (`75,70,65,60,55,50,45,40,0`). Validated by one pure function (unit tests: 0, 100, adjacent, inverted, equal, decimals, a single band 0–100, > 12 bands,
+  duplicate letters), re-run by the API in the write transaction; `min < max` and `0 <= min`, `max <= 100` are also CHECK constraints.
+- Exactly **one default scale per school** (partial unique index on `isDefault` among non-archived). The same lock/new-version rule as schemes (decision 14). Per-class-group scales are **not** in this slice
+  (one default per school; noted for 1.4).
+- `gradeFor(scale, score)` — a pure function, and the only way a score becomes a letter; tested at every band edge. (Its consumer is 1.4.)
+
+**Decision 16 — copy-forward.** `POST …/sessions/[id]/copy-forward { label, dryRun? }` creates the **next** session from `[id]`: dates shifted by the whole-year difference to the new start date the
+administrator gives, periods copied with the same shifted dates (ordinals and labels kept), status `PLANNED`, `copiedFromId = [id]`. Class groups, subjects, schemes and scales are school-level and **not**
+session-scoped, so there is nothing else to copy (stated so nobody expects it). **Idempotent:** a partial unique index on `(tenantId, copiedFromId)` where not archived — a second run is refused with
+`ALREADY_COPIED` naming the existing session (or, with `dryRun`, reports it) and creates nothing. `dryRun: true` returns the summary (`{ session: {label, start, end}, periods: n, conflicts: [...] }`) and
+writes **nothing** (asserted by row counts). One transaction, audited `SESSION_COPIED_FORWARD`.
+
+**Decision 17 — API.** All under `/api/v1/schools/[code]/academics/…` (so the route-discovery guard in `tests/api/tenant-boundary.spec.ts` covers them): `sessions` (GET list `?status=planned|active|closed|archived|all`
+default *not archived*, paginated · POST) · `sessions/[id]` (GET · PATCH) · `sessions/[id]/activate|close|archive|copy-forward` (POST) · `sessions/[id]/periods` (GET · POST) · `periods/[id]` (PATCH) ·
+`periods/[id]/current|archive` (POST) · `class-groups` (GET · POST) · `class-groups/[id]` (GET · PATCH) · `class-groups/[id]/archive` (POST) · `class-groups/[id]/arms` (GET · POST) · `arms/[id]` (PATCH) ·
+`arms/[id]/archive` (POST) · `class-groups/[id]/subjects` (GET · PUT) · `subjects` (GET · POST) · `subjects/[id]` (PATCH) · `subjects/[id]/archive` (POST) · `assessment-schemes` (GET · POST) ·
+`assessment-schemes/[id]` (GET · PATCH · and `…/new-version` · `…/archive` POST) · `grade-scales` (same shape). Every write: `validate({ body })` (strict — unknown keys **refused** here, not stripped, via `.strict()`)
+inside `withAuth(…, { tenant: true, roles })`, audit in the same transaction, a per-administrator rate limit on writes (the existing limiter, `refund` on a refused-by-validation request), an unknown or foreign id answers
+the **same 404** `NOT_FOUND`, and a request for an archived row answers normally for GET but 409 `ARCHIVED` for any write. Lists use the shared pagination helpers.
+
+**Decision 18 — screens.** One new area **"Academic setup"** at `/schools/[code]/academics` (admin and staff read; admin writes), added to `navFor` (visible "Soon" until it ships), with four sections in a
+tab-like list that works with the keyboard and on a phone (cards below `md`): *Sessions and terms* (list → create/edit → detail with its periods; activate / close / archive with confirmation `Dialog`s that say
+what they do; copy-forward with its dry-run summary shown first), *Classes and subjects* (groups with their arms and offered subjects), *Assessment* (the scheme editor with a live "components + exam = total" readout), *Grading*
+(band table with live gap/overlap feedback). Reuses `Dialog`, `SelectField`, `TextField`, one polite live region, focus placed after the refresh (no timers), tap targets ≥ 44 px. A non-admin sees the same pages read-only (no buttons,
+not merely disabled). Every state and open dialog is checked with axe in both themes.
+
+##### Tests (written with the code, not after)
+- **1.0 — unit:** `with-auth` options rule table (every role × every `roles`/`permissions` combination, ADMIN-implies only for `permissions`, empty array throws); `with-auth.types.ts` compile-time cases. **integration (as `app_user`):**
+  `SchoolSettings` RLS (no context = no rows; A never sees B; WITH CHECK on insert/move with statements that read nothing); the trigger fires for every creation path and **restores the caller's tenant context**; backfill idempotent
+  (run its SQL twice); pinned secure defaults; `getSchoolSettings` throws when the row is absent; permissions: only ADMIN grants, not self, staff roles only, role change clears them in the same transaction (rolled back with it on failure),
+  the CHECK constraint refuses a raw `UPDATE` that violates it, deactivated member holds none, a permission held in school A is **not** honoured in school B. **api (SaaS server):** a route guarded by `permissions` — the matrix; the member
+  PATCH validation (unknown permission, duplicate, wrong role, no-op writes nothing); the route-discovery guard still passes. **e2e:** the Edit dialog's checkboxes, announced result, focus return; axe both themes.
+- **1.1 — unit (pure):** period-kind mapping; session overlap; `currentSessionFor`; period-inside-session and overlap rules; scheme sum rule at the boundaries (hundredths, no float drift: 0.1+0.2); `snapshotScheme` canonicality and hash
+  stability; grade-scale validation (list in decision 15) and `gradeFor` at every edge; label/name normalisation; copy-forward date shifting (leap day 29 Feb → 28/29). **integration:** RLS for every table incl. write-check-alone tests;
+  composite FK refuses a foreign parent id **even through the owner role** (so it is the constraint, not RLS, that holds); partial unique indexes (active session, current period, default scale, active scheme, copy-forward) each hit by a raw
+  statement; **two-simultaneous-requests tests** for create-overlap, activate (exactly one wins), set-current, copy-forward twice, default-scale swap; archive-not-delete (no route and no service function deletes; `HAS_ACTIVE_ARMS`);
+  campus scope (campus staff vs admin; cross-campus); audit row exists with the right action in the same transaction (and none when the write fails). **api (SaaS server):** role matrix per route (ADMIN / TEACHING_STAFF / NON_TEACHING_STAFF /
+  PARENT / STUDENT / deactivated / another school's admin), strict-body refusal, 404-sameness for foreign ids, pagination errors name the field. **e2e (desktop and phone) + axe both themes** for every screen and open dialog.
+- The file-system route guard is **extended only by running** (it discovers routes); the catalog guard's expected list gains each table.
+
+##### Mutation plan (≥ 25 per sub-phase; the survivors become tests, equivalents are justified in the phase record)
+*1.0:* `withAuth` ignores `permissions` / treats ADMIN as passing `roles`-only routes / lets a permission from another school through / accepts `permissions: []` / returns 500 or a different body on refusal; resolver forgets `deactivatedAt` for
+permissions; PATCH grants to a PARENT / to an ADMIN / to yourself / without the audit row / audits a no-op / forgets to clear on role change / role-change clear not in the same transaction / non-ADMIN may call it; CHECK constraint dropped;
+trigger not firing / not restoring the context / leaving the caller in the new school's context; backfill not idempotent; `SchoolSettings` RLS `WITH CHECK` dropped / policy on the wrong column / not `FORCE`d; a secure default flipped
+(`resultApprovalRequired`, `mfaRequiredForTeaching`); `getSchoolSettings` returns defaults instead of throwing; `schoolType` default changed; UI shows permission boxes for a PARENT.
+*1.1:* a role check removed on each write route (sampled across all families); a read opened to PARENT; campus filter dropped / inverted; tenant taken from the body; `WITH CHECK` dropped on each new table; composite FK downgraded to a plain FK;
+foreign parent accepted by the service; overlap check skipped / off-by-one at the boundary day; advisory lock removed; activate ignores the unique guard / deactivates silently / `closeCurrent` closes without auditing / `status` not conditional;
+current-period pointer not unique / allowed on a closed session; period kind taken from the client; `endDate` optional for TERM; archive implemented as DELETE; archived row editable; `HAS_ACTIVE_ARMS` skipped; capacity 0 accepted; scheme sum off
+by one hundredth / compared with floats; locked scheme editable; `snapshotScheme` order-dependent; scale gap/overlap accepted at each edge (0, 100, adjacent); `gradeFor` boundary inclusive on the wrong side; second default scale accepted; copy-forward
+not idempotent / dry run writes / shifts dates wrongly / skips periods; audit omitted or wrong action on each family; an unknown id answers a different status than a foreign id; validation lets unknown keys through; list default includes archived;
+pagination cap removed on a list.
+
+##### Order of work and definition of done
+1.0: this design (committed alone) → migration + schema + trigger + RLS + catalog/RLS tests → `with-auth` + resolver + unit/types tests → member permissions service + route + tests → UI + e2e/axe → mutation pass → one-lane green →
+docs/trackers → push. 1.1: same, in five commits by family (sessions+periods → classes/arms/subjects → assessment → grading → copy-forward) with the UI after each, one mutation pass at the end. Done = the brief's §6 checklist, evidenced in
+`docs/development-history/handoff/phase-1-slice-1.md`. **Open questions for the maintainer** (carried to the hand-off): (1) campus session shadows school-wide (decision 11); (2) K12 default for `schoolType` and no wizard question until
+Settings (decision 1); (3) `CLOSED` is terminal — is a "reopen" ever wanted (decision 9); (4) half-open bands (decision 15) rather than the printed "70–74" style; (5) scale per class group deferred.
+
 ---
+
+#### Build design — Phase 1.2 (people and enrolment) (2026-10-07, written before any code)
+
+**Scope.** Roadmap sub-phase 1.2 only: staff records, student records, guardians, enrolment, the CSV import/export, their screens, the staff read-only academic setup screen (maintainer's answer, 2026-10-07: "with 1.2"), and
+the school-type rule (decision P1). Not here: attendance (1.3), anything that reads a person's results (1.4), parent/student sign-in views (1.4), the settings screen (1.7). Builds on the Slice 1 branch (1.0, 1.1 and the
+session-closing change); stacked on it until that is merged.
+
+##### Reconciliations with the §1.2 sketches (each is a deliberate change; this section wins)
+1. **Every table has its own `tenantId` and composite foreign keys to its parents**, as in 1.1 (`StaffSubjectAssignment` and `StudentEnrollment` had none in the sketch).
+2. **A linked sign-in account must be a member of THIS school.** The sketch made `userId` globally `@unique`, which would stop one teacher working at two schools. It becomes unique **per school**
+   (partial unique index on `(tenantId, userId) WHERE userId IS NOT NULL`) and a composite FK `(userId, tenantId)` → `TenantMembership(userId, tenantId)` (which already has that unique), so a record can never point
+   at a person who is not a member of the same school. A `NULL` `userId` is the normal state (a security guard has a record and never an account).
+3. **Enrolment is per SESSION, not per period.** The sketch keyed `StudentEnrollment` on `periodId`; a pupil stays in JSS1-A for all three terms, so a row per term would be copied three times a year and drift. One
+   row per (student, session): `UNIQUE (tenantId, studentId, sessionId)`. Moving arm inside a session edits the row (audited with before/after); the year-end outcome (`PROMOTED`, `REPEATED`, …) is set by 1.4.
+4. **Guardians are people with contact details, and a link says who is whose.** The sketch linked a *user account* to a student, but a parent usually has no account when the child is admitted, and one parent has
+   several children. New table `GuardianRecord` (the person: name, phone, address-free, optional account) and `GuardianLink` (student ↔ guardian: relationship, primary contact, status). `GuardianLink.status`
+   (`PENDING|APPROVED|REVOKED`) is kept: **in 1.2 only an administrator creates links and they are `APPROVED`**; no code path lets a parent create or approve one (1.4 adds a linking-code claim that creates `PENDING`).
+   Every parent-facing read, when it exists, goes through `status = 'APPROVED'` and the guardian's *account* — never a bare student id.
+5. **`isActive` booleans become `archivedAt`**, as everywhere in 1.1 (a record that a later phase will reference is archived, never deleted; there is no `DELETE` route for any table here).
+6. **No national-ID field, no gender, no religion, no passport photo** — data minimisation (the sketch's rule stands). Fields are added when a feature needs them, with a named reason.
+
+##### P1 — School type (maintainer: "superadmin settings or env, not the wizard")
+Today `Tenant.schoolType` defaults to `K12` in the database and only `PeriodKind` reads it. There is **no platform-level superadmin** yet, and the only place a school is created is `src/app/api/v1/setup/route.ts`.
+- New environment setting **`DEFAULT_SCHOOL_TYPE`** (`K12` | `HIGHER_ED` | `VOCATIONAL`, default `K12`), validated when the server starts (a wrong value stops it with a message naming the allowed values — never silently K12).
+  The setup route passes it to `tenant.create` on the server; **the browser never sends a school type** (the setup body is strict and gains no field).
+- **A school's own administrator cannot change it** (no route, no screen): it renames every term to semester or cohort and can strand periods that exist. When a platform superadmin exists, a screen there writes the
+  same column; no data change is needed then. Documented in `.env.example`, the installer notes and CLAUDE.md.
+- Tests: the setup route over HTTP with the env at each value (a test server per value is too heavy — the env is read through one small function, `defaultSchoolType(env)`, unit-tested, and one integration test creates a school
+  through the route with the default); an invalid value throws; a body carrying `schoolType` is refused.
+- *Status: built with 1.2a as a separate small commit so it can be dropped if the maintainer answers differently.*
+
+##### 1.2a — Schema (migration `…_phase_1_2_people`)
+New tables, each `ENABLE`+`FORCE` RLS (`USING` and `WITH CHECK` on `"tenantId" = app_tenant_id()`) in the same migration, added to the catalog guard:
+- `StaffRecord { id, tenantId, campusId?, userId?, category StaffCategory(TEACHING|NON_TEACHING), firstName, lastName, phone?, email?, archivedAt?, createdAt, updatedAt }`. Names 1–80 characters trimmed; `email`
+  lower-cased; `phone` 7–20 characters of digits, space, `+ - ( )`. Unique linked account per school (reconciliation 2). Unique live email per school when present (partial index on `lower(email)`, non-archived).
+- `StaffSubjectAssignment { id, tenantId, staffRecordId, subjectId, classArmId }` — composite FKs to the three parents; `UNIQUE (staffRecordId, subjectId, classArmId)`. **A subject may be assigned to an arm only if its class
+  group is offered that subject** (`SubjectOffering`) — validated in the service, and the foreign key to the offering is the database's second guard (composite `(tenantId, classGroupId, subjectId)` is not expressible without a
+  denormalised column, so the service check plus a test is the guard; recorded as a known limit).
+- `StudentRecord { id, tenantId, campusId?, userId?, firstName, middleName?, lastName, dateOfBirth @db.Date, admissionNo, archivedAt?, … }` with `UNIQUE (tenantId, id)`, **case-insensitive unique `admissionNo` per school**
+  (index on `lower("admissionNo")`, including archived — a number is never reused), `dateOfBirth` between 1900-01-01 and today (CHECK on the lower bound; the upper bound is the application's, with the clock injected).
+  The `userId` column exists and is constrained like the staff one; **no route links a student account in 1.2** (students get their own sign-in with the 1.4 views).
+- `AdmissionCounter { tenantId, year, next }` — `PRIMARY KEY (tenantId, year)`.
+- `GuardianRecord { id, tenantId, userId?, firstName, lastName, phone?, email?, archivedAt?, … }` (same field rules; account link as reconciliation 2, but the linked member must have role `PARENT`).
+- `GuardianLink { id, tenantId, studentId, guardianId, relationship Relationship(MOTHER|FATHER|GUARDIAN|OTHER), isPrimary, status GuardianLinkStatus @default(APPROVED), approvedById?, createdAt, revokedAt? }`;
+  `UNIQUE (studentId, guardianId)`; **at most one primary live link per student** (partial unique index `WHERE isPrimary AND status <> 'REVOKED'`).
+- `StudentEnrollment { id, tenantId, studentId, sessionId, classArmId, status EnrollmentStatus @default(ACTIVE), enrolledAt, … }` — composite FKs to student, session and arm; `UNIQUE (tenantId, studentId, sessionId)`.
+  `EnrollmentStatus { ACTIVE PROMOTED REPEATED WITHDRAWN TRANSFERRED ALUMNI }` as the sketch has it; 1.2 writes only `ACTIVE` and `WITHDRAWN` (the others are 1.4's).
+- `Invitation.staffRecordId?` (additive, composite FK) so an invitation can carry the record it is for (decision P5).
+- Additive and live-safe: no existing column changes meaning, everything new is nullable or has a default.
+
+##### Decisions
+**P2 — who may do what.** Reads of people: `ADMIN`, `TEACHING_STAFF`, `NON_TEACHING_STAFF` (the one 403 for `STUDENT`/`PARENT`); a non-admin member whose membership names a campus sees records of that campus
+and school-wide ones (`campusId IS NULL`), as in 1.1 — filtered in the query and asserted by a cross-campus test. Writes: `ADMIN` only (still no permission is defined for people; `CAN_MANAGE_USERS` stays stored and unused,
+decision 6). A record is read through `auth.tenant.run` and every id route answers one 404 for unknown, foreign and other-campus ids (the 1.1 rule).
+
+**P3 — admission numbers.** A person may type one (a migrated school has its own) or leave it blank to have one generated: `YYYY/NNNN` (year of the school's current session if one is active, otherwise the calendar
+year; sequence padded to four, growing past 9999). Generation is `UPDATE "AdmissionCounter" SET next = next + 1 … RETURNING` — the row lock serialises concurrent creates, and it is in the same transaction as the insert, so a
+failed insert leaves no gap. If the generated number is already taken (someone typed it earlier) the generator takes the next one, at most 50 times, then refuses (`ADMISSION_NUMBER_EXHAUSTED`). Typed numbers: 1–30
+characters of letters, digits, `/ - .`, compared case-insensitively. A student record never exposes `admissionNo` in a URL (ids are cuids; the number is a field only).
+
+**P4 — duplicates.** Creating a student whose (first name, last name, date of birth), compared case-insensitively and trimmed, matches a **live** student of the school is refused (`POSSIBLE_DUPLICATE`, naming the
+existing record's admission number). There is no "create anyway" in this slice; the administrator edits the existing record. (A real twin pair shares a birthday but not a first name; if a school truly needs it, that is a
+reviewed override later, not a silent default.)
+
+**P5 — staff and sign-in accounts.** A staff record exists without an account. To give one: **"Invite to sign in"** creates a 0.5.4 invitation to the record's email (role `TEACHING_STAFF` for `TEACHING`,
+`NON_TEACHING_STAFF` for `NON_TEACHING`, campus from the record) carrying `staffRecordId`; **accepting it creates the membership and sets `StaffRecord.userId` in the same transaction** (if the record has since been
+linked or archived, the membership is still created and the link is skipped and noted in the audit entry — never a stranded invitee). Or **"Link account"** for someone who is already a member: an administrator picks one
+member of this school whose role matches the category (`TEACHING_STAFF` ↔ `TEACHING`) and who is not linked to another record; the link is conditional (`WHERE userId IS NULL`) and one-way — changing it later means
+"Unlink" (clears it) then link again, both audited. Changing a linked member's role to a non-matching one is allowed by the Users page (it is the Users page's rule) and shows on the record as "account role differs".
+
+**P6 — guardians.** Created from a student's page ("Add guardian": name, phone, optional email, relationship; the first becomes primary) or by choosing an existing `GuardianRecord` of the school (siblings). Making another
+link primary demotes the first in the same transaction (the partial index is the guard, a lost-race test the proof). Removing a link sets `REVOKED` + `revokedAt` (history stays); a guardian with no live links is archived
+by an administrator, never deleted. Phone numbers are shown only to roles that may read people (P2). `guardianId` of a link and `studentId` are checked to be in the caller's school and, for non-admins, campus.
+
+**P7 — enrolment.** `POST …/students/[id]/enrolments { sessionId, classArmId }`: the session must be `PLANNED` or `ACTIVE` (effective status; not `CLOSED`, not archived), visible to the student's campus (the 1.1
+`visibleTo` rule), the arm live and its class group visible to that campus, the student live. Conditional create (unique index decides; a duplicate is `ALREADY_ENROLLED` naming the existing arm). `PATCH` moves the
+arm inside the session (same checks, `ACTIVE` enrolments only). `POST …/withdraw` sets `WITHDRAWN` with a typed reason (5–300 characters, as reopen has) in the audit entry. Arm **capacity is displayed, never enforced**
+(MVP rule from §1.2): the class list shows "27 of 30" and, past it, "3 over". Closing a session does not touch enrolments; 1.4's promotion does.
+
+**P8 — CSV import (students).** `POST …/students/import { csv, dryRun }` (JSON body so CSRF and validation are the usual path; no multipart parser). Header row required, case-insensitive, **unknown columns refused**:
+`first_name, last_name, middle_name, date_of_birth (YYYY-MM-DD), admission_no, campus, class, arm, session, guardian_name, guardian_phone, guardian_email, relationship`. Caps: 1 MiB, 1,000 data rows, 200 characters a cell
+(each refusal tells the exact number). A small RFC 4180 parser (quotes, doubled quotes, CRLF, BOM) is written and unit-tested here rather than adding a dependency. **All or nothing:** one transaction under a per-school
+advisory lock (two imports at once queue); any invalid row ⇒ nothing is written and the report lists every row's problems (row number, column, message). `dryRun: true` runs the *same* code and rolls back, returning the
+same report plus counts (`would create`, `would skip`); the confirm step re-sends the file with `dryRun: false` and **re-validates everything** — a dry run proves nothing to the server. Rerunning the same file is
+idempotent: a row whose admission number exists **and whose name and birthday match** is `skipped` (reported), one whose number exists for someone else is an error, a row with no number matches by P4 or is created.
+`campus`, `class`, `arm`, `session` are looked up **by name inside the school** (never by id), unambiguous or an error. Audit: one entry for the import (counts + file hash, not the content).
+**Export:** `GET …/students/export?…filters` returns `text/csv` (`Content-Disposition: attachment`, `Cache-Control: no-store`), at most 10,000 rows (else refused, "narrow the filter"), every cell that starts with
+`= + - @ tab CR` prefixed with `'` (spreadsheet formula injection), audited (who, filters, count), rate-limited per administrator.
+
+**P9 — screens.** New area `/schools/[code]/people` with tabs **Students** and **Staff** (real links, like Academics), "People" in the nav for admins and staff:
+- Students: list (search by name or number, campus, class, "not enrolled this session"), cursor pages; "Add student", "Import…" (file → dry-run report with every problem listed → "Import N students" button), "Export".
+  Student detail `/people/students/[id]`: details (edit), enrolment history (enrol/move/withdraw), guardians (add/choose/primary/remove).
+- Staff: list with category, campus, account status ("No account", "Invited", "Signed in as …"); create/edit; "Invite to sign in", "Link account", "Unlink"; "Teaches" (subject × arm assignments).
+- Class list: from Academics ▸ Classes an arm links to `/people/students?arm=…`, showing "27 of 30".
+- **Staff read-only Academic setup** (Q9): `/schools/[code]/academics` stops being administrators-only; staff see the same four sections with every button and form absent and a line "Only an administrator can change this."
+  (Components receive `readOnly`; the data comes from the existing GET routes, which already allow staff.) Students and parents still get the one access-denied view.
+- Every state is built for a phone first (cards under 640 px), axe in both themes, focus returns to the control that opened a dialog, results announced in a live region (the 0.5.4/1.1 patterns).
+
+##### Order of work (each its own commit group; gate after each: typecheck → lint → format:check → build → the new tests)
+**a** migration + schema + pure rules (names, phone, admission number format, CSV parser, duplicate key) + `defaultSchoolType` and the setup change · **b** students + enrolment services, routes, RLS/policy tests ·
+**c** guardians · **d** staff, assignments, invitation `staffRecordId`, link/unlink · **e** import/export · **f** screens, read-only academics, a11y states · **g** docs (phase record, plan As-built, handoff, ADRs,
+CLAUDE.md, tests/README), one full-suite run, PR.
+
+##### Tests designed (written with the code, not after)
+- **Unit:** admission-number format and padding; name/phone/date validators (boundaries: 0/1/80/81 characters, DOB today and tomorrow); CSV parser (quotes, embedded newlines, BOM, CRLF, ragged rows, 1 MiB boundary);
+  formula-injection neutraliser; duplicate key normalisation; `defaultSchoolType`.
+- **Integration (as `app_user`, real database):** RLS policies for every new table (cross-school read, insert and move refused; the catalog guard lists them); composite FKs (a school-A student cannot be enrolled in a school-B
+  arm even with the foreign id); partial unique indexes; **race tests with held locks** — two simultaneous creates without a number get two different numbers, two with the same typed number get one winner and
+  `ADMISSION_NUMBER_TAKEN`, two simultaneous "make primary" leave exactly one primary, two simultaneous enrols leave one row; refusal-after-write rolls back (the ADR 0002 rule) for every multi-step write here; a failed
+  insert burns no admission number; invitation accept links the staff record in one transaction and survives a linked/archived record; campus scoping; archive-never-delete (no `DELETE` reachable); import atomicity
+  (row 999 invalid ⇒ zero rows written), dry-run writes nothing, rerun idempotence, advisory-lock queueing.
+- **API:** 401/403/404 sameness for every new route (the file-system-discovered route guard picks them up; probes may need bodies), CSRF, strict bodies, pagination, export headers and the cell neutraliser, import caps,
+  rate limits, a body with `schoolType` refused at setup.
+- **E2E (desktop and phone):** the whole path — add a student, enrol, add a guardian (primary), import a CSV with an error (report shown, nothing created), fix, import; staff record → invite → accept → signed in;
+  staff read-only academics shows no buttons; **axe in light and dark** for every new state.
+
+##### Mutation plan (pending — all passes together at the end of Phase 2; ≥ 25 targets)
+Admission counter increments by 1 (and by 0 / 2) · the year used (session vs calendar) · padding width · the taken-number retry bound (50 vs 51 vs none) · case-insensitive comparison dropped on `admissionNo` · duplicate key
+ignoring date of birth / using case-sensitive names · "primary" demotion removed · primary index predicate loses `<> 'REVOKED'` · guardian link created as `PENDING` or by a non-admin · parent-visible read without
+`APPROVED` · enrolment allowed in a `CLOSED` session / archived session / archived arm · campus visibility check removed in enrol · `ALREADY_ENROLLED` check removed · withdraw without reason · move allowed on a
+`WITHDRAWN` row · capacity enforced (should not be) · staff link not conditional on `userId IS NULL` · link allowed to a member of another school · category/role mismatch allowed · invitation accept skipping the link /
+linking an archived record / not in the same transaction · unlink not audited · import: not all-or-nothing, caps off by one (1,000 vs 1,001 rows; 1 MiB ± 1), unknown column accepted, dry-run committing, re-validation skipped on
+confirm, existing-number-for-someone-else treated as skip, lookup by id instead of name · export: no formula neutralisation, cap off by one, no `no-store`, not audited · read-only academics rendering a button or
+accepting a write · `DEFAULT_SCHOOL_TYPE` ignored / invalid value accepted / school type accepted from the body · staff of another campus reading a student · parent/student role admitted to the people reads.
+
+##### Questions the maintainer can overrule (each built with the stated default)
+1. **Per-session enrolment** (reconciliation 3) rather than per term — a pupil keeps one class for the year. Changing to per-period later means a new table, so say so now if terms can differ.
+2. **No gender field** until a report or form needs it (some report cards print it). One line to add later.
+3. **Admission-number format** `YYYY/NNNN` (typed numbers always allowed).
+4. **No "create anyway"** for a duplicate name+birthday.
+5. **Student sign-in accounts** are not linked in 1.2 (column ready); they arrive with the 1.4 views.
+
+##### As built — Phase 1.2 (2026-10-08)
+
+Record: `phases/phase-1.2-people.md`; hand-off `handoff/phase-1-2-people.md`; branch `claude/phase-1-2-people` (stacked on `claude/phase-1-0-1-1`). Built as designed (P1–P9, reconciliations 1–6), with these differences:
+(a) **Lists use offset pagination** (`page`/`limit` with `meta.total`, like Users and Academics), not the cursor P9 mentioned — the lists are filtered and searched, and the pager needs a total. (b) **Import skips rather than errors** on a row whose admission number exists *and* whose name and birth date match (reported as `skipped`, which is what makes a re-run idempotent); a number that exists for someone else is an error. (c) **Export has exactly the import's columns** (no `status`), so an export file can be imported into another school. (d) **Per-route body cap:** `validate()` takes `maxBodyBytes`; only the import raises it (a 1 MiB CSV is larger as JSON); the global 1 MiB default is unchanged. (e) **Export fetches related rows in 1,000-id chunks** — 10,000 rows in one `IN (…)` list overran Postgres's stack depth (found by the cap test). (f) **Guardian validation precedes the archived-student refusal**, so a form shows what is wrong first. (g) **Dialog keys carry the dialog's name** (`archiving-1`, not `1`): `useDialog` counters all start at 1 and two dialogs as siblings collided (this affected every panel, Slice 1's included). (h) **Custom 404** under `(app)` — Next's default page has an inline `<style>` the CSP refuses. (i) The "Link account" list shows only members of this school whose role fits the category and who are unlinked (`linkable-accounts`). (j) Staff may read the Academic setup screen read-only; "People" is in their nav.
+Mutation pass: **not run — pending, end of Phase 2** (the list above stands).
 
 ## Phase 2 — Communication
 
@@ -2310,3 +2692,191 @@ segment gains traction first") — matching that uncertainty here rather than ov
 No schema for any of these should be finalized before a real signal (a paying customer, a specific
 request) exists — inventing it now risks the exact "a field or enum value that sounds right but was
 never actually decided" trap `TheNiche`'s own plan names as the thing to guard against.
+
+---
+
+#### Build design — Phase 1.3 (attendance and day-to-day operations) (2026-10-09, written before any code)
+
+**Scope.** Roadmap sub-phase 1.3: daily roll-call attendance tracking for class arms and students, idempotent bulk-mark endpoint, absence reason classification, phone-optimized touch grid UI, and audit logging. Builds on Phase 1.2 (people and enrolment) and 1.1 (academic sessions and class arms).
+
+##### Reconciliations with the §1.3 sketches
+1. **Row-level security and composite tenant keys:** As in 1.1 and 1.2, every table carries `tenantId` and composite foreign keys `(tenantId, studentId)` → `StudentRecord`, `(tenantId, classArmId)` → `ClassArm`. RLS is enabled and forced in Postgres.
+2. **Idempotent daily uniqueness:** Keyed on `UNIQUE (tenantId, studentId, date)`. Marking attendance for a class arm upserts the record for each enrolled student on that date; re-submitting the same roll call updates existing records cleanly without producing duplicate entries or stranded rows.
+3. **Provenance flag (`source`):** `ONLINE` vs `OFFLINE_SYNC` (closes Audit #8) so background or synced submissions are auditable without an auxiliary table.
+4. **Who may do what:**
+   - Reads: `ADMIN`, `TEACHING_STAFF`, `NON_TEACHING_STAFF`.
+   - Writes: `ADMIN` and `TEACHING_STAFF`. Teachers mark roll calls for classes; administrators can mark or correct any attendance record.
+5. **Edit window boundaries:**
+   - Future dates are rejected (`FUTURE_DATE_NOT_ALLOWED`).
+   - Historical window: `TEACHING_STAFF` may edit attendance within a 7-day window; older edits require `ADMIN`.
+   - Attendance dates must fall within an active or unarchived academic session.
+6. **Mobile touch grid:**
+   - One-tap "Mark All Present" default.
+   - Tap-to-cycle or fast toggle between `PRESENT`, `LATE`, `ABSENT`, `EXCUSED`.
+   - Full roll call for a class of 30+ students completable in under 30 seconds on a mobile viewport.
+   - Live summary stats (percentage, count of present/absent/late).
+
+---
+
+#### Build design — Phase 1.4 (Results, Grading & Publishing Workflow) (2026-10-09)
+
+**Scope.** Record assessments by component, dynamic grade band resolution, GPA calculation, locked-term publication workflows, append-only score audit logs (`ResultAudit`), and student report card generator.
+
+##### Reconciliations & Invariants
+1. **Append-Only Score Ledger:** Every grade modification writes to `ResultAudit` with previous score, new score, and author ID. `app_user` has `REVOKE UPDATE, DELETE, TRUNCATE` on `ResultAudit`.
+2. **Lock-on-Publish:** Once an academic period's results are marked published by an `ADMIN`, scores cannot be edited by teachers without an administrative unlock.
+3. **Continuous Band Math:** Grade letters and remarks resolve from contiguous, non-overlapping `GradeBand` rows (0.00 to 100.00).
+4. **Tenant Isolation:** Enforced with `app_user` Row-Level Security in PostgreSQL.
+
+---
+
+#### Build design — Phase 1.5 (Finance, Invoicing & Dual-Mode Paystack Integration) (2026-10-10)
+
+**Scope.** Term fee structures per class group, automated batch invoice generation, partial payments, manual receipt recording, waiver support, dual-mode Paystack checkout (`PAYSTACK_MOCK_MODE=true` for instant interactive testing, live HMAC-verified webhooks with replay protection via `PaymentWebhookEvent`), and parent/admin invoices dashboard.
+
+##### Reconciliations & Invariants
+1. **Dual-Mode Paystack Gateway:** Safe local / test development using zero-credential interactive mock dialogs, alongside hardened production HMAC SHA-512 webhook signature verification.
+2. **Decimal Precision:** All fee structures, item amounts, discounts, and payments use `Decimal(12, 2)` to eliminate floating-point drift.
+3. **Automated Status Reconciliation:** Invoice status dynamically calculates (`UNPAID` → `PARTIALLY_PAID` → `PAID` / `WAIVED`) based on sum of verified payments.
+4. **Row-Level Security:** `Invoice`, `FeeStructure`, `Payment`, and `InvoiceDiscount` are tenant-isolated with forced PostgreSQL RLS policies.
+
+---
+
+#### Build design — Phase 1.6 (Announcements & Timetable Scheduling) (2026-10-10)
+
+**Scope.** Multi-audience broadcast notices (`Announcement`) targeted by `Role[]`, `campusId`, `classArmId` with active publish/expiry windows; recurring weekly timetable slot scheduling (`TimetableSlot`) per class arm, subject, teacher, day of week (1–7), and room; 3D pure conflict detection engine (teacher double-booking, class arm schedule overlap, room clash); interactive TwoNode visual canvas with week grid, conflict badges, and mobile-responsive cards.
+
+##### Reconciliations & Invariants
+1. **Multi-Audience Broadcast Model:**
+   - `targetRoles = []` signifies a school-wide broadcast visible to all roles (`ADMIN`, `TEACHING_STAFF`, `NON_TEACHING_STAFF`, `STUDENT`, `PARENT`).
+   - `campusId = null` applies to all campuses; specific `campusId` restricts visibility.
+   - `classArmId = null` applies to all classes; specific `classArmId` restricts visibility.
+   - Publication windows respect `publishedAt <= now` and `expiresAt > now`.
+2. **Pure Clash Detection Engine:**
+   - Teacher double-booking: matching `staffRecordId` during overlapping interval on same day of week.
+   - Class arm overlap: matching `classArmId` during overlapping interval on same day of week.
+   - Room clash: matching room (case-insensitive) during overlapping interval on same day of week.
+   - Atomic batch saves reject internal collisions and external database clashes with HTTP 409 `TIMETABLE_CLASH`.
+3. **Interactive TwoNode Canvas Architecture:**
+   - Desktop/tablet week grid (Mon–Fri/Sat) with subject cards, teacher/arm badges, and live clash warning banners.
+   - Mobile card view grouping lessons by weekday with responsive tap targets.
+   - Interactive creation/edit modal with client-side live clash detection preview.
+4. **Row-Level Security:**
+   - `Announcement` and `TimetableSlot` enforce `ENABLE` and `FORCE` RLS with `app_tenant_id()` policies for runtime role `app_user`.
+
+
+
+#### Fix design — Phase 1 review findings (finance, webhook, results) (2026-10-11; written before any code)
+
+Source: code review of `claude/phase-1-3-attendance` on 2026-10-11, entries ISS-0001…0007 in `docs/issues/README.md`. Every finding below is **read, not yet reproduced**: each fix starts with a test that fails on today's code (the rule that makes the finding real). Mutation pass: not run — pending, end of Phase 2.
+
+**F1 — receipt numbers (ISS-0001).** Today `receiptNo` = `generateReceiptNumber(code, year, count of SUCCESS payments + …)` computed inside the fulfilment transaction; two concurrent fulfilments of different payments read the same count (the row lock is per payment, not per school), and nothing is unique. Decision: a per-school, per-year `ReceiptCounter { tenantId, year, next }` incremented with `UPDATE … RETURNING` in the same transaction (the `AdmissionCounter` pattern, ADR 0004-style), and a partial unique index on `(tenantId, receiptNo) WHERE receiptNo IS NOT NULL`. A manual payment's receipt number is generated the same way; a **supplied** one must be unique in the school (409 `RECEIPT_TAKEN`). Migration: additive (new table with RLS in the same file, the index); **before** creating the index the migration renames existing duplicates deterministically (`-R2`, `-R3`, … in `paidAt` order) so it cannot fail on data that already exists; the number of renamed rows is written into the migration's comment and the PR. Test: 25 concurrent fulfilments of distinct payments in one school produce 25 distinct numbers.
+
+**F2 — webhook retry (ISS-0002).** Today any thrown error is answered `200 {received:true,error}` and the event stays unprocessed, so Paystack never retries. Decision: failures are split. *Permanent* (amount mismatch, unknown reference, payment not found, gateway says not successful): record `PaymentWebhookEvent.error`, answer 200 (retrying cannot help). *Transient* (database or network error while verifying/fulfilling): answer **503** so the provider retries; the event row stays unprocessed and a retry takes the normal path (already idempotent: the conditional `updateMany` on `PENDING`). Test: a forced database failure on first delivery gives 503, the second delivery fulfils exactly once.
+
+**F3 — secret and unauthenticated writes (ISS-0004, ISS-0005).** No fallback string: the route reads the key through the same function as the gateway (`getPaystackClient` rules). In production a missing key is 503 `PAYSTACK_NOT_CONFIGURED`; `FORCE_MOCK_PAYSTACK=true` in production is refused at first use (throws) — mock mode is dev/test only. In dev/test the signing secret is one exported constant of the mock module. An **invalid signature writes nothing** (no `PaymentWebhookEvent` row) and answers 401. A missing/odd event id is derived from the payload hash, never `Date.now()`. Tests: forged body signed with the old public string is refused in production mode; invalid delivery leaves the table unchanged; the same body twice maps to the same id.
+
+**F4 — error text (ISS-0006).** The manual-payment route maps known service errors to 4xx codes (`NOT_FOUND`, `OVERPAYMENT`, `INVOICE_PAID`, `RECEIPT_TAKEN`) and answers anything else 500 with a generic message; the raw `err.message` is logged, never returned. Test: a database error does not appear in the response.
+
+**F5 — results transitions (ISS-0003).** Decision: (a) `DRAFT → SUBMITTED` only by the teacher who entered the result (`enteredByStaffId`, which holds a user id) or an ADMIN; (b) every other transition keeps today's rules, **plus** the actor must be able to see the result's campus (`visibleTo` as in 1.1); (c) **no self-approval**: the approver of a result may not be the user who entered it unless ADMIN; (d) reverting `APPROVED → SUBMITTED` and returning `SUBMITTED → DRAFT` need the approve permission or ADMIN (a teacher without it cannot pull results back); (e) a batch is all-or-nothing (already pre-validated). Test: a second teacher cannot submit or revert another's results; an approver with the permission cannot approve their own entries; an ADMIN can.
+**Not here:** renaming `*StaffId` columns or adding foreign keys (ISS-0007 — a migration of its own, decide with the maintainer), the public-verification privacy question (ISS-0008), landing the branch stack on `dev` (ISS-0009).
+
+##### Design amendment F3a — how mock payments are allowed in a production-shaped server (2026-10-11, before the code)
+Found while writing the F3 tests: every test server runs production-shaped (`NODE_ENV=production`, `APP_ENV=production`) **with** `FORCE_MOCK_PAYSTACK=true` — so "refuse `FORCE_MOCK_PAYSTACK` in production" as written in F3 would break every finance API test. Decision: mock payments in a production-shaped server (`appEnv() === "production"`, `lib/dev-tools.ts`) need a **second, loudly named switch**, `ALLOW_MOCK_PAYMENTS_IN_PRODUCTION=true`, which only the test harness sets (`tests/support/env.ts`); `FORCE_MOCK_PAYSTACK` alone is refused there (`MOCK_PAYMENTS_NOT_ALLOWED`). In development and staging `FORCE_MOCK_PAYSTACK` works as today. The decision is a pure function of the environment, `resolvePaystackMode(env)` (real | mock | not-configured | mock-refused), unit-tested over the whole matrix like `devToolsAccess`. The webhook signing secret is read through it: the real key, or — only where mock mode is allowed — the one exported mock constant; otherwise 503 `PAYSTACK_NOT_CONFIGURED`. Webhook failures are classified by type: a `FulfilmentRefusal` (our own deliberate refusals: amount mismatch, unknown reference, gateway status not success) is permanent; anything else (database, network, gateway down) is transient → `status: "retry"` → 503.
+
+#### Build design — campus administrators and a platform superadmin (2026-10-11, written before any code; **awaiting the maintainer's go-ahead before the migration**)
+
+**Why.** Octalve Edu serves many schools. Two levels of authority are missing: (1) **inside a school**, an `ADMIN` is school-wide whatever their campus (`resolve-tenant.ts`: the campus on an ADMIN "is bookkeeping"), so a school cannot appoint someone to run one campus; (2) **across schools**, nobody can create a school, set its type (ADR 0010 says "until a superadmin exists") or suspend it except through the one-time setup wizard and the database. The maintainer asked for the same shape as AlEemaan's branch-admin / superadmin design (see that plan), adapted to a multi-tenant system where **tenant isolation (RLS, ADR 0001) must not be weakened**.
+
+**C1 — three levels.**
+| Level | Who | Authority |
+|---|---|---|
+| Platform superadmin | a person with `User.isPlatformAdmin` | the *platform surface* only: list/create/suspend schools, set a school's type and plan; **no access to a school's people, results, fees or settings** |
+| School admin | `TenantMembership.role = ADMIN` (today's meaning, unchanged) | the whole school, all campuses |
+| Campus admin | `TenantMembership.role = CAMPUS_ADMIN` with `campusId` **required** | one campus: people, sessions, classes, attendance, announcements, timetable, fees *of that campus*; cannot touch school-wide settings, other campuses, or any admin |
+Staff, students, parents are unchanged.
+**C2 — campus admin is a role value, not a flag.** A membership is already per (person, school), so one role value fits: `CAMPUS_ADMIN`, with `CHECK (role <> 'CAMPUS_ADMIN' OR "campusId" IS NOT NULL)`. Existing `ADMIN` rows are **untouched** (including those with a `campusId`, which stays bookkeeping) — nobody loses authority, nothing to backfill. Adding an enum value is additive; the code that lists roles is updated before any row uses it. Rejected: reinterpreting `ADMIN + campusId` as "campus admin" (silently demotes every existing admin who was given a campus), and a separate `isCampusAdmin` flag (two columns that can disagree with `role`).
+**C3 — the helper.** `canAdminister(tenant, campusId | null)`: `ADMIN` → always; `CAMPUS_ADMIN` → only when `campusId` equals theirs (school-wide targets, `campusId = null`, are refused); anyone else → no. It composes with the existing `visibleTo` (campus visibility, 1.1) so a campus admin sees only their campus's rows and every id route answers the same 404 for other campuses. `withAuth({ roles })` gains the new role where a campus admin may act; the **25 route files** (of 108) that name `ADMIN` are reviewed one by one into three groups — *school-only* (settings, finance configuration, permissions grants, school-wide Users actions), *campus-capable* (people, academics of a campus, attendance, timetable, announcements), *unchanged* — and the list goes in the task file. The route-role guard idea from AlEemaan (every handler declares `roles:`) is added here as a source test.
+**C4 — what a campus admin may not do (ADR 0006 of this repo).** No granting or revoking permissions; no creating, editing or deactivating an `ADMIN` or another `CAMPUS_ADMIN`; no inviting outside their campus; no school settings; no finance configuration (fee structures) — they may record a manual payment and view invoices *for their campus* (open question 3). The last-active-`ADMIN` rule (0.5.4) counts `ADMIN` only: a campus admin never satisfies it.
+**C5 — platform superadmin without breaking RLS.** `User.isPlatformAdmin Boolean @default(false)`. The platform surface reads and writes `Tenant` through a few narrow `SECURITY DEFINER` functions (the pattern of `app_invitation_hash()`): `platform_list_schools()` (id, code, name, status, school type, member counts — no personal data), `platform_create_school(...)`, `platform_set_school_type(...)`, `platform_suspend_school(...)`, each re-checking the caller's `isPlatformAdmin` inside the function and writing a platform audit row. **No bypass of the `app_user` policies and no "act as a school" mode in this phase.** A suspended school's members get the same sign-in refusal as a deactivated membership. Access to a school's data for support is a separate, later feature (time-boxed, reasoned, audited, visible to that school's admin) and is **not designed here**. Platform admins must have two-step verification enrolled (the 1.7 step-up proof is required for every platform action). The first platform admin is made with a script (`scripts/make-platform-admin.mjs <email>`, audited), like AlEemaan's recovery script; the setup wizard does not create one.
+**C6 — ADR 0010 follows.** `DEFAULT_SCHOOL_TYPE` stays the default for new schools; `platform_set_school_type` is the only way to change one afterwards, refused when the school already has periods of the old kind (no stranding), so ADR 0010's promise ("when a platform superadmin exists, a screen there writes the same column") is kept without letting a school's own admin touch it.
+**C7 — migration (additive, ordered).** (1) `ALTER TYPE "Role" ADD VALUE 'CAMPUS_ADMIN'` (own migration step; cannot be used in the same transaction), (2) the CHECK constraint, (3) `User.isPlatformAdmin`, (4) the `platform_*` functions and a `PlatformAuditLog` table (no `tenantId`; **not** under tenant RLS, readable only through the platform functions; catalog-guard entry with that exception stated). No data is changed. Code deploy order: migration, then code.
+**C8 — tests (with the code).** *Integration (as `app_user`):* the CHECK refuses a `CAMPUS_ADMIN` without a campus; a campus admin cannot read or write another campus's rows (people, sessions, attendance, announcements) even with a foreign id; cannot create/edit an admin; `platform_*` functions refuse a non-platform admin, work for one, write the platform audit row, and **a platform admin still cannot read any tenant table**; suspension blocks sign-in; school-type change refused with existing periods. *API:* the route-by-group matrix (school-only routes 403 for a campus admin; campus-capable routes 404 for the other campus; unchanged routes untouched); the route-role guard. *E2E:* Users page for a campus admin (only their campus's people, no admin controls), the platform page (list, create, suspend, type), axe in both themes. *Unit:* `canAdminister` truth table.
+
+**Open questions for the maintainer (defaults in brackets).**
+1. Campus admin as a **role value** [yes] or as a flag?
+2. May a campus admin invite and manage staff of their campus [yes, below admin level] and students/guardians [yes]?
+3. Fees: may a campus admin record manual payments and see invoices of their campus [yes], and configure fee structures [no, school admin only]?
+4. Platform superadmin: **no** access to school data at all in this phase [yes] — is a later, audited support-access feature wanted?
+5. Is a suspended school simply "cannot sign in" [yes], or must its data also be hidden from public verification links?
+
+**Order of work.** a) this design (committed alone) → b) your answers → c) migration + helper + tests → d) route review in three groups → e) Users page and a platform page → f) docs, ADR (Proposed), full suite → g) PR into `dev`. Mutation pass: not run — pending, end of Phase 2 (targets: the CHECK, the campus comparison in `canAdminister`, "cannot touch an admin", the platform functions' caller check, the platform-admin-cannot-read-tenant-tables guarantee).
+
+##### Maintainer's answers to the campus-admin / platform-superadmin questions (2026-10-11)
+1. Campus admin is a **role value** (`CAMPUS_ADMIN`), not a flag — as designed.
+2. A campus admin **may manage staff and students (and guardians) of their campus**, below admin level — as designed.
+3. A campus admin **may record manual payments and see their campus's invoices**, and **may not configure fee structures** (school admin only) — as designed.
+4. The platform superadmin has **no access to a school's data in this phase**, and the maintainer **wants an audited support-access feature later**. That feature is added to the backlog with these requirements, to be designed separately before any code: time-boxed, a typed reason, visible to the school's own administrators, read-only by default, every read audited, and never a bypass of row-level security (ADR 0001).
+5. A suspended school simply **cannot sign in** — as designed.
+The design therefore stands as written (C1–C8 with the defaults) and is the plan for building after the review fixes (task 0008) are done. Status: answered; **built — see "As built" below**.
+
+##### As built — campus administrators and the platform administrator (2026-10-11)
+Record: task `0009`, ADR 0016 (Proposed). Branch `claude/campus-admins-platform-superadmin`; migrations `20261022090000_campus_admin_role` (the enum value, alone) and `20261022090100_campus_admin_and_platform` (CHECK, `User.isPlatformAdmin`, `Tenant.suspendedAt`, `PlatformAuditLog`, the `platform_*` functions) — additive, migrate before the code.
+- **Built as designed:** C1–C4 (role value, `canAdminister`, the three route groups, what a campus administrator may not do) and C5–C8 (platform administrator through definer functions, suspension, school type, tests).
+- **The route review, as it turned out:** the design counted 25 route files naming `ADMIN`; the real number is **81** (many through the `WRITE_ROLES` constants), plus ~10 pages. Campus-capable: people (B1), academics of a campus, attendance, announcements, timetable (B2), invoices and manual payment (B3), members and invitations (B4). School-only: settings, campuses, fee structures and discounts, invoice generation, subjects, grade scales, assessment schemes, results.
+- **Deviations, deliberate (the maintainer should see these):** (a) `platform_list_schools()` returns **no member counts** — a count is a cross-tenant read, the bypass C5 forbids; (b) an invoice of a student with **no campus** is a 404 to a campus administrator, not the 403 other school-wide rows get; (c) the Academic setup page is **read-only** for a campus administrator in the UI although the API lets them write; (d) a parent/student whose membership has no campus is invisible on a campus administrator's Users page; (e) the "1.7 step-up proof" is the existing password re-auth, plus two-step verification must be ON; (f) a first-administrator invitation cannot be re-sent from the platform page — decided later the same day: build both a platform action and an operator script, plus member counters that reverse (a) (task 0010).
+- **Bugs found on the way:** the role was assignable through the members/invitations API the moment the enum value existed, and would have 500'd on the CHECK (fixed: `CAMPUS_REQUIRED`); `GET finance/invoices` returned every invoice to any parent/student/teacher (ISS-0014, pre-existing, fixed); the attendance GET routes do not hide another campus's arm/student from a teacher of a different campus (ISS-0013, pre-existing, open).
+- **Tests:** unit `administer`, `route-role-guard`, nav; integration `platform`, `make-platform-admin-script`; API `campus-admin-{people,academics,finance,users}`, `platform`; e2e `users` (campus administrator), `platform`. Mutation pass: **NOT RUN — pending, end of Phase 2** (targets: the CHECK, the campus comparison in `canAdminister`, `campusActorRefusal`, `invoiceVisibility`, `platform_assert_admin`, the platform-administrator-reads-nothing guarantee).
+
+#### Build design — platform follow-ups (2026-10-11, written before any code; the maintainer approved the direction: "go on with all your recommendations")
+Record: task `0010`, branch `claude/platform-followups`, amends ADR 0016 (Proposed). Each item is a separate commit, tests first.
+
+**F1 — platform counters (reverses deviation (a)).** Table `TenantStats` (see the ADR amendment): non-readable by the runtime role, `SECURITY DEFINER` delta triggers on `TenantMembership`, `StudentRecord`, `Campus`, a recount backfill in the migration, `tenant_stats_recompute(tenant)` for repair, new `platform_school_stats()`; the service merges it into the list; the Platform page shows members, students, campuses and a "no administrator" mark. Tests first: integration (every kind of write moves the right counter; triggers == live recount after a mixed run; `app_user` cannot read the table; a non-platform caller is refused; deleting a school leaves no orphan); API (the list carries counts, no names); e2e (+axe default theme) on the Platform page.
+**F2 — re-invite the first administrator (ISS-0015).** Function, service, route `POST /api/v1/platform/schools/[id]/first-admin-invitation {email, password}`, a button on the Platform page shown for a school with zero administrators, and the operator script (see the ADR amendment). Tests first: API (refused with a clear error when the school has an administrator — including a deactivated one not counting; the old open invitation is revoked; exactly one open invitation afterwards; both audit logs written; password required; non-platform refused; unknown school = 404; mail queued), integration (the function itself; the script as a child process: refuses unknown school / has-admin / missing `--as` / non-platform `--as`).
+**F3 — teachers' attendance reads (ISS-0013): campus level AND arm level.** Rule for `TEACHING_STAFF` and `NON_TEACHING_STAFF` on `GET arms/[id]/attendance` and `GET people/students/[id]/attendance`:
+- *campus:* the arm's class group (or the student) must be school-wide or in the member's own campus; a member with no campus is school-wide; anything else is the usual 404;
+- *arm (teaching staff only):* the arm must be one they are assigned to — a `StaffSubjectAssignment` or a `TimetableSlot` of their staff record (`StaffRecord.userId` = them) in that arm; a student's history is readable if the student has an ACTIVE enrolment in such an arm in the active session. Non-teaching staff (registrar, secretary) have no arm assignments by nature and get the campus rule only.
+- *the same rule guards the roll-call write* for teachers (a teacher who cannot read an arm must not be able to write to it); `ADMIN` and `CAMPUS_ADMIN` are unchanged.
+- *consequence the maintainer should see:* a teacher with **no assignment** can no longer call the roll of any arm until an administrator gives them one (before this change any teacher could mark any arm of the school). The attendance screen's arm list is filtered the same way and says why when it is empty. Tests first: API (campus × arm matrix over real HTTP: own assigned arm 200; assigned in the timetable only 200; unassigned arm of own campus 404; arm of another campus 404 even if assigned; school-wide arm assigned 200; teacher with no assignment 404; non-teaching own campus 200 / other campus 404; admins unchanged); e2e for the picker. Existing `attendance.spec` teachers gain an assignment (an adjustment made on purpose and listed in the commit).
+**F4 — public verification (ISS-0008).** `verifyPublicCredential` drops the admission number and returns the student's name in full (`studentName` = first, middle if any, last — the maintainer's choice: "in full"); the route adds `X-Robots-Tag: noindex, nofollow` (the existing per-IP limit stays); the unused `VerifyCertificateForm` follows the new fields. Test: `results.spec` public verification asserts no admission number anywhere in the body and the full name; header asserted. Revocation: a token already stops working when the result leaves PUBLISHED/LOCKED (re-asserted by a test); a separate "revoke link" control is not built.
+**F5 — Academic setup editing controls for a campus administrator.** Follow-up PR: hide the campus picker (their campus is fixed), show school-wide rows read-only ("set by the school"), keep subjects, grade scales and assessment schemes read-only; e2e plus axe in both themes.
+**Order:** F1, F2 (platform, one PR), F3, F4 (one PR), F5 (own PR). Mutation passes stay deferred to the end of Phase 2.
+
+
+##### As built — platform follow-ups F1–F4 (2026-10-11)
+Record: task `0010`, branch `claude/platform-followups`; migrations `20261023090000_tenant_stats` and `20261023090100_first_admin_invite` (both additive; applied to the `octalve_edu` dev database).
+- **F1 counters:** as designed. `TenantStats` (RLS forced, owner-only policy), delta triggers on membership/student/campus, recount backfill, `tenant_stats_recompute`, `platform_school_stats()`; EXECUTE on the apply/recompute functions revoked from PUBLIC. The Platform page shows members · students · campuses and a "No administrator" mark. Deviation (a) of task 0009 is reversed.
+- **F2 re-invite:** as designed. `platform_authorize_first_admin_invite` counts live inside the school (not the counter), the service revokes every open `ADMIN` invitation and writes the new one in the same transaction, both audit logs record it; `pnpm platform-admin:invite-first-admin` requires `--as <platform administrator>` and prints the link.
+- **F3 attendance scoping:** as designed. `lib/attendance/access.ts`; the same rule guards the roll-call write; new `GET academics/attendance/arms` feeds the attendance screen. A teacher with no assignment sees and writes no arm.
+- **F4 public verification:** `studentName` in full, no admission number, `X-Robots-Tag: noindex, nofollow` on every response.
+- **F5 (Academic setup editing for a campus administrator)** is NOT built here; it is its own PR.
+- **Tests:** integration `platform-stats`, `platform-first-admin`, `invite-first-admin-script`; API `platform` (counters, re-invite), `attendance-access`, `results` (verification); e2e `platform`, `attendance`. Mutation pass: **NOT RUN — pending, end of Phase 2.**
+
+##### As built — F5, Academic setup editing for a campus administrator (2026-10-11/12)
+Record: task `0010`, branch `claude/campus-admin-setup-controls`. UI only, no migration, no API change (the API already allowed it).
+- The page lets a campus administrator into the **Sessions & terms** and **Classes & subjects** sections with controls; every other section stays read-only for them. Their campus is fixed (`ownCampusId`): no campus filter, no "Applies to" / "Belongs to" picker, new rows are created in their campus. A session or class the whole school owns shows "Set by the school" and no controls (and its terms view is view-only); subjects stay read-only with a note.
+- **Not done, on purpose:** timetable and attendance remain read-only in the UI for a campus administrator although their API is open to them. **Found, not changed:** `readOnly` is true for every non-ADMIN, so a teacher also sees the roll call read-only in the UI even though the API lets them take it - needs a decision.
+- **Tests:** `tests/e2e/campus-admin-setup.spec.ts`: sessions and classes in the dark and the light theme with axe, desktop and phone.
+
+#### Build design — audited support access (2026-10-13, written before any code; ADR 0017 Accepted the same day)
+Record: ADR 0017. Task `0011` will carry the build.
+
+**Why.** ADR 0016 left the platform administrator with no view of school data; support still needs one for the rare "look at my timetable" case, without a standing key and without an RLS bypass.
+
+**S1 — the grant.** Table `SupportGrant(id, tenantId, granteeUserId?, areas[], reason, expiresAt, revokedAt, createdById, createdAt)` under the school's RLS (read/insert/update by that school only; no delete). Only a school `ADMIN` creates one (4 h default, 24 h max, areas none by default); revoking sets `revokedAt`. A platform administrator learns which schools granted through a narrow definer function `platform_support_grants()` (grants addressed to them or to anyone, live only: school id, areas, expiry — no reason text, no people).
+**S2 — the session.** `resolveTenant` gains one branch: a platform administrator (flag, two-step on, password proof within the last 15 minutes) with a live grant gets `{ role: "SUPPORT", areas }`; the school context is set as for a member. `withAuth` refuses every non-safe method for `SUPPORT`, and refuses a route whose declared area is not in `areas`. A suspended school is refused.
+**S3 — areas.** Each route file declares one area (settings, academics, people, attendance, results, `finance` (declared but never grantable), or `none` for routes a support view never reaches); `tests/unit/route-area-guard.spec.ts` fails an undeclared route. Pages that fetch several areas simply show what the API gives them.
+**S4 — audit.** Every `SUPPORT` request writes `AuditLog` (`SUPPORT_ACCESS`: actor, route pattern, area) in the school and a `PlatformAuditLog` row; grant creation, revocation and expiry are audited. The school's **Support access** page (ADMIN only) lists them.
+**S5 — UI.** Grant dialog (areas, duration, reason) on the Support access page; on the platform page "Open support view" for a school with a live grant; a persistent read-only banner with the expiry; no write controls are drawn for `SUPPORT`.
+**Tests first (planned):** integration + API matrix (no/expired/revoked/other-area/other-school grant; non-GET; suspended; campus administrator and teacher cannot grant; both audit rows; secrets never present), source guard, e2e with axe in both themes.
+**Decided 2026-10-13:** areas = settings, academics, people, attendance, results (finance is NOT grantable); 4 h default, 24 h maximum; no break-glass for now.
+
+
+**As built — audited support access (task 0011, 2026-10-13/14; differs from the design above in these ways).**
+- **The session is NOT a `SUPPORT` role.** `resolveTenant` returns the school's context with `role: ADMIN` plus a `support: { grantId, areas, endsAt }` view, only when the person has no membership of their own in the school. `withAuth({ area })` and `requireTenantPage(code, area)` then refuse (the one 403) a non-GET, a route or page with no declared area, an area outside the grant, and any request the database cannot tie to a LIVE grant. No change to the `Role` enum; the cost is that the safety rests on those two entry points and on the source-level area guard.
+- **"Password within 15 minutes" became "password at opening":** `POST platform/support/open` takes the password; the view is recorded on the sign-in `Session` row (`supportTenantId`, `supportOpenedAt`) and ends at the earlier of the grant's expiry and one hour after opening. Whether it is still allowed is decided from the grant on EVERY request (`platform_support_grants()`), so a revoke or expiry or suspension is effective on the next request.
+- **A grant is open to ANY platform administrator** (`granteeUserId` exists in the table but the API refuses to set it for now).
+- **Audit:** the definer function `platform_support_record` proves the grant is live, then writes the school's `AuditLog` row and the `PlatformAuditLog` row in one go (`SUPPORT_OPENED` / `SUPPORT_ACCESS` / `SUPPORT_CLOSED`). A page view is recorded as `/schools/<code>` + its area (the exact path is not known to the page guard).
+- **Areas:** 31 school GET routes declare one; 8 are out of reach on purpose with reasons in `tests/unit/route-area-guard.spec.ts` (finance, announcements, support-grants and its activity list, the student export).
+- **Screens:** the school's `/schools/[code]/support` page (linked from Settings, not from the nav), the platform page's "Open support view", the shell banner. In a support view, write controls are removed or the panel is a disabled fieldset; the API refuses writes regardless.
+- **Not built:** a named grantee, notification to the school's administrators when a view opens, a cap on audit rows per view, the light theme for the platform flow's e2e.

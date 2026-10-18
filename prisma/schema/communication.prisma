@@ -1,0 +1,113 @@
+// --- Communication & Messaging Engine (Phase 2) ---
+//
+// Multi-channel delivery: EMAIL, SMS, WHATSAPP, IN_APP.
+// Enforces tenant isolation via PostgreSQL Row-Level Security for runtime role app_user.
+// Every table carries tenantId with composite unique [tenantId, id].
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  WHATSAPP
+  IN_APP
+}
+
+enum NotificationDispatchStatus {
+  QUEUED
+  PROCESSING
+  SENT
+  FAILED
+  RETRYING
+}
+
+/// Notification templates for system and custom school-wide dispatches.
+model NotificationTemplate {
+  id              String              @id @default(cuid())
+  tenantId        String
+  code            String
+  name            String
+  channel         NotificationChannel
+  subjectTemplate String?
+  bodyTemplate    String              @db.Text
+  variables       Json?
+  isSystem        Boolean             @default(false)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @default(now()) @updatedAt
+
+  tenant     Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dispatches NotificationDispatch[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, code, channel])
+  @@index([tenantId, channel])
+  @@index([tenantId, code])
+}
+
+/// Dispatched message record tracking individual delivery attempts and statuses.
+model NotificationDispatch {
+  id               String                     @id @default(cuid())
+  tenantId         String
+  templateId       String?
+  channel          NotificationChannel
+  recipientAddress String
+  recipientUserId  String?
+  status           NotificationDispatchStatus @default(QUEUED)
+  subject          String?
+  body             String                     @db.Text
+  metadata         Json?
+  attempts         Int                        @default(0)
+  lastError        String?
+  sentAt           DateTime?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @default(now()) @updatedAt
+
+  tenant        Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  template      NotificationTemplate? @relation(fields: [tenantId, templateId], references: [tenantId, id], onDelete: NoAction)
+  recipientUser User?                 @relation(fields: [recipientUserId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, status])
+  @@index([tenantId, channel])
+  @@index([tenantId, createdAt])
+}
+
+/// Cryptographically signed magic link token allowing guardians frictionless access.
+model GuardianLinkToken {
+  id         String              @id @default(cuid())
+  tenantId   String
+  studentId  String
+  guardianId String?
+  tokenHash  String
+  channel    NotificationChannel
+  action     String
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime            @default(now())
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student  StudentRecord   @relation(fields: [tenantId, studentId], references: [tenantId, id], onDelete: Cascade)
+  guardian GuardianRecord? @relation(fields: [tenantId, guardianId], references: [tenantId, id], onDelete: NoAction)
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, tokenHash])
+  @@index([tenantId, studentId])
+  @@index([tenantId, expiresAt])
+}
+
+/// Append-only audit trail of communication dispatch lifecycle events.
+model NotificationAuditLog {
+  id          String              @id @default(cuid())
+  tenantId    String
+  dispatchId  String?
+  actorUserId String?
+  event       String
+  channel     NotificationChannel
+  recipient   String
+  details     Json?
+  createdAt   DateTime            @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, event])
+  @@index([tenantId, createdAt])
+}

@@ -25,6 +25,7 @@ export const POST = withAuth(
       return fail("That invitation was resent several times just now. Please wait a few minutes.", 429, "RATE_LIMITED");
     }
     const result = await resendInvitation(tenant, auth.userId, id);
+    if (result === "ADMIN_ONLY") return fail("Only a school administrator can do that.", 403, "FORBIDDEN");
     if (!result) return notFound("open invitation");
     const { invitation, token } = result;
 
@@ -32,7 +33,14 @@ export const POST = withAuth(
       try {
         if (!(await reserveAttempt(`invite:mail:${invitation.email}`, MAIL_PER_ADDRESS))) return;
         await sendEmailQuietly(
-          invitationEmail({ to: invitation.email, token, schoolName: tenant.tenantName, roleLabel: ROLE_LABELS[invitation.role], inviterName: auth.user.name, days: INVITATION_TTL_DAYS }),
+          invitationEmail({
+            to: invitation.email,
+            token,
+            schoolName: tenant.tenantName,
+            roleLabel: ROLE_LABELS[invitation.role],
+            inviterName: auth.user.name,
+            days: INVITATION_TTL_DAYS,
+          }),
         );
       } catch (error) {
         console.error("[invitations] mail failed:", error instanceof Error ? error.message : error);
@@ -40,5 +48,5 @@ export const POST = withAuth(
     });
     return ok({ invitation });
   },
-  { tenant: true, roles: ["ADMIN"] },
+  { tenant: true, roles: ["ADMIN", "CAMPUS_ADMIN"] },
 );

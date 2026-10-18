@@ -1,4 +1,4 @@
-import { ok } from "@/lib/api/envelope";
+import { fail, ok } from "@/lib/api/envelope";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { isPlausibleId, notFound } from "@/lib/members/http";
 import { revokeInvitation } from "@/lib/invitations/service";
@@ -12,7 +12,9 @@ export const DELETE = withAuth(
   async (_req, auth: TenantAuthContext, ctx: Ctx) => {
     const { id } = await ctx.params;
     if (!isPlausibleId(id)) return notFound("open invitation");
-    return (await revokeInvitation(auth.tenant, auth.userId, id)) ? ok({ revoked: true }) : notFound("open invitation");
+    const revoked = await revokeInvitation(auth.tenant, auth.userId, id);
+    if (revoked === "ADMIN_ONLY") return fail("Only a school administrator can do that.", 403, "FORBIDDEN");
+    return revoked ? ok({ revoked: true }) : notFound("open invitation");
   },
-  { tenant: true, roles: ["ADMIN"] },
+  { tenant: true, roles: ["ADMIN", "CAMPUS_ADMIN"] },
 );

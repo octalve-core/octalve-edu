@@ -11,12 +11,12 @@ import { isActive, navFor } from "./nav";
 /// are plain text with a "Soon" tag.
 export function SidebarNav() {
   const pathname = usePathname();
-  const { home } = useShell();
+  const { home, platform } = useShell();
 
   return (
     <nav aria-label="Main">
       <ul className="space-y-1">
-        {navFor(home).map((item) => (
+        {navFor(home, platform).map((item) => (
           <li key={item.label}>
             {item.href ? (
               <Link

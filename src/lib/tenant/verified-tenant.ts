@@ -6,7 +6,8 @@
 // confined by ESLint (eslint.config.mjs) to the files that have a reason to call it:
 //   - `resolve-tenant.ts` — AFTER the membership check; everything request-driven comes through here;
 //   - the first-run setup route — the tenant was minted a moment ago by that same transaction;
-//   - `lib/auth/audit.ts` — the id was just read from the person's own membership rows.
+//   - `lib/auth/audit.ts` — the id was just read from the person's own membership rows;
+//   - `lib/platform/service.ts` — `createSchool`: the id was returned by `platform_create_school` in the same transaction (the first administrator's invitation).
 // Tenant business code never imports this file: it receives a verified id from `withAuth(…, { tenant: true })`.
 
 export type VerifiedTenantId = string & { readonly __brand: "VerifiedTenantId" };

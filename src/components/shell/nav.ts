@@ -1,6 +1,6 @@
 import type { ComponentType, SVGProps } from "react";
 import type { Role } from "@prisma/client";
-import { HomeIcon, SlidersIcon, UsersIcon } from "@/components/ui/icons";
+import { BuildingIcon, CalendarIcon, GraduationCapIcon, HomeIcon, MailIcon, SlidersIcon, UsersIcon } from "@/components/ui/icons";
 import { isValidTenantCode } from "@/lib/tenant/validate-code";
 
 /// A school the signed-in person belongs to, as the shell needs it. Display data only (see lib/auth/page-session.ts).
@@ -20,13 +20,34 @@ export type NavItem = {
 /// from this, so they can't disagree. `school` is the school being looked at (or the person's only school, when they
 /// are on a page outside one); without it the person has a school to choose first.
 /// Hiding an entry is a courtesy: the page and the API behind it decide.
-export function navFor(school: ShellSchool | null): NavItem[] {
-  if (!school) return [{ label: "Your schools", href: "/dashboard", icon: HomeIcon, exact: true }];
+export function navFor(school: ShellSchool | null, platform = false): NavItem[] {
+  const platformItem: NavItem[] = platform ? [{ label: "Platform", href: "/platform", icon: BuildingIcon }] : [];
+  if (!school) return [{ label: "Your schools", href: "/dashboard", icon: HomeIcon, exact: true }, ...platformItem];
   const items: NavItem[] = [{ label: "Overview", href: `/schools/${school.code}`, icon: HomeIcon, exact: true }];
   if (school.role === "ADMIN") {
-    items.push({ label: "Users", href: `/schools/${school.code}/users`, icon: UsersIcon }, { label: "Settings", href: null, icon: SlidersIcon });
+    items.push(
+      { label: "Academics", href: `/schools/${school.code}/academics`, icon: CalendarIcon },
+      { label: "People", href: `/schools/${school.code}/people`, icon: GraduationCapIcon },
+      { label: "Communication", href: `/schools/${school.code}/communication`, icon: MailIcon },
+      { label: "Users", href: `/schools/${school.code}/users`, icon: UsersIcon },
+      { label: "Settings", href: `/schools/${school.code}/settings`, icon: SlidersIcon },
+    );
+  } else if (school.role === "CAMPUS_ADMIN") {
+    // A campus administrator runs their own campus: no school Settings (the school's name, type and campuses are the school administrator's).
+    items.push(
+      { label: "Academics", href: `/schools/${school.code}/academics`, icon: CalendarIcon },
+      { label: "People", href: `/schools/${school.code}/people`, icon: GraduationCapIcon },
+      { label: "Communication", href: `/schools/${school.code}/communication`, icon: MailIcon },
+      { label: "Users", href: `/schools/${school.code}/users`, icon: UsersIcon },
+    );
+  } else if (school.role === "TEACHING_STAFF" || school.role === "NON_TEACHING_STAFF") {
+    // Staff may look at the school year and at the school's people (read-only; plan 1.2, decisions P2 and P9) — they change none of it.
+    items.push(
+      { label: "Academics", href: `/schools/${school.code}/academics`, icon: CalendarIcon },
+      { label: "People", href: `/schools/${school.code}/people`, icon: GraduationCapIcon },
+    );
   }
-  return items;
+  return [...items, ...platformItem];
 }
 
 /// Which of the person's schools the path names, if any. **For display only** — which links to draw. A path naming a
@@ -46,14 +67,27 @@ export function schoolFromPath(pathname: string, schools: readonly ShellSchool[]
 }
 
 /// The page's own name for the breadcrumb ("School / Users"), by path.
-const SCHOOL_PAGES: Record<string, string> = { "": "Overview", users: "Users", settings: "Settings" };
-const GLOBAL_PAGES: Record<string, string> = { "/dashboard": "Your schools", "/account": "Account" };
+const SCHOOL_PAGES: Record<string, string> = {
+  "": "Overview",
+  users: "Users",
+  academics: "Academics",
+  people: "People",
+  communication: "Communication",
+  settings: "Settings",
+  support: "Support access",
+};
+const GLOBAL_PAGES: Record<string, string> = { "/dashboard": "Your schools", "/account": "Account", "/platform": "Platform" };
 
 export function pageLabel(pathname: string): string | null {
   const own = GLOBAL_PAGES[pathname.replace(/\/+$/, "") || "/"];
   if (own) return own;
   const match = /^\/schools\/[^/]+(?:\/([^/]+))?\/?$/.exec(pathname);
-  return match ? (SCHOOL_PAGES[match[1] ?? ""] ?? null) : null;
+  if (match) return SCHOOL_PAGES[match[1] ?? ""] ?? null;
+  // A person's own page under People (a student or a member of staff) is still "People" in the breadcrumb.
+  if (/^\/schools\/[^/]+\/people\/(?:students|staff)\/[^/]+\/?$/.test(pathname)) return "People";
+  // Sub-pages under Communication are still "Communication" in the breadcrumb.
+  if (/^\/schools\/[^/]+\/communication(?:\/.*)?$/.test(pathname)) return "Communication";
+  return null;
 }
 
 export const isActive = (pathname: string, item: Pick<NavItem, "href" | "exact">): boolean => {

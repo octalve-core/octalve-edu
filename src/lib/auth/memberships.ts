@@ -17,7 +17,8 @@ export type UserMembership = {
 export async function getUserMemberships(userId: string): Promise<UserMembership[]> {
   const rows = await forUser(userId).transaction((tx) =>
     tx.tenantMembership.findMany({
-      where: { userId, deactivatedAt: null }, // a deactivated membership is no membership
+      // a deactivated membership is no membership, and a suspended school is not one the person can open (lib/platform: suspension)
+      where: { userId, deactivatedAt: null, tenant: { suspendedAt: null } },
       include: { tenant: { select: { id: true, code: true, name: true } } },
       orderBy: { createdAt: "asc" },
     }),

@@ -30,11 +30,20 @@ replace a design pass — every phase still gets its design written into the pla
 | **0.5.2 Tenant trust boundary** | ✅ application layer (`claude/tenant-trust-boundary`) **and row-level security** (`claude/tenant-rls`) built and verified | `phases/phase-0.5.2…` |
 | 0.5.3 Shared API infrastructure | ✅ built and verified (`claude/tenant-trust-boundary`) | `phases/phase-0.5.3…` |
 | **0.5.2-H App shell** | ✅ built and verified (`claude/app-shell-users`) | `phases/phase-0.5.2H-app-shell.md` |
-| **0.5.4 Users pages & invitations** | 🟡 **built and WIP-committed** (`claude/app-shell-users`); **mutation pass (122 written, none run), a complete green run and the docs are outstanding** — handed to the local Claude Code session: `handoff/TAKEOVER.md` | plan; `handoff/` |
-| Phase 1 … 5 | ⬜ | plan |
+| **0.5.4 Users pages & invitations** | ✅ built, verified, documented (`claude/app-shell-users`) | `phases/phase-0.5.4-users-invitations.md` |
+| **1.0 Foundations & Sessions** | ✅ built and verified (`claude/phase-1-0-1-1`) | `phases/phase-1.0-foundations.md` |
+| **1.1 Academic Structure** | ✅ built and verified (`claude/phase-1-0-1-1`) | `phases/phase-1.1-academic-structure.md` |
+| **1.2 People & Enrollment** | ✅ built and verified (`claude/phase-1-2-people`) | `phases/phase-1.2-people.md` |
+| **1.3 Attendance & Operations** | ✅ built and verified (`fork/claude/phase-1-3-attendance`) | `phases/phase-1.3-attendance.md` |
+| **1.4 Results & Grading** | ✅ built and verified (`claude/phase-1-4-results`) | `phases/phase-1.4-results-and-grading.md` |
+| **1.5 Finance & Billing** | ✅ built and verified (`claude/phase-1-5-finance`, PR #14 merged) | `phases/phase-1.5-finance-and-billing.md` |
+| **1.6 Announcements & Timetable** | ✅ built and verified (`claude/phase-1-6-timetable`, PR #15 merged) | `phases/phase-1.6-announcements-and-timetable.md` |
+| **1.7 Settings UI & Step-up MFA** | ✅ built and verified (`claude/phase-1-7-settings`, PR #16 merged) | `phases/phase-1.7-settings-and-mfa.md` |
+| **1.8 End-to-End Hardening & Phase Gate** | ✅ built and verified (`claude/phase-1-8-gate`, PR #17 open) | `phases/phase-1.8-phase-gate.md` |
+| Phase 2 … 5 | ⬜ | plan |
 
-**No open blocker.** The RLS role was created with the maintainer's approval ("do both and run") and the whole suite now runs as `app_user`. Phase 1 may start once the shell and
-the Users pages exist; **every Phase 1 table ships RLS in its own migration** (the catalog guard enforces it).
+**Phase 1 (Core SIS & Finance) is 100% built, verified, and gated.** Next up: Phase 2 (Communication).
+
 
 ---
 
@@ -65,17 +74,16 @@ Design: plan §0.5.2 + "Build design for §0.5.2". Branch `claude/tenant-trust-b
   context (no campus names) · **T3** `completeSignIn` admin check via user context · **T4** setup wizard sets the tenant
   context in its own transaction · **T5** `scripts/mfa-reset.mjs` uses plain `set_config`.
 
-### 0.5.2-D — School routes, pages and the front door 🟡
+### 0.5.2-D — School routes, pages and the front door ✅
 - **T1 API** `GET /api/v1/schools/[code]` ✅ (20 API tests incl. *every route under `/schools/` discovered from the file system
   and hit cross-tenant / signed-out / no-school*).
 - **T2 pages** `/schools/[code]` workspace; `requireTenantPage`; `forbidden()` 403 view (`experimental.authInterrupts`) ✅ built.
 - **T3 front door** `/dashboard` → one school redirects, several → picker, none → message ✅ built.
-- **T4 existing tests adapt to the front door** (a one-school user now lands on `/schools/<code>`): `HOME_URL` helper applied;
-  **⬜ steps:** (1) run the whole api/e2e/https suites; (2) fix the tests that assert dashboard *content* (`sign-in.spec`,
-  `setup-handoff.spec`, a11y "dashboard" block); (3) confirm `forbidden()` returns a real 403 in the production build.
-- **T5 new e2e** `front-door.spec.ts` on the SaaS server ⬜: one school → redirect; several → picker → click; none → message;
-  code tampering → 403 view naming no school; ADMIN sees all campuses, staff only theirs; hostile school name renders inert.
-- **T6 a11y** both themes + phone targets for picker, workspace, workspace-without-campus, 403 view ⬜.
+- **T4 existing tests adapt to the front door** (a one-school user now lands on `/schools/<code>`) ✅: `HOME_URL` helper applied; the whole suites run green (2026-10-06 baseline: 1131 tests, one lane);
+  `forbidden()` is a real 403 in the production build (asserted).
+- **T5 new e2e** `front-door.spec.ts` on the SaaS server ✅ (6 tests): one school → redirect; several → picker → click; none → message; code tampering → 403 view naming no school; ADMIN sees all campuses,
+  staff only theirs; hostile school name renders inert.
+- **T6 a11y** both themes + phone targets for picker, workspace, workspace-without-campus, 403 view ✅ (blocks in `responsive-and-a11y.spec.ts`).
 
 ### 0.5.2-E — Test harness for multi-school ✅ built
 SaaS-mode **fifth server** (`SAAS_PORT` 3103), `createTenant` / `addMembership` / `removeCreatedTenants`, shared `withEnv`.
@@ -87,7 +95,7 @@ T1 infra (`docker/postgres/init/01-roles.sql`, `pnpm db:roles`, `DIRECT_URL`) �
 T3 harness (`TEST_APP_DATABASE_URL`; every server and in-process module runs as `app_user`; admin for fixtures; setup verifies and prints the exact fix) ✅ · T4 `assertRlsEnforced()` (+ a sixth, deliberately
 misconfigured test server proving it is wired in) ✅ · T5 negative tests as `app_user` incl. the catalog guard (33 + 4) ✅ · T6 mutation pass (44; results in the phase record) ✅ · T7 docs ✅ — PR only when asked.
 
-### 0.5.2-G — Mutation pass and docs for the application layer ⬜
+### 0.5.2-G — Mutation pass and docs for the application layer ✅ (records in `phases/phase-0.5.2-tenant-boundary.md`)
 Mutations for A–D (resolver trusting the URL, differing refusals, roles from the wrong school, Solo invariant removed, session
 check after tenant check, forbidden view leaking the name, picker choosing the wrong school); full suites (unit, integration,
 api, e2e desktop + phone, https); plan "as built"; `phases/phase-0.5.2-tenant-boundary.md`; trackers; `CLAUDE.md`.
@@ -96,7 +104,7 @@ api, e2e desktop + phone, https); plan "as built"; `phases/phase-0.5.2-tenant-bo
 T1 shell components + nav model driven by the role **in the school in view** ✅ · T2 account menu / sign-out ✅ · T3 `/account`, `/dashboard`, `/schools/[code]` and the 403 view moved into the shell ✅ · T4 responsive + axe both themes
 (open states too) ✅ · T5 tests that sign out through the header adapted (`signOut` helper) ✅ · T6 record + 26 mutations ✅.
 
-## 0.5.3 — Shared API infrastructure ⬜ (plan §0.5.3; each item below is its own task)
+## 0.5.3 — Shared API infrastructure ✅ (plan §0.5.3; each item below is its own task)
 - **A envelope** exists; audit that no route builds the shape inline (an ESLint/test guard).
 - **B pagination** `lib/api/pagination.ts`: offset (`page`/`limit`) and cursor helpers; hard caps; malformed params → 400 with
   field errors; tests for boundaries (0, negative, huge, non-numeric, repeated params).
@@ -111,7 +119,7 @@ T1 shell components + nav model driven by the role **in the school in view** ✅
 - **H negative-test file** exercising every item (wrong tenant, no membership, revoked session, malformed pagination, limit
   exceeded) **as `app_user`** — the Phase 1 gate.
 
-## 0.5.4 (new) — Users pages and invitations ⬜ (finishes 0.5.E)
+## 0.5.4 (new) — Users pages and invitations ✅ (finishes 0.5.E; email change 0.5.4-F still open)
 Needs 0.5.2's roles. Tasks: (1) member list per school (paged, role/campus filters); (2) **invite** — hashed single-use link,
 invitee proves the email and sets their own password; existing accounts attach only when the invitee accepts while signed in as
 themselves (never silently by an admin); (3) change role / campus / deactivate (history survives; sessions revoked); (4) admin
@@ -127,9 +135,9 @@ fails otherwise. Routes are `withAuth(…, { tenant: true, roles/permissions })`
 
 | Sub-phase | Content | Depends on |
 | :-- | :-- | :-- |
-| 1.0 | `SchoolType` on `Tenant`; `SchoolSettings` auto-created with every tenant; permissions enum + `permissions` on membership (§1.7) | 0.5.2-F |
-| 1.1 | Academic structure: `AcademicSession`/`Period`, `ClassGroup`/`Arm`, `Subject`, `AssessmentConfig`, `GradeScale` | 1.0 |
-| 1.2 | People: `StaffRecord`, `StudentRecord`, `GuardianLink`, `StudentEnrollment` | 1.1 |
+| 1.0 | `SchoolType` on `Tenant`; `SchoolSettings` auto-created with every tenant; permissions enum + `permissions` on membership (§1.7) — **✅ built 2026-10-06** (`phases/phase-1.0-foundations.md`; full gate + mutation pass pending) | 0.5.2-F |
+| 1.1 | Academic structure: `AcademicSession`/`Period`, `ClassGroup`/`Arm`, `Subject`, `AssessmentConfig`, `GradeScale` — **✅ built 2026-10-07** (`phases/phase-1.1-academic-structure.md`; mutation pass pending, end of Phase 2) | 1.0 |
+| 1.2 | People: `StaffRecord`, `StudentRecord`, `GuardianRecord`+`GuardianLink`, `StudentEnrollment` — **✅ built 2026-10-08** (`phases/phase-1.2-people.md`; branch `claude/phase-1-2-people`, stacked on 1-0-1-1); mutation pass pending (end of Phase 2) | 1.1 |
 | 1.3 | Attendance | 1.2 |
 | 1.4 | Results + approval workflow + publish + parent view | 1.1, 1.2, §1.7 permissions |
 | 1.5 | Finance: `FeeStructure`, `Invoice`, `Payment`, gateway webhooks (+ mock Paystack engine) | 1.2 |
@@ -171,7 +179,9 @@ T3 cursor pagination (high churn) · T4 edit window and who may edit · T5 summa
 T1 score entry per component with max-score validation against the snapshot · T2 status machine DRAFT → SUBMITTED → APPROVED →
 PUBLISHED (conditional updates; `CAN_APPROVE_RESULTS`) · T3 position/ranking computed server-side with correct ties ·
 T4 server-rendered report-card PDF · T5 parent/student view only of PUBLISHED, only own children (IDOR tests) · T6 promotion
-(closes enrollment, opens next) · T7 screens.
+(closes enrollment, opens next) · T7 screens · **T8 public certificate / report-card verification & file access pattern**:
+each generated credential/report card carries a cryptographic hash and QR code linking to a public verification endpoint (referencing
+the `VerifyCertificateForm` pattern and `out/certificate_or_file_access` architecture for tamper-evident credentials).
 
 ### 1.5 detail (finance)
 T1 fee structures per period/class · T2 invoice generation (idempotent per student+period) · T3 payment records, `Decimal`
@@ -182,7 +192,9 @@ amount re-checked) · T7 status polling endpoint rate-limited per IP and referen
 body refused, 20 simultaneous fulfilments → one, amount mismatch throws.
 
 ### 1.6 detail
-Announcements (audience targeting by role/campus, publish window) · timetable slots (clash detection per teacher/room/class).
+Announcements (audience targeting by role/campus, publish window) · timetable slots (clash detection per teacher/room/class;
+**interactive timetable & curriculum scheduling canvas**: adopting the visual workflow node/grid design architecture from
+`TwoNode_V2_Design_Canvas.html` for real-time drag-and-drop clash resolution).
 
 ### 1.7 detail (settings + step-up)
 All toggles from plan §1.3 table; each change requires a fresh second factor (reuse 0.5.D) and is audited before/after

@@ -3,7 +3,15 @@ import { test, expect } from "@playwright/test";
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import {
-  DEFAULT_LIMIT, MAX_LIMIT, MAX_PAGE, cursorMeta, decodeCursor, encodeCursor, offsetMeta, parseCursorPagination, parseOffsetPagination,
+  DEFAULT_LIMIT,
+  MAX_LIMIT,
+  MAX_PAGE,
+  cursorMeta,
+  decodeCursor,
+  encodeCursor,
+  offsetMeta,
+  parseCursorPagination,
+  parseOffsetPagination,
 } from "@/lib/api/pagination";
 import { MAX_BODY_BYTES, validate } from "@/lib/api/validate";
 
@@ -71,9 +79,20 @@ test.describe("cursor pagination", () => {
     const good = encodeCursor(cursor);
     const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
     for (const bad of [
-      "", "!!!", "not base64 url", good + "A".repeat(300), good.slice(0, -4),
-      b64(null), b64("str"), b64([]), b64({}), b64({ t: 1, id: "x" }), b64({ t: "2026-10-05", id: "x" }), // not the exact ISO form
-      b64({ t: "not a date", id: "x" }), b64({ t: cursor.createdAt.toISOString(), id: "" }), b64({ t: cursor.createdAt.toISOString(), id: "x".repeat(200) }),
+      "",
+      "!!!",
+      "not base64 url",
+      good + "A".repeat(300),
+      good.slice(0, -4),
+      b64(null),
+      b64("str"),
+      b64([]),
+      b64({}),
+      b64({ t: 1, id: "x" }),
+      b64({ t: "2026-10-05", id: "x" }), // not the exact ISO form
+      b64({ t: "not a date", id: "x" }),
+      b64({ t: cursor.createdAt.toISOString(), id: "" }),
+      b64({ t: cursor.createdAt.toISOString(), id: "x".repeat(200) }),
       b64({ t: cursor.createdAt.toISOString(), id: 7 }),
     ]) {
       expect(decodeCursor(bad), JSON.stringify(bad).slice(0, 60)).toBeNull();
@@ -81,7 +100,9 @@ test.describe("cursor pagination", () => {
   });
 
   test("a VALID cursor padded past the length cap is refused too (the cap is its own rule, not a side effect)", () => {
-    const padded = Buffer.from(JSON.stringify({ t: cursor.createdAt.toISOString(), id: cursor.id, pad: "x".repeat(400) })).toString("base64url");
+    const padded = Buffer.from(JSON.stringify({ t: cursor.createdAt.toISOString(), id: cursor.id, pad: "x".repeat(400) })).toString(
+      "base64url",
+    );
     expect(padded.length).toBeGreaterThan(256);
     expect(decodeCursor(padded)).toBeNull();
     expect(decodeCursor(encodeCursor(cursor))).toEqual(cursor); // …while the ordinary one is fine
@@ -116,7 +137,10 @@ function request(opts: { body?: string; query?: string; headers?: Record<string,
     headers: opts.headers,
   });
 }
-const bodySchema = z.object({ name: z.string().trim().min(1, "Enter a name.").max(10, "Too long."), age: z.number().int().min(0).optional() });
+const bodySchema = z.object({
+  name: z.string().trim().min(1, "Enter a name.").max(10, "Too long."),
+  age: z.number().int().min(0).optional(),
+});
 const querySchema = z.object({ q: z.string().max(5).optional(), tag: z.union([z.string(), z.array(z.string())]).optional() });
 
 function route() {
@@ -135,7 +159,10 @@ const run = async (handler: ReturnType<typeof route>["handler"], req: NextReques
 test.describe("validate()", () => {
   test("valid input reaches the handler parsed; unknown keys are STRIPPED, never passed on", async () => {
     const { handler, calls } = route();
-    const res = await run(handler, request({ body: JSON.stringify({ name: "  Amina  ", age: 3, isAdmin: true, role: "ADMIN" }), query: "q=ab&tag=x&tag=y" }));
+    const res = await run(
+      handler,
+      request({ body: JSON.stringify({ name: "  Amina  ", age: 3, isAdmin: true, role: "ADMIN" }), query: "q=ab&tag=x&tag=y" }),
+    );
     expect(res.status).toBe(200);
     expect(calls).toEqual([{ body: { name: "Amina", age: 3 }, query: { q: "ab", tag: ["x", "y"] } }]);
   });
@@ -185,10 +212,35 @@ test.describe("validate()", () => {
     expect(calls).toHaveLength(0);
   });
 
+  test("one route may declare a higher body cap (the CSV import); the cap applies to that route only, and a lower or zero value never lowers the default", async () => {
+    const big = JSON.stringify({ name: "x".repeat(MAX_BODY_BYTES + 100) });
+    const roomy = validate(
+      { body: z.object({ name: z.string() }), maxBodyBytes: MAX_BODY_BYTES * 2 },
+      async (_r, _a: unknown, _c: unknown, input) => Response.json({ n: input.body.name.length }),
+    );
+    expect((await run(roomy as never, request({ body: big }))).json).toEqual({ n: MAX_BODY_BYTES + 100 });
+    const tooBig = JSON.stringify({ name: "x".repeat(MAX_BODY_BYTES * 2) });
+    expect(await run(roomy as never, request({ body: tooBig }))).toMatchObject({ status: 413 });
+    expect(await run(roomy as never, request({ body: "{}", headers: { "content-length": String(MAX_BODY_BYTES * 2 + 1) } }))).toMatchObject(
+      { status: 413 },
+    );
+    for (const maxBodyBytes of [0, 1, MAX_BODY_BYTES - 1]) {
+      const stingy = validate({ body: z.object({ name: z.string() }), maxBodyBytes }, async () => Response.json({}));
+      expect(await run(stingy as never, request({ body: JSON.stringify({ name: "x".repeat(1000) }) })), String(maxBodyBytes)).toMatchObject(
+        { status: 200 },
+      ); // not lowered
+      expect(await run(stingy as never, request({ body: big })), String(maxBodyBytes)).toMatchObject({ status: 413 });
+    }
+    const { handler } = route(); // an ordinary route is still capped at the default
+    expect(await run(handler, request({ body: big }))).toMatchObject({ status: 413 });
+  });
+
   test("a route with only a query schema never reads the body; one with only a body never reads the query", async () => {
     const onlyQuery = validate({ query: querySchema }, async (_r, _a: unknown, _c: unknown, input) => Response.json(input));
     expect((await run(onlyQuery as never, request({ query: "q=a" }))).json).toEqual({ query: { q: "a" } });
     const onlyBody = validate({ body: bodySchema }, async (_r, _a: unknown, _c: unknown, input) => Response.json(input));
-    expect((await run(onlyBody as never, request({ body: JSON.stringify({ name: "n" }), query: "q=whatever&evil=1" }))).json).toEqual({ body: { name: "n" } });
+    expect((await run(onlyBody as never, request({ body: JSON.stringify({ name: "n" }), query: "q=whatever&evil=1" }))).json).toEqual({
+      body: { name: "n" },
+    });
   });
 });
