@@ -25,7 +25,9 @@
 | 12 | [TASK-0012](0012-phase-2-communication-and-messaging.md) | Phase 2: Communication & Multi-Channel Messaging Engine (Templates, BullMQ on Redis, Resend/Termii) | [x] Completed | 2026-10-15 UTC | 2026-10-16 09:03:00 UTC | [PR #18](https://github.com/octalve-core/octalve-edu/pull/18) (`claude/phase-2-communication`) |
 | 13 | [TASK-0013](0013-global-quick-tools-and-pwa.md) | Phase 3: Global Quick-Tools Dock & Progressive Web App (PWA) | [x] Completed | 2026-10-16 10:00:00 UTC | 2026-10-16 14:00:00 UTC | [PR #19](https://github.com/octalve-core/octalve-edu/pull/19) (`claude/phase-3-quick-tools-pwa`) |
 | 14 | [TASK-0014](0014-phase-4-lms-and-assignments.md) | Phase 4: Learning Management System (LMS) & Assignments | [x] Completed | 2026-10-16 14:30:00 UTC | 2026-10-16 15:45:00 UTC | [PR #20](https://github.com/octalve-core/octalve-edu/pull/20) (`claude/phase-4-lms-assignments`) |
-| 15 | [TASK-0015](0015-phase-5-expansion-higher-ed-and-domains.md) | Phase 5: Higher-Ed Credit Unit System, Custom Domains & Vocational Certifications | [x] Completed | 2026-10-18 01:00:00 UTC | 2026-10-18 01:30:00 UTC | `claude/phase-5-expansion` |
+| 15 | [TASK-0015](0015-phase-5-expansion-higher-ed-and-domains.md) | Phase 5: Higher-Ed Credit Unit System, Custom Domains & Vocational Certifications | [x] Completed | 2026-10-18 01:00:00 UTC | 2026-10-18 01:30:00 UTC | [PR #21](https://github.com/octalve-core/octalve-edu/pull/21) |
+| 16 | Release Staging | Release v1.0.0 Staging: Promote `dev` ➔ `master` (Phases 1-5) | [x] Completed | 2026-10-18 05:14:00 UTC | 2026-10-18 05:15:00 UTC | [PR #22](https://github.com/octalve-core/octalve-edu/pull/22) |
+| 17 | Release Production | Release v1.0.0 Production: Promote `master` ➔ `prod` (Tagged `v1.0.0`) | [x] Completed | 2026-10-18 05:15:00 UTC | 2026-10-18 05:16:00 UTC | [PR #23](https://github.com/octalve-core/octalve-edu/pull/23) |
 ---
 
 ## Detailed Milestone Checklist
@@ -154,12 +156,13 @@
 - [x] F5: academic setup editing controls for campus administrators
 
 ### TASK-0011: Audited support access (ADR 0017)
-- **Status:** Completed — slices A-E landed in octalve-core `dev` as PR #14 (full suite 1972 passed, 2 assertions updated); PR #15 status updates
+- **Status:** Completed — slices A-E landed in octalve-core `dev` as PR #14; named grantee & admin email notification follow-ups landed in PR #24
 - [x] Slice A: support grants on the school side (`SupportGrant`, RLS policies, time limits)
 - [x] Slice B: support session on the platform side (`supportTenantId`, `platform_support_record`, read-only enforcement)
 - [x] Slice C: declared areas across 31 school GET routes + source-level area guard
 - [x] Slice D: UI panels (school support page, platform open-view dialog, persistent shell read-only banner)
 - [x] Slice E: full suite verification and production deploy checklist
+- [x] Follow-ups: Named Grantee support (`granteeUserId` / `granteeEmail`) and school administrator email notification on support session open (`PR #24`)
 
 ### TASK-0012: Phase 2 — Communication & Multi-Channel Messaging Engine
 - **Status:** [x] Completed (Slices A-H landed and verified 100% green)

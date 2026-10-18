@@ -16,6 +16,8 @@ export type SupportGrantView = {
   revokedAt: string | null;
   createdAt: string;
   createdByName: string | null;
+  granteeName: string | null;
+  granteeEmail: string | null;
 };
 
 type Row = {
@@ -26,6 +28,7 @@ type Row = {
   revokedAt: Date | null;
   createdAt: Date;
   createdBy: { name: string | null } | null;
+  grantee: { name: string | null; email: string | null } | null;
 };
 const SELECT = {
   id: true,
@@ -35,6 +38,7 @@ const SELECT = {
   revokedAt: true,
   createdAt: true,
   createdBy: { select: { name: true } },
+  grantee: { select: { name: true, email: true } },
 } as const;
 
 const statusOf = (row: Pick<Row, "expiresAt" | "revokedAt">, now = new Date()): GrantStatus =>
@@ -50,6 +54,8 @@ function view(row: Row): SupportGrantView {
     revokedAt: row.revokedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     createdByName: row.createdBy?.name ?? null,
+    granteeName: row.grantee?.name ?? null,
+    granteeEmail: row.grantee?.email ?? null,
   };
 }
 
@@ -63,12 +69,19 @@ export async function listGrants(tenant: Tenant): Promise<SupportGrantView[]> {
 export async function createGrant(
   tenant: Tenant,
   actorUserId: string,
-  input: { areas: SupportArea[]; hours: number; reason: string },
+  input: { areas: SupportArea[]; hours: number; reason: string; granteeUserId?: string | null },
 ): Promise<SupportGrantView> {
   const expiresAt = new Date(Date.now() + input.hours * 3600_000);
   const row = await tenant.run(async (tx) => {
     const created = await tx.supportGrant.create({
-      data: { tenantId: tenant.tenantId, areas: input.areas, reason: input.reason, expiresAt, createdById: actorUserId },
+      data: {
+        tenantId: tenant.tenantId,
+        areas: input.areas,
+        reason: input.reason,
+        expiresAt,
+        createdById: actorUserId,
+        granteeUserId: input.granteeUserId ?? null,
+      },
       select: SELECT,
     });
     await tx.auditLog.create({
@@ -78,7 +91,12 @@ export async function createGrant(
         action: "SUPPORT_GRANT_CREATED",
         targetType: "SupportGrant",
         targetId: created.id,
-        afterValue: { areas: input.areas, hours: input.hours, expiresAt: expiresAt.toISOString() },
+        afterValue: {
+          areas: input.areas,
+          hours: input.hours,
+          expiresAt: expiresAt.toISOString(),
+          granteeUserId: input.granteeUserId ?? null,
+        },
         reason: input.reason,
       },
     });
