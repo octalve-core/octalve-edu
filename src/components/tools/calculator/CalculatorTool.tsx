@@ -140,9 +140,7 @@ export function CalculatorTool() {
     <div className="flex flex-col gap-4">
       {/* Display Screen */}
       <div className="relative rounded-2xl border border-line bg-canvas p-4 text-right shadow-inner">
-        <div className="h-6 overflow-x-auto text-xs font-mono text-fg-muted whitespace-nowrap">
-          {expression || "0"}
-        </div>
+        <div className="h-6 overflow-x-auto text-xs font-mono text-fg-muted whitespace-nowrap">{expression || "0"}</div>
         <div className="mt-1 flex items-baseline justify-between gap-2">
           <button
             type="button"
@@ -163,7 +161,10 @@ export function CalculatorTool() {
               </>
             )}
           </button>
-          <div data-testid="calculator-result" className="overflow-x-auto text-2xl font-bold font-mono tracking-tight text-fg whitespace-nowrap">
+          <div
+            data-testid="calculator-result"
+            className="overflow-x-auto text-2xl font-bold font-mono tracking-tight text-fg whitespace-nowrap"
+          >
             {result}
           </div>
         </div>
@@ -171,9 +172,7 @@ export function CalculatorTool() {
 
       {/* School Financial Helpers */}
       <div className="flex flex-wrap items-center gap-1.5 border-b border-line pb-3 text-xs">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-fg-muted mr-1">
-          Fee Helpers:
-        </span>
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-fg-muted mr-1">Fee Helpers:</span>
         <button
           type="button"
           onClick={() => handleQuickPreset(0.95, "− 5% waiver")}
@@ -353,11 +352,7 @@ export function CalculatorTool() {
         <div className="mt-1 border-t border-line pt-3">
           <div className="flex items-center justify-between text-[11px] font-semibold text-fg-muted mb-1.5">
             <span className="uppercase tracking-wider">Recent Calculations</span>
-            <button
-              type="button"
-              onClick={() => setHistory([])}
-              className="flex items-center gap-1 hover:text-fg transition-colors"
-            >
+            <button type="button" onClick={() => setHistory([])} className="flex items-center gap-1 hover:text-fg transition-colors">
               <RefreshCwIcon className="h-3 w-3" />
               <span>Clear</span>
             </button>

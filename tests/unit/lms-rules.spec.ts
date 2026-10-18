@@ -7,12 +7,7 @@ import {
   QuizQuestionItem,
   QuizAnswerItem,
 } from "@/lib/lms/rules";
-import {
-  createAssignmentSchema,
-  gradeSubmissionSchema,
-  createLearningMaterialSchema,
-  createQuizSchema,
-} from "@/lib/lms/validation";
+import { createAssignmentSchema, gradeSubmissionSchema, createLearningMaterialSchema, createQuizSchema } from "@/lib/lms/validation";
 
 test.describe("LMS — Submission Status Engine", () => {
   test("returns PENDING when there is no submission date", () => {

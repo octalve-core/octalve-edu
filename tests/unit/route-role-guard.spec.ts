@@ -35,6 +35,7 @@ allow(
   "GET v1/setup/route.ts",
   "POST v1/setup/route.ts",
   "GET v1/verify/[token]/route.ts",
+  "GET v1/verify-certificate/[certificateNo]/route.ts",
 );
 allow(
   "a payment provider calls it: the SIGNATURE of the body is the credential (lib/finance/crypto.ts)",
@@ -133,6 +134,48 @@ elsewhere(
 elsewhere(
   "reads of the school's structure: row-level security and the visibleTo functions show a campus administrator what any member of that campus sees (the route lists every staff role beside CAMPUS_ADMIN); the people routes' reads are the same",
   "GET v1/schools/[code]/timetable/route.ts",
+);
+elsewhere(
+  "lib/communication/service.ts: communications are school-wide or filtered by audience target; campus-level isolation handled in dispatch service",
+  "POST v1/schools/[code]/communication/broadcast/route.ts",
+  "POST v1/schools/[code]/communication/dispatches/[id]/retry/route.ts",
+  "GET v1/schools/[code]/communication/dispatches/route.ts",
+  "GET v1/schools/[code]/communication/templates/[id]/route.ts",
+  "GET v1/schools/[code]/communication/templates/route.ts",
+);
+elsewhere(
+  "lib/lms/service.ts: learning materials, quizzes, and assignments are scoped to class arms/subjects with tenant RLS; campus checks in class arm resolution",
+  "GET v1/schools/[code]/lms/assignments/[id]/route.ts",
+  "PATCH v1/schools/[code]/lms/assignments/[id]/route.ts",
+  "DELETE v1/schools/[code]/lms/assignments/[id]/route.ts",
+  "PATCH v1/schools/[code]/lms/assignments/[id]/submissions/[submissionId]/grade/route.ts",
+  "POST v1/schools/[code]/lms/assignments/[id]/submissions/route.ts",
+  "GET v1/schools/[code]/lms/assignments/route.ts",
+  "POST v1/schools/[code]/lms/assignments/route.ts",
+  "DELETE v1/schools/[code]/lms/materials/[id]/route.ts",
+  "GET v1/schools/[code]/lms/materials/route.ts",
+  "POST v1/schools/[code]/lms/materials/route.ts",
+  "POST v1/schools/[code]/lms/quizzes/[id]/attempt/route.ts",
+  "GET v1/schools/[code]/lms/quizzes/[id]/route.ts",
+  "GET v1/schools/[code]/lms/quizzes/route.ts",
+  "POST v1/schools/[code]/lms/quizzes/route.ts",
+);
+elsewhere(
+  "lib/higher-ed/service.ts: departments, courses, registrations, and transcripts are scoped to tenant; campus isolation handled via student/course enrollments",
+  "GET v1/schools/[code]/higher-ed/departments/route.ts",
+  "POST v1/schools/[code]/higher-ed/departments/route.ts",
+  "GET v1/schools/[code]/higher-ed/courses/route.ts",
+  "POST v1/schools/[code]/higher-ed/courses/route.ts",
+  "GET v1/schools/[code]/higher-ed/registrations/route.ts",
+  "POST v1/schools/[code]/higher-ed/registrations/route.ts",
+  "PATCH v1/schools/[code]/higher-ed/registrations/route.ts",
+  "GET v1/schools/[code]/higher-ed/transcript/[studentId]/route.ts",
+);
+elsewhere(
+  "lib/certificates/service.ts: vocational certificates are scoped to tenant and validated by student record",
+  "GET v1/schools/[code]/certificates/route.ts",
+  "POST v1/schools/[code]/certificates/route.ts",
+  "POST v1/schools/[code]/certificates/[id]/revoke/route.ts",
 );
 
 function routeFiles(dir: string): string[] {

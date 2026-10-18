@@ -68,6 +68,11 @@ model Tenant {
   quizzes               Quiz[]
   quizQuestions         QuizQuestion[]
   quizAttempts          QuizAttempt[]
+  customDomains         CustomDomain[]
+  departments           Department[]
+  courses               Course[]
+  courseRegistrations   CourseRegistration[]
+  certificates          Certificate[]
 }
 
 /// A branch/campus under one tenant (PRD §7) — distinct from multi-tenancy:
@@ -181,4 +186,26 @@ model Invitation {
 
   @@index([tenantId, email])
   @@index([tenantId, createdAt])
+}
+
+enum DomainStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  FAILED
+}
+
+model CustomDomain {
+  id                String       @id @default(cuid())
+  tenantId          String
+  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  domain            String       @unique
+  status            DomainStatus @default(PENDING_VERIFICATION)
+  verificationToken String
+  verifiedAt        DateTime?
+  sslActive         Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @default(now()) @updatedAt
+
+  @@unique([tenantId, id])
+  @@index([tenantId])
 }

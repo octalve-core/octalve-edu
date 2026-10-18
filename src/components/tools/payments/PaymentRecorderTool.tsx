@@ -7,12 +7,7 @@ import { TextField } from "@/components/ui/TextField";
 import { SelectField } from "@/components/ui/SelectField";
 import { CheckCircle2Icon, ReceiptIcon, RefreshCwIcon } from "@/components/ui/icons";
 import { getJson, sendJson } from "@/components/auth/postJson";
-import {
-  queueOfflinePayment,
-  getPendingPayments,
-  syncPendingPayments,
-  type PendingPaymentRecord,
-} from "@/lib/offline/indexed-db";
+import { queueOfflinePayment, getPendingPayments, syncPendingPayments, type PendingPaymentRecord } from "@/lib/offline/indexed-db";
 
 interface StudentApiItem {
   id: string;
@@ -154,9 +149,7 @@ export function PaymentRecorderTool({ schoolCode }: { schoolCode?: string }) {
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await getJson(
-          `/api/v1/schools/${schoolCode}/people/students?q=${encodeURIComponent(searchQuery.trim())}&status=live`,
-        );
+        const res = await getJson(`/api/v1/schools/${schoolCode}/people/students?q=${encodeURIComponent(searchQuery.trim())}&status=live`);
         if (res.ok && res.data && typeof res.data === "object" && "students" in res.data) {
           const rawStudents = (res.data as { students: StudentApiItem[] }).students;
           setStudents(
@@ -185,9 +178,7 @@ export function PaymentRecorderTool({ schoolCode }: { schoolCode?: string }) {
     }
 
     let active = true;
-    getJson(
-      `/api/v1/schools/${schoolCode}/finance/invoices?studentId=${selectedStudent.id}`,
-    )
+    getJson(`/api/v1/schools/${schoolCode}/finance/invoices?studentId=${selectedStudent.id}`)
       .then((res) => {
         if (!active) return;
         if (res.ok && res.data && typeof res.data === "object" && "items" in res.data) {
@@ -252,11 +243,7 @@ export function PaymentRecorderTool({ schoolCode }: { schoolCode?: string }) {
     };
 
     try {
-      const res = await sendJson(
-        `/api/v1/schools/${schoolCode}/finance/invoices/${selectedInvoice.id}/manual-payment`,
-        "POST",
-        payload,
-      );
+      const res = await sendJson(`/api/v1/schools/${schoolCode}/finance/invoices/${selectedInvoice.id}/manual-payment`, "POST", payload);
 
       setSubmitting(false);
 
@@ -358,9 +345,7 @@ export function PaymentRecorderTool({ schoolCode }: { schoolCode?: string }) {
           </div>
           <div className="flex justify-between pt-1">
             <span className="text-fg-muted">Remaining Balance:</span>
-            <span className="font-semibold text-fg">
-              ₦ {receipt.newBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-            </span>
+            <span className="font-semibold text-fg">₦ {receipt.newBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
           </div>
         </div>
 
@@ -369,11 +354,7 @@ export function PaymentRecorderTool({ schoolCode }: { schoolCode?: string }) {
             <RefreshCwIcon className="h-3.5 w-3.5" />
             <span>Record Another</span>
           </Button>
-          <Button
-            variant="primary"
-            onClick={() => window.print()}
-            className="flex items-center gap-1.5 text-xs"
-          >
+          <Button variant="primary" onClick={() => window.print()} className="flex items-center gap-1.5 text-xs">
             <ReceiptIcon className="h-3.5 w-3.5" />
             <span>Print Receipt</span>
           </Button>
@@ -426,9 +407,7 @@ export function PaymentRecorderTool({ schoolCode }: { schoolCode?: string }) {
               className="w-full rounded-xl border border-line bg-canvas px-4 py-2.5 text-xs text-fg placeholder:text-fg-muted focus:border-brand-strong focus:outline-none"
               autoFocus
             />
-            {searching && (
-              <span className="absolute right-3 top-3 text-[11px] text-fg-muted">Searching...</span>
-            )}
+            {searching && <span className="absolute right-3 top-3 text-[11px] text-fg-muted">Searching...</span>}
           </div>
 
           {visibleStudents.length > 0 && (
@@ -449,11 +428,7 @@ export function PaymentRecorderTool({ schoolCode }: { schoolCode?: string }) {
                     <p className="font-semibold text-fg">{s.name}</p>
                     {s.admissionNo && <p className="text-[11px] font-mono text-fg-muted">{s.admissionNo}</p>}
                   </div>
-                  {s.campusName && (
-                    <span className="rounded-md bg-surface-2 px-2 py-0.5 text-[10px] text-fg-muted">
-                      {s.campusName}
-                    </span>
-                  )}
+                  {s.campusName && <span className="rounded-md bg-surface-2 px-2 py-0.5 text-[10px] text-fg-muted">{s.campusName}</span>}
                 </button>
               ))}
             </div>
@@ -557,12 +532,7 @@ export function PaymentRecorderTool({ schoolCode }: { schoolCode?: string }) {
               />
 
               <div className="flex justify-end gap-2 pt-2 border-t border-line">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setSelectedStudent(null)}
-                  disabled={submitting}
-                >
+                <Button type="button" variant="secondary" onClick={() => setSelectedStudent(null)} disabled={submitting}>
                   Cancel
                 </Button>
                 <Button type="submit" variant="primary" loading={submitting}>

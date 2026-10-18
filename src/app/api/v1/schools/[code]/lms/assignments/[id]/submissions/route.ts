@@ -12,11 +12,14 @@ const submitBodySchema = submitAssignmentSchema.extend({
 
 // POST /api/v1/schools/[code]/lms/assignments/[id]/submissions
 export const POST = withAuth(
-  validate({ body: submitBodySchema }, async (_req, auth: TenantAuthContext, ctx: { params: Promise<{ code: string; id: string }> }, { body }) => {
-    const { id } = await ctx.params;
-    const submission = await submitAssignment(auth.tenant.tenantId, id, auth.userId, body);
-    return ok(submission, {}, 201);
-  }),
+  validate(
+    { body: submitBodySchema },
+    async (_req, auth: TenantAuthContext, ctx: { params: Promise<{ code: string; id: string }> }, { body }) => {
+      const { id } = await ctx.params;
+      const submission = await submitAssignment(auth.tenant.tenantId, id, auth.userId, body);
+      return ok(submission, {}, 201);
+    },
+  ),
   {
     tenant: true,
     roles: [Role.STUDENT, Role.ADMIN, Role.CAMPUS_ADMIN, Role.TEACHING_STAFF],

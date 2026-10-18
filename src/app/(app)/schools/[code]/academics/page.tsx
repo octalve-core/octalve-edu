@@ -46,8 +46,16 @@ export default async function AcademicsPage({
   const [campuses, subjects, classGroups] = await tenant.run((tx) =>
     Promise.all([
       tx.campus.findMany({ where: { tenantId: tenant.tenantId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
-      tx.subject.findMany({ where: { tenantId: tenant.tenantId, archivedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
-      tx.classGroup.findMany({ where: { tenantId: tenant.tenantId, archivedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+      tx.subject.findMany({
+        where: { tenantId: tenant.tenantId, archivedAt: null },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
+      tx.classGroup.findMany({
+        where: { tenantId: tenant.tenantId, archivedAt: null },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
     ]),
   );
 
@@ -70,12 +78,7 @@ export default async function AcademicsPage({
         {section === "timetable" && <TimetablePanel schoolCode={tenant.tenantCode} readOnly={readOnly} />}
         {section === "attendance" && <AttendancePanel schoolCode={tenant.tenantCode} readOnly={!canTakeRoll} />}
         {section === "lms" && (
-          <LmsPanel
-            schoolCode={tenant.tenantCode}
-            canManage={canTakeRoll}
-            subjects={subjects}
-            classGroups={classGroups}
-          />
+          <LmsPanel schoolCode={tenant.tenantCode} canManage={canTakeRoll} subjects={subjects} classGroups={classGroups} />
         )}
         {section === "sessions" && (
           <SessionsPanel

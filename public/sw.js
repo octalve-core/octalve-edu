@@ -1,12 +1,7 @@
 // Octalve Edu Progressive Web App Service Worker
 const CACHE_NAME = "octalve-edu-v1";
 
-const PRECACHE_RESOURCES = [
-  "/offline",
-  "/brand.css",
-  "/icon",
-  "/apple-icon",
-];
+const PRECACHE_RESOURCES = ["/offline", "/brand.css", "/icon", "/apple-icon"];
 
 // Install: Cache offline shell and activate immediately
 self.addEventListener("install", (event) => {
@@ -27,13 +22,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((cacheNames) =>
-        Promise.all(
-          cacheNames
-            .filter((name) => name !== CACHE_NAME)
-            .map((name) => caches.delete(name)),
-        ),
-      )
+      .then((cacheNames) => Promise.all(cacheNames.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))))
       .then(() => self.clients.claim()),
   );
 });
@@ -66,11 +55,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   // 3. Static assets (images, fonts, stylesheets): Cache-first with network fallback
-  if (
-    request.destination === "image" ||
-    request.destination === "font" ||
-    request.destination === "style"
-  ) {
+  if (request.destination === "image" || request.destination === "font" || request.destination === "style") {
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
         if (cachedResponse) {

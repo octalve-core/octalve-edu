@@ -53,9 +53,7 @@ function notifySyncChanged() {
   }
 }
 
-export async function queueOfflinePayment(
-  data: Omit<PendingPaymentRecord, "id" | "createdAt" | "status">,
-): Promise<PendingPaymentRecord> {
+export async function queueOfflinePayment(data: Omit<PendingPaymentRecord, "id" | "createdAt" | "status">): Promise<PendingPaymentRecord> {
   const db = await openDb();
   const record: PendingPaymentRecord = {
     ...data,
@@ -150,9 +148,7 @@ export async function updatePendingPaymentStatus(
   });
 }
 
-export async function syncPendingPayments(
-  schoolCode: string,
-): Promise<{ synced: number; failed: number }> {
+export async function syncPendingPayments(schoolCode: string): Promise<{ synced: number; failed: number }> {
   if (!navigator.onLine) {
     return { synced: 0, failed: 0 };
   }
@@ -168,16 +164,12 @@ export async function syncPendingPayments(
   for (const item of items) {
     try {
       await updatePendingPaymentStatus(item.id, "syncing");
-      const res = await sendJson(
-        `/api/v1/schools/${schoolCode}/finance/invoices/${item.invoiceId}/manual-payment`,
-        "POST",
-        {
-          amount: item.amount,
-          channel: item.channel,
-          receiptNo: item.receiptNo,
-          note: item.note ? `${item.note} [Synced from offline receipt]` : "[Synced from offline receipt]",
-        },
-      );
+      const res = await sendJson(`/api/v1/schools/${schoolCode}/finance/invoices/${item.invoiceId}/manual-payment`, "POST", {
+        amount: item.amount,
+        channel: item.channel,
+        receiptNo: item.receiptNo,
+        note: item.note ? `${item.note} [Synced from offline receipt]` : "[Synced from offline receipt]",
+      });
 
       if (res.ok) {
         await removePendingPayment(item.id);

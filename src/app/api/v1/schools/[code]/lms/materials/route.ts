@@ -19,6 +19,7 @@ export const GET = withAuth(
   }),
   {
     tenant: true,
+    area: "academics",
     roles: [Role.ADMIN, Role.CAMPUS_ADMIN, Role.TEACHING_STAFF, Role.NON_TEACHING_STAFF, Role.STUDENT, Role.PARENT],
   },
 );

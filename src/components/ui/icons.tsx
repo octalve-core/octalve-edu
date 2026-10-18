@@ -446,5 +446,3 @@ export function BookOpenIcon(props: IconProps) {
     </svg>
   );
 }
-
-

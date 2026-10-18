@@ -32,8 +32,7 @@ async function cookieFor(user: TestUser) {
   return cookieHeader(res.token!);
 }
 
-const lmsApi = (path: string, opts: ApiOptions = {}) =>
-  api(path, { baseUrl: SAAS_URL, ...opts });
+const lmsApi = (path: string, opts: ApiOptions = {}) => api(path, { baseUrl: SAAS_URL, ...opts });
 
 test.beforeAll(async () => {
   await seedInstance();
@@ -148,18 +147,15 @@ test.describe("LMS API — Assignments, Submissions & Speed Grading", () => {
   });
 
   test("teacher can grade the student submission", async () => {
-    const res = await lmsApi(
-      `/api/v1/schools/${a.code}/lms/assignments/${assignmentId}/submissions/${submissionId}/grade`,
-      {
-        method: "PATCH",
-        cookie: cookie.teacherA,
-        body: {
-          score: 48,
-          feedback: "Outstanding work on delta-epsilon proofs!",
-          status: "GRADED",
-        },
+    const res = await lmsApi(`/api/v1/schools/${a.code}/lms/assignments/${assignmentId}/submissions/${submissionId}/grade`, {
+      method: "PATCH",
+      cookie: cookie.teacherA,
+      body: {
+        score: 48,
+        feedback: "Outstanding work on delta-epsilon proofs!",
+        status: "GRADED",
       },
-    );
+    });
 
     expect(res.status).toBe(200);
     expect(res.json.data.score).toBe(48);
@@ -251,9 +247,7 @@ test.describe("LMS API — Course Materials & Online Quizzes", () => {
       method: "POST",
       cookie: cookie.studentA,
       body: {
-        answers: [
-          { questionId: "placeholder", answer: "B" },
-        ],
+        answers: [{ questionId: "placeholder", answer: "B" }],
       },
     });
 

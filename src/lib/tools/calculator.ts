@@ -5,11 +5,7 @@
 export function evaluateArithmetic(expr: string): number | null {
   if (!expr || !expr.trim()) return null;
 
-  const sanitized = expr
-    .replace(/×/g, "*")
-    .replace(/÷/g, "/")
-    .replace(/−/g, "-")
-    .replace(/\s+/g, "");
+  const sanitized = expr.replace(/×/g, "*").replace(/÷/g, "/").replace(/−/g, "-").replace(/\s+/g, "");
 
   if (!sanitized) return null;
 
@@ -94,11 +90,7 @@ export function evaluateArithmetic(expr: string): number | null {
       if (ops.length === 0 || ops[ops.length - 1] !== "(") return null;
       ops.pop(); // Pop '('
     } else if (["+", "-", "*", "/"].includes(token)) {
-      while (
-        ops.length > 0 &&
-        ops[ops.length - 1] !== "(" &&
-        (precedence[ops[ops.length - 1]] ?? 0) >= (precedence[token] ?? 0)
-      ) {
+      while (ops.length > 0 && ops[ops.length - 1] !== "(" && (precedence[ops[ops.length - 1]] ?? 0) >= (precedence[token] ?? 0)) {
         if (!applyOp()) return null;
       }
       ops.push(token);

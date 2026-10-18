@@ -110,6 +110,8 @@ model StudentRecord {
   guardianLinkTokens  GuardianLinkToken[]
   assignmentSubmissions AssignmentSubmission[]
   quizAttempts        QuizAttempt[]
+  courseRegistrations CourseRegistration[]
+  certificates        Certificate[]
 
   @@unique([tenantId, id])
   @@index([tenantId])

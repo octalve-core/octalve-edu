@@ -67,11 +67,7 @@ export function QuickBroadcastTool({ schoolCode }: QuickBroadcastToolProps) {
         body: body.trim(),
       };
 
-      const res = await sendJson(
-        `/api/v1/schools/${schoolCode}/communication/broadcast`,
-        "POST",
-        payload,
-      );
+      const res = await sendJson(`/api/v1/schools/${schoolCode}/communication/broadcast`, "POST", payload);
 
       if (!res.ok) {
         setError(res.message || "Failed to dispatch broadcast.");
@@ -117,9 +113,15 @@ export function QuickBroadcastTool({ schoolCode }: QuickBroadcastToolProps) {
         </div>
 
         <div className="rounded-xl border border-line bg-canvas p-4 text-xs text-left font-mono">
-          <p className="text-fg-muted">Channel: <span className="font-semibold text-fg">{channel}</span></p>
-          <p className="text-fg-muted mt-1">Target: <span className="font-semibold text-fg">{audienceRole}</span></p>
-          <p className="text-fg-muted mt-1">Status: <span className="font-semibold text-emerald-600 dark:text-emerald-400">Enqueued in Delivery Bus</span></p>
+          <p className="text-fg-muted">
+            Channel: <span className="font-semibold text-fg">{channel}</span>
+          </p>
+          <p className="text-fg-muted mt-1">
+            Target: <span className="font-semibold text-fg">{audienceRole}</span>
+          </p>
+          <p className="text-fg-muted mt-1">
+            Status: <span className="font-semibold text-emerald-600 dark:text-emerald-400">Enqueued in Delivery Bus</span>
+          </p>
         </div>
 
         <div className="pt-2">
@@ -186,9 +188,7 @@ export function QuickBroadcastTool({ schoolCode }: QuickBroadcastToolProps) {
 
       {/* Quick Urgency Preset Chips */}
       <div>
-        <span className="block text-[11px] font-medium text-fg-muted mb-1.5">
-          Urgency Presets:
-        </span>
+        <span className="block text-[11px] font-medium text-fg-muted mb-1.5">Urgency Presets:</span>
         <div className="flex flex-wrap gap-1.5">
           {URGENCY_PRESETS.map((p) => (
             <button

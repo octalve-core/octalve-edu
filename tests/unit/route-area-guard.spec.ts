@@ -22,6 +22,9 @@ const OUT_OF_REACH: Record<string, string> = {
   "support-grants/activity/route.ts": "the school's own record of who looked: a support view must never read it",
   "support-grants/route.ts": "the school's own control over who may look: a support view must never read or change it",
   "people/students/export/route.ts": "a bulk download of every student's details is an export, not a view",
+  "communication/dispatches/route.ts": "not a grantable area: messages are the school's own communications to its families",
+  "communication/templates/[id]/route.ts": "not a grantable area: message templates are the school's own words",
+  "communication/templates/route.ts": "not a grantable area: message templates are the school's own words",
 };
 
 function routes(dir: string): string[] {

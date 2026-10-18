@@ -229,9 +229,7 @@ export function LmsPanel({
             setSelectedAssignment(null);
           }}
           className={`pb-3 text-sm flex items-center gap-2 border-b-2 transition-colors ${
-            tab === "assignments"
-              ? "border-brand-fg text-fg font-semibold"
-              : "border-transparent text-fg-muted hover:text-fg font-medium"
+            tab === "assignments" ? "border-brand-fg text-fg font-semibold" : "border-transparent text-fg-muted hover:text-fg font-medium"
           }`}
         >
           <FileTextIcon className="h-4 w-4" />
@@ -244,9 +242,7 @@ export function LmsPanel({
             setSelectedAssignment(null);
           }}
           className={`pb-3 text-sm flex items-center gap-2 border-b-2 transition-colors ${
-            tab === "materials"
-              ? "border-brand-fg text-fg font-semibold"
-              : "border-transparent text-fg-muted hover:text-fg font-medium"
+            tab === "materials" ? "border-brand-fg text-fg font-semibold" : "border-transparent text-fg-muted hover:text-fg font-medium"
           }`}
         >
           <BookOpenIcon className="h-4 w-4" />
@@ -259,9 +255,7 @@ export function LmsPanel({
             setSelectedAssignment(null);
           }}
           className={`pb-3 text-sm flex items-center gap-2 border-b-2 transition-colors ${
-            tab === "quizzes"
-              ? "border-brand-fg text-fg font-semibold"
-              : "border-transparent text-fg-muted hover:text-fg font-medium"
+            tab === "quizzes" ? "border-brand-fg text-fg font-semibold" : "border-transparent text-fg-muted hover:text-fg font-medium"
           }`}
         >
           <CheckCircle2Icon className="h-4 w-4" />
@@ -284,9 +278,7 @@ export function LmsPanel({
           </p>
         </div>
 
-        {canManage && tab === "assignments" && (
-          <Button onClick={() => setIsAssignmentModalOpen(true)}>+ Create Assignment</Button>
-        )}
+        {canManage && tab === "assignments" && <Button onClick={() => setIsAssignmentModalOpen(true)}>+ Create Assignment</Button>}
       </div>
 
       {loading ? (
@@ -300,9 +292,7 @@ export function LmsPanel({
                 <div className="rounded-2xl border border-dashed border-line p-12 text-center">
                   <FileTextIcon className="mx-auto h-8 w-8 text-fg-muted" />
                   <p className="mt-3 text-sm font-medium text-fg">No assignments created yet</p>
-                  <p className="mt-1 text-xs text-fg-muted">
-                    Set homework or projects for your students to submit online.
-                  </p>
+                  <p className="mt-1 text-xs text-fg-muted">Set homework or projects for your students to submit online.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -328,16 +318,10 @@ export function LmsPanel({
                         </span>
                       </div>
 
-                      {assignment.description && (
-                        <p className="mt-2 text-xs text-fg-2 line-clamp-2">{assignment.description}</p>
-                      )}
+                      {assignment.description && <p className="mt-2 text-xs text-fg-2 line-clamp-2">{assignment.description}</p>}
 
                       <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-xs text-fg-muted">
-                        <span>
-                          {assignment.dueDate
-                            ? `Due: ${new Date(assignment.dueDate).toLocaleDateString()}`
-                            : "No due date"}
-                        </span>
+                        <span>{assignment.dueDate ? `Due: ${new Date(assignment.dueDate).toLocaleDateString()}` : "No due date"}</span>
                         <button
                           type="button"
                           onClick={() => handleOpenSubmissions(assignment)}
@@ -411,9 +395,7 @@ export function LmsPanel({
         <div className="rounded-2xl border border-brand/20 bg-surface-2 p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-line pb-3">
             <div>
-              <h3 className="text-base font-bold text-fg">
-                Submissions: {selectedAssignment.title}
-              </h3>
+              <h3 className="text-base font-bold text-fg">Submissions: {selectedAssignment.title}</h3>
               <p className="text-xs text-fg-muted">Total Marks: {selectedAssignment.totalPoints}</p>
             </div>
             <Button variant="ghost" onClick={() => setSelectedAssignment(null)}>
@@ -438,9 +420,7 @@ export function LmsPanel({
                       Status: <span className="font-semibold text-brand-fg">{sub.status}</span>
                       {sub.submittedAt && ` • ${new Date(sub.submittedAt).toLocaleTimeString()}`}
                     </p>
-                    {sub.feedback && (
-                      <p className="mt-1 text-xs italic text-fg-2">Feedback: {sub.feedback}</p>
-                    )}
+                    {sub.feedback && <p className="mt-1 text-xs italic text-fg-2">Feedback: {sub.feedback}</p>}
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -469,11 +449,7 @@ export function LmsPanel({
                       }
                       className="w-40 rounded-lg border border-line bg-canvas px-3 py-1.5 text-sm"
                     />
-                    <Button
-                      variant="primary"
-                      disabled={isPending}
-                      onClick={() => handleGradeSubmission(sub.id)}
-                    >
+                    <Button variant="primary" disabled={isPending} onClick={() => handleGradeSubmission(sub.id)}>
                       Save
                     </Button>
                   </div>
@@ -493,7 +469,9 @@ export function LmsPanel({
 
             <form onSubmit={handleCreateAssignment} className="mt-4 space-y-4">
               <div>
-                <label htmlFor="assignment-title" className="text-xs font-semibold text-fg">Title</label>
+                <label htmlFor="assignment-title" className="text-xs font-semibold text-fg">
+                  Title
+                </label>
                 <input
                   id="assignment-title"
                   type="text"
@@ -507,7 +485,9 @@ export function LmsPanel({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="assignment-subject" className="text-xs font-semibold text-fg">Subject</label>
+                  <label htmlFor="assignment-subject" className="text-xs font-semibold text-fg">
+                    Subject
+                  </label>
                   <select
                     id="assignment-subject"
                     value={assignmentSubjectId}
@@ -523,7 +503,9 @@ export function LmsPanel({
                 </div>
 
                 <div>
-                  <label htmlFor="assignment-group" className="text-xs font-semibold text-fg">Class Group</label>
+                  <label htmlFor="assignment-group" className="text-xs font-semibold text-fg">
+                    Class Group
+                  </label>
                   <select
                     id="assignment-group"
                     value={assignmentClassGroupId}
@@ -542,7 +524,9 @@ export function LmsPanel({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="assignment-points" className="text-xs font-semibold text-fg">Total Marks</label>
+                  <label htmlFor="assignment-points" className="text-xs font-semibold text-fg">
+                    Total Marks
+                  </label>
                   <input
                     id="assignment-points"
                     type="number"
@@ -554,7 +538,9 @@ export function LmsPanel({
                 </div>
 
                 <div>
-                  <label htmlFor="assignment-duedate" className="text-xs font-semibold text-fg">Due Date</label>
+                  <label htmlFor="assignment-duedate" className="text-xs font-semibold text-fg">
+                    Due Date
+                  </label>
                   <input
                     id="assignment-duedate"
                     type="date"
@@ -566,7 +552,9 @@ export function LmsPanel({
               </div>
 
               <div>
-                <label htmlFor="assignment-instructions" className="text-xs font-semibold text-fg">Instructions</label>
+                <label htmlFor="assignment-instructions" className="text-xs font-semibold text-fg">
+                  Instructions
+                </label>
                 <textarea
                   id="assignment-instructions"
                   rows={3}
@@ -578,11 +566,7 @@ export function LmsPanel({
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  variant="ghost"
-                  type="button"
-                  onClick={() => setIsAssignmentModalOpen(false)}
-                >
+                <Button variant="ghost" type="button" onClick={() => setIsAssignmentModalOpen(false)}>
                   Cancel
                 </Button>
                 <Button variant="primary" type="submit" disabled={isPending}>

@@ -131,14 +131,10 @@ export async function updateAssignment(tenantId: string, assignmentId: string, d
     if (data.title !== undefined) updateData.title = data.title;
     if (data.subjectId !== undefined) updateData.subject = { connect: { tenantId_id: { tenantId, id: data.subjectId } } };
     if (data.classGroupId !== undefined) {
-      updateData.classGroup = data.classGroupId
-        ? { connect: { tenantId_id: { tenantId, id: data.classGroupId } } }
-        : { disconnect: true };
+      updateData.classGroup = data.classGroupId ? { connect: { tenantId_id: { tenantId, id: data.classGroupId } } } : { disconnect: true };
     }
     if (data.classArmId !== undefined) {
-      updateData.classArm = data.classArmId
-        ? { connect: { tenantId_id: { tenantId, id: data.classArmId } } }
-        : { disconnect: true };
+      updateData.classArm = data.classArmId ? { connect: { tenantId_id: { tenantId, id: data.classArmId } } } : { disconnect: true };
     }
     if (data.description !== undefined) updateData.description = data.description;
     if (data.instructions !== undefined) updateData.instructions = data.instructions;
@@ -225,12 +221,7 @@ export async function submitAssignment(
   });
 }
 
-export async function gradeSubmission(
-  tenantId: string,
-  submissionId: string,
-  userId: string,
-  data: GradeSubmissionInput,
-) {
+export async function gradeSubmission(tenantId: string, submissionId: string, userId: string, data: GradeSubmissionInput) {
   const tId = trustedTenantId(tenantId);
 
   return forTenant(tId).transaction(async (tx) => {
@@ -255,10 +246,7 @@ export async function gradeSubmission(
   });
 }
 
-export async function listLearningMaterials(
-  tenantId: string,
-  filters: { subjectId?: string; classGroupId?: string } = {},
-) {
+export async function listLearningMaterials(tenantId: string, filters: { subjectId?: string; classGroupId?: string } = {}) {
   const tId = trustedTenantId(tenantId);
 
   return forTenant(tId).transaction(async (tx) => {
@@ -416,12 +404,7 @@ export async function createQuiz(tenantId: string, userId: string, data: CreateQ
   });
 }
 
-export async function submitQuizAttempt(
-  tenantId: string,
-  quizId: string,
-  userId: string,
-  data: SubmitQuizInput & { studentId?: string },
-) {
+export async function submitQuizAttempt(tenantId: string, quizId: string, userId: string, data: SubmitQuizInput & { studentId?: string }) {
   const tId = trustedTenantId(tenantId);
 
   return forTenant(tId).transaction(async (tx) => {

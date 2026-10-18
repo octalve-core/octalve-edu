@@ -9,12 +9,7 @@ import { gradeSubmission } from "@/lib/lms/service";
 export const PATCH = withAuth(
   validate(
     { body: gradeSubmissionSchema },
-    async (
-      _req,
-      auth: TenantAuthContext,
-      ctx: { params: Promise<{ code: string; id: string; submissionId: string }> },
-      { body },
-    ) => {
+    async (_req, auth: TenantAuthContext, ctx: { params: Promise<{ code: string; id: string; submissionId: string }> }, { body }) => {
       const { submissionId } = await ctx.params;
       const graded = await gradeSubmission(auth.tenant.tenantId, submissionId, auth.userId, body);
       return ok(graded);
