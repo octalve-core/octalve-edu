@@ -229,7 +229,7 @@ test.describe.serial("Phase 1 Complete Operational Lifecycle Walk", () => {
 
   test("Step 5: Teacher logs in and conducts daily roll-call attendance for class arm", async () => {
     const admin = tenantCtx(Role.ADMIN);
-    const today = "2026-10-10";
+    const today = new Date().toISOString().slice(0, 10);
 
     // Teacher retrieves roll call roster
     const rollCall = await admin.run((tx) => getArmRollCall(tx, school.id, classArmId, today, "TEACHING_STAFF"));
