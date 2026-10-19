@@ -104,7 +104,8 @@ test.describe("the page", () => {
     await expect(item(page, "2026/2027")).toBeVisible();
     await expect(page.getByRole("button", { name: "New session" })).toHaveCount(0);
     for (const verb of ["Edit", "Open", "Close", "Reopen", "Copy", "Archive"]) {
-      await expect(page.getByRole("button", { name: new RegExp(`^${verb}`) }), verb).toHaveCount(0);
+      // "Open Quick Tools (Cmd+K)" is the dock's launcher (Phase 3), on every page for everyone: it is not a session action ("Open 2026/2027").
+      await expect(page.getByRole("button", { name: new RegExp(`^${verb}(?! Quick Tools)`) }), verb).toHaveCount(0);
     }
     await page.getByRole("button", { name: /^Terms of 2026\/2027/ }).click(); // looking at the terms is allowed…
     await expect(page.getByRole("button", { name: /Add a term/ })).toHaveCount(0); // …changing them is not

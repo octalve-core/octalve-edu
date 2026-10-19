@@ -203,9 +203,7 @@ test.describe("on a phone: the tab bar and the More sheet", () => {
     expect(card && bar && card.y + card.height <= bar.y).toBe(true); // the bar never covers the last thing on the page
   });
 
-  test("More: who you are and where, Profile, Sign out; Escape closes it and returns focus — Users and Settings are TABS", async ({
-    page,
-  }) => {
+  test("More: who you are and where, Users and Settings, Profile, Sign out; Escape closes it and returns focus", async ({ page }) => {
     await signedInAs(page, Role.ADMIN, { name: "Tunde Bello" });
     const more = mainNav(page).getByRole("button", { name: "More" });
     await more.click();
@@ -213,10 +211,12 @@ test.describe("on a phone: the tab bar and the More sheet", () => {
     await expect(sheet).toBeVisible();
     await expect(sheet.getByRole("heading", { name: "Tunde Bello" })).toBeVisible();
     await expect(sheet.getByText("Administrator · Alpha School")).toBeVisible();
-    await expect(mainNav(page).getByRole("link", { name: "Users" })).toBeVisible(); // a page now: it earns a tab on the phone
-    await expect(sheet.getByText("Users")).toHaveCount(0);
-    await expect(mainNav(page).getByRole("link", { name: "Settings" })).toBeVisible(); // built in 1.7: a tab too, so not repeated in the sheet
-    await expect(sheet.getByText("Settings")).toHaveCount(0);
+    // An administrator has six pages since Communication (c9cf6f2): the bar holds four tabs and the rest live in this sheet (MobileNav), not on the bar.
+    await expect(mainNav(page).getByRole("link", { name: "Communication" })).toBeVisible();
+    await expect(mainNav(page).getByRole("link", { name: "Users" })).toHaveCount(0);
+    await expect(sheet.getByRole("link", { name: "Users" })).toBeVisible();
+    await expect(mainNav(page).getByRole("link", { name: "Settings" })).toHaveCount(0);
+    await expect(sheet.getByRole("link", { name: "Settings" })).toBeVisible();
     await expect(sheet.getByRole("link", { name: "Profile" })).toBeVisible();
     await expect(sheet.getByRole("button", { name: "Sign out" })).toBeVisible();
     await page.keyboard.press("Escape");
