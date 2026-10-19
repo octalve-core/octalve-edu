@@ -95,3 +95,17 @@ A detailed technical blueprint is documented in:
 - **Suite Status:** 1,972+ tests passing, 0 failures, 23 documented design skips.
 - **RLS Guard:** `tests/integration/tenant-rls.spec.ts` verifies all tenant tables enforce Postgres Row-Level Security.
 - **Cross-Tenant Guard:** `tests/api/tenant-boundary.spec.ts` executes automated IDOR attacks on every tenant-scoped endpoint.
+
+---
+
+## 6. Current work (2026-10-19)
+
+**Branch `claude/ui-fixes-hydration-nav`, commit `d5f1129`, not pushed, no PR yet** (open it into `dev`; check `base.ref` is `dev` before any merge; never promote to `master`/`prod` without the maintainer's approval).
+
+What it does: fixes the React hydration error #418 (`ServiceWorkerRegister` read `navigator.onLine` while rendering); maps design classes the theme never defines (`text-foreground`, `bg-primary`, `border-border`, `bg-card`, `bg-destructive`) to the real tokens in the finance, higher-ed, certificates, Paystack-mock and custom-domain screens; fixes the 3 lint errors that were red on `dev` (the support-grants route now reads the platform administrator through `findPlatformAdminByEmail` in `lib/support/grants.ts`; an unescaped apostrophe); repairs two stale tests (academics sections list now includes LMS; people-students expects `gender`).
+
+Test state: full suite 2069 passed, 13 failed; explained in `docs/tasks/current-tasks.md`. Two failures are on `dev` itself and not fixed: `shell.spec.ts` "More: who you are..." on a phone (the Users tab is not found while the More sheet is open) and `academics.spec.ts` "staff may LOOK" (an `Open` button is present).
+
+Rules learned (they apply here too): the theme has only the tokens in `src/app/globals.css` (`text-fg`, `bg-surface`, `border-line`, `bg-brand-strong`, `text-ok-fg`, `bg-danger-bg`...); the `dark:` variant follows the OS, not the app theme, so use tokens; the servers under test are a production build, so `pnpm build` before running specs; published results and similar rows are write-protected, so clean up by truncating.
+
+Not decided for Octalve: the question bank and the Forms module were designed for AlEemaan first (see AlEemaan `docs/HANDOVER.md` section 6). Octalve parity (tenant-scoped, RLS) needs its own note.

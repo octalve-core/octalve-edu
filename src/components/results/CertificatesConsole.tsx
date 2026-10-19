@@ -85,64 +85,64 @@ export function CertificatesConsole({ schoolCode, initialCertificates = [] }: Ce
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-foreground">Vocational & Modular Certificates</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-xl font-bold tracking-tight text-fg">Vocational & Modular Certificates</h2>
+          <p className="text-sm text-fg-muted">
             Issue cryptographically tamper-evident certificates with unique serials and public QR verification.
           </p>
         </div>
       </div>
 
-      <form onSubmit={handleIssue} className="rounded-lg border border-border bg-card p-5 shadow-sm space-y-4">
-        <h3 className="text-sm font-semibold text-foreground">Issue New Certificate</h3>
+      <form onSubmit={handleIssue} className="rounded-lg border border-line bg-surface p-5 shadow-sm space-y-4">
+        <h3 className="text-sm font-semibold text-fg">Issue New Certificate</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Recipient Student Name</label>
+            <label className="text-xs font-medium text-fg-muted">Recipient Student Name</label>
             <input
               type="text"
               required
               value={studentName}
               onChange={(e) => setStudentName(e.target.value)}
               placeholder="e.g. Fatima Abubakar"
-              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+              className="mt-1 w-full rounded-md border border-line-strong bg-field px-3 py-2 text-sm shadow-sm"
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Admission / Reg No</label>
+            <label className="text-xs font-medium text-fg-muted">Admission / Reg No</label>
             <input
               type="text"
               value={admissionNo}
               onChange={(e) => setAdmissionNo(e.target.value)}
               placeholder="e.g. 2026/VOC-082"
-              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+              className="mt-1 w-full rounded-md border border-line-strong bg-field px-3 py-2 text-sm shadow-sm"
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Certificate Title / Program</label>
+            <label className="text-xs font-medium text-fg-muted">Certificate Title / Program</label>
             <input
               type="text"
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Professional Certificate in Cybersecurity"
-              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+              className="mt-1 w-full rounded-md border border-line-strong bg-field px-3 py-2 text-sm shadow-sm"
             />
           </div>
         </div>
         <div className="flex justify-end">
           <button
             type="submit"
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition"
+            className="rounded-md bg-brand-strong px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-strong-hover transition"
           >
             Issue Credential
           </button>
         </div>
       </form>
 
-      <div className="rounded-lg border border-border bg-card overflow-hidden shadow-sm">
+      <div className="rounded-lg border border-line bg-surface overflow-hidden shadow-sm">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <thead className="border-b border-line bg-surface-2 text-xs font-semibold uppercase tracking-wider text-fg-muted">
             <tr>
               <th className="px-4 py-3">Certificate No</th>
               <th className="px-4 py-3">Student Name</th>
@@ -152,15 +152,15 @@ export function CertificatesConsole({ schoolCode, initialCertificates = [] }: Ce
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border">
+          <tbody className="divide-y divide-line">
             {certificates.map((cert) => (
-              <tr key={cert.id} className="hover:bg-muted/30 transition-colors">
-                <td className="px-4 py-3 font-mono font-bold text-primary">{cert.certificateNo}</td>
+              <tr key={cert.id} className="hover:bg-surface-2 transition-colors">
+                <td className="px-4 py-3 font-mono font-bold text-brand-fg">{cert.certificateNo}</td>
                 <td className="px-4 py-3">
-                  <div className="font-semibold text-foreground">{cert.studentName}</div>
-                  <div className="text-xs text-muted-foreground">{cert.admissionNo}</div>
+                  <div className="font-semibold text-fg">{cert.studentName}</div>
+                  <div className="text-xs text-fg-muted">{cert.admissionNo}</div>
                 </td>
-                <td className="px-4 py-3 text-foreground">{cert.title}</td>
+                <td className="px-4 py-3 text-fg">{cert.title}</td>
                 <td className="px-4 py-3 text-center">
                   <span
                     className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
@@ -173,7 +173,7 @@ export function CertificatesConsole({ schoolCode, initialCertificates = [] }: Ce
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="w-36 truncate font-mono text-xs text-muted-foreground" title={cert.verificationHash}>
+                  <div className="w-36 truncate font-mono text-xs text-fg-muted" title={cert.verificationHash}>
                     {cert.verificationHash}
                   </div>
                 </td>
@@ -182,12 +182,12 @@ export function CertificatesConsole({ schoolCode, initialCertificates = [] }: Ce
                     href={`/api/v1/verify-certificate/${cert.certificateNo}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs text-primary hover:underline"
+                    className="text-xs text-brand-fg hover:underline"
                   >
                     Verify
                   </a>
                   {cert.status === CertificateStatus.ISSUED && (
-                    <button onClick={() => handleRevoke(cert.id)} className="text-xs text-destructive hover:underline">
+                    <button onClick={() => handleRevoke(cert.id)} className="text-xs text-danger-fg hover:underline">
                       Revoke
                     </button>
                   )}

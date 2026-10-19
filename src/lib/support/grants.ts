@@ -1,4 +1,5 @@
 import type { TenantAuthContext } from "@/lib/auth/with-auth";
+import { prisma } from "@/lib/db";
 import { SUPPORT_AREAS, type SupportArea } from "./areas";
 
 // A school's support grants (task 0011, ADR 0017): the school ADMIN creates a grant, lists them, revokes one. The database keeps a grant honest (areas,
@@ -159,4 +160,11 @@ export async function listSupportActivity(tenant: Tenant): Promise<SupportActivi
             : "",
     };
   });
+}
+
+/// The platform administrator behind an email, or `null` when the address is not one. A platform administrator is a global account (no tenant column), so this is
+/// read outside the tenant context on purpose, and only ever answers "is this a platform administrator", never a school member.
+export async function findPlatformAdminByEmail(email: string): Promise<string | null> {
+  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() }, select: { id: true, isPlatformAdmin: true } });
+  return user?.isPlatformAdmin ? user.id : null;
 }
