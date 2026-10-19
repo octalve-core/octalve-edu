@@ -113,10 +113,10 @@ export function HigherEdPanel({ schoolCode: _schoolCode, initialDepartments = []
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-foreground">Higher-Ed Credit Unit System</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-xl font-bold tracking-tight text-fg">Higher-Ed Credit Unit System</h2>
+          <p className="text-sm text-fg-muted">
             Tertiary academic structure: departments, credit-weighted courses, and automated 5.0 scale GPA calculation.
           </p>
         </div>
@@ -124,7 +124,7 @@ export function HigherEdPanel({ schoolCode: _schoolCode, initialDepartments = []
           <button
             onClick={() => setActiveTab("courses")}
             className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-              activeTab === "courses" ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"
+              activeTab === "courses" ? "bg-brand-strong text-white shadow-sm" : "bg-surface-2 text-fg-muted hover:bg-surface-2"
             }`}
           >
             Course Catalog
@@ -133,8 +133,8 @@ export function HigherEdPanel({ schoolCode: _schoolCode, initialDepartments = []
             onClick={() => setActiveTab("registrations")}
             className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
               activeTab === "registrations"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "bg-muted text-muted-foreground hover:bg-muted/80"
+                ? "bg-brand-strong text-white shadow-sm"
+                : "bg-surface-2 text-fg-muted hover:bg-surface-2"
             }`}
           >
             Registrations & GPA
@@ -146,15 +146,15 @@ export function HigherEdPanel({ schoolCode: _schoolCode, initialDepartments = []
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Level:</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-fg-muted">Level:</span>
               {[100, 200, 300, 400, 500].map((lvl) => (
                 <button
                   key={lvl}
                   onClick={() => setSelectedLevel(lvl)}
                   className={`rounded px-3 py-1 text-xs font-semibold transition ${
                     selectedLevel === lvl
-                      ? "bg-primary text-primary-foreground"
-                      : "border border-border bg-card text-foreground hover:bg-accent"
+                      ? "bg-brand-strong text-white"
+                      : "border border-line bg-surface text-fg hover:bg-accent"
                   }`}
                 >
                   {lvl}L
@@ -162,15 +162,15 @@ export function HigherEdPanel({ schoolCode: _schoolCode, initialDepartments = []
               ))}
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Semester:</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-fg-muted">Semester:</span>
               {[1, 2].map((sem) => (
                 <button
                   key={sem}
                   onClick={() => setSelectedSemester(sem)}
                   className={`rounded px-3 py-1 text-xs font-semibold transition ${
                     selectedSemester === sem
-                      ? "bg-primary text-primary-foreground"
-                      : "border border-border bg-card text-foreground hover:bg-accent"
+                      ? "bg-brand-strong text-white"
+                      : "border border-line bg-surface text-fg hover:bg-accent"
                   }`}
                 >
                   Semester {sem}
@@ -179,9 +179,9 @@ export function HigherEdPanel({ schoolCode: _schoolCode, initialDepartments = []
             </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-card overflow-hidden shadow-sm">
+          <div className="rounded-lg border border-line bg-surface overflow-hidden shadow-sm">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <thead className="border-b border-line bg-surface-2 text-xs font-semibold uppercase tracking-wider text-fg-muted">
                 <tr>
                   <th className="px-4 py-3">Course Code</th>
                   <th className="px-4 py-3">Title</th>
@@ -190,17 +190,17 @@ export function HigherEdPanel({ schoolCode: _schoolCode, initialDepartments = []
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="divide-y divide-line">
                 {filteredCourses.length > 0 ? (
                   filteredCourses.map((c) => {
                     const dept = departments.find((d) => d.id === c.departmentId);
                     return (
-                      <tr key={c.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-4 py-3 font-semibold text-foreground">{c.code}</td>
-                        <td className="px-4 py-3 text-foreground">{c.title}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{dept?.name ?? "General"}</td>
+                      <tr key={c.id} className="hover:bg-surface-2 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-fg">{c.code}</td>
+                        <td className="px-4 py-3 text-fg">{c.title}</td>
+                        <td className="px-4 py-3 text-fg-muted">{dept?.name ?? "General"}</td>
                         <td className="px-4 py-3 text-center">
-                          <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                          <span className="inline-flex items-center rounded-full bg-brand-tint px-2.5 py-0.5 text-xs font-medium text-brand-fg">
                             {c.creditUnits} CU
                           </span>
                         </td>
@@ -218,7 +218,7 @@ export function HigherEdPanel({ schoolCode: _schoolCode, initialDepartments = []
                               };
                               setRegistrations((prev) => [...prev, newReg]);
                             }}
-                            className="rounded border border-primary/20 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10 transition"
+                            className="rounded border border-brand-fg px-2.5 py-1 text-xs font-medium text-brand-fg hover:bg-brand-tint transition"
                           >
                             + Register
                           </button>
@@ -228,7 +228,7 @@ export function HigherEdPanel({ schoolCode: _schoolCode, initialDepartments = []
                   })
                 ) : (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={5} className="px-4 py-8 text-center text-fg-muted">
                       No courses configured for {selectedLevel} Level, Semester {selectedSemester}.
                     </td>
                   </tr>
@@ -242,23 +242,23 @@ export function HigherEdPanel({ schoolCode: _schoolCode, initialDepartments = []
       {activeTab === "registrations" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Registered Credits</span>
-              <p className="mt-1 text-2xl font-bold text-foreground">{gpaSummary.totalCredits} CU</p>
+            <div className="rounded-lg border border-line bg-surface p-4 shadow-sm">
+              <span className="text-xs font-medium uppercase tracking-wider text-fg-muted">Total Registered Credits</span>
+              <p className="mt-1 text-2xl font-bold text-fg">{gpaSummary.totalCredits} CU</p>
             </div>
-            <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Quality Points (TQP)</span>
-              <p className="mt-1 text-2xl font-bold text-foreground">{gpaSummary.totalQualityPoints}</p>
+            <div className="rounded-lg border border-line bg-surface p-4 shadow-sm">
+              <span className="text-xs font-medium uppercase tracking-wider text-fg-muted">Total Quality Points (TQP)</span>
+              <p className="mt-1 text-2xl font-bold text-fg">{gpaSummary.totalQualityPoints}</p>
             </div>
-            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 shadow-sm">
-              <span className="text-xs font-medium uppercase tracking-wider text-primary">Cumulative GPA (5.0 Scale)</span>
-              <p className="mt-1 text-2xl font-bold text-primary">{gpaSummary.gpa.toFixed(2)}</p>
+            <div className="rounded-lg border border-brand-fg bg-brand-tint p-4 shadow-sm">
+              <span className="text-xs font-medium uppercase tracking-wider text-brand-fg">Cumulative GPA (5.0 Scale)</span>
+              <p className="mt-1 text-2xl font-bold text-brand-fg">{gpaSummary.gpa.toFixed(2)}</p>
             </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-card overflow-hidden shadow-sm">
+          <div className="rounded-lg border border-line bg-surface overflow-hidden shadow-sm">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <thead className="border-b border-line bg-surface-2 text-xs font-semibold uppercase tracking-wider text-fg-muted">
                 <tr>
                   <th className="px-4 py-3">Course</th>
                   <th className="px-4 py-3 text-center">Credit Units</th>
@@ -268,14 +268,14 @@ export function HigherEdPanel({ schoolCode: _schoolCode, initialDepartments = []
                   <th className="px-4 py-3 text-right">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="divide-y divide-line">
                 {registrations.map((reg) => (
-                  <tr key={reg.id} className="hover:bg-muted/30 transition-colors">
+                  <tr key={reg.id} className="hover:bg-surface-2 transition-colors">
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-foreground">{reg.course.code}</div>
-                      <div className="text-xs text-muted-foreground">{reg.course.title}</div>
+                      <div className="font-semibold text-fg">{reg.course.code}</div>
+                      <div className="text-xs text-fg-muted">{reg.course.title}</div>
                     </td>
-                    <td className="px-4 py-3 text-center text-foreground">{reg.creditUnits}</td>
+                    <td className="px-4 py-3 text-center text-fg">{reg.creditUnits}</td>
                     <td className="px-4 py-3 text-center">
                       <input
                         type="number"
@@ -293,11 +293,11 @@ export function HigherEdPanel({ schoolCode: _schoolCode, initialDepartments = []
                             );
                           }
                         }}
-                        className="w-16 rounded border border-input bg-background px-2 py-1 text-center text-sm"
+                        className="w-16 rounded border border-line-strong bg-field px-2 py-1 text-center text-sm"
                       />
                     </td>
-                    <td className="px-4 py-3 text-center font-bold text-foreground">{reg.grade ?? "—"}</td>
-                    <td className="px-4 py-3 text-center font-medium text-foreground">
+                    <td className="px-4 py-3 text-center font-bold text-fg">{reg.grade ?? "—"}</td>
+                    <td className="px-4 py-3 text-center font-medium text-fg">
                       {reg.gradePoint !== null ? reg.gradePoint.toFixed(1) : "—"}
                     </td>
                     <td className="px-4 py-3 text-right">

@@ -34,13 +34,13 @@ export function PaystackMockModal({ isOpen, onClose, reference, amountFormatted,
   return (
     <Dialog open={isOpen} onClose={onClose} title="Paystack Checkout Simulator">
       <div className="space-y-4 py-2">
-        <div className="rounded-lg bg-primary/5 p-4 border border-primary/20 text-center">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Test Mode</p>
-          <p className="mt-1 text-2xl font-bold tracking-tight text-foreground">{amountFormatted}</p>
-          <p className="mt-1 font-mono text-xs text-muted-foreground break-all">Ref: {reference}</p>
+        <div className="rounded-lg bg-brand-tint p-4 border border-brand-fg text-center">
+          <p className="text-xs font-semibold text-fg-muted uppercase tracking-wider">Test Mode</p>
+          <p className="mt-1 text-2xl font-bold tracking-tight text-fg">{amountFormatted}</p>
+          <p className="mt-1 font-mono text-xs text-fg-muted break-all">Ref: {reference}</p>
         </div>
 
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-fg-muted">
           This is an interactive simulation of the Paystack gateway. Select an outcome to simulate a real payment webhook and server-side
           verification:
         </p>

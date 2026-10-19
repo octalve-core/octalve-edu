@@ -226,3 +226,13 @@
 
 
 
+
+### UI fixes found by the AlEemaan browser run, applied here (branch `claude/ui-fixes-hydration-nav`)
+- **Status:** [x] Committed locally, PR into `dev` pending.
+- [x] React hydration error #418 on signed-in full loads: `ServiceWorkerRegister` read `navigator.onLine` while rendering; it now starts online and reads it in an effect.
+- [x] Finance, Higher-ed, Certificates and Custom-domain screens used design tokens this app does not define (`text-foreground`, `bg-primary`, `border-border`...), so they rendered largely unstyled; mapped to the real tokens (`text-fg`, `bg-brand-strong`, `border-line`...).
+- [x] Lint was failing on `dev` with 3 errors: the support-grants route read the platform administrator with the raw client (now `findPlatformAdminByEmail` in `lib/support/grants.ts`), and an unescaped apostrophe.
+- [x] Stale tests repaired: academics sections list (the LMS section exists), people-students (the `gender` field).
+- [ ] Known failing on `dev` itself (verified by stashing): `shell.spec.ts` "More: who you are..." on a phone (the Users tab is not found while the More sheet is open) and `academics.spec.ts` "staff may LOOK" (an `Open` button is present). Not caused by this branch; not fixed.
+- Correction: the Coursework page IS reachable (Academics > "LMS & Assignments"); an earlier note saying it was unreachable was wrong, so no menu item was added.
+- Full suite on this branch: 2069 passed, 13 failed, of which 4 were nav-test failures from a menu item that was then removed, 4 sign-out/cookie tests that passed again when run alone (load), 2 stale tests fixed above and 3 pre-existing (above).
