@@ -264,22 +264,28 @@ test.describe.serial("Phase 1 Complete Operational Lifecycle Walk", () => {
 
     // Teacher records marks: CA (36/40) + Exam (52/60) = 88 (A1)
     const recordRes = await admin.run((tx) =>
-      recordStudentResults(tx, school.id, teacherUser.id, {
-        periodId,
-        subjectId,
-        results: [
-          {
-            studentId: studentRecordId,
-            score: 88,
-            maxScore: 100,
-            components: [
-              { name: "Continuous Assessment 1", score: 18, maxScore: 20 },
-              { name: "Continuous Assessment 2", score: 18, maxScore: 20 },
-              { name: "Final Examination", score: 52, maxScore: 60 },
-            ],
-          },
-        ],
-      }),
+      recordStudentResults(
+        tx,
+        school.id,
+        teacherUser.id,
+        {
+          periodId,
+          subjectId,
+          results: [
+            {
+              studentId: studentRecordId,
+              score: 88,
+              maxScore: 100,
+              components: [
+                { name: "Continuous Assessment 1", score: 18, maxScore: 20 },
+                { name: "Continuous Assessment 2", score: 18, maxScore: 20 },
+                { name: "Final Examination", score: 52, maxScore: 60 },
+              ],
+            },
+          ],
+        },
+        { role: "TEACHING_STAFF", campusId: null },
+      ),
     );
     expect(recordRes.ok).toBe(true);
     if (!recordRes.ok) return;
