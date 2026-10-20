@@ -1,6 +1,13 @@
 import { forTenant } from "@/lib/tenant/for-tenant";
 import { trustedTenantId } from "@/lib/tenant/verified-tenant";
-import { findSlotClashes, findBatchClashes, groupSlotsByDay, type TimetableSlotInput, type TimetableClash } from "./rules";
+import {
+  findSlotClashes,
+  findBatchClashes,
+  groupSlotsByDay,
+  isValidTimeRange,
+  type TimetableSlotInput,
+  type TimetableClash,
+} from "./rules";
 import type {
   CreateTimetableSlotInput,
   UpdateTimetableSlotInput,
@@ -233,6 +240,11 @@ export async function updateTimetableSlot(
     const mergedDayOfWeek = input.dayOfWeek ?? existing.dayOfWeek;
     const mergedStartTime = input.startTime ?? existing.startTime;
     const mergedEndTime = input.endTime ?? existing.endTime;
+    // The schema judges the order only when both times are sent; a request that sends one is judged against the other as stored (the database refuses a lesson that
+    // ends before it starts, and that refusal was an unhandled error).
+    if (!isValidTimeRange(mergedStartTime, mergedEndTime)) {
+      return { ok: false, failure: "BAD_REQUEST", detail: "startTime must be strictly before endTime." };
+    }
 
     const candidate: TimetableSlotInput = {
       id: existing.id,
