@@ -6,7 +6,7 @@ import { TEST_APP_DATABASE_URL, TEST_DATABASE_URL } from "../support/env";
 import { addMembership, createTenant, createUser, db, removeCreatedTenants, seedInstance, type TestTenant } from "../support/db";
 import { prisma } from "@/lib/db";
 import { assertRlsEnforced, checkRlsEnforcement, resetRlsAssertionForTests, rlsVerdict } from "@/lib/tenant/assert-rls";
-import { setTenantContext, setUserContext, forInvitation, forTenant, forUser } from "@/lib/tenant/for-tenant";
+import { setTenantContext, setUserContext, forInvitation, forTenant, forUser, forVerification } from "@/lib/tenant/for-tenant";
 import { trustedTenantId } from "@/lib/tenant/verified-tenant";
 
 // THE negative-test file of domain-implementation-plan.md §0.5.2 / §0.5.3 — run as `app_user`, the role the app runs
@@ -1193,6 +1193,108 @@ test.describe("people and enrolment: tenant-scoped, archived never deleted, kept
     await db.staffRecord.update({ where: { id: ids.a.staff }, data: { userId: null } });
     await db.staffRecord.update({ where: { id: ids.b.staff }, data: { userId: null } });
     await db.staffRecord.delete({ where: { id: second.id } });
+  });
+});
+
+test.describe("Certificate: a school's own, and the ONE issued row a verification token names", () => {
+  const made = {} as Record<"issued" | "draft" | "revoked" | "otherIssued", { id: string; verificationToken: string }>;
+
+  test.beforeAll(async () => {
+    const student = (tenant: TestTenant, label: string) =>
+      db.studentRecord.create({
+        data: {
+          tenantId: tenant.id,
+          firstName: label,
+          lastName: "Cert",
+          dateOfBirth: new Date("2004-04-04"),
+          admissionNo: `RC-${label}-${Date.now()}`,
+        },
+      });
+    const certificate = async (tenant: TestTenant, who: { id: string }, status: "ISSUED" | "DRAFT" | "REVOKED") =>
+      db.certificate.create({
+        data: {
+          tenantId: tenant.id,
+          studentId: who.id,
+          title: `Certificate ${status}`,
+          certificateNo: `RLS-${status}-${Date.now()}`,
+          verificationHash: "b".repeat(64),
+          status,
+        },
+      });
+    const [sa, sb] = [await student(a, "Alpha"), await student(b, "Beta")];
+    made.issued = await certificate(a, sa, "ISSUED");
+    made.draft = await certificate(a, sa, "DRAFT");
+    made.revoked = await certificate(a, sa, "REVOKED");
+    made.otherIssued = await certificate(b, sb, "ISSUED");
+  });
+
+  const byToken = <T>(token: string, fn: Parameters<ReturnType<typeof forVerification>["transaction"]>[0]) =>
+    forVerification(token).transaction(fn) as Promise<T>;
+
+  test("the database gives every certificate its own 32-character token", () => {
+    const tokens = Object.values(made).map((c) => c.verificationToken);
+    for (const token of tokens) expect(token).toMatch(/^[0-9a-f]{32}$/);
+    expect(new Set(tokens).size).toBe(tokens.length);
+  });
+
+  test("a token alone reads the ISSUED certificate it names, and nothing else", async () => {
+    const seen = await byToken<{ id: string }[]>(made.issued.verificationToken, (tx) => tx.certificate.findMany({ select: { id: true } }));
+    expect(seen.map((c) => c.id)).toEqual([made.issued.id]);
+    const other = await byToken<{ id: string }[]>(made.otherIssued.verificationToken, (tx) =>
+      tx.certificate.findMany({ select: { id: true } }),
+    );
+    expect(other.map((c) => c.id)).toEqual([made.otherIssued.id]);
+  });
+
+  test("the token of a DRAFT or a REVOKED certificate reads nothing", async () => {
+    for (const which of ["draft", "revoked"] as const) {
+      const seen = await byToken<{ id: string }[]>(made[which].verificationToken, (tx) =>
+        tx.certificate.findMany({ select: { id: true } }),
+      );
+      expect(seen, which).toEqual([]);
+    }
+  });
+
+  test("with no token and no school, no certificate is readable; a school sees its own, not another's", async () => {
+    const none = await prisma.$transaction((tx) => tx.certificate.findMany({ select: { id: true } }));
+    expect(none).toEqual([]);
+
+    const ofA = await asTenant<{ id: string }[]>(a, (tx) => tx.certificate.findMany({ select: { id: true } }));
+    expect(ofA.map((c) => c.id).sort()).toEqual([made.issued.id, made.draft.id, made.revoked.id].sort());
+    const ofB = await asTenant<{ id: string }[]>(b, (tx) => tx.certificate.findMany({ select: { id: true } }));
+    expect(ofB.map((c) => c.id)).toEqual([made.otherIssued.id]);
+  });
+
+  test("a token opens a row for reading only: it can neither change nor delete it", async () => {
+    await expect(
+      byToken(made.issued.verificationToken, (tx) => tx.certificate.update({ where: { id: made.issued.id }, data: { title: "Changed" } })),
+    ).rejects.toThrow();
+    const removed = await byToken<{ count: number }>(made.issued.verificationToken, (tx) =>
+      tx.certificate.deleteMany({ where: { id: made.issued.id } }),
+    );
+    expect(removed.count).toBe(0);
+    const row = await db.certificate.findUniqueOrThrow({ where: { id: made.issued.id } });
+    expect(row.title).toBe("Certificate ISSUED");
+  });
+
+  test("a certificate number is unique within a school, and may repeat in another", async () => {
+    const student = await db.studentRecord.findFirstOrThrow({ where: { tenantId: a.id } });
+    const sameNo = `RLS-SAME-${Date.now()}`;
+    const row = (tenant: TestTenant, studentId: string) =>
+      db.certificate.create({
+        data: {
+          tenantId: tenant.id,
+          studentId,
+          title: "Same number",
+          certificateNo: sameNo,
+          verificationHash: "c".repeat(64),
+          status: "ISSUED",
+        },
+      });
+    await row(a, student.id);
+    await expect(row(a, student.id)).rejects.toThrow(/Unique constraint/);
+    const other = await db.studentRecord.findFirstOrThrow({ where: { tenantId: b.id } });
+    await expect(row(b, other.id)).resolves.toBeTruthy();
   });
 });
 

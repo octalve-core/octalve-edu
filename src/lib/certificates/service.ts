@@ -1,21 +1,27 @@
 // --- Certificates Service (Phase 5) ---
 import { CertificateStatus, Prisma } from "@prisma/client";
-import { forTenant } from "@/lib/tenant/for-tenant";
+import { forTenant, forVerification, setTenantContext } from "@/lib/tenant/for-tenant";
 import { trustedTenantId } from "@/lib/tenant/verified-tenant";
 import { computeCertificateHash, formatCertificateNumber, verifyCertificateIntegrity } from "./rules";
 
+/// The school's certificates, newest first. A STUDENT reads the certificates of the student record that is theirs and no others; anyone else anchored to a
+/// campus (but an ADMIN, who is school-wide) reads those of that campus's students and the school-wide ones; a member of no campus reads all.
 export async function listCertificates(
   tenantId: string,
   filters: {
     studentId?: string;
     status?: CertificateStatus;
-  } = {},
+  },
+  viewer: { role: string; campusId: string | null; userId: string },
 ) {
   const tId = trustedTenantId(tenantId);
   return forTenant(tId).transaction(async (tx) => {
     const where: Prisma.CertificateWhereInput = { tenantId };
     if (filters.studentId) where.studentId = filters.studentId;
     if (filters.status) where.status = filters.status;
+    if (viewer.role === "STUDENT") where.student = { userId: viewer.userId };
+    else if (viewer.role !== "ADMIN" && viewer.campusId !== null)
+      where.student = { OR: [{ campusId: null }, { campusId: viewer.campusId }] };
 
     return tx.certificate.findMany({
       where,
@@ -28,6 +34,8 @@ export async function listCertificates(
   });
 }
 
+/// Issues a certificate, or says why not (`STUDENT_NOT_FOUND`, `PERIOD_NOT_FOUND`: not in this school). The number is the school's next one (`<PREFIX>-VOC-<year>-<sequence>`); one issuer at a time per school holds the lock for the
+/// count, so two requests never take the same number, and two schools may hold the same number. The verification token is the database's default.
 export async function issueCertificate(
   tenantId: string,
   data: {
@@ -40,6 +48,15 @@ export async function issueCertificate(
 ) {
   const tId = trustedTenantId(tenantId);
   return forTenant(tId).transaction(async (tx) => {
+    // Every refusal is decided before the first write.
+    const student = await tx.studentRecord.findFirst({ where: { tenantId, id: data.studentId }, select: { id: true } });
+    if (!student) return { ok: false as const, failure: "STUDENT_NOT_FOUND" as const };
+    if (data.periodId) {
+      const period = await tx.academicPeriod.findFirst({ where: { tenantId, id: data.periodId }, select: { id: true } });
+      if (!period) return { ok: false as const, failure: "PERIOD_NOT_FOUND" as const };
+    }
+
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`certificate-number:${tenantId}`}::text))`;
     const year = new Date().getFullYear();
     const count = await tx.certificate.count({ where: { tenantId } });
     const certificateNo = formatCertificateNumber(data.prefix || "OCT", year, count + 1);
@@ -53,7 +70,7 @@ export async function issueCertificate(
       issueDate,
     });
 
-    return tx.certificate.create({
+    const certificate = await tx.certificate.create({
       data: {
         tenantId,
         studentId: data.studentId,
@@ -70,12 +87,15 @@ export async function issueCertificate(
         period: { select: { id: true, label: true } },
       },
     });
+    return { ok: true as const, certificate };
   });
 }
 
 export async function revokeCertificate(tenantId: string, certificateId: string) {
   const tId = trustedTenantId(tenantId);
   return forTenant(tId).transaction(async (tx) => {
+    const found = await tx.certificate.findFirst({ where: { id: certificateId, tenantId }, select: { id: true } });
+    if (!found) return null;
     return tx.certificate.update({
       where: { id: certificateId, tenantId },
       data: { status: CertificateStatus.REVOKED },
@@ -83,15 +103,15 @@ export async function revokeCertificate(tenantId: string, certificateId: string)
   });
 }
 
-export async function verifyPublicCertificate(certificateNo: string) {
-  const sanitized = certificateNo.trim().toUpperCase();
-  const { forVerification, setTenantContext } = await import("@/lib/tenant/for-tenant");
-  const { trustedTenantId } = await import("@/lib/tenant/verified-tenant");
+/// The public lookup: by the 32-character token, ISSUED certificates only (the `certificate_public_verification` policy says the same). A token that is
+/// not 32 lower-case hex characters is "not found", as is one that matches nothing, a draft, or a revoked certificate.
+export async function verifyPublicCertificate(token: string) {
+  if (!/^[0-9a-f]{32}$/.test(token)) return null;
 
-  return forVerification(sanitized).transaction(async (tx) => {
+  return forVerification(token).transaction(async (tx) => {
     const probe = await tx.certificate.findFirst({
       where: {
-        certificateNo: sanitized,
+        verificationToken: token,
         status: CertificateStatus.ISSUED,
       },
       select: { id: true, tenantId: true },

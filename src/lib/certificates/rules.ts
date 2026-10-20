@@ -20,14 +20,15 @@ export function computeCertificateHash(input: CertificateFingerprintInput): stri
 }
 
 /**
- * Formats a standardized unique certificate serial number.
- * e.g., OCT-VOC-2026-00042
+ * Formats a standardized certificate serial number, unique within a school.
+ * e.g., OCT-VOC-2026-00042. A prefix with no letter or digit in it (nothing is left of it once reduced to A-Z and 0-9) is the default, OCT.
  */
 export function formatCertificateNumber(prefix: string, year: number, sequence: number): string {
-  const sanitizedPrefix = (prefix || "OCT")
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "");
+  const sanitizedPrefix =
+    (prefix || "")
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "") || "OCT";
   const paddedSeq = sequence.toString().padStart(5, "0");
   return `${sanitizedPrefix}-VOC-${year}-${paddedSeq}`;
 }

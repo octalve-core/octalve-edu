@@ -119,6 +119,14 @@ export const timetableSlotScope = (auth: Auth, id: string) =>
     return slot?.classArm.classGroup.campusId;
   });
 
+/// A certificate belongs to its student's campus: a campus administrator changes those of their own campus's students, those of a school-wide student
+/// are the school administrator's (403), another campus's and an unknown id are the usual 404.
+export const certificateScope = (auth: Auth, id: string) =>
+  lookup(auth, "certificate", async (tx) => {
+    const row = await tx.certificate.findFirst({ where: { id }, select: { student: { select: { campusId: true } } } });
+    return row?.student.campusId;
+  });
+
 /// An invoice belongs to its student's campus. Money records are not "visible but off-limits": the invoice of a student with NO campus is the school
 /// administrator's alone, so to a campus administrator it is "no such invoice" (404), not the 403 other school-wide rows get.
 export const invoiceScope = (auth: Auth, id: string) =>
