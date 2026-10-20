@@ -1,11 +1,13 @@
 import type { NextRequest } from "next/server";
 import { z, type ZodType } from "zod";
 import { fail, type ErrorDetail } from "@/lib/api/envelope";
+import { readBoundedText } from "@/lib/api/read-body";
 
 // Input validation for route handlers (domain-implementation-plan.md §0.5.3, A). A route declares the zod schema for
 // its body and/or query string; this wrapper does the rest, the same way every time:
 //   - body that is not JSON                      → 400 INVALID_BODY
-//   - body bigger than MAX_BODY_BYTES (declared or actual) → 413 PAYLOAD_TOO_LARGE
+//   - body bigger than MAX_BODY_BYTES (declared or actual) → 413 PAYLOAD_TOO_LARGE; a body with no declared length is read
+//     no further than the cap (lib/api/read-body.ts), so the answer does not wait for the end of it
 //   - a schema failure                           → 400 VALIDATION, with `details` naming each field (max 20)
 //   - keys the schema does not name              → STRIPPED, never passed on (no mass assignment)
 // The same schema objects are what the generated API docs (zod-openapi) will describe, so validation and
@@ -51,11 +53,8 @@ export async function parseRequest<B = undefined, Q = undefined>(
   let body = undefined as B;
   if (schemas.body) {
     const cap = Math.max(MAX_BODY_BYTES, schemas.maxBodyBytes ?? 0);
-    const declared = Number(req.headers.get("content-length"));
-    if (Number.isFinite(declared) && declared > cap)
-      return { ok: false, response: fail("That request is too large.", 413, "PAYLOAD_TOO_LARGE") };
-    const text = await req.text();
-    if (Buffer.byteLength(text) > cap) return { ok: false, response: fail("That request is too large.", 413, "PAYLOAD_TOO_LARGE") };
+    const text = await readBoundedText(req, cap);
+    if (text === null) return { ok: false, response: fail("That request is too large.", 413, "PAYLOAD_TOO_LARGE") };
     let json: unknown;
     try {
       json = JSON.parse(text);
