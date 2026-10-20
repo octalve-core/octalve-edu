@@ -315,6 +315,9 @@ export async function deleteTimetableSlot(tenantId: string, id: string): Promise
 
 /**
  * Batch saves timetable slots atomically, optionally replacing existing slots for a class arm.
+ *
+ * Every refusal comes BEFORE the first write (ADR 0002): a batch that is refused leaves the whole timetable exactly as it was. `forTenant().transaction` rolls back only
+ * when the callback throws, and a refusal is a normal return, so a delete that had already run would have been committed with it.
  */
 export async function batchSaveTimetable(
   tenantId: string,
@@ -334,16 +337,23 @@ export async function batchSaveTimetable(
   }
 
   return forTenant(tId).transaction(async (tx) => {
-    // 2. If replacing existing for a class arm, delete them first
-    if (input.replaceExisting && input.classArmId) {
-      await tx.timetableSlot.deleteMany({
-        where: { tenantId, classArmId: input.classArmId },
-      });
+    // 2. Every class arm, subject and teacher the batch names must be in this school, and an archived class arm is not one: the same rule createTimetableSlot applies
+    const armIds = [...new Set([...(input.classArmId ? [input.classArmId] : []), ...input.slots.map((s) => s.classArmId)])];
+    const subjectIds = [...new Set(input.slots.map((s) => s.subjectId))];
+    const staffIds = [...new Set(input.slots.map((s) => s.staffRecordId))];
+    const [arms, subjects, staff] = await Promise.all([
+      tx.classArm.count({ where: { tenantId, id: { in: armIds }, archivedAt: null } }),
+      tx.subject.count({ where: { tenantId, id: { in: subjectIds } } }),
+      tx.staffRecord.count({ where: { tenantId, id: { in: staffIds } } }),
+    ]);
+    if (arms !== armIds.length || subjects !== subjectIds.length || staff !== staffIds.length) {
+      return { ok: false, failure: "INVALID_FOREIGN_KEY", detail: "Class arm, subject, or staff record does not exist in this school." };
     }
 
-    // 3. Query all remaining slots to check external clashes
+    // 3. The lessons the new ones must not collide with: every lesson in the school, except the arm's own when they are about to be replaced
+    const replacing = input.replaceExisting && input.classArmId ? input.classArmId : null;
     const remainingSlots = await tx.timetableSlot.findMany({
-      where: { tenantId },
+      where: { tenantId, ...(replacing ? { classArmId: { not: replacing } } : {}) },
       select: {
         id: true,
         classArmId: true,
@@ -369,7 +379,12 @@ export async function batchSaveTimetable(
       }
     }
 
-    // 4. Create all slots
+    // 4. Only now write: delete the lessons being replaced, then create the new ones
+    if (replacing) {
+      await tx.timetableSlot.deleteMany({
+        where: { tenantId, classArmId: replacing },
+      });
+    }
     await tx.timetableSlot.createMany({
       data: input.slots.map((s) => ({
         tenantId,
