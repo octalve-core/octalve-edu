@@ -2,6 +2,7 @@ import { Decimal } from "@prisma/client/runtime/library";
 import { ResultStatus, Permission, type Prisma } from "@prisma/client";
 import type { Tx } from "@/lib/tenant/for-tenant";
 import { gradeFor } from "@/lib/academics/scoring";
+import { assignedArmIds } from "@/lib/attendance/access";
 import { canTransitionResult, validateComponentScores, generateVerificationToken, calculateVerificationHash } from "./rules";
 import { calculateCompetitionRanks, evaluatePromotion } from "./ranking";
 import type { RecordResultsInput, TransitionStatusInput, ResultFailure } from "./http";
@@ -18,9 +19,22 @@ function campusOf(role: string, campusId: string | null): Prisma.StudentRecordWh
 const NOT_EDITABLE =
   "Results that have left DRAFT cannot be changed here. Send them back to DRAFT first (an administrator unlocks a LOCKED result, with a reason).";
 
+const NOT_ASSIGNED = "You are not assigned to teach this subject to every student in this request.";
+
+/// The arms this person is assigned to teach `subjectId` in: a subject assignment, for exactly this subject, on their (live) staff record. A timetable
+/// slot does not count here: it says when a class meets, not who answers for its marks.
+async function armsTaught(tx: Tx, tenantId: string, userId: string, subjectId: string): Promise<string[]> {
+  const rows = await tx.staffSubjectAssignment.findMany({
+    where: { tenantId, subjectId, staffRecord: { userId, archivedAt: null } },
+    select: { classArmId: true },
+  });
+  return rows.map((row) => row.classArmId);
+}
+
 /**
  * Records or updates score entries for students in a given subject and period. A result is edited only while it is DRAFT (PRD 5): once it has been
- * submitted, a change goes back through the lifecycle, with its reason and its audit row. The whole request is accepted or none of it is.
+ * submitted, a change goes back through the lifecycle, with its reason and its audit row. A teacher records only for the students of an arm they are
+ * assigned to teach the subject in. The whole request is accepted or none of it is.
  */
 export async function recordStudentResults(
   tx: Tx,
@@ -52,6 +66,23 @@ export async function recordStudentResults(
   const known = await tx.studentRecord.count({ where: { tenantId, id: { in: studentIds }, ...campusOf(caller.role, caller.campusId) } });
   if (known !== studentIds.length) {
     return { ok: false, failure: "NOT_FOUND", message: "A student in this request was not found." };
+  }
+
+  // A teacher records a subject only for the students on the roll of an arm they are assigned to teach it in (an ACTIVE enrolment in this period's
+  // session); one student outside that refuses the whole request. An ADMIN is not held to it.
+  if (caller.role === "TEACHING_STAFF") {
+    const arms = await armsTaught(tx, tenantId, actorUserId, input.subjectId);
+    const rolled =
+      arms.length === 0
+        ? []
+        : await tx.studentEnrollment.findMany({
+            where: { tenantId, sessionId: period.sessionId, status: "ACTIVE", studentId: { in: studentIds }, classArmId: { in: arms } },
+            select: { studentId: true },
+          });
+    const covered = new Set(rolled.map((row) => row.studentId));
+    if (studentIds.some((id) => !covered.has(id))) {
+      return { ok: false, failure: "NOT_ASSIGNED", message: NOT_ASSIGNED };
+    }
   }
 
   const entries: Array<{
@@ -282,7 +313,9 @@ export async function transitionResultStatuses(
 }
 
 /**
- * Queries results with optional filters.
+ * Queries results with optional filters. A teacher sees the results of the students on the roll of the arms they are assigned to (the rule the student's
+ * attendance history and report card apply), except one who holds CAN_APPROVE_RESULTS: approving other teachers' results needs to see them, and that
+ * person is held to the campus rule alone.
  */
 export async function queryResults(
   tx: Tx,
@@ -293,12 +326,23 @@ export async function queryResults(
     classArmId?: string;
     status?: ResultStatus;
   },
-  /// Who is asking: the role in this school and the campus the membership is anchored to (null = the whole school).
-  caller: { role: string; campusId: string | null },
+  /// Who is asking: the role in this school, the campus the membership is anchored to (null = the whole school), who they are and what they may do here.
+  caller: { role: string; campusId: string | null; userId: string; permissions: readonly (Permission | string)[] },
 ) {
+  let enrolled: Prisma.StudentEnrollmentWhereInput | undefined = filter.classArmId
+    ? { classArmId: filter.classArmId, status: "ACTIVE" }
+    : undefined;
+  if (caller.role === "TEACHING_STAFF" && !caller.permissions.includes("CAN_APPROVE_RESULTS")) {
+    // On the roll, in the active session, of an arm they are assigned to; a teacher with no such arm (or a school with no active session) sees none.
+    const arms = await assignedArmIds(tx, tenantId, caller.userId);
+    const active = await tx.academicSession.findFirst({ where: { tenantId, status: "ACTIVE", archivedAt: null }, select: { id: true } });
+    const mine = filter.classArmId ? [...arms].filter((id) => id === filter.classArmId) : [...arms];
+    if (!active || mine.length === 0) return [];
+    enrolled = { sessionId: active.id, status: "ACTIVE", classArmId: { in: mine } };
+  }
   const student: Prisma.StudentRecordWhereInput = {
     ...campusOf(caller.role, caller.campusId),
-    ...(filter.classArmId ? { enrollments: { some: { classArmId: filter.classArmId, status: "ACTIVE" } } } : {}),
+    ...(enrolled ? { enrollments: { some: enrolled } } : {}),
   };
   return tx.result.findMany({
     where: {

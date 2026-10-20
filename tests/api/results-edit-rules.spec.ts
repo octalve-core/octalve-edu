@@ -16,6 +16,8 @@ import { api, cookieHeader, loginAs } from "../support/http";
 
 // Recording results (POST /academics/results) and listing them (GET): the rules the PRD gives the lifecycle (a result is edited only while it is DRAFT; a
 // correction goes back through the lifecycle with a reason), that a refused request changes nothing, and the campus a member works at.
+// A teacher records only for the students of an arm they are assigned the subject in (tests/api/results-assigned-subject.spec.ts): every pupil here is on
+// one arm's roll and every subject is assigned to the teachers in it, so the cases below are about the rules above and not about that one.
 
 const SAAS = { baseUrl: SAAS_URL };
 
@@ -30,8 +32,11 @@ let parent: TestUser;
 let outsider: TestUser;
 const cookie: Record<string, string> = {};
 
+let session: { id: string };
 let period: { id: string };
+let arm: { id: string };
 let stranger: { id: string };
+const staff: Record<string, string> = {};
 let n = 0;
 
 async function cookieFor(user: TestUser) {
@@ -66,7 +71,7 @@ test.beforeAll(async () => {
   for (const [key, user] of Object.entries({ admin, teacher, approver, northTeacher, northClerk, parent, outsider }))
     cookie[key] = await cookieFor(user);
 
-  const session = await db.academicSession.create({
+  session = await db.academicSession.create({
     data: { tenantId: a.id, label: "2026/2027", startDate: new Date("2026-09-01"), endDate: new Date("2027-07-20"), status: "ACTIVE" },
   });
   period = await db.academicPeriod.create({
@@ -81,6 +86,19 @@ test.beforeAll(async () => {
       isCurrent: true,
     },
   });
+  // the one arm every pupil is on, and the teachers who teach in it (the north teacher's staff record is in the north campus, as their membership is)
+  const group = await db.classGroup.create({ data: { tenantId: a.id, name: "Grade 9", sortOrder: 1 } });
+  arm = await db.classArm.create({ data: { tenantId: a.id, classGroupId: group.id, name: "A" } });
+  for (const [key, user, campusId] of [
+    ["teacher", teacher, null],
+    ["approver", approver, null],
+    ["northTeacher", northTeacher, a.campuses[0].id],
+  ] as const) {
+    const record = await db.staffRecord.create({
+      data: { tenantId: a.id, userId: user.id, category: "TEACHING", firstName: key, lastName: "Rules", campusId },
+    });
+    staff[key] = record.id;
+  }
   // a pupil of the other school: never reachable from this one
   stranger = await db.studentRecord.create({
     data: { tenantId: b.id, firstName: "Out", lastName: "Sider", dateOfBirth: new Date("2011-01-01"), admissionNo: "B-0001" },
@@ -95,9 +113,10 @@ const as = (who: string, extra: object = {}) => ({ ...SAAS, cookie: cookie[who],
 const resultsRoute = () => `/api/v1/schools/${a.code}/academics/results`;
 const transitionRoute = () => `/api/v1/schools/${a.code}/academics/results/transition`;
 
+/// A pupil on the roll of the arm in the active session.
 async function pupil(campusId: string | null = null) {
   n += 1;
-  return db.studentRecord.create({
+  const student = await db.studentRecord.create({
     data: {
       tenantId: a.id,
       firstName: `Pupil${n}`,
@@ -107,10 +126,19 @@ async function pupil(campusId: string | null = null) {
       campusId,
     },
   });
+  await db.studentEnrollment.create({
+    data: { tenantId: a.id, sessionId: session.id, classArmId: arm.id, studentId: student.id, status: "ACTIVE" },
+  });
+  return student;
 }
+/// A subject the teachers of the arm are assigned to teach in it.
 async function subject() {
   n += 1;
-  return db.subject.create({ data: { tenantId: a.id, name: `Subject ${n}`, code: `RS${n}` } });
+  const made = await db.subject.create({ data: { tenantId: a.id, name: `Subject ${n}`, code: `RS${n}` } });
+  await db.staffSubjectAssignment.createMany({
+    data: Object.values(staff).map((staffRecordId) => ({ tenantId: a.id, staffRecordId, subjectId: made.id, classArmId: arm.id })),
+  });
+  return made;
 }
 /// A result as it stands in `status` (written straight to the table: what the lifecycle would have left).
 async function seed(studentId: string, subjectId: string, status: ResultStatus, score = 50) {

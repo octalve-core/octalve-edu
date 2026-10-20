@@ -32,6 +32,12 @@ let armA: { id: string };
 let subjectA: { id: string };
 let student1: { id: string; admissionNo: string };
 let student2: { id: string; admissionNo: string };
+let teacherStaffId: string;
+let approverStaffId: string;
+
+/// A teacher records a subject only for the students of an arm they are assigned to teach it in: this gives a staff record the subject in the arm.
+const teaches = (staffRecordId: string, subjectId: string) =>
+  db.staffSubjectAssignment.create({ data: { tenantId: a.id, staffRecordId, subjectId, classArmId: armA.id } });
 
 async function cookieFor(user: TestUser) {
   const res = await loginAs(user, SAAS);
@@ -120,12 +126,16 @@ test.beforeAll(async () => {
   });
 
   // The teacher teaches the arm the students are in: a teacher reads the report cards of the students of their own arms (ISS-0013, tests/api/report-card-access.spec.ts)
+  // and records a subject only for an arm they are assigned it in (tests/api/results-assigned-subject.spec.ts). The approver is a teacher too.
   const teacherRecord = await db.staffRecord.create({
     data: { tenantId: a.id, userId: regularTeacher.id, category: "TEACHING", firstName: "Tunde", lastName: "Teacher" },
   });
-  await db.staffSubjectAssignment.create({
-    data: { tenantId: a.id, staffRecordId: teacherRecord.id, subjectId: subjectA.id, classArmId: armA.id },
+  teacherStaffId = teacherRecord.id;
+  await teaches(teacherStaffId, subjectA.id);
+  const approverRecord = await db.staffRecord.create({
+    data: { tenantId: a.id, userId: approverTeacher.id, category: "TEACHING", firstName: "Abike", lastName: "Approver" },
   });
+  approverStaffId = approverRecord.id;
 
   // Students in School A
   student1 = await db.studentRecord.create({
@@ -429,6 +439,7 @@ test.describe("Phase 1 review F5: who may move a result", () => {
     await addMembership(other.id, a.id, Role.TEACHING_STAFF);
     cookie.other = await cookieFor(other);
     subject = await db.subject.create({ data: { tenantId: a.id, name: "Physics F5", code: "PHF5" } });
+    await teaches(teacherStaffId, subject.id);
     ids.physics = await enter("teacher", subject.id, [student1.id]);
   });
 
@@ -452,6 +463,7 @@ test.describe("Phase 1 review F5: who may move a result", () => {
 
   test("nobody approves results they entered themselves - except an administrator", async () => {
     const chem = await db.subject.create({ data: { tenantId: a.id, name: "Chemistry F5", code: "CHF5" } });
+    await teaches(approverStaffId, chem.id);
     const own = await enter("approver", chem.id, [student1.id, student2.id]);
     expect((await move("approver", own, "SUBMITTED")).status).toBe(200);
 
