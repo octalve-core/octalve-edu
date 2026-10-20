@@ -18,9 +18,22 @@ function campusOf(role: string, campusId: string | null): Prisma.StudentRecordWh
 const NOT_EDITABLE =
   "Results that have left DRAFT cannot be changed here. Send them back to DRAFT first (an administrator unlocks a LOCKED result, with a reason).";
 
+const NOT_ASSIGNED = "You are not assigned to teach this subject to every student in this request.";
+
+/// The arms this person is assigned to teach `subjectId` in: a subject assignment, for exactly this subject, on their (live) staff record. A timetable
+/// slot does not count here: it says when a class meets, not who answers for its marks.
+async function armsTaught(tx: Tx, tenantId: string, userId: string, subjectId: string): Promise<string[]> {
+  const rows = await tx.staffSubjectAssignment.findMany({
+    where: { tenantId, subjectId, staffRecord: { userId, archivedAt: null } },
+    select: { classArmId: true },
+  });
+  return rows.map((row) => row.classArmId);
+}
+
 /**
  * Records or updates score entries for students in a given subject and period. A result is edited only while it is DRAFT (PRD 5): once it has been
- * submitted, a change goes back through the lifecycle, with its reason and its audit row. The whole request is accepted or none of it is.
+ * submitted, a change goes back through the lifecycle, with its reason and its audit row. A teacher records only for the students of an arm they are
+ * assigned to teach the subject in. The whole request is accepted or none of it is.
  */
 export async function recordStudentResults(
   tx: Tx,
@@ -52,6 +65,23 @@ export async function recordStudentResults(
   const known = await tx.studentRecord.count({ where: { tenantId, id: { in: studentIds }, ...campusOf(caller.role, caller.campusId) } });
   if (known !== studentIds.length) {
     return { ok: false, failure: "NOT_FOUND", message: "A student in this request was not found." };
+  }
+
+  // A teacher records a subject only for the students on the roll of an arm they are assigned to teach it in (an ACTIVE enrolment in this period's
+  // session); one student outside that refuses the whole request. An ADMIN is not held to it.
+  if (caller.role === "TEACHING_STAFF") {
+    const arms = await armsTaught(tx, tenantId, actorUserId, input.subjectId);
+    const rolled =
+      arms.length === 0
+        ? []
+        : await tx.studentEnrollment.findMany({
+            where: { tenantId, sessionId: period.sessionId, status: "ACTIVE", studentId: { in: studentIds }, classArmId: { in: arms } },
+            select: { studentId: true },
+          });
+    const covered = new Set(rolled.map((row) => row.studentId));
+    if (studentIds.some((id) => !covered.has(id))) {
+      return { ok: false, failure: "NOT_ASSIGNED", message: NOT_ASSIGNED };
+    }
   }
 
   const entries: Array<{

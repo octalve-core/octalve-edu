@@ -65,6 +65,7 @@ export type ResultFailure =
   | "SCHEME_VALIDATION_FAILED"
   | "SCORE_OUT_OF_BOUNDS"
   | "NOT_EDITABLE"
+  | "NOT_ASSIGNED"
   | "FORBIDDEN_STUDENT_ACCESS"
   | "PERIOD_NOT_ACTIVE";
 
@@ -84,6 +85,8 @@ export function resultFailure(reason: ResultFailure, message?: string): Response
       return fail(message ?? "Score exceeds allowed maximum or is negative.", 400, "VALIDATION");
     case "NOT_EDITABLE":
       return fail(message ?? "That result has left DRAFT and cannot be changed here.", 409, "CONFLICT");
+    case "NOT_ASSIGNED":
+      return fail(message ?? "You are not assigned to teach this subject to this class.", 403, "FORBIDDEN");
     case "FORBIDDEN_STUDENT_ACCESS":
       return fail(message ?? "You are not authorized to view this student's report card.", 403, "FORBIDDEN");
     case "PERIOD_NOT_ACTIVE":
