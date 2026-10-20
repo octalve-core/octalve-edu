@@ -6,7 +6,7 @@ export const NAME_MAX_LENGTH = 100;
 
 /// Control characters and the bidirectional-override characters (which can make a name display as something else
 /// in a list). Zero-width joiners are NOT refused: Persian, Arabic and Indic scripts and many emoji need them.
-const FORBIDDEN = /[\p{Cc}‪-‮⁦-⁩]/u;
+const FORBIDDEN = /[\p{Cc}\u202a-\u202e\u2066-\u2069]/u;
 
 export type NameCheck = { ok: true; name: string } | { ok: false; message: string };
 

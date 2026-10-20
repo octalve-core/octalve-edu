@@ -33,7 +33,7 @@ test.describe("reading", () => {
   });
 
   test("a byte-order mark at the start is dropped", () => {
-    expect(rows("﻿first_name,last_name\nA,B")[0]).toEqual(["first_name", "last_name"]);
+    expect(rows("\ufefffirst_name,last_name\nA,B")[0]).toEqual(["first_name", "last_name"]);
   });
 
   test("quoted cells: commas, doubled quotes and newlines inside", () => {

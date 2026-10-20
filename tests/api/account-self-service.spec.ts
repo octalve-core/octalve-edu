@@ -88,7 +88,7 @@ test.describe("PATCH /account/profile", () => {
       ["   ", /enter your name/i],
       ["a".repeat(101), /at most 100/],
       ["Amina\u0000Yusuf", /can't be used/],
-      ["Amina‮Yusuf", /can't be used/],
+      ["Amina\u202eYusuf", /can't be used/],
     ];
     for (const [name, message] of cases) {
       const res = await patch(person, { name });

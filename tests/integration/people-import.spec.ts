@@ -250,7 +250,7 @@ test.describe("the file itself", () => {
 
   test("headers match in any case with spaces around them; a byte-order mark and CRLF line ends are fine; a ragged row and an over-long cell are row errors", async () => {
     const csv =
-      "﻿ First_Name , LAST_NAME,Date_Of_Birth\r\nSade,Okoro,2012-05-01\r\nShort,Row\r\n" + `${"x".repeat(201)},Okoro,2012-05-01\r\n`;
+      "\ufeff First_Name , LAST_NAME,Date_Of_Birth\r\nSade,Okoro,2012-05-01\r\nShort,Row\r\n" + `${"x".repeat(201)},Okoro,2012-05-01\r\n`;
     const report = await run(csv, true);
     expect(report.headerProblems).toEqual([]);
     expect(report.counts).toEqual({ rows: 3, created: 1, skipped: 0, errors: 2 });
