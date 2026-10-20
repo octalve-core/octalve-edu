@@ -178,14 +178,6 @@ export function CertificatesConsole({ schoolCode, initialCertificates = [] }: Ce
                   </div>
                 </td>
                 <td className="px-4 py-3 text-right space-x-2">
-                  <a
-                    href={`/api/v1/verify-certificate/${cert.certificateNo}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs text-brand-fg hover:underline"
-                  >
-                    Verify
-                  </a>
                   {cert.status === CertificateStatus.ISSUED && (
                     <button onClick={() => handleRevoke(cert.id)} className="text-xs text-danger-fg hover:underline">
                       Revoke

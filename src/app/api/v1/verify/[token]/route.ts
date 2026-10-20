@@ -5,7 +5,7 @@ import { verifyPublicCredential } from "@/lib/results/service";
 
 type Ctx = { params: Promise<{ token: string }> };
 
-const IP_LIMIT = 60; // 60 attempts per 10 minutes per IP
+const IP_LIMIT = 60; // 60 attempts per 5 minutes per IP (the window in rate-limit.ts)
 
 // GET /api/v1/verify/[token]
 // Unauthenticated public route for external validation of certificates and report cards.

@@ -1,5 +1,6 @@
 import { Role } from "@prisma/client";
-import { ok, fail } from "@/lib/api/envelope";
+import { ok } from "@/lib/api/envelope";
+import { isPlausibleId, notFound } from "@/lib/academics/http";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { revokeCertificate } from "@/lib/certificates/service";
 
@@ -7,13 +8,10 @@ import { revokeCertificate } from "@/lib/certificates/service";
 export const POST = withAuth(
   async (_req, auth: TenantAuthContext, ctx: { params: Promise<{ code: string; id: string }> }) => {
     const { id } = await ctx.params;
-    try {
-      const revoked = await revokeCertificate(auth.tenant.tenantId, id);
-      return ok({ certificate: revoked, message: "Certificate successfully revoked" });
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Failed to revoke certificate";
-      return fail(message, 400, "BAD_REQUEST");
-    }
+    if (!isPlausibleId(id)) return notFound("certificate");
+    const revoked = await revokeCertificate(auth.tenant.tenantId, id);
+    if (!revoked) return notFound("certificate");
+    return ok({ certificate: revoked, message: "Certificate successfully revoked" });
   },
   {
     tenant: true,
