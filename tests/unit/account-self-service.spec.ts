@@ -129,13 +129,13 @@ test.describe("checkName", () => {
     }
   });
   test("bidirectional overrides are refused — they can make a name DISPLAY as something else", () => {
-    for (const bad of ["Amina‮Yusuf", "‪Amina", "Amina⁦Yusuf", "Amina⁩", "Amina‬"]) {
+    for (const bad of ["Amina\u202eYusuf", "\u202aAmina", "Amina\u2066Yusuf", "Amina\u2069", "Amina\u202c"]) {
       expect(message(bad)).toMatch(/characters that can't be used/);
     }
   });
   test("zero-width joiners are ALLOWED (needed by Persian, Arabic, Indic scripts and emoji sequences)", () => {
-    expect(ok("می‌خواهم")).toContain("‌"); // ZWNJ
-    expect(ok("👩‍🏫")).toContain("‍"); // ZWJ
+    expect(ok("می\u200cخواهم")).toContain("\u200c"); // ZWNJ
+    expect(ok("👩\u200d🏫")).toContain("\u200d"); // ZWJ
   });
 });
 
