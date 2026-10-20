@@ -4,18 +4,24 @@ import { forTenant, forVerification, setTenantContext } from "@/lib/tenant/for-t
 import { trustedTenantId } from "@/lib/tenant/verified-tenant";
 import { computeCertificateHash, formatCertificateNumber, verifyCertificateIntegrity } from "./rules";
 
+/// The school's certificates, newest first. A STUDENT reads the certificates of the student record that is theirs and no others; anyone else anchored to a
+/// campus (but an ADMIN, who is school-wide) reads those of that campus's students and the school-wide ones; a member of no campus reads all.
 export async function listCertificates(
   tenantId: string,
   filters: {
     studentId?: string;
     status?: CertificateStatus;
-  } = {},
+  },
+  viewer: { role: string; campusId: string | null; userId: string },
 ) {
   const tId = trustedTenantId(tenantId);
   return forTenant(tId).transaction(async (tx) => {
     const where: Prisma.CertificateWhereInput = { tenantId };
     if (filters.studentId) where.studentId = filters.studentId;
     if (filters.status) where.status = filters.status;
+    if (viewer.role === "STUDENT") where.student = { userId: viewer.userId };
+    else if (viewer.role !== "ADMIN" && viewer.campusId !== null)
+      where.student = { OR: [{ campusId: null }, { campusId: viewer.campusId }] };
 
     return tx.certificate.findMany({
       where,

@@ -87,6 +87,7 @@ const CAMPUS_HELPERS = [
   "timetableSlotScope",
   "armsScope",
   "invoiceScope",
+  "certificateScope",
 ];
 /// Does the handler let a campus administrator WRITE? It uses the constant that promises a campus check, or lists the role itself.
 const LETS_CAMPUS_ADMIN_ACT = /CAMPUS_WRITE_ROLES|\bCAMPUS_ADMIN\b|Role\.CAMPUS_ADMIN/;
@@ -170,10 +171,8 @@ elsewhere(
   "GET v1/schools/[code]/higher-ed/transcript/[studentId]/route.ts",
 );
 elsewhere(
-  "lib/certificates/service.ts: vocational certificates are scoped to tenant and validated by student record",
+  "lib/certificates/service.ts listCertificates: a student reads their own certificates, anyone else anchored to a campus reads that campus's students' and the school-wide ones' (issuing and revoking call studentScope and certificateScope in the routes)",
   "GET v1/schools/[code]/certificates/route.ts",
-  "POST v1/schools/[code]/certificates/route.ts",
-  "POST v1/schools/[code]/certificates/[id]/revoke/route.ts",
 );
 
 function routeFiles(dir: string): string[] {
