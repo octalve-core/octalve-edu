@@ -31,6 +31,7 @@
 | 18 | [TASK-0011-Followups](0011-audited-support-access.md) | Audited Support Access Enhancements (Named Grantee & Admin Notice) | [x] Completed | 2026-10-18 05:40:00 UTC | 2026-10-18 06:15:00 UTC | [PR #24](https://github.com/octalve-core/octalve-edu/pull/24) |
 | 19 | Release Staging | Release v1.0.1 Staging: Promote `dev` ➔ `master` | [x] Completed | 2026-10-18 06:33:00 UTC | 2026-10-18 06:33:30 UTC | [PR #25](https://github.com/octalve-core/octalve-edu/pull/25) |
 | 20 | Release Production | Release v1.0.1 Production: Promote `master` ➔ `prod` (Tagged `v1.0.1`) | [x] Completed | 2026-10-18 06:33:40 UTC | 2026-10-18 06:34:00 UTC | [PR #26](https://github.com/octalve-core/octalve-edu/pull/26) |
+| 21 | [TASK-0017](0017-review-fixes-access-atomicity-and-request-bodies.md) | Review fixes: who may read and write what, writes that are all or nothing, request bodies | [x] Completed (merged into `dev`; one full-suite run on the merged `dev` still to do) | before 2026-10-20 17:37:44 UTC | 2026-10-20 19:57:42 UTC | PRs [#36](https://github.com/octalve-core/octalve-edu/pull/36) to [#43](https://github.com/octalve-core/octalve-edu/pull/43) |
 ---
 
 ## Detailed Milestone Checklist
@@ -236,3 +237,21 @@
 - [ ] Known failing on `dev` itself (verified by stashing): `shell.spec.ts` "More: who you are..." on a phone (the Users tab is not found while the More sheet is open) and `academics.spec.ts` "staff may LOOK" (an `Open` button is present). Not caused by this branch; not fixed.
 - Correction: the Coursework page IS reachable (Academics > "LMS & Assignments"); an earlier note saying it was unreachable was wrong, so no menu item was added.
 - Full suite on this branch: 2069 passed, 13 failed, of which 4 were nav-test failures from a menu item that was then removed, 4 sign-out/cookie tests that passed again when run alone (load), 2 stale tests fixed above and 3 pre-existing (above).
+
+---
+
+### TASK-0017: Review fixes - who may read and write what, writes that are all or nothing, request bodies
+- **Started:** before `2026-10-20 17:37:44 UTC` (the first commit of the series; the start was not timestamped)
+- **Ended:** `2026-10-20 19:57:42 UTC` (PR #43 merged)
+- **Status:** [x] Completed: merged into `dev` as PRs #36 to #43 on 2026-10-20, in order, each after its Vercel check passed and with `base.ref` checked to be `dev` (merge commits `b13d725`, `6eb6fd4`, `25ae546`, `3206971`, `abe0d57`, `fb76827`, `87a4cb9`, `d12d22d`). Detail, rules and numbers: [the task file](0017-review-fixes-access-atomicity-and-request-bodies.md).
+- [x] #36 `claude/fix-bounded-body-read`: `validate()` reads a request body no further than the cap
+- [x] #37 `claude/fix-timetable-write-checks` (two commits): a refused batch changes nothing; one lesson's start and end are checked together
+- [x] #38 `claude/fix-lms-whose-work`: work is handed in for the signed-in student's own record, reads follow the viewer, marked work is final for the student
+- [x] #39 `claude/fix-results-draft-only`: a result is edited only while DRAFT, a refused request writes nothing, recording and listing follow the caller's campus
+- [x] #40 `claude/fix-attendance-roll`: a roll names only the students on that arm's roll
+- [x] #41 `claude/fix-report-card-scope`: staff read a report card within their campus and, for a teacher, their own arms
+- [x] #42 `claude/chore-source-hygiene`: no invisible or direction-changing character typed into a source file, with a guard test
+- [x] #43 `claude/fix-names-need-a-visible-character` (on top of #42): a name needs a visible character
+- [x] Verification: typecheck, lint and prettier clean on each branch and on the merge of the six fixes; unit 382 on `dev` before, 385 on the merge of the six, 389 on the merged `dev`; API 705, integration 614, e2e (3 specs) 15 on one build of the first five; the last two changes 148 + 40 API tests; every new test failed on the unfixed build first
+- [ ] NOT run: mobile e2e, https project, API and integration on each branch alone, one full suite on the merged `dev` (a first attempt, built from the eight branches, ended before any test ran: the web servers did not start within 60 s on a machine at load average 48; that is not a test failure)
+- [ ] After the promotion to `prod`: record the issues these fixed in `docs/issues/README.md` (the maintainer decides the wording while the repository is public)

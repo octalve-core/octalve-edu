@@ -1,6 +1,6 @@
 # Octalve Edu — Development Progress Tracker
 
-Last Updated: 2026-10-11
+Last Updated: 2026-10-20
 
 Companion to `docs/development-history/domain-implementation-plan.md` (the step-by-step build
 plan), `docs/development-history/phases/*.md` (one detailed doc per completed phase), and
@@ -27,19 +27,21 @@ against the real repo, not what a plan says should exist.
   project).
 - **Phase 0.5 — Auth, RLS & Shared API Infrastructure**: **100% Complete.** All sub-phases (0.5.0–0.5.F, 0.5.2 tenant trust boundary, 0.5.2-RLS, 0.5.2-H app shell, 0.5.3 API infrastructure, 0.5.4 users and invitations) built, verified with automated test suites under `app_user` role, and merged.
 - **Phase 1 — MVP: Core SIS + Finance**: **100% Complete.** All 8 milestones built, verified, hardened, and gated across Phase 1.0 (Foundations), 1.1 (Academic Structure), 1.2 (People & Enrolment), 1.3 (Attendance), 1.4 (Results & Grading), 1.5 (Finance & Invoicing with dual-mode Paystack), 1.6 (Timetable & Announcements), 1.7 (Settings & Step-up MFA), and 1.8 (End-to-End Hardening, Cross-Tenant IDOR Matrix, Lifecycle Walk, Finance Adversarial Suite, PostgreSQL EXPLAIN Query Plan Sanity, and Phase Gate). Full repository gates clean. Records: `phases/phase-1.*.md`.
-- **Campus administrators and a platform administrator (task 0009, ADR 0016 Proposed)**: **built on `claude/campus-admins-platform-superadmin`, in review (not merged).** Slices A (migrations, `canAdminister`), B1–B4 (people; academics, attendance, announcements, timetable; invoices and manual payment; members and invitations), C (suspension, `pnpm platform-admin:make`, the platform API and page), D (route-role guard, ADR, docs). Found and fixed on the way: ISS-0014 (every invoice listed to any parent), the role being assignable without a campus; ISS-0013 (teacher attendance read scope) is open. Mutation pass NOT RUN — pending, end of Phase 2.
-- **Phase 2 — Communication**: **0% — not started.** Schema designed (`comms.prisma`).
-- **Phase 3 — LMS**: **0% — not started.** Schema designed (`lms.prisma`).
-- **Phase 4 — Operations**: **0% — not started.** Schema deliberately thin per the plan's own
-  reasoning (PRD §6 marks this phase lower-priority; full design deferred to when it's actually
-  scheduled).
-- **Phase 5 — Expansion**: **0% — not started, and deliberately unscoped** beyond a directional
-  sketch — PRD §6 itself frames this phase as conditional on which market segment gains traction
-  first.
+- **Campus administrators and a platform administrator (task 0009, ADR 0016)**: **built, verified and landed in `dev` (PR #7; follow-ups in tasks 0010 and 0011, PRs #8 and #14).** Slices A (migrations, `canAdminister`), B1–B4 (people; academics, attendance, announcements, timetable; invoices and manual payment; members and invitations), C (suspension, `pnpm platform-admin:make`, the platform API and page), D (route-role guard, ADR, docs). Found and fixed on the way: ISS-0014 (every invoice listed to any parent), the role being assignable without a campus; ISS-0013 (teacher attendance read scope) was fixed in task 0010 (F3). Mutation pass NOT RUN — pending, end of Phase 2.
+- **Phase 2 — Communication**: **built and released** (task 0012, PR #18, 2026-10-16): templates, a queue on Redis and the email and SMS gateways. The catalogs (`docs/functions/school-app.md`) say, file by file, what each route and screen does today, including what is built and not yet wired.
+- **Phase 3 — Quick tools and PWA**: **built and released** (task 0013, PR #19, 2026-10-16): the quick-tools dock and the installable app with an offline payment queue.
+- **Phase 4 — LMS and assignments**: **built and released** (task 0014, PR #20, 2026-10-16). The operations modules planned for a later phase (HR and payroll, library, transport, inventory, NEMIS reporting, admissions) are specified in `docs/tasks/0016-phase-4-operations-and-admissions-blueprint.md` and not built; only the extended staff and guardian fields landed (PRs #27 and #28).
+- **Phase 5 — Expansion**: **built and released** (task 0015, PR #21, 2026-10-18): higher-ed credit units, custom domains and vocational certificates. Tagged `v1.0.0` and `v1.0.1` (PRs #22, #23, #25, #26). The phase numbers here follow the task register (`docs/tasks/current-tasks.md`); earlier versions of this file numbered them differently and showed all four as not started.
+- **Review fixes (task 0017)**: **merged into `dev` on 2026-10-20 as PRs #36 to #43 (six fixes, then two source-character changes); not yet promoted to `master` or `prod`.** Request bodies are read no further than the cap; a refused timetable batch changes nothing and one lesson's start and end are checked together; LMS work belongs to the signed-in student and reads follow the viewer; results are edited only while DRAFT and a refused request writes nothing; a roll names only the arm's students; a report card is read within the reader's campus and, for a teacher, their own arms. Every new test failed on the unfixed build first. Record: `docs/tasks/0017-review-fixes-access-atomicity-and-request-bodies.md`.
 
 ---
 
 ## What's real vs. what's designed-but-unbuilt
+
+> **Note, 2026-10-20:** the bullets below were written on 2026-09-30, during Phase 0.5, and describe
+> that moment (they say, for example, that no RLS policy exists yet). They are kept as history. The
+> Overall Status Summary above and the code catalogs (`docs/pages`, `docs/components`,
+> `docs/functions`) say what is built today.
 
 This section exists specifically to prevent the trap `TheNiche`'s own plan names: a schema decision
 that "sounds right" getting treated as done because it's written down somewhere. As of this
@@ -344,6 +346,22 @@ Record: `phases/phase-1.8-phase-gate.md`, task register `docs/tasks/0007-phase-1
 ## Next action
 1. Commit branch `claude/phase-1-8-gate` and submit PR to fork `roji-tech/octalve-edu-fork`.
 2. Phase 1 (Core SIS + Finance) is 100% Complete. Prepare for Phase 2 (Communication).
+
+## Review fixes: who may read and write what, writes that are all or nothing, request bodies (2026-10-20) - merged into `dev`, not promoted
+Record: `docs/tasks/0017-review-fixes-access-atomicity-and-request-bodies.md` (register row 21). Eight pull requests off `dev` (`e99972b`), merged into `dev` in order on 2026-10-20 (19:54 to 19:58 UTC) at the maintainer's instruction, each after its Vercel check passed: #36 `claude/fix-bounded-body-read`, #37 `claude/fix-timetable-write-checks` (two commits), #38 `claude/fix-lms-whose-work`, #39 `claude/fix-results-draft-only`, #40 `claude/fix-attendance-roll`, #41 `claude/fix-report-card-scope`, #42 `claude/chore-source-hygiene`, #43 `claude/fix-names-need-a-visible-character`. They follow the review that wrote the code catalogs (PR #35); each new test was run on an unfixed production build first and failed there.
+- **Request bodies:** `validate()` reads through `readBoundedText` (`src/lib/api/read-body.ts`): a body with no declared length is refused as soon as it passes the cap.
+- **Timetable:** a batch decides every refusal (references in this school, clashes) before it deletes the arm's lessons, so a refused batch changes nothing (ADR 0002); a one-time change to a lesson is judged against the other time as stored.
+- **LMS:** work is stored under the signed-in student's own record (staff name the student); a student sees published work and their own submissions; a parent and non-teaching staff see published work and no submissions; the quiz answer key is for staff; marked work is final for the student; late work is refused when the assignment says so.
+- **Results:** a result is edited only while it is DRAFT (rows locked while a request records them); a refused request saves nothing; students must be in this school and the caller's campus; ids, scores (at most 9999.99) and duplicates are validated; listing follows the campus rule.
+- **Attendance:** a roll needs an ACTIVE session and names only students on that arm's roll, once each.
+- **Report card:** staff read it under the rule the student's attendance history uses (campus; for a teacher, an arm they are assigned to).
+- **Source characters:** no source file holds an invisible or direction-changing character typed in as itself (a unit test keeps it so), and a name needs at least one visible character.
+- **Verification:** typecheck, lint, prettier clean per branch and on the merge of the six fixes; unit 382 per branch, 385 on the merge of the six and 389 on the merged `dev`; on one production build of the first five changes API 705, integration 614, e2e (attendance, lms-a11y, academics) 15; the last two changes were run as 148 + 40 API tests. NOT run: mobile e2e, the https project, the API and integration projects per branch, one full suite on the merged `dev` (an attempt ended before any test ran: the web servers did not start within 60 s on a machine at load average 48).
+
+## Next action
+1. Run one full suite on the merged `dev` when the machine is quiet (API project at `--timeout=120000`) and record the result in task 0017.
+2. After the promotion to `prod`: record the issues these fixed in `docs/issues/README.md` (the maintainer decides the wording while the repository is public).
+3. Then the open items listed in `docs/HANDOVER.md` section 6 (the question-bank parity design comes first, as the maintainer decided on 2026-10-19).
 
 
 

@@ -2,8 +2,9 @@
 
 # Octalve Edu — orientation for whoever (or whatever) picks this up next
 
-> ### 🚨 ACTIVE HANDOVER FOR NEXT AI SESSION (Updated 2026-10-19)
+> ### 🚨 ACTIVE HANDOVER FOR NEXT AI SESSION (Updated 2026-10-20)
 > - **Primary Repository Handover:** [`docs/HANDOVER.md`](docs/HANDOVER.md) — **start at section 6** (current state and rules learned). Hand-offs go in this file, in each repository.
+> - **Review fixes (task 0017, 2026-10-20):** merged into `dev` as PRs #36 to #43 (access, atomic writes, request bodies, source characters); not promoted to `master`/`prod`; one full suite on the merged `dev` is still to run — see [`docs/tasks/0017-review-fixes-access-atomicity-and-request-bodies.md`](docs/tasks/0017-review-fixes-access-atomicity-and-request-bodies.md) and `HANDOVER.md` section 6.0. The rules they add are listed there.
 > - **Operations & Admissions Architecture Blueprint:** [`docs/tasks/0016-phase-4-operations-and-admissions-blueprint.md`](docs/tasks/0016-phase-4-operations-and-admissions-blueprint.md) — Specifications for Extended HR/Payroll, Library, Transport, Inventory, NEMIS, and Admissions CRM.
 > - **Retired:** `/home/rojitech/Desktop/CODEC/out/HANDOFF-FOR-NEXT-AI.md` is history only (the maintainer retired it on 2026-10-19). Do not read it for state and do not add to it.
 > - **Tasks Register:** [`/home/rojitech/Desktop/CODEC/out/tasks.md`](/home/rojitech/Desktop/CODEC/out/tasks.md).

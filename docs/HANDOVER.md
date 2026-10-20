@@ -98,7 +98,29 @@ A detailed technical blueprint is documented in:
 
 ---
 
-## 6. Current work (2026-10-19)
+## 6. Current work (2026-10-20)
+
+### 6.0 Review fixes: merged into `dev` as PRs #36 to #43 (2026-10-20)
+
+**Where the code is:** on `dev` (tip `d12d22d` after the eight merges), merged on 2026-10-20 between 19:54 and 19:58 UTC at the maintainer's instruction, in this order, each after its Vercel check passed and with `base.ref` checked to be `dev`: #36 `claude/fix-bounded-body-read`, #37 `claude/fix-timetable-write-checks` (two commits), #38 `claude/fix-lms-whose-work`, #39 `claude/fix-results-draft-only`, #40 `claude/fix-attendance-roll`, #41 `claude/fix-report-card-scope`, #42 `claude/chore-source-hygiene` (no invisible or direction-changing characters in the source, with a guard test), #43 `claude/fix-names-need-a-visible-character` (on top of #42: a name needs a visible character). The remote branches are kept. These merges are on `dev` only: nothing is promoted to `master` or `prod`, and never promote without the maintainer's approval. Task: [`docs/tasks/0017-review-fixes-access-atomicity-and-request-bodies.md`](tasks/0017-review-fixes-access-atomicity-and-request-bodies.md) (merge commits and times are in its section 6).
+
+**What they do (the rule each one adds):** `validate()` reads a body no further than the cap; a refused timetable batch changes nothing, and one lesson's start and end are checked together; LMS work is stored under the signed-in student's own record and reads follow the viewer (a student sees published work and their own submissions, marked work is final for the student); a result is edited only while it is DRAFT and a refused request saves nothing; a roll names only the students on that arm's roll; a report card is read within the reader's campus and, for a teacher, their own arms. The catalog rows of every changed file are in the same commits.
+
+**What to know before promoting `dev` (behaviour a school will notice):** results cannot be changed once they leave DRAFT (a correction goes back through the lifecycle; an administrator unlocks a LOCKED result with a reason); a teacher with no assigned arm (no subject assignment, no timetable slot) cannot open any student's report card, as for attendance; in the LMS a parent and non-teaching staff see published work and no submissions; a roll call needs an ACTIVE session.
+
+**Test state:** unit 382 on `dev` before the merges and on each branch (385 on the body-read branch, which adds three, and on the merge of the six fixes), and 389 on the merged `dev` (the two source-character branches add two each; run on a tree identical to `d12d22d`). On one production build of the first five changes: API 705 passed (run with `--timeout=120000`: the email-change response-time check in `tests/api/account-self-service.spec.ts` takes about 85 s here against the 30 s default), integration 614, e2e-desktop attendance, lms-a11y and academics 15. The report-card and lesson-time changes: a 148-test API run with 145 passed (the other three: a results test that the new report-card rule changed, since fixed because its teacher now teaches the arm; the test that reads that test's token; and the email-change check, which measured 150 ms against its 40 ms limit while the machine was loaded and passes alone in 59 s), then 40 tests, all passed. NOT run: the mobile e2e project, the https project, the API and integration projects on each branch alone, one full suite on the merged `dev`. A full-suite attempt on a build of all eight branches ended before any test ran (the web servers did not start within 60 s on a machine at load average 48): run it again when the machine is quiet, with the API project at `--timeout=120000`, and record the result in the task file. Every new test failed on the unfixed build first.
+
+**Rules learned (they apply to new code):**
+- A service that can refuse a request after it has begun writing decides every refusal before its first write, or throws: `forTenant().transaction` rolls back only when the callback throws (ADR 0002), so returning `{ ok: false }` after a write commits the write.
+- A route's `roles` list says who may call it, not whose data they may read: a route that admits STUDENT or PARENT filters per caller in the service, and a route that admits staff applies the campus rule and, for a teacher, the assigned-arm rule of `lib/attendance/access.ts`.
+- A request body is read through `validate()` or `readBoundedText`, never `req.text()` or `req.json()` straight from the request.
+- An id from a request has the shape of an id (`isPlausibleId`) before it reaches the database: Postgres refuses a NUL byte in a string and that ended as a 500.
+- A test of a race holds one side open in a second transaction and polls (`pg_stat_activity`, `expect.poll`) instead of sleeping.
+- A spec that has a teacher read or write an arm gives that teacher a staff record with a subject assignment (or a timetable slot) in it.
+
+**Open / next:** (1) one full suite on the merged `dev` (see Test state); (2) after the promotion to `prod`, record the issues these fixed in `docs/issues/README.md` (the maintainer decides the wording while the repository is public); (3) further review items found by the same review are tracked outside the repository (it is public) and are the next work, each on its own branch off `dev` with a failing test first.
+
+### Earlier: 2026-10-19
 
 **Branch `claude/ui-fixes-hydration-nav` was merged into `dev` as PR #31 (merge commit `e154d40`, 2026-10-19 17:32 UTC, by the maintainer).** Check `base.ref` is `dev` before any merge; never promote to `master`/`prod` without the maintainer's approval. Not in that merge, still to come as their own PR: repairs of the two tests that fail on `dev` (see Test state), and the docs commits recorded after it.
 
