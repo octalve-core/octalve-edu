@@ -235,6 +235,74 @@ test.describe("validate()", () => {
     expect(await run(handler, request({ body: big }))).toMatchObject({ status: 413 });
   });
 
+  // A body with no declared length (a chunked upload) can only be measured by reading it, so it is read no further than the cap.
+  const CHUNK = 64 * 1024;
+  const streamedRequest = (stream: ReadableStream<Uint8Array>) =>
+    new NextRequest("http://localhost/api/x", { method: "POST", body: stream, duplex: "half" as const } as ConstructorParameters<
+      typeof NextRequest
+    >[1]);
+  /// `total` bytes in chunks of `chunk`; `state.pulled` is how many the consumer has taken. With `stall` the stream never ends after the last chunk.
+  function streamOf(total: number, chunk = CHUNK, stall = false) {
+    let sent = 0;
+    const state = { pulled: 0 };
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent >= total) {
+          if (!stall) controller.close();
+          return;
+        }
+        const n = Math.min(chunk, total - sent);
+        sent += n;
+        state.pulled = sent;
+        controller.enqueue(new Uint8Array(n).fill(0x78));
+      },
+    });
+    return { stream, state };
+  }
+  const streamBytes = (bytes: Uint8Array, chunk: number) =>
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (let at = 0; at < bytes.length; at += chunk) controller.enqueue(bytes.subarray(at, at + chunk));
+        controller.close();
+      },
+    });
+
+  test("a body streamed past the cap is refused once the cap is passed: the rest of it is never read", async () => {
+    const { stream, state } = streamOf(MAX_BODY_BYTES * 20);
+    const { handler, calls } = route();
+    const res = await run(handler, streamedRequest(stream));
+    expect(res).toMatchObject({ status: 413, json: { error: { code: "PAYLOAD_TOO_LARGE" } } });
+    expect(calls).toHaveLength(0);
+    expect(state.pulled, "bytes taken from a stream of 20 MiB").toBeLessThanOrEqual(MAX_BODY_BYTES + 8 * CHUNK);
+  });
+
+  test("a body that stalls after passing the cap is still refused: the end of it is not waited for", async () => {
+    const { stream } = streamOf(MAX_BODY_BYTES + 3 * CHUNK, CHUNK, true);
+    const { handler } = route();
+    const outcome = await Promise.race([
+      run(handler, streamedRequest(stream)),
+      new Promise<"still waiting">((resolve) => setTimeout(() => resolve("still waiting"), 5_000)),
+    ]);
+    expect(outcome).toMatchObject({ status: 413 });
+  });
+
+  test("a streamed body is read whole up to the cap: exactly the cap is accepted, one byte more is not, and characters split across chunks decode intact", async () => {
+    const echo = validate({ body: z.object({ pad: z.string() }) }, async (_r, _a: unknown, _c: unknown, input) =>
+      Response.json({ n: input.body.pad.length }),
+    );
+    const exact = Buffer.from(JSON.stringify({ pad: "x".repeat(MAX_BODY_BYTES - 10) }));
+    expect(exact.byteLength).toBe(MAX_BODY_BYTES);
+    expect((await run(echo as never, streamedRequest(streamBytes(exact, 50_000)))).json).toEqual({ n: MAX_BODY_BYTES - 10 });
+    const over = Buffer.from(JSON.stringify({ pad: "x".repeat(MAX_BODY_BYTES - 9) }));
+    expect(over.byteLength).toBe(MAX_BODY_BYTES + 1);
+    expect(await run(echo as never, streamedRequest(streamBytes(over, 50_000)))).toMatchObject({ status: 413 });
+    // two, three and four bytes per character, one byte per chunk: every character is split across chunks
+    const text = "é€😀 ok";
+    expect((await run(echo as never, streamedRequest(streamBytes(Buffer.from(JSON.stringify({ pad: text })), 1)))).json).toEqual({
+      n: text.length,
+    });
+  });
+
   test("a route with only a query schema never reads the body; one with only a body never reads the query", async () => {
     const onlyQuery = validate({ query: querySchema }, async (_r, _a: unknown, _c: unknown, input) => Response.json(input));
     expect((await run(onlyQuery as never, request({ query: "q=a" }))).json).toEqual({ query: { q: "a" } });
