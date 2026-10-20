@@ -106,6 +106,7 @@ one-off pattern sources, referenced once for a specific technique and then done:
   decisions without saying what changed and why).
 - **`prisma/schema/*.prisma`** — grows one file per domain area as phases are built (`sis.prisma`,
   `finance.prisma`, `comms.prisma`, `lms.prisma` are already named in Phase 1 onward's sketches).
+- **`docs/pages/`, `docs/components/`, `docs/functions/`** — the **code catalogs**: every tracked file under `src/` has exactly one row (pages: Route/File/Description; components and `lib/`: File/Description per folder; the API routes are catalogued inside `functions/`: Method/Route/File/Who/Description). Each folder's `index.md` says how it is laid out. A file added, renamed or deleted gets its row added, changed or removed in the same change.
 
 ## Files that are stable reference — read once, trust, don't expect them to move
 
