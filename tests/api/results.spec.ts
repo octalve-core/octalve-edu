@@ -119,6 +119,14 @@ test.beforeAll(async () => {
     },
   });
 
+  // The teacher teaches the arm the students are in: a teacher reads the report cards of the students of their own arms (ISS-0013, tests/api/report-card-access.spec.ts)
+  const teacherRecord = await db.staffRecord.create({
+    data: { tenantId: a.id, userId: regularTeacher.id, category: "TEACHING", firstName: "Tunde", lastName: "Teacher" },
+  });
+  await db.staffSubjectAssignment.create({
+    data: { tenantId: a.id, staffRecordId: teacherRecord.id, subjectId: subjectA.id, classArmId: armA.id },
+  });
+
   // Students in School A
   student1 = await db.studentRecord.create({
     data: {
