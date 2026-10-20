@@ -1,43 +1,59 @@
 import { z } from "zod";
 import { fail } from "@/lib/api/envelope";
 import { ResultStatus } from "@prisma/client";
+import { isPlausibleId } from "@/lib/academics/http";
 
 export const STAFF_READ_ROLES = ["ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF"] as const;
 export const WRITE_ROLES = ["ADMIN", "TEACHING_STAFF"] as const;
 
+/// The largest mark the column holds (`Result.score` and `maxScore` are Decimal(6,2)): a larger one is a refusal, not a database error.
+const MAX_MARK = 9999.99;
+const idField = (what: string) => z.string().min(1, `${what} is required`).refine(isPlausibleId, `Not a valid ${what.toLowerCase()}.`);
+
 export const componentScoreItemSchema = z.strictObject({
   name: z.string().min(1, "Component name is required").max(40, "Component name cannot exceed 40 characters"),
-  score: z.number().min(0, "Component score cannot be negative"),
-  maxScore: z.number().positive("Component max score must be positive"),
+  score: z.number().min(0, "Component score cannot be negative").max(MAX_MARK, `A score cannot exceed ${MAX_MARK}`),
+  maxScore: z.number().positive("Component max score must be positive").max(MAX_MARK, `A maximum cannot exceed ${MAX_MARK}`),
 });
 
 export const studentResultEntrySchema = z.strictObject({
-  studentId: z.string().min(1, "Student ID is required"),
-  score: z.number().min(0, "Score cannot be negative").optional(),
-  maxScore: z.number().positive("Max score must be positive").optional().default(100),
+  studentId: idField("Student ID"),
+  score: z.number().min(0, "Score cannot be negative").max(MAX_MARK, `A score cannot exceed ${MAX_MARK}`).optional(),
+  maxScore: z.number().positive("Max score must be positive").max(MAX_MARK, `A maximum cannot exceed ${MAX_MARK}`).optional().default(100),
   components: z.array(componentScoreItemSchema).optional(),
 });
 
 export const recordResultsSchema = z.strictObject({
-  periodId: z.string().min(1, "Academic period ID is required"),
-  subjectId: z.string().min(1, "Subject ID is required"),
-  results: z.array(studentResultEntrySchema).min(1, "Provide at least one student result"),
+  periodId: idField("Academic period ID"),
+  subjectId: idField("Subject ID"),
+  results: z
+    .array(studentResultEntrySchema)
+    .min(1, "Provide at least one student result")
+    .superRefine((entries, ctx) => {
+      const seen = new Set<string>();
+      entries.forEach((entry, index) => {
+        if (seen.has(entry.studentId)) ctx.addIssue({ code: "custom", path: [index, "studentId"], message: "This student appears twice." });
+        seen.add(entry.studentId);
+      });
+    }),
 });
 
 export type RecordResultsInput = z.infer<typeof recordResultsSchema>;
 
 export const transitionStatusSchema = z.strictObject({
-  resultIds: z.array(z.string().min(1, "Result ID is required")).min(1, "Provide at least one result ID"),
+  resultIds: z.array(idField("Result ID")).min(1, "Provide at least one result ID"),
   toStatus: z.nativeEnum(ResultStatus, { error: "Invalid result status" }),
   reason: z.string().max(500, "Reason cannot exceed 500 characters").optional().nullable(),
 });
 
 export type TransitionStatusInput = z.infer<typeof transitionStatusSchema>;
 
+const queryId = (what: string) => z.string().refine(isPlausibleId, `Not a valid ${what}.`).optional();
+
 export const resultsQuerySchema = z.object({
-  periodId: z.string().optional(),
-  subjectId: z.string().optional(),
-  classArmId: z.string().optional(),
+  periodId: queryId("period id"),
+  subjectId: queryId("subject id"),
+  classArmId: queryId("class arm id"),
   status: z.nativeEnum(ResultStatus).optional(),
 });
 
@@ -48,6 +64,7 @@ export type ResultFailure =
   | "MISSING_REASON"
   | "SCHEME_VALIDATION_FAILED"
   | "SCORE_OUT_OF_BOUNDS"
+  | "NOT_EDITABLE"
   | "FORBIDDEN_STUDENT_ACCESS"
   | "PERIOD_NOT_ACTIVE";
 
@@ -65,6 +82,8 @@ export function resultFailure(reason: ResultFailure, message?: string): Response
       return fail(message ?? "Component scores do not conform to assessment scheme.", 400, "VALIDATION");
     case "SCORE_OUT_OF_BOUNDS":
       return fail(message ?? "Score exceeds allowed maximum or is negative.", 400, "VALIDATION");
+    case "NOT_EDITABLE":
+      return fail(message ?? "That result has left DRAFT and cannot be changed here.", 409, "CONFLICT");
     case "FORBIDDEN_STUDENT_ACCESS":
       return fail(message ?? "You are not authorized to view this student's report card.", 403, "FORBIDDEN");
     case "PERIOD_NOT_ACTIVE":

@@ -1,5 +1,5 @@
 import { Decimal } from "@prisma/client/runtime/library";
-import { ResultStatus, Permission } from "@prisma/client";
+import { ResultStatus, Permission, type Prisma } from "@prisma/client";
 import type { Tx } from "@/lib/tenant/for-tenant";
 import { gradeFor } from "@/lib/academics/scoring";
 import { canTransitionResult, validateComponentScores, generateVerificationToken, calculateVerificationHash } from "./rules";
@@ -9,14 +9,26 @@ import { triggerResultsPublishedAlerts } from "@/lib/communication/event-trigger
 
 export type ServiceResult<T> = { ok: true; data: T } | { ok: false; failure: ResultFailure; message?: string };
 
+/// What a member anchored to a campus works with: that campus's students and the school-wide ones (the rule `transitionResultStatuses` has always
+/// applied). `undefined` (no restriction) for an ADMIN and for a member of no campus.
+function campusOf(role: string, campusId: string | null): Prisma.StudentRecordWhereInput | undefined {
+  return role === "ADMIN" || campusId === null ? undefined : { OR: [{ campusId: null }, { campusId }] };
+}
+
+const NOT_EDITABLE =
+  "Results that have left DRAFT cannot be changed here. Send them back to DRAFT first (an administrator unlocks a LOCKED result, with a reason).";
+
 /**
- * Records or updates score entries for students in a given subject and period.
+ * Records or updates score entries for students in a given subject and period. A result is edited only while it is DRAFT (PRD 5): once it has been
+ * submitted, a change goes back through the lifecycle, with its reason and its audit row. The whole request is accepted or none of it is.
  */
 export async function recordStudentResults(
   tx: Tx,
   tenantId: string,
   actorUserId: string,
   input: RecordResultsInput,
+  /// Who is recording: the role in this school and the campus the membership is anchored to (null = the whole school).
+  caller: { role: string; campusId: string | null },
 ): Promise<ServiceResult<{ count: number; saved: string[] }>> {
   // Validate period and subject exist
   const [period, subject] = await Promise.all([
@@ -34,7 +46,22 @@ export async function recordStudentResults(
     include: { bands: true },
   });
 
-  const savedIds: string[] = [];
+  // Every refusal is decided before the first write: `forTenant().transaction` commits when this function RETURNS and rolls back only when it THROWS,
+  // so a refusal returned after a write would keep that write (ADR 0002).
+  const studentIds = input.results.map((entry) => entry.studentId);
+  const known = await tx.studentRecord.count({ where: { tenantId, id: { in: studentIds }, ...campusOf(caller.role, caller.campusId) } });
+  if (known !== studentIds.length) {
+    return { ok: false, failure: "NOT_FOUND", message: "A student in this request was not found." };
+  }
+
+  const entries: Array<{
+    studentId: string;
+    finalScore: number;
+    maxScore: number;
+    components: (typeof input.results)[number]["components"];
+    gradeLetter: string | null;
+    gradeRemark: string | null;
+  }> = [];
 
   for (const entry of input.results) {
     let finalScore = entry.score ?? 0;
@@ -67,27 +94,32 @@ export async function recordStudentResults(
       }
     }
 
-    // Check if result already exists
-    const existing = await tx.result.findUnique({
-      where: {
-        tenantId_studentId_subjectId_periodId: {
-          tenantId,
-          studentId: entry.studentId,
-          subjectId: input.subjectId,
-          periodId: input.periodId,
-        },
-      },
-    });
+    entries.push({ studentId: entry.studentId, finalScore, maxScore, components: entry.components, gradeLetter, gradeRemark });
+  }
 
-    if (existing && existing.status === ResultStatus.LOCKED) {
-      return {
-        ok: false,
-        failure: "INVALID_TRANSITION",
-        message: "Cannot edit LOCKED results directly. An administrator must unlock them first.",
-      };
-    }
+  // The rows are locked while they are read: a request moving one of them out of DRAFT waits for this one to finish, and one that has already done so
+  // is seen here, so "still DRAFT" holds until this request commits. (In id order, so two overlapping requests cannot wait on each other.)
+  const held = await tx.$queryRaw<{ id: string; studentId: string; status: ResultStatus; score: Prisma.Decimal }[]>`
+    SELECT id, "studentId", status, score FROM "Result"
+    WHERE "tenantId" = ${tenantId} AND "subjectId" = ${input.subjectId} AND "periodId" = ${input.periodId} AND "studentId" = ANY(${studentIds}::text[])
+    ORDER BY id
+    FOR UPDATE`;
+  if (held.some((row) => row.status !== ResultStatus.DRAFT)) {
+    return { ok: false, failure: "NOT_EDITABLE", message: NOT_EDITABLE };
+  }
+  const existing = new Map(held.map((row) => [row.studentId, row]));
 
-    const verificationToken = existing?.verificationToken ?? generateVerificationToken();
+  const savedIds: string[] = [];
+
+  for (const entry of entries) {
+    const before = existing.get(entry.studentId);
+    const content = {
+      score: new Decimal(entry.finalScore),
+      maxScore: new Decimal(entry.maxScore),
+      componentScores: entry.components ? JSON.parse(JSON.stringify(entry.components)) : undefined,
+      gradeLetter: entry.gradeLetter,
+      gradeRemark: entry.gradeRemark,
+    };
 
     const upserted = await tx.result.upsert({
       where: {
@@ -98,41 +130,30 @@ export async function recordStudentResults(
           periodId: input.periodId,
         },
       },
-      update: {
-        score: new Decimal(finalScore),
-        maxScore: new Decimal(maxScore),
-        componentScores: entry.components ? JSON.parse(JSON.stringify(entry.components)) : undefined,
-        gradeLetter,
-        gradeRemark,
-        updatedAt: new Date(),
-      },
+      update: { ...content, updatedAt: new Date() },
       create: {
         tenantId,
         studentId: entry.studentId,
         subjectId: input.subjectId,
         periodId: input.periodId,
-        score: new Decimal(finalScore),
-        maxScore: new Decimal(maxScore),
+        ...content,
         status: ResultStatus.DRAFT,
-        componentScores: entry.components ? JSON.parse(JSON.stringify(entry.components)) : undefined,
-        gradeLetter,
-        gradeRemark,
         enteredByStaffId: actorUserId,
-        verificationToken,
+        verificationToken: generateVerificationToken(),
       },
     });
 
     // Record audit row if updated
-    if (existing && Number(existing.score) !== finalScore) {
+    if (before && Number(before.score) !== entry.finalScore) {
       await tx.resultAudit.create({
         data: {
           tenantId,
           resultId: upserted.id,
           actorUserId,
-          fromStatus: existing.status,
-          toStatus: existing.status,
-          fromScore: existing.score,
-          toScore: new Decimal(finalScore),
+          fromStatus: before.status,
+          toStatus: before.status,
+          fromScore: before.score,
+          toScore: new Decimal(entry.finalScore),
           reason: "Score update",
         },
       });
@@ -162,11 +183,12 @@ export async function transitionResultStatuses(
   const hasApprovePermission = permissions.includes("CAN_APPROVE_RESULTS") || isAdmin;
 
   const requested = [...new Set(input.resultIds)];
+  const visible = campusOf(actorRole, campusId);
   const results = await tx.result.findMany({
     where: {
       tenantId,
       id: { in: requested },
-      ...(isAdmin || campusId === null ? {} : { student: { OR: [{ campusId: null }, { campusId }] } }),
+      ...(visible ? { student: visible } : {}),
     },
     include: {
       student: true,
@@ -271,14 +293,20 @@ export async function queryResults(
     classArmId?: string;
     status?: ResultStatus;
   },
+  /// Who is asking: the role in this school and the campus the membership is anchored to (null = the whole school).
+  caller: { role: string; campusId: string | null },
 ) {
+  const student: Prisma.StudentRecordWhereInput = {
+    ...campusOf(caller.role, caller.campusId),
+    ...(filter.classArmId ? { enrollments: { some: { classArmId: filter.classArmId, status: "ACTIVE" } } } : {}),
+  };
   return tx.result.findMany({
     where: {
       tenantId,
       periodId: filter.periodId,
       subjectId: filter.subjectId,
       status: filter.status,
-      student: filter.classArmId ? { enrollments: { some: { classArmId: filter.classArmId, status: "ACTIVE" } } } : undefined,
+      student: Object.keys(student).length > 0 ? student : undefined,
     },
     include: {
       student: { select: { id: true, firstName: true, lastName: true, admissionNo: true } },
