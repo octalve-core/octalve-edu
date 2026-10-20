@@ -9,7 +9,8 @@ import { getAssignment, updateAssignment, archiveAssignment } from "@/lib/lms/se
 export const GET = withAuth(
   async (_req, auth: TenantAuthContext, ctx: { params: Promise<{ code: string; id: string }> }) => {
     const { id } = await ctx.params;
-    const assignment = await getAssignment(auth.tenant.tenantId, id);
+    // what the caller may see depends on their role: a draft, and the other students' submissions, are for staff (the service decides)
+    const assignment = await getAssignment(auth.tenant.tenantId, id, { userId: auth.userId, role: auth.tenant.role });
     if (!assignment) {
       return fail("Assignment not found", 404, "NOT_FOUND");
     }
