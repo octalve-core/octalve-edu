@@ -8,12 +8,16 @@ export const NAME_MAX_LENGTH = 100;
 /// in a list). Zero-width joiners are NOT refused: Persian, Arabic and Indic scripts and many emoji need them.
 const FORBIDDEN = /[\p{Cc}\u202a-\u202e\u2066-\u2069]/u;
 
+/// Characters that take no room on the screen (zero-width spaces and joiners, the word joiner, the byte-order mark, variation selectors, the soft hyphen, fillers): a name
+/// made of nothing else is blank in every list that prints it. Joiners between letters stay welcome.
+const INVISIBLE = /\p{Default_Ignorable_Code_Point}/gu;
+
 export type NameCheck = { ok: true; name: string } | { ok: false; message: string };
 
 /// Normalises (NFC, inner whitespace collapsed, trimmed) and checks. `name` in the result is what gets stored.
 export function checkName(input: string): NameCheck {
   const name = input.normalize("NFC").replace(/\s+/g, " ").trim();
-  if (!name) return { ok: false, message: "Enter your name." };
+  if (!name || !name.replace(INVISIBLE, "").trim()) return { ok: false, message: "Enter your name." };
   if ([...name].length > NAME_MAX_LENGTH) {
     return { ok: false, message: `Use at most ${NAME_MAX_LENGTH} characters.` };
   }
