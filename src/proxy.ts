@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isMalformedPath } from "@/lib/api/malformed-path";
 import { buildCsp, generateNonce } from "@/lib/security/csp";
 
 // Per-request nonce-based CSP (domain-implementation-plan.md §0.5.B). Next 16 calls this file `proxy`
@@ -10,6 +11,15 @@ import { buildCsp, generateNonce } from "@/lib/security/csp";
 // in the browser console but nothing is blocked. It is a valve for diagnosing an unforeseen violation
 // on a live deployment without an outage; the default is enforcing.
 export function proxy(request: NextRequest) {
+  // Broken percent-encoding in the path ("%ff", "%ED%A0%80") makes Next answer 500 before any route runs. It is a bad request, not a server fault.
+  if (isMalformedPath(request.nextUrl.pathname))
+    return new NextResponse("Bad request", {
+      status: 400,
+      headers: { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" },
+    });
+  // The API has its own static policy (next.config.ts); it comes through here only for the check above.
+  if (request.nextUrl.pathname.startsWith("/api/")) return NextResponse.next();
+
   const nonce = generateNonce();
   const policy = buildCsp({
     nonce,
@@ -28,8 +38,9 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Pages only. The API has its own static policy (next.config.ts); static assets need none.
-    // Prefetches are skipped, as Next's guide recommends.
+    // The API: only the malformed-path check above (its headers are static, next.config.ts).
+    { source: "/api/:path*" },
+    // Pages. Static assets need no policy. Prefetches are skipped, as Next's guide recommends.
     {
       source: "/((?!api|_next/static|_next/image|favicon.ico).*)",
       missing: [
