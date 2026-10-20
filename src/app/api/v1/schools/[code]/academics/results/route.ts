@@ -13,7 +13,7 @@ export const GET = withAuth(
         tx,
         auth.tenant.tenantId,
         { periodId: query.periodId, subjectId: query.subjectId, classArmId: query.classArmId, status: query.status },
-        { role: auth.tenant.role, campusId: auth.tenant.campusId },
+        { role: auth.tenant.role, campusId: auth.tenant.campusId, userId: auth.userId, permissions: auth.tenant.permissions ?? [] },
       ),
     );
 

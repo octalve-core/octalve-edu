@@ -2,6 +2,7 @@ import { Decimal } from "@prisma/client/runtime/library";
 import { ResultStatus, Permission, type Prisma } from "@prisma/client";
 import type { Tx } from "@/lib/tenant/for-tenant";
 import { gradeFor } from "@/lib/academics/scoring";
+import { assignedArmIds } from "@/lib/attendance/access";
 import { canTransitionResult, validateComponentScores, generateVerificationToken, calculateVerificationHash } from "./rules";
 import { calculateCompetitionRanks, evaluatePromotion } from "./ranking";
 import type { RecordResultsInput, TransitionStatusInput, ResultFailure } from "./http";
@@ -312,7 +313,9 @@ export async function transitionResultStatuses(
 }
 
 /**
- * Queries results with optional filters.
+ * Queries results with optional filters. A teacher sees the results of the students on the roll of the arms they are assigned to (the rule the student's
+ * attendance history and report card apply), except one who holds CAN_APPROVE_RESULTS: approving other teachers' results needs to see them, and that
+ * person is held to the campus rule alone.
  */
 export async function queryResults(
   tx: Tx,
@@ -323,12 +326,23 @@ export async function queryResults(
     classArmId?: string;
     status?: ResultStatus;
   },
-  /// Who is asking: the role in this school and the campus the membership is anchored to (null = the whole school).
-  caller: { role: string; campusId: string | null },
+  /// Who is asking: the role in this school, the campus the membership is anchored to (null = the whole school), who they are and what they may do here.
+  caller: { role: string; campusId: string | null; userId: string; permissions: readonly (Permission | string)[] },
 ) {
+  let enrolled: Prisma.StudentEnrollmentWhereInput | undefined = filter.classArmId
+    ? { classArmId: filter.classArmId, status: "ACTIVE" }
+    : undefined;
+  if (caller.role === "TEACHING_STAFF" && !caller.permissions.includes("CAN_APPROVE_RESULTS")) {
+    // On the roll, in the active session, of an arm they are assigned to; a teacher with no such arm (or a school with no active session) sees none.
+    const arms = await assignedArmIds(tx, tenantId, caller.userId);
+    const active = await tx.academicSession.findFirst({ where: { tenantId, status: "ACTIVE", archivedAt: null }, select: { id: true } });
+    const mine = filter.classArmId ? [...arms].filter((id) => id === filter.classArmId) : [...arms];
+    if (!active || mine.length === 0) return [];
+    enrolled = { sessionId: active.id, status: "ACTIVE", classArmId: { in: mine } };
+  }
   const student: Prisma.StudentRecordWhereInput = {
     ...campusOf(caller.role, caller.campusId),
-    ...(filter.classArmId ? { enrollments: { some: { classArmId: filter.classArmId, status: "ACTIVE" } } } : {}),
+    ...(enrolled ? { enrollments: { some: enrolled } } : {}),
   };
   return tx.result.findMany({
     where: {

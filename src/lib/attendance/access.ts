@@ -19,8 +19,8 @@ const GOVERNED = new Set(["TEACHING_STAFF", "NON_TEACHING_STAFF"]);
 const campusAllows = (own: string | null, rowCampus: string | null) => own === null || rowCampus === null || own === rowCampus;
 const notFound = () => attendanceFailure("NOT_FOUND");
 
-/// The arms this person teaches: a subject assignment or a timetable slot of their (live) staff record.
-async function assignedArmIds(tx: Tx, tenantId: string, userId: string): Promise<Set<string>> {
+/// The arms this person teaches: a subject assignment or a timetable slot of their (live) staff record. The results list uses the same definition.
+export async function assignedArmIds(tx: Tx, tenantId: string, userId: string): Promise<Set<string>> {
   const staff = await tx.staffRecord.findFirst({
     where: { tenantId, userId, archivedAt: null },
     select: { assignments: { select: { classArmId: true } }, timetableSlots: { select: { classArmId: true } } },
