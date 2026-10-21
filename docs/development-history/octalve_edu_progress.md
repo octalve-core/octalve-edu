@@ -369,7 +369,7 @@ Record: `docs/tasks/0018-teacher-assignments-for-results-and-certificate-verific
 
 ## A request that cannot be valid is a 4xx, and two tests that failed only under load (2026-10-21) - merged into `dev`, not promoted
 Record: `docs/tasks/0019-a-request-that-cannot-be-valid-is-a-4xx.md` (register row 23). Three pull requests off `dev` (`a17baa3`), merged into `dev` (#47 at 23:47 on 2026-10-20, #48 at 00:04 and #49 at 00:28 on 2026-10-21, UTC), each after its Vercel check passed: #47 `claude/fix-malformed-path-is-400`, #49 `claude/fix-nul-in-input`, #48 `claude/fix-two-load-sensitive-tests` (two commits). Each new test was run on an unfixed production build first.
-- **Broken percent-encoding:** the proxy answers 400 for a path that cannot be decoded, for pages and the API (a bare 500 before); its matcher covers `/api/:path*`.
+- **Broken percent-encoding:** the proxy answers 400 for a path that cannot be decoded, for pages and the API (a bare 500 before); its matcher covers an API path only when it has a percent sign (`/api/(.*%.*)`, task 0021), so an ordinary API request is not buffered by the proxy.
 - **NUL character:** refused before the handler: 404 for a path segment and 400 for the query string in `withAuth`, 400 for a JSON body in `validate()`; the routes that read their own body (16) are not behind the body scan and none answers 5xx for a NUL today.
 - **An id this school does not have:** four route-and-method pairs answered 500 (PATCH and DELETE of an LMS assignment, DELETE of an LMS material, the payment status for a payment the gateway does not confirm); now 404, 404 and 400 `REFUSED`, found by the extra path test of the NUL branch and fixed in it.
 - **Two tests:** the email-change timing check (lower quartile of 12 samples, 250 ms, 240 s of its own) and the account-menu e2e test (waits for the page the person ends up on).
@@ -382,7 +382,7 @@ Record: `docs/tasks/0020-results-approver-scopes.md` (register row 24) and `docs
 - **Not started:** slice 2 (settings API), slice 3 (settings screen), slice 4 (AlEemaan).
 
 ## A failing test on `dev` and the shared body reader (2026-10-21) - found, not yet fixed
-- `tests/api/body-cap-chunked.spec.ts` "a chunked body that passes the cap and then stalls still gets its 413" fails alone on `dev` since PR #47: the proxy's matcher covers `/api/:path*`, Next buffers the request body for a proxied request and waits for its END before the route runs, so a body that never ends is never answered. Planned fix: limit the API entry of the matcher to paths containing a percent sign.
+- `tests/api/body-cap-chunked.spec.ts` "a chunked body that passes the cap and then stalls still gets its 413" fails alone on `dev` since PR #47: the proxy's matcher covers `/api/:path*`, Next buffers the request body for a proxied request and waits for its END before the route runs, so a body that never ends is never answered. Fixed in task 0021, module A: the API entry of the matcher is limited to paths containing a percent sign (seen failing first on an unfixed build, then passing).
 - The shared reader `readJsonBody()` for the 16 routes that read their own body is on the pushed branch `claude/fix-own-body-reader` (one work-in-progress commit, NOT verified, no PR); see `docs/HANDOVER.md` section 6 "Start here".
 
 ## Next action
