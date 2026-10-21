@@ -1,10 +1,10 @@
 # 0021: The proxy must not make Next wait for an API request body, and one shared reader for a request body
 
 - **Period / Focus:** 2026-10-21 onward (found while verifying slice 1 of task 0020 and starting the shared body reader)
-- **Status:** In progress (module A, the proxy fix, is written and verified on branch `claude/fix-proxy-api-matcher`; the reader is a pushed work-in-progress branch, not verified)
+- **Status:** In progress (module A merged as PR #56; module B, the reader, is verified and its PR is open; module C, AlEemaan, not started)
 - **Priority:** High (a failing test on `dev`)
 - **Assignee:** Agent (Claude)
-- **Target Branch / PR:** the proxy fix: a new branch off `dev`; the reader: `claude/fix-own-body-reader` (pushed, one commit `c8466f7`, no PR)
+- **Target Branch / PR:** `dev`; module A: PR #56 (merged); module B: branch `claude/shared-body-reader`
 - **Started:** 2026-10-21 (probing); **Ended:** —
 
 > **How to tick:** change `[ ]` to `[x]`. The table shows the characters, not a clickable box.
@@ -21,24 +21,25 @@
 
 ## 3. Work Breakdown
 ### Module A: the proxy (do this first)
-- [ ] Limit the API entry of the matcher in `src/proxy.ts` to paths that can be malformed, i.e. that contain a percent sign (for example `{ source: "/api/(.*%.*)" }`); check by running that an ordinary API request no longer goes through the proxy and that a malformed one still gets its 400.
-- [ ] Re-run `tests/api/malformed-path.spec.ts`, `tests/integration/proxy.spec.ts` and `tests/api/body-cap-chunked.spec.ts`; the stall test is the failing-first evidence (it fails today on `dev`).
-- [ ] Comment in `src/proxy.ts` on why the API entry is narrow (a proxied request is buffered to its end).
+- [x] Limit the API entry of the matcher in `src/proxy.ts` to paths that can be malformed, i.e. that contain a percent sign (for example `{ source: "/api/(.*%.*)" }`); check by running that an ordinary API request no longer goes through the proxy and that a malformed one still gets its 400.
+- [x] Re-run `tests/api/malformed-path.spec.ts`, `tests/integration/proxy.spec.ts` and `tests/api/body-cap-chunked.spec.ts`; the stall test is the failing-first evidence (it fails today on `dev`).
+- [x] Comment in `src/proxy.ts` on why the API entry is narrow (a proxied request is buffered to its end).
 
-### Module B: the shared reader (`claude/fix-own-body-reader`, `c8466f7`, NOT verified)
+### Module B: the shared reader (`claude/shared-body-reader`, verified)
 - [x] Written: `readJsonBody()` in `src/lib/api/validate.ts`; the 16 routes that read their own body, the payment webhook and the student restore route use the shared reading; `tests/unit/route-body-guard.spec.ts`, `tests/api/own-body-routes.spec.ts`, +1 `setup.spec.ts`, +3 chunked stalls in `body-cap-chunked.spec.ts`, +6 unit tests, the profile test's NUL wording; catalog rows.
-- [ ] Re-create the worktree (`git worktree add ../octalve-edu-body claude/fix-own-body-reader`), `pnpm install --frozen-lockfile`, copy `.env`, `pnpm build`, run the specs named above, then the whole setup, unit, integration and api projects on your own lane; reword the commit (what, why, decisions, tests run and not run); PR into `dev`; merge after Vercel.
-- [ ] A lane-4 run of ten spec files on the branch (before the last edit of the profile test) gave 220 passed and 5 failed: the profile NUL-wording test (fixed after the run) and the four chunked stalls (they need Module A).
+- [x] Worktree re-created, `pnpm build`, the specs named above, then the whole setup, unit, integration and api projects on lane 6: 1929 passed, 0 failed; commit reworded; PR into `dev`.
+- [ ] Merge after Vercel.
+- [x] Failing first on a production build of the old routes (the new and changed specs copied onto it): 14 of 52 failed (6 `readJsonBody` unit tests and the 2 guard tests, because the reader and its guard do not exist there; the sweep and the restore route's cap; the three chunked stalls, no answer within 20 s; the setup cap), 38 passed as controls.
 
 ### Module C: AlEemaan
 - [ ] Check its proxy matcher and chunked-body tests (above); the same fix if it fails. Port the shared reader (its `req.json()` routes answer 500 for a body that is not JSON: see its `docs/HANDOVER.md`).
 
 ## 4. Unified Verification & Quality Gates
-- [ ] Failing-first for Module A: the stall test fails on `dev` today (seen alone, twice, on two builds).
-- [ ] `pnpm build`, prettier, the catalogs, the whole unit, integration and api projects.
+- [x] Failing-first for Module A: the stall test failed on `dev` (seen alone, twice, on two builds); passes with the fix.
+- [x] `pnpm build`, prettier, eslint, the catalogs, the whole setup, unit, integration and api projects (module B: 1929 passed, 0 failed). NOT run: the e2e and https projects.
 
 ## 5. Notes
 - In Octalve the 16 routes already answered 400 for a body that is not JSON (each had its own try/catch); the reader's gain is the bounded read, the NUL scan and one guard test. In AlEemaan the same routes answer 500.
 
 ## 6. Output & Deliverables
-- Not started: no PR.
+- Module A: PR #56, merged. Module B: PR open.

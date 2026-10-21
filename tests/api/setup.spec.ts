@@ -107,6 +107,17 @@ test.describe("POST /api/v1/setup — guards", () => {
     expect(res.json.error.code).toBe("INVALID_BODY");
   });
 
+  test("a body over the 1 MiB cap is a 413, and a NUL character in a field is a 400 with the one message: nothing is created either time (readJsonBody)", async () => {
+    const big = await post({ ...valid(), pad: "x".repeat(1024 * 1024 + 10) });
+    expect(big.status).toBe(413);
+    expect(big.json.error.code).toBe("PAYLOAD_TOO_LARGE");
+    const nul = await post({ ...valid(), name: `Amina${String.fromCharCode(0)}` });
+    expect(nul.status).toBe(400);
+    expect(nul.json.error.code).toBe("VALIDATION");
+    expect(nul.json.error.details).toEqual([{ path: "body", message: "A value contains a character that cannot be stored." }]);
+    expect(await db.user.count()).toBe(0);
+  });
+
   const bad: [string, Record<string, unknown>, RegExp][] = [
     ["blank school name", { schoolName: "   " }, /school name/i],
     ["blank admin name", { name: "" }, /name/i],

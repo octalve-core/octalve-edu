@@ -1,3 +1,4 @@
+import { readJsonBody } from "@/lib/api/validate";
 import { NextRequest } from "next/server";
 import crypto from "crypto";
 import { z } from "zod";
@@ -86,12 +87,9 @@ export async function POST(req: NextRequest) {
     return fail("Too many setup attempts from this IP. Please try again later.", 429, "RATE_LIMITED");
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return fail("Invalid JSON body", 400, "INVALID_BODY");
-  }
+  const read = await readJsonBody(req);
+  if (!read.ok) return read.response;
+  const body = read.json;
 
   // The kind of school is the server's decision (DEFAULT_SCHOOL_TYPE), never the browser's — a body that tries to say is refused, not ignored.
   if (typeof body === "object" && body !== null && "schoolType" in body) {

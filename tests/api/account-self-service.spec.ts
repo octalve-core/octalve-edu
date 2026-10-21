@@ -87,7 +87,7 @@ test.describe("PATCH /account/profile", () => {
       ["", /enter your name/i],
       ["   ", /enter your name/i],
       ["a".repeat(101), /at most 100/],
-      ["Amina\u0000Yusuf", /can't be used/],
+      [`Amina${String.fromCharCode(0)}Yusuf`, /not valid/], // a NUL is refused by the shared body reader (readJsonBody), before the profile rule: its words are the central ones
       ["Amina\u202eYusuf", /can't be used/],
     ];
     for (const [name, message] of cases) {

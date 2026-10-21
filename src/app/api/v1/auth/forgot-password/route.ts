@@ -1,3 +1,4 @@
+import { readJsonBody } from "@/lib/api/validate";
 import { after, type NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
@@ -33,12 +34,9 @@ async function handle(req: NextRequest) {
     return fail("Too many requests. Please try again in a few minutes.", 429, "RATE_LIMITED");
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return fail("Invalid JSON body", 400, "INVALID_BODY");
-  }
+  const read = await readJsonBody(req);
+  if (!read.ok) return read.response;
+  const body = read.json;
   const parsed = schema.safeParse(body);
   if (!parsed.success) return ok(GENERIC); // nothing to do — and nothing to learn from the answer
   const { email } = parsed.data;

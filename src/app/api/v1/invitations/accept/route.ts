@@ -1,3 +1,4 @@
+import { readJsonBody } from "@/lib/api/validate";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { fail, ok, noStore } from "@/lib/api/envelope";
@@ -38,12 +39,9 @@ async function handle(req: NextRequest) {
   const ipKey = `invite:accept:ip:${getClientIp(req)}`;
   if (!(await reserveAttempt(ipKey, IP_LIMIT))) return fail("Too many attempts. Please try again in a few minutes.", 429, "RATE_LIMITED");
 
-  let json: unknown;
-  try {
-    json = await req.json();
-  } catch {
-    return fail("Invalid JSON body", 400, "INVALID_BODY");
-  }
+  const read = await readJsonBody(req);
+  if (!read.ok) return read.response;
+  const json = read.json;
   const parsed = schema.safeParse(json);
   if (!parsed.success || !isInvitationToken(parsed.data.token)) return fail(INVALID_LINK, 400, "INVALID_TOKEN");
   const { token, name, password } = parsed.data;

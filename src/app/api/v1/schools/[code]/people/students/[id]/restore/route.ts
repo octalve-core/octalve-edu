@@ -1,4 +1,6 @@
-import { ok } from "@/lib/api/envelope";
+import { fail, ok } from "@/lib/api/envelope";
+import { readBoundedText } from "@/lib/api/read-body";
+import { MAX_BODY_BYTES } from "@/lib/api/validate";
 import { studentScope } from "@/lib/auth/campus-scope";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { CAMPUS_WRITE_ROLES, isPlausibleId, notFound, peopleFailure, peopleWriteLimited } from "@/lib/people/http";
@@ -16,7 +18,9 @@ export const POST = withAuth(
     const scoped = await studentScope(auth, id);
     if (scoped) return scoped;
     let allowDuplicate = false;
-    const text = await _req.text().catch(() => "");
+    // The body is optional ({ allowDuplicate }); an empty or non-JSON body keeps the default. It is read no further than the cap.
+    const text = await readBoundedText(_req, MAX_BODY_BYTES).catch(() => "");
+    if (text === null) return fail("That request is too large.", 413, "PAYLOAD_TOO_LARGE");
     if (text.trim()) {
       try {
         const json = JSON.parse(text);

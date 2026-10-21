@@ -1,3 +1,4 @@
+import { readJsonBody } from "@/lib/api/validate";
 import { after } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
@@ -19,12 +20,9 @@ export const PATCH = withAuth(async (req, auth) => {
     return fail("Too many changes. Please try again in a few minutes.", 429, "RATE_LIMITED");
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return fail("Invalid JSON body", 400, "INVALID_BODY");
-  }
+  const read = await readJsonBody(req);
+  if (!read.ok) return read.response;
+  const body = read.json;
   const parsed = schema.safeParse(body);
   if (!parsed.success) return fail("Enter your name.", 400, "VALIDATION");
   const checked = checkName(parsed.data.name);
