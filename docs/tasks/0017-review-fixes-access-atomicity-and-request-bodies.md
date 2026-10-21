@@ -1,7 +1,7 @@
 # 0017: Review fixes - who may read and write what, writes that are all or nothing, request bodies
 
 - **Period / Focus:** 2026-10-20 (follow-up of the code review that wrote the code catalogs: authorization and atomicity of existing routes)
-- **Status:** Completed (merged into `dev` on 2026-10-20 as PRs #36 to #43; one full-suite run on the merged `dev` is still to do, see section 4)
+- **Status:** Completed (merged into `dev` on 2026-10-20 as PRs #36 to #43; one full suite on the merged `dev` was run on 2026-10-20: 2159 passed, 23 skipped, 2 failed, the two failures repaired in task 0019, see section 4)
 - **Priority:** High
 - **Assignee:** Agent (Claude); merged at the maintainer's instruction ("merge all the PRs in order")
 - **Target Branch / PR:** `dev`; PRs #36 to #41 (the six fixes), #42 and #43 (source characters), listed in section 6
@@ -65,7 +65,7 @@ Close the review findings about existing routes that a failing test confirmed: e
 - [x] Every new test was run on an unfixed production build first and failed there as intended (results 14 of 16, attendance 6 of 8, LMS 19 of 28, timetable batch 2 of 6, body read 3 tests of which 2 are unit tests, report card 3 of 6, lesson times 1 of 3); the controls in them passed.
 - [x] One production build of the first five changes (body read, timetable batch, LMS, results, attendance): unit 385, integration 614, API 705 passed (run with `--timeout=120000`), e2e-desktop attendance, lms-a11y and academics 15.
 - [x] The report-card and lesson-time changes: a 148-test API run (145 passed; the 3 others are explained in section 5), then a 40-test re-run, all passed.
-- [ ] NOT run: the mobile e2e project, the https project, the API and integration projects on each branch alone, and one full suite on the merged `dev`. The fixes were tested in two stages (the second build also held the names check that is now #43). A full-suite attempt on a build of all eight branches ended before any test ran: Playwright timed out waiting 60 s for the web servers to start, on a machine at load average 48 (other projects were running). That is a start-up failure, not a test failure; the run is still to be repeated when the machine is quieter, and its result goes here.
+- [x] **One full suite on the merged `dev`** (PRs #36 to #44, before #45 and #46; production build, its own lane and database, all Playwright projects, 2.1 hours, on a machine busy with other work): **2159 passed, 23 skipped, 2 failed**. The two failures were not product defects: the email-change response-time check (a 40 ms tolerance inside the noise of a busy machine) and the account-menu e2e test (it waited for a page the person is sent on from); both are repaired and measured in task 0019 (PR #48). The first attempt at a full suite (a build of all eight branches) had ended before any test ran: Playwright timed out waiting 60 s for the web servers, at a load average of 48. NOT run, still: the API and integration projects on each branch alone.
 
 ---
 
