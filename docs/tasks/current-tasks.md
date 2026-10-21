@@ -35,7 +35,8 @@
 | 22 | [TASK-0018](0018-teacher-assignments-for-results-and-certificate-verification.md) | Teacher assignments for results; certificates: verification by token, numbers per school, access by role and campus | [x] Completed (merged into `dev`; the certificate migration is for the maintainer to run on the hosted database BEFORE the code is deployed there) | 2026-10-20 20:31:57 UTC | 2026-10-20 21:39:38 UTC | PRs [#45](https://github.com/octalve-core/octalve-edu/pull/45), [#46](https://github.com/octalve-core/octalve-edu/pull/46) |
 | 23 | [TASK-0019](0019-a-request-that-cannot-be-valid-is-a-4xx.md) | A request that cannot be valid is a 4xx (NUL character, broken percent-encoding) and two tests that failed only under load | [x] Completed (merged into `dev`) | 2026-10-20 23:45:54 UTC | 2026-10-21 00:28:14 UTC | PRs #47, #48 and #49 |
 | 24 | [TASK-0020](0020-results-approver-scopes.md) | Results are approved by assignment: generally, per section or per class (ADR 0018) | [ ] In progress (ADR merged as PR #51, status Proposed; slice 1 merged as PR #54; slices 2 to 4 not started; the migration `20261030090000_results_approval_scopes` is for the maintainer to run BEFORE the code is deployed) | 2026-10-21 01:12:08 UTC | — | PRs #51 (ADR), #54 (slice 1) |
-| 25 | [TASK-0021](0021-proxy-api-matcher-and-shared-body-reader.md) | The proxy must not make Next wait for an API request body; one shared reader for a request body | [ ] In progress (module A merged as PR #56; module B, the reader, is verified and its PR is open; module C, AlEemaan, not started) | 2026-10-21 UTC | — | `claude/shared-body-reader` |
+| 25 | [TASK-0021](0021-proxy-api-matcher-and-shared-body-reader.md) | The proxy must not make Next wait for an API request body; one shared reader for a request body | [ ] In progress (module A merged as PR #56; module B, the reader, merged as PR #57; module C, AlEemaan, not started) | 2026-10-21 UTC | — | `claude/shared-body-reader` |
+| 26 | [TASK-0022](0022-invoice-numbers-under-concurrency.md) | Invoice numbers are unique under concurrency (ISS-0030) | [ ] In progress (verified; PR #58 open, branch `claude/fix-invoice-numbers`) | 2026-10-21 | — | `claude/fix-invoice-numbers` |
 ---
 
 ## Detailed Milestone Checklist
@@ -297,5 +298,11 @@
 ### TASK-0021: The proxy must not make Next wait for an API request body; one shared reader for a request body
 - **Status:** [ ] In progress. [The task file](0021-proxy-api-matcher-and-shared-body-reader.md) has the cause, the plan and what is left.
 - [x] Module A, the proxy fix: merged as PR #56 (`ae724c9`, 2026-10-21 19:54 UTC)
-- [x] Module B, the shared reader: written, failing first (14 of 52 failed on the old routes), verified (whole setup, unit, integration and api projects: 1929 passed, 0 failed); PR open
+- [x] Module B, the shared reader: written, failing first (14 of 52 failed on the old routes), verified (whole setup, unit, integration and api projects: 1929 passed, 0 failed); merged as PR #57 (`cfef611`, 2026-10-21 22:14 UTC)
 - [ ] Module C, AlEemaan: its matcher is fixed in its task 0036; port the reader (its routes answer 500 for a body that is not JSON)
+
+### TASK-0022: Invoice numbers are unique under concurrency (ISS-0030)
+- **Status:** [ ] In progress: branch `claude/fix-invoice-numbers`, PR #58 open. [The task file](0022-invoice-numbers-under-concurrency.md) has the plan and what is left.
+- [x] A bill run takes the school's invoice-number lock first and takes the next free number; `tests/integration/invoice-numbers.spec.ts` (3 tests)
+- [x] Failing first on the unfixed service (3 of 3 failed); on the branch the 3 tests, the lifecycle walk and the finance API specs (38) pass; build, tsc, eslint, prettier and the catalogs clean
+- [ ] Not run: the whole setup, unit, integration and api projects; e2e and https; a full suite on the merged `dev`
