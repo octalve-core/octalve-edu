@@ -13,6 +13,7 @@ import {
   parseCursorPagination,
   parseOffsetPagination,
 } from "@/lib/api/pagination";
+import { NUL_MESSAGE } from "@/lib/api/no-nul";
 import { MAX_BODY_BYTES, validate } from "@/lib/api/validate";
 
 // Pagination and validation helpers (plan §0.5.3, A): strict on purpose — a malformed parameter is a 400 that names
@@ -195,6 +196,27 @@ test.describe("validate()", () => {
     const { handler } = route();
     const res = await run(handler, request({ body: JSON.stringify({ name: "ok" }), query: "q=toolong" }));
     expect(res.json.error.details).toEqual([{ path: "query.q", message: expect.any(String) }]);
+  });
+
+  test("a NUL character anywhere in the body (a value, a key, nested) is 400 VALIDATION before the schema is asked, and the handler never runs", async () => {
+    const { handler, calls } = route();
+    const nul = String.fromCharCode(0);
+    // each of these would pass the schema (a string of 3 characters; keys the schema does not name are stripped): only the scan refuses them
+    const refused = [{ name: `a${nul}b` }, { name: "ok", [`x${nul}`]: 1 }, { name: "ok", extra: { deep: [`${nul}`] } }];
+    for (const body of refused) {
+      const res = await run(handler, request({ body: JSON.stringify(body) }));
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      expect(res.json.error).toEqual({
+        code: "VALIDATION",
+        message: "Some of the fields are not valid.",
+        details: [{ path: "body", message: NUL_MESSAGE }],
+      });
+    }
+    expect(calls).toHaveLength(0);
+    // the six characters of an escape are text, not a NUL: they reach the schema like any other text
+    const literalEscape = ["\\", "u0000"].join("");
+    expect((await run(handler, request({ body: JSON.stringify({ name: literalEscape }) }))).status).toBe(200);
+    expect(calls).toHaveLength(1);
   });
 
   test("details are capped at 20, so a hostile payload cannot make a huge response", async () => {

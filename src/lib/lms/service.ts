@@ -159,10 +159,14 @@ export async function createAssignment(tenantId: string, userId: string, data: C
   });
 }
 
+/// `null` when this school has no such assignment (the route answers 404). Without the look-up the update itself throws "record not found" for an unknown id, which was a 500.
 export async function updateAssignment(tenantId: string, assignmentId: string, data: UpdateAssignmentInput) {
   const tId = trustedTenantId(tenantId);
 
   return forTenant(tId).transaction(async (tx) => {
+    const existing = await tx.assignment.findFirst({ where: { tenantId, id: assignmentId }, select: { id: true } });
+    if (!existing) return null;
+
     const updateData: Prisma.AssignmentUpdateInput = {};
     if (data.title !== undefined) updateData.title = data.title;
     if (data.subjectId !== undefined) updateData.subject = { connect: { tenantId_id: { tenantId, id: data.subjectId } } };
@@ -187,10 +191,13 @@ export async function updateAssignment(tenantId: string, assignmentId: string, d
   });
 }
 
+/// `null` when this school has no such assignment (the route answers 404).
 export async function archiveAssignment(tenantId: string, assignmentId: string) {
   const tId = trustedTenantId(tenantId);
 
   return forTenant(tId).transaction(async (tx) => {
+    const existing = await tx.assignment.findFirst({ where: { tenantId, id: assignmentId }, select: { id: true } });
+    if (!existing) return null;
     return tx.assignment.update({
       where: { tenantId_id: { tenantId, id: assignmentId } },
       data: { archivedAt: new Date(), status: AssignmentStatus.ARCHIVED },
@@ -365,10 +372,13 @@ export async function createLearningMaterial(tenantId: string, userId: string, d
   });
 }
 
+/// `null` when this school has no such material (the route answers 404).
 export async function archiveLearningMaterial(tenantId: string, materialId: string) {
   const tId = trustedTenantId(tenantId);
 
   return forTenant(tId).transaction(async (tx) => {
+    const existing = await tx.learningMaterial.findFirst({ where: { tenantId, id: materialId }, select: { id: true } });
+    if (!existing) return null;
     return tx.learningMaterial.update({
       where: { tenantId_id: { tenantId, id: materialId } },
       data: { archivedAt: new Date() },

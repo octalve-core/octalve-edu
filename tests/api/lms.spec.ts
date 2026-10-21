@@ -170,6 +170,24 @@ test.describe("LMS API — Assignments, Submissions & Speed Grading", () => {
 
     expect(res.status).toBe(404);
   });
+
+  test("an assignment this school does not have is a 404 for an update and for an archive, not a 500; a real one is still updated and archived", async () => {
+    const missing = `/api/v1/schools/${a.code}/lms/assignments/cabcdefghijklmnopqrstuvwx`;
+    const patch = await lmsApi(missing, { method: "PATCH", cookie: cookie.teacherA, body: { title: "Renamed" } });
+    expect(patch.status).toBe(404);
+    expect(patch.json.error.code).toBe("NOT_FOUND");
+    const del = await lmsApi(missing, { method: "DELETE", cookie: cookie.teacherA });
+    expect(del.status).toBe(404);
+    expect(del.json.error.code).toBe("NOT_FOUND");
+
+    const real = `/api/v1/schools/${a.code}/lms/assignments/${assignmentId}`;
+    const renamed = await lmsApi(real, { method: "PATCH", cookie: cookie.teacherA, body: { title: "Calculus Problem Set 1 (revised)" } });
+    expect(renamed.status).toBe(200);
+    expect(renamed.json.data.title).toBe("Calculus Problem Set 1 (revised)");
+    const archived = await lmsApi(real, { method: "DELETE", cookie: cookie.teacherA });
+    expect(archived.status).toBe(200);
+    expect(archived.json.data.status).toBe("ARCHIVED");
+  });
 });
 
 test.describe("LMS API — Course Materials & Online Quizzes", () => {
@@ -253,5 +271,19 @@ test.describe("LMS API — Course Materials & Online Quizzes", () => {
 
     expect(res.status).toBe(201);
     expect(res.json.data.score).toBeDefined();
+  });
+
+  test("a material this school does not have is a 404 for an archive, not a 500; a real one is archived and leaves the list", async () => {
+    const del = await lmsApi(`/api/v1/schools/${a.code}/lms/materials/cabcdefghijklmnopqrstuvwx`, {
+      method: "DELETE",
+      cookie: cookie.teacherA,
+    });
+    expect(del.status).toBe(404);
+    expect(del.json.error.code).toBe("NOT_FOUND");
+
+    const archived = await lmsApi(`/api/v1/schools/${a.code}/lms/materials/${materialId}`, { method: "DELETE", cookie: cookie.teacherA });
+    expect(archived.status).toBe(200);
+    const list = await lmsApi(`/api/v1/schools/${a.code}/lms/materials`, { cookie: cookie.studentA });
+    expect(list.json.data.find((m: { id: string }) => m.id === materialId)).toBeUndefined();
   });
 });
