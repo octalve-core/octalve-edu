@@ -2,10 +2,12 @@ import type { NextRequest } from "next/server";
 import { z, type ZodType } from "zod";
 import { fail, type ErrorDetail } from "@/lib/api/envelope";
 import { readBoundedText } from "@/lib/api/read-body";
+import { holdsNul, NUL_MESSAGE } from "@/lib/api/no-nul";
 
 // Input validation for route handlers (domain-implementation-plan.md §0.5.3, A). A route declares the zod schema for
 // its body and/or query string; this wrapper does the rest, the same way every time:
 //   - body that is not JSON                      → 400 INVALID_BODY
+//   - a NUL character in a key or a value of the body → 400 VALIDATION (lib/api/no-nul.ts), before the schema. (The path and the query string are checked by withAuth.)
 //   - body bigger than MAX_BODY_BYTES (declared or actual) → 413 PAYLOAD_TOO_LARGE; a body with no declared length is read
 //     no further than the cap (lib/api/read-body.ts), so the answer does not wait for the end of it
 //   - a schema failure                           → 400 VALIDATION, with `details` naming each field (max 20)
@@ -60,6 +62,12 @@ export async function parseRequest<B = undefined, Q = undefined>(
       json = JSON.parse(text);
     } catch {
       return { ok: false, response: fail("Invalid JSON body", 400, "INVALID_BODY") };
+    }
+    if (holdsNul(json)) {
+      return {
+        ok: false,
+        response: fail("Some of the fields are not valid.", 400, "VALIDATION", [{ path: "body", message: NUL_MESSAGE }]),
+      };
     }
     const result = schemas.body.safeParse(json);
     if (!result.success)

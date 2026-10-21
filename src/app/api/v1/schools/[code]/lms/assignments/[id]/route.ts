@@ -30,6 +30,7 @@ export const PATCH = withAuth(
     async (_req, auth: TenantAuthContext, ctx: { params: Promise<{ code: string; id: string }> }, { body }) => {
       const { id } = await ctx.params;
       const updated = await updateAssignment(auth.tenant.tenantId, id, body);
+      if (!updated) return fail("Assignment not found", 404, "NOT_FOUND");
       return ok(updated);
     },
   ),
@@ -44,6 +45,7 @@ export const DELETE = withAuth(
   async (_req, auth: TenantAuthContext, ctx: { params: Promise<{ code: string; id: string }> }) => {
     const { id } = await ctx.params;
     const archived = await archiveAssignment(auth.tenant.tenantId, id);
+    if (!archived) return fail("Assignment not found", 404, "NOT_FOUND");
     return ok(archived);
   },
   {
