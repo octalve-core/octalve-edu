@@ -14,11 +14,11 @@ Recorded: 2026-10-21 (drafted by an agent)
 
 - **An administrator assigns each approver one or more scopes** in the school's settings: **General** (every class of the person's campus; the whole school for a membership with no campus), **Section** (every class group in a named section of a campus) or **Class** (one class group, all its arms).
 - **The scope governs both what the approver sees and what they may do:** the results list, and approve, return, publish, revert and lock. One function answers "which arms may this person approve for", and both the list and the transitions use it, so the two cannot drift apart. A result is in scope when its student's ACTIVE enrolment in the period's session is in an arm of an in-scope class group.
-- **Out of scope is "not found"**, like every other result a caller may not see; a batch that holds one out-of-scope result moves nothing.
+- **Out of scope:** a result the approver may not act on is absent from their list, and an action on it is refused like a missing permission (the transition's usual `UNAUTHORIZED`), because the person may well see it (a teacher sees the arms they teach); a batch that holds one such result moves nothing. A result the caller cannot see at all (another campus) stays "not found", as now.
 - **A section is a small new thing:** `Section` (school, optional campus, name, sort order) and a nullable `ClassGroup.sectionId`. A class group with no section is reached only by a General or a Class scope.
 - **`CAN_APPROVE_RESULTS` stays the capability; the scope says where. No scope means no approving (fail closed).** The migration gives every current holder a General scope on their own campus, so nothing changes on the day it is deployed.
 - **Who may change it:** only an `ADMIN` (never delegable, like permissions), every change audited with before and after, and the administrator re-types their password first, as for the question-bank settings.
-- **Unchanged:** a teacher-approver sees the union of their assigned arms and their approver scope; the author of an entry cannot approve it (an `ADMIN` may); an `ADMIN` is held to no scope and a campus administrator to their campus.
+- **Unchanged:** a teacher's own submit (DRAFT to SUBMITTED) is not an approval and is not scoped by this; a teacher-approver sees the union of their assigned arms and their approver scope; the author of an entry cannot approve it (an `ADMIN` may); an `ADMIN` is held to no scope and a campus administrator to their campus.
 
 ## Proposed details (need the maintainer's yes)
 
