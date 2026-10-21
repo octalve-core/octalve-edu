@@ -30,6 +30,9 @@ async function signedInAs(page: Page, role: Role, opts: { name?: string; also?: 
   await addMembership(user.id, a.id, role, role === Role.ADMIN ? null : a.campuses[0].id);
   if (opts.also) await addMembership(user.id, b.id, opts.also, opts.also === Role.ADMIN ? null : b.campuses[0].id);
   await signInThroughUi(page, user);
+  // Wait for where the person ends up, not for `/dashboard` on the way: the front door forwards someone with ONE school into it a moment after it shows (a second client
+  // navigation, which re-mounts the shell), and a menu opened in between closes by itself.
+  await expect(page).toHaveURL(opts.also ? /\/dashboard$/ : new RegExp(`/schools/${a.code}$`));
   await waitForHydration(page); // the tests click straight away: an un-hydrated button swallows the click
   return user;
 }
