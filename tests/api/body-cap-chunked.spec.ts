@@ -30,7 +30,13 @@ test.afterAll(async () => {
 
 /// A chunked POST written straight to the socket: the first chunk starts a JSON string, then `chunks` chunks of `chunkBytes`; the body is only ended when `finish` is true.
 /// Resolves with the response's status line code, or null when none arrived within `waitMs`.
-function chunkedPost(chunkBytes: number, chunks: number, finish: boolean, waitMs: number): Promise<{ status: number | null; ms: number }> {
+function chunkedPost(
+  chunkBytes: number,
+  chunks: number,
+  finish: boolean,
+  waitMs: number,
+  target: { route: string; first: string; signedIn: boolean } = { route: path(), first: `{"title":"`, signedIn: true },
+): Promise<{ status: number | null; ms: number }> {
   return new Promise((resolve) => {
     const started = Date.now();
     const socket = net.connect(SAAS_PORT, "127.0.0.1");
@@ -52,10 +58,10 @@ function chunkedPost(chunkBytes: number, chunks: number, finish: boolean, waitMs
     socket.on("error", () => settle(/^HTTP\/1\.1 (\d{3})/.exec(received) ? Number(/^HTTP\/1\.1 (\d{3})/.exec(received)![1]) : null));
     socket.on("connect", () => {
       const headers = [
-        `POST ${path()} HTTP/1.1`,
+        `POST ${target.route} HTTP/1.1`,
         `Host: localhost:${SAAS_PORT}`,
         `Origin: ${SAAS_URL}`,
-        `Cookie: ${cookie}`,
+        ...(target.signedIn ? [`Cookie: ${cookie}`] : []),
         `x-real-ip: ${uniqueIp()}`,
         "Content-Type: application/json",
         "Transfer-Encoding: chunked",
@@ -63,7 +69,7 @@ function chunkedPost(chunkBytes: number, chunks: number, finish: boolean, waitMs
         "",
       ].join("\r\n");
       socket.write(headers);
-      const first = `{"title":"`;
+      const first = target.first;
       socket.write(`${first.length.toString(16)}\r\n${first}\r\n`);
       const piece = "x".repeat(chunkBytes);
       for (let i = 0; i < chunks; i++) socket.write(`${chunkBytes.toString(16)}\r\n${piece}\r\n`);
@@ -91,6 +97,29 @@ test("a chunked body that is finished and over the cap is a 413", async () => {
 
 test("a chunked body that passes the cap and then stalls still gets its 413, without waiting for the end of it", async () => {
   const sent = await chunkedPost(64 * 1024, 20, false, 20_000); // 1.25 MiB, never ended
+  expect(sent.status, "no answer within 20 s: the server is waiting for the end of the body").toBe(413);
+  expect(sent.ms).toBeLessThan(10_000);
+});
+
+// The routes that read their own body (readJsonBody) are bounded the same way: the sign-in route, which anybody can reach, and a route behind a session.
+test("sign-in: a chunked body that passes the cap and then stalls still gets its 413, without waiting for the end of it", async () => {
+  const sent = await chunkedPost(64 * 1024, 20, false, 20_000, { route: "/api/v1/auth/login", first: `{"email":"`, signedIn: false });
+  expect(sent.status, "no answer within 20 s: the server is waiting for the end of the body").toBe(413);
+  expect(sent.ms).toBeLessThan(10_000);
+});
+
+test("a route behind a session that reads its own body (change of password): the same", async () => {
+  const sent = await chunkedPost(64 * 1024, 20, false, 20_000, {
+    route: "/api/v1/auth/change-password",
+    first: `{"currentPassword":"`,
+    signedIn: true,
+  });
+  expect(sent.status, "no answer within 20 s: the server is waiting for the end of the body").toBe(413);
+  expect(sent.ms).toBeLessThan(10_000);
+});
+
+test("the payment webhook (raw text, its own cap of 256 KiB): a chunked body past the cap that never ends gets its 413", async () => {
+  const sent = await chunkedPost(64 * 1024, 5, false, 20_000, { route: "/api/v1/webhooks/paystack", first: `{"event":"`, signedIn: false });
   expect(sent.status, "no answer within 20 s: the server is waiting for the end of the body").toBe(413);
   expect(sent.ms).toBeLessThan(10_000);
 });
