@@ -7,6 +7,7 @@ import {
   createTenant,
   createUser,
   db,
+  grantApprovalScope,
   removeCreatedTenants,
   seedInstance,
   type TestTenant,
@@ -63,6 +64,7 @@ test.beforeAll(async () => {
   await db.tenantMembership.create({
     data: { userId: approver.id, tenantId: a.id, role: Role.TEACHING_STAFF, permissions: [Permission.CAN_APPROVE_RESULTS] },
   });
+  await grantApprovalScope(approver.id, a.id); // a general approver, as granting the permission through the API gives
   await addMembership(northTeacher.id, a.id, Role.TEACHING_STAFF, a.campuses[0].id);
   await addMembership(northClerk.id, a.id, Role.NON_TEACHING_STAFF, a.campuses[0].id);
   await addMembership(parent.id, a.id, Role.PARENT);

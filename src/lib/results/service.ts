@@ -3,6 +3,7 @@ import { ResultStatus, Permission, type Prisma } from "@prisma/client";
 import type { Tx } from "@/lib/tenant/for-tenant";
 import { gradeFor } from "@/lib/academics/scoring";
 import { assignedArmIds } from "@/lib/attendance/access";
+import { approverScope, inScopeResultIds, NO_SCOPE } from "./approver-scope";
 import { canTransitionResult, validateComponentScores, generateVerificationToken, calculateVerificationHash } from "./rules";
 import { calculateCompetitionRanks, evaluatePromotion } from "./ranking";
 import type { RecordResultsInput, TransitionStatusInput, ResultFailure } from "./http";
@@ -20,6 +21,8 @@ const NOT_EDITABLE =
   "Results that have left DRAFT cannot be changed here. Send them back to DRAFT first (an administrator unlocks a LOCKED result, with a reason).";
 
 const NOT_ASSIGNED = "You are not assigned to teach this subject to every student in this request.";
+
+const OUT_OF_SCOPE = "This result is outside the classes you approve results for.";
 
 /// The arms this person is assigned to teach `subjectId` in: a subject assignment, for exactly this subject, on their (live) staff record. A timetable
 /// slot does not count here: it says when a class meets, not who answers for its marks.
@@ -211,7 +214,7 @@ export async function transitionResultStatuses(
   campusId: string | null = null,
 ): Promise<ServiceResult<{ updatedCount: number; toStatus: ResultStatus }>> {
   const isAdmin = actorRole === "ADMIN";
-  const hasApprovePermission = permissions.includes("CAN_APPROVE_RESULTS") || isAdmin;
+  const holdsApprove = permissions.includes("CAN_APPROVE_RESULTS");
 
   const requested = [...new Set(input.resultIds)];
   const visible = campusOf(actorRole, campusId);
@@ -234,17 +237,35 @@ export async function transitionResultStatuses(
     return { ok: false, failure: "NOT_FOUND", message: "No matching results found." };
   }
 
+  // Where this person approves (ADR 0018): an approver acts only on the results their scope covers; an ADMIN is held to no scope. The scope matters only to the
+  // transitions that need approval authority, so the author's own submit (DRAFT to SUBMITTED) is not touched by it.
+  const scoped = holdsApprove && !isAdmin;
+  const covered = scoped
+    ? await inScopeResultIds(
+        tx,
+        tenantId,
+        await approverScope(tx, tenantId, actorUserId),
+        results.map((res) => ({ id: res.id, studentId: res.studentId, sessionId: res.period.sessionId })),
+      )
+    : new Set<string>();
+
   // Pre-validate transitions for all target records
   for (const res of results) {
     const check = canTransitionResult(res.status, input.toStatus, {
       isAdmin,
-      hasApprovePermission,
+      hasApprovePermission: scoped ? covered.has(res.id) : holdsApprove,
       isAuthor: res.enteredByStaffId === actorUserId,
       reason: input.reason,
     });
 
     if (!check.allowed) {
-      return { ok: false, failure: check.code, message: check.error };
+      // An approver whose scope does not reach this result is told that, not that they lack the permission they hold.
+      const outOfScope = check.code === "UNAUTHORIZED" && scoped && !covered.has(res.id);
+      return {
+        ok: false,
+        failure: check.code,
+        message: outOfScope && /requires CAN_APPROVE_RESULTS/.test(check.error) ? OUT_OF_SCOPE : check.error,
+      };
     }
   }
 
@@ -314,8 +335,8 @@ export async function transitionResultStatuses(
 
 /**
  * Queries results with optional filters. A teacher sees the results of the students on the roll of the arms they are assigned to (the rule the student's
- * attendance history and report card apply), except one who holds CAN_APPROVE_RESULTS: approving other teachers' results needs to see them, and that
- * person is held to the campus rule alone.
+ * attendance history and report card apply), plus - when they hold CAN_APPROVE_RESULTS - those of the classes their approver scope covers (ADR 0018). An approver
+ * with a GENERAL scope is held to the campus rule alone.
  */
 export async function queryResults(
   tx: Tx,
@@ -332,9 +353,15 @@ export async function queryResults(
   let enrolled: Prisma.StudentEnrollmentWhereInput | undefined = filter.classArmId
     ? { classArmId: filter.classArmId, status: "ACTIVE" }
     : undefined;
-  if (caller.role === "TEACHING_STAFF" && !caller.permissions.includes("CAN_APPROVE_RESULTS")) {
-    // On the roll, in the active session, of an arm they are assigned to; a teacher with no such arm (or a school with no active session) sees none.
-    const arms = await assignedArmIds(tx, tenantId, caller.userId);
+  // A teacher works with the arms they are assigned to, plus - when they hold CAN_APPROVE_RESULTS - the arms of their approver scope (ADR 0018); a GENERAL approver
+  // is held to the campus rule alone.
+  const scope =
+    caller.role === "TEACHING_STAFF" && caller.permissions.includes("CAN_APPROVE_RESULTS")
+      ? await approverScope(tx, tenantId, caller.userId)
+      : NO_SCOPE;
+  if (caller.role === "TEACHING_STAFF" && !scope.general) {
+    // On the roll, in the active session, of such an arm; a teacher with none (or a school with no active session) sees none.
+    const arms = new Set([...(await assignedArmIds(tx, tenantId, caller.userId)), ...scope.armIds]);
     const active = await tx.academicSession.findFirst({ where: { tenantId, status: "ACTIVE", archivedAt: null }, select: { id: true } });
     const mine = filter.classArmId ? [...arms].filter((id) => id === filter.classArmId) : [...arms];
     if (!active || mine.length === 0) return [];

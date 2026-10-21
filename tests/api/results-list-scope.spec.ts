@@ -7,6 +7,7 @@ import {
   createTenant,
   createUser,
   db,
+  grantApprovalScope,
   removeCreatedTenants,
   seedInstance,
   type TestTenant,
@@ -17,8 +18,9 @@ import { api, cookieHeader, loginAs } from "../support/http";
 
 // Listing results (GET /academics/results) as a teacher: the results of the students on the roll (ACTIVE, in the active session) of the arms the teacher is
 // assigned to, for every subject, and no others. The arms are those the student's attendance history and report card use (a subject assignment or a
-// timetable slot of the teacher's live staff record). A teacher who holds CAN_APPROVE_RESULTS is not narrowed, because approving other teachers' results
-// needs to see them; non-teaching staff and administrators are held to the campus rule alone, as before.
+// timetable slot of the teacher's live staff record). A teacher who holds CAN_APPROVE_RESULTS with a GENERAL approver scope is not narrowed, because approving other
+// teachers' results needs to see them (a narrower scope is tests/api/results-approver-scope.spec.ts); non-teaching staff and administrators are held to the campus
+// rule alone, as before.
 
 const SAAS = { baseUrl: SAAS_URL };
 
@@ -76,6 +78,7 @@ test.beforeAll(async () => {
   await db.tenantMembership.create({
     data: { userId: approver.id, tenantId: a.id, role: Role.TEACHING_STAFF, permissions: [Permission.CAN_APPROVE_RESULTS] },
   });
+  await grantApprovalScope(approver.id, a.id); // a general approver, as granting the permission through the API gives
   await addMembership(clerk.id, a.id, Role.NON_TEACHING_STAFF);
   await addMembership(admin.id, a.id, Role.ADMIN);
   await addMembership(lateTeacher.id, closed.id, Role.TEACHING_STAFF);

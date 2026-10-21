@@ -1362,8 +1362,10 @@ test.describe("catalog guard", () => {
       "QuizQuestion",
       "ReceiptCounter",
       "Result",
+      "ResultApprovalScope",
       "ResultAudit",
       "SchoolSettings",
+      "Section",
       "SettingsChangeAudit",
       "StaffRecord",
       "StaffSubjectAssignment",
@@ -1415,5 +1417,71 @@ test.describe("catalog guard", () => {
     } finally {
       await db.$executeRawUnsafe(`DROP TABLE "ZzPrivilegeProbe"`);
     }
+  });
+});
+
+test.describe("approval scopes and sections (ADR 0018)", () => {
+  const ids: Record<"a" | "b", { section: string; scope: string }> = { a: { section: "", scope: "" }, b: { section: "", scope: "" } };
+
+  test.beforeAll(async () => {
+    for (const [key, t, user] of [
+      ["a", a, userA],
+      ["b", b, userBoth],
+    ] as const) {
+      const section = await db.section.create({ data: { tenantId: t.id, name: `Junior ${key}` } });
+      const scope = await db.resultApprovalScope.create({ data: { tenantId: t.id, userId: user.id, kind: "GENERAL" } });
+      ids[key] = { section: section.id, scope: scope.id };
+    }
+  });
+
+  test("no context = no rows; a tenant reads ITS sections and scopes and never another's", async () => {
+    for (const table of ["Section", "ResultApprovalScope"]) {
+      expect(await prisma.$queryRawUnsafe(`SELECT 1 FROM "${table}"`), table).toEqual([]);
+      const rows = await asTenant<{ tenantId: string }[]>(a, (tx) => tx.$queryRawUnsafe(`SELECT "tenantId" FROM "${table}"`));
+      expect(rows.length, table).toBeGreaterThan(0);
+      expect(
+        rows.every((r) => r.tenantId === a.id),
+        table,
+      ).toBe(true);
+    }
+    expect(await asTenant(a, (tx) => tx.section.findUnique({ where: { id: ids.b.section } }))).toBeNull();
+    expect(await asTenant(a, (tx) => tx.resultApprovalScope.findUnique({ where: { id: ids.b.scope } }))).toBeNull();
+  });
+
+  test("WITH CHECK: A's context cannot create a section or a scope for B, nor move its own section to B", async () => {
+    await expect(asTenant(a, (tx) => tx.section.createMany({ data: [{ tenantId: b.id, name: "Smuggled" }] }))).rejects.toThrow(violation);
+    await expect(
+      asTenant(a, (tx) => tx.resultApprovalScope.createMany({ data: [{ tenantId: b.id, userId: userBoth.id, kind: "GENERAL" }] })),
+    ).rejects.toThrow(violation);
+    await expect(asTenant(a, (tx) => tx.section.updateMany({ where: { id: ids.a.section }, data: { tenantId: b.id } }))).rejects.toThrow(
+      violation,
+    );
+  });
+
+  test("a section can be renamed and archived by its school but never deleted; another school's cannot be touched", async () => {
+    const renamed = await asTenant<{ count: number }>(a, (tx) =>
+      tx.section.updateMany({ where: { id: ids.a.section }, data: { name: "Junior A (renamed)" } }),
+    );
+    expect(renamed.count).toBe(1);
+    const foreign = await asTenant<{ count: number }>(a, (tx) =>
+      tx.section.updateMany({ where: { id: ids.b.section }, data: { name: "taken" } }),
+    );
+    expect(foreign.count).toBe(0);
+    const deleted = await asTenant<{ count: number }>(a, (tx) => tx.section.deleteMany({ where: { id: ids.a.section } }));
+    expect(deleted.count).toBe(0);
+    expect(await db.section.count({ where: { id: { in: [ids.a.section, ids.b.section] } } })).toBe(2);
+    expect((await db.section.findUniqueOrThrow({ where: { id: ids.b.section } })).name).toBe("Junior b");
+  });
+
+  test("a scope is added and removed, never edited; another school's cannot be removed", async () => {
+    const edited = await asTenant<{ count: number }>(a, (tx) =>
+      tx.resultApprovalScope.updateMany({ where: { id: ids.a.scope }, data: { createdById: userA.id } }),
+    );
+    expect(edited.count).toBe(0);
+    const foreign = await asTenant<{ count: number }>(a, (tx) => tx.resultApprovalScope.deleteMany({ where: { id: ids.b.scope } }));
+    expect(foreign.count).toBe(0);
+    expect(await db.resultApprovalScope.count({ where: { id: ids.b.scope } })).toBe(1);
+    const own = await asTenant<{ count: number }>(a, (tx) => tx.resultApprovalScope.deleteMany({ where: { id: ids.a.scope } }));
+    expect(own.count).toBe(1);
   });
 });
