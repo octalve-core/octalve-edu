@@ -13,6 +13,7 @@ import {
   parseCursorPagination,
   parseOffsetPagination,
 } from "@/lib/api/pagination";
+import { fail } from "@/lib/api/envelope";
 import { NUL_MESSAGE } from "@/lib/api/no-nul";
 import { MAX_BODY_BYTES, readJsonBody, validate } from "@/lib/api/validate";
 
@@ -336,6 +337,14 @@ test.describe("validate()", () => {
 });
 
 // The reader of a route that reads its own body (sign-in, passwords, invitations, ...): what validate() does with a body, without a schema.
+test.describe("fail() and the connection", () => {
+  test("a 413 closes the connection after it (the rest of the body may still be on its way); no other status does", () => {
+    expect(fail("Too big.", 413, "PAYLOAD_TOO_LARGE").headers.get("connection")).toBe("close");
+    for (const status of [400, 401, 403, 404, 409, 422, 429, 500])
+      expect(fail("No.", status).headers.get("connection"), String(status)).toBeNull();
+  });
+});
+
 test.describe("readJsonBody()", () => {
   const NULCHAR = String.fromCharCode(0);
   const refusal = async (read: Awaited<ReturnType<typeof readJsonBody>>) => {
