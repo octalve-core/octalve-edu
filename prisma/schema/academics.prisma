@@ -88,12 +88,15 @@ model ClassGroup {
   name       String
   /// The progression order promotion will use (1.4). Not unique: two groups may share a rung (parallel streams).
   sortOrder  Int       @default(0)
+  /// The section (Primary, JSS, SSS) this class belongs to, if any (ADR 0018). A class with no section is reached only by a General or a Class approval scope.
+  sectionId  String?
   archivedAt DateTime?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @default(now()) @updatedAt
 
   tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   campus        Campus?            @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  section       Section?           @relation(fields: [tenantId, sectionId], references: [tenantId, id], onDelete: NoAction)
   arms              ClassArm[]
   offerings         SubjectOffering[]
   schemes           AssessmentScheme[]
@@ -101,6 +104,29 @@ model ClassGroup {
   assignments       Assignment[]
   learningMaterials LearningMaterial[]
   quizzes           Quiz[]
+  approvalScopes    ResultApprovalScope[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId])
+  @@index([tenantId, sectionId])
+}
+
+/// A named group of class groups ("Primary", "JSS", "SSS") of one campus, used to say where a person approves results (ADR 0018). campusId null = a section of
+/// a school that has no campuses. Archived, never deleted: class groups and approval scopes point at it. Live names are unique per campus (the migration).
+model Section {
+  id         String    @id @default(cuid())
+  tenantId   String
+  campusId   String?
+  name       String
+  sortOrder  Int       @default(0)
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
+
+  tenant         Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus         Campus?               @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  classGroups    ClassGroup[]
+  approvalScopes ResultApprovalScope[]
 
   @@unique([tenantId, id])
   @@index([tenantId])

@@ -7,6 +7,7 @@ import {
   createTenant,
   createUser,
   db,
+  grantApprovalScope,
   removeCreatedTenants,
   seedInstance,
   type TestTenant,
@@ -66,6 +67,7 @@ test.beforeAll(async () => {
       permissions: [Permission.CAN_APPROVE_RESULTS],
     },
   });
+  await grantApprovalScope(approverTeacher.id, a.id); // a general approver, as granting the permission through the API gives
   // Regular teacher without extra permissions
   await addMembership(regularTeacher.id, a.id, Role.TEACHING_STAFF);
   await addMembership(parent.id, a.id, Role.PARENT);
