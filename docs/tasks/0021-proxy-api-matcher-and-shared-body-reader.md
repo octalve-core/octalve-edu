@@ -1,7 +1,7 @@
 # 0021: The proxy must not make Next wait for an API request body, and one shared reader for a request body
 
 - **Period / Focus:** 2026-10-21 onward (found while verifying slice 1 of task 0020 and starting the shared body reader)
-- **Status:** Pending (nothing of the proxy fix is written; the reader is a pushed work-in-progress branch, not verified)
+- **Status:** In progress (module A, the proxy fix, is written and verified on branch `claude/fix-proxy-api-matcher`; the reader is a pushed work-in-progress branch, not verified)
 - **Priority:** High (a failing test on `dev`)
 - **Assignee:** Agent (Claude)
 - **Target Branch / PR:** the proxy fix: a new branch off `dev`; the reader: `claude/fix-own-body-reader` (pushed, one commit `c8466f7`, no PR)

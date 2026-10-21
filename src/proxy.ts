@@ -38,8 +38,10 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // The API: only the malformed-path check above (its headers are static, next.config.ts).
-    { source: "/api/:path*" },
+    // The API: only a path with a percent sign can be badly encoded, so only those come through here, for the check above (its headers are static, next.config.ts).
+    // Every other API request must NOT: a request that goes through the proxy is buffered by Next until its body ENDS before the route runs, so a body that never ends
+    // would never be answered and the routes' own size cap would never get its say (task 0021).
+    { source: "/api/(.*%.*)" },
     // Pages. Static assets need no policy. Prefetches are skipped, as Next's guide recommends.
     {
       source: "/((?!api|_next/static|_next/image|favicon.ico).*)",
