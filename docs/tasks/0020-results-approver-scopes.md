@@ -1,10 +1,10 @@
 # 0020: Results are approved by assignment: generally, per section or per class (ADR 0018)
 
 - **Period / Focus:** 2026-10-21 onward (the maintainer's decision on how approvers are assigned, answering the open question of task 0018)
-- **Status:** In Progress (the ADR is merged as PR #51 with the status Proposed; slice 1 is built and being verified on a local branch; slices 2 to 4 are not started)
+- **Status:** In Progress (the ADR is merged as PR #51 with the status Proposed; slice 1 is merged as PR #54; slices 2 to 4 are not started)
 - **Priority:** High
 - **Assignee:** Agent (Claude); the maintainer accepts the ADR and runs the migration on the hosted database
-- **Target Branch / PR:** `dev`; PR #51 (the ADR, merged); slice 1 `claude/results-approver-scope-rules` (no PR yet)
+- **Target Branch / PR:** `dev`; PR #51 (the ADR, merged); slice 1 PR #54 (`claude/results-approver-scope-rules`)
 - **Started:** 2026-10-21 01:12:08 UTC (the first commit of the ADR)
 - **Ended:** —
 - **Duration:** — (the ADR took 3 min 23 s from its first commit to its merge)
@@ -33,7 +33,7 @@ Approving results is assigned by scope instead of being one on/off permission: a
 - [x] ADR 0018 written and merged with the status Proposed (two commits; the second corrected two things found while reading `transitionResultStatuses`: an action on an out-of-scope result is refused like a missing permission, not "not found", and a teacher's own submit is not an approval and is not scoped). Merge commit `b6729c8`, 2026-10-21 01:15:31 UTC.
 - [ ] The maintainer's yes (or changes) on the three proposed details, then the ADR is accepted by a person.
 
-### Module B: Slice 1, the model and the rules (`claude/results-approver-scope-rules`, a local branch in `../octalve-edu-approvers`)
+### Module B: Slice 1, the model and the rules (`claude/results-approver-scope-rules`, PR #54, merged)
 - [x] Schema: `Section`, `ClassGroup.sectionId`, `ResultApprovalScope` (kind `GENERAL` | `SECTION` | `CLASS`).
 - [x] Migration `20261030090000_results_approval_scopes`: the tables, a check that a section's name is 1 to 80 characters, one live section name per campus (case-insensitive), a check that a scope's kind and target agree, a unique index on a person's scope rows, a BACKFILL that gives every membership that holds `CAN_APPROVE_RESULTS` a `GENERAL` scope (before row-level security is enabled), and the policies (`Section`: read, insert, update; `ResultApprovalScope`: read, insert, delete).
 - [x] `src/lib/results/approver-scope.ts`: `approverScope` and `inScopeResultIds`, the one place that answers "which results may this person approve".
@@ -43,9 +43,11 @@ Approving results is assigned by scope instead of being one on/off permission: a
 - [x] Tests: `tests/api/results-approver-scope.spec.ts` (new), `tests/integration/rls.spec.ts` (two tables, their policies), `tests/support/db.ts` (`grantApprovalScope`) used by the three results specs that make an approver, `tests/integration/members.spec.ts` (the new audit row).
 - [x] Catalog rows (`docs/functions/school-app.md`) in the same commit.
 - [x] `pnpm build` clean (type-checks source and tests), prettier clean; a targeted run on lane 3 of 11 spec files: 192 passed, 2 failed (both mistakes in the tests, repaired).
-- [ ] The whole `setup` + `unit` + `integration` + `api` run on the branch's build (started on lane 3; result to be recorded here).
-- [ ] A failing-first run: the new tables mean most of the new spec cannot run on an unfixed build; run what can (the list and transition behaviour for an approver with no scope) and say in the PR what could not.
-- [ ] Reword the work-in-progress commit with the full message (what, why, decisions, tests run and not run, the migration's run order), push, open the PR into `dev`, wait for Vercel, merge with `guarded-merge.sh`.
+- [x] The whole `setup` + `unit` + `integration` + `api` run on the branch's build (lane 3): 1832 passed, 3 failed of 1835; the two `mfa.spec.ts` failures pass alone, the third is `body-cap-chunked.spec.ts` "a chunked body that passes the cap and then stalls", a failure on `dev` since PR #47 (the proxy matcher makes Next wait for the end of an API request body), not this change.
+- [x] Failing-first by MUTATION (the spec needs the new tables, so it cannot run on an unfixed build): with `approverScope()` made to answer "general" for everybody, 12 of the 21 new tests fail ("Expected 403, Received 200", lists too wide) and 9 controls pass.
+- [x] The migration rehearsed over seeded data (five memberships in two schools: exactly the three holders of `CAN_APPROVE_RESULTS` got a GENERAL scope).
+- [x] Commit message reworded in full, pushed, PR #54 opened into `dev`, Vercel SUCCESS, merged with `guarded-merge.sh`: merge commit `4dd25a1`, 2026-10-21 08:12 UTC.
+- [ ] The maintainer runs `20261030090000_results_approval_scopes` on the hosted database before the results code is deployed there.
 
 ### Module C: Slice 2, the settings API
 - [ ] Sections: create, rename, archive and place class groups in a section; approver scopes: assign and remove. `ADMIN` only (never delegable, like permissions), every change audited with before and after, the administrator re-types their password first (as for the question-bank settings). Route-area and role guards, API tests, catalog rows.
@@ -64,8 +66,8 @@ Approving results is assigned by scope instead of being one on/off permission: a
 ## 4. Unified Verification & Quality Gates
 - [x] `pnpm build` (type-checks source and tests) and prettier clean on slice 1.
 - [x] Targeted run on lane 3 (production build, 11 spec files: the new spec, `rls`, the three results specs, the two members specs, `permissions`, `phase-1-lifecycle-walk`, the route-area guard, `source-hygiene`): 192 passed, 2 failed. The two: the members spec expected the audit rows of a change that now also writes a scope row (updated), and one test of the new spec saw a staff record that an earlier test had left behind (a `beforeEach` now removes it).
-- [ ] The two repaired tests re-run, then the whole unit, integration and api projects.
-- [ ] Failing-first (see Module B).
+- [x] The two repaired tests re-run, then the whole unit, integration and api projects (Module B).
+- [x] Failing-first by mutation (Module B).
 - [ ] NOT run so far: the e2e projects and the https project (no page changed in slice 1).
 
 ---
@@ -79,6 +81,6 @@ Approving results is assigned by scope instead of being one on/off permission: a
 - **Open questions for the maintainer:** the three proposed details (section 2); whether an approver may also approve results of a class that has no section (today: only through a General or a Class scope).
 
 ## 6. Output & Deliverables
-- **PRs:** #51 (the ADR; merged `b6729c8`, 2026-10-21 01:15:31 UTC). Slice 1: none yet.
+- **PRs:** #51 (the ADR; merged `b6729c8`, 2026-10-21 01:15:31 UTC); #54 (slice 1; merged `4dd25a1`, 2026-10-21 08:12 UTC).
 - **Migration (the maintainer's to run, once slice 1 is merged):** `20261030090000_results_approval_scopes`.
 - **Docs:** `docs/adr/0018-...md`, this file, `docs/functions/school-app.md`.
