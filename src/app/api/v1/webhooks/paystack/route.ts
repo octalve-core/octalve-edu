@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { processPaystackWebhook } from "@/lib/finance/service";
 import { resolvePaystackMode } from "@/lib/finance/paystack";
 import { readBoundedText } from "@/lib/api/read-body";
+import { CLOSE_AFTER_RESPONSE } from "@/lib/api/envelope";
 
 // POST /api/v1/webhooks/paystack
 // Public webhook endpoint for Paystack payment notifications (plan "Fix design - Phase 1 review findings", F2-F3).
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
   // The raw text, because the signature is over the exact bytes; read no further than the cap (a body with no declared length is not buffered whole).
   const rawBody = await readBoundedText(req, MAX_BODY_BYTES);
   if (rawBody === null) {
-    return NextResponse.json({ received: false, error: "Payload too large." }, { status: 413 });
+    return NextResponse.json({ received: false, error: "Payload too large." }, { status: 413, headers: CLOSE_AFTER_RESPONSE });
   }
 
   try {

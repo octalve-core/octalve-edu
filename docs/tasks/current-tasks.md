@@ -299,6 +299,7 @@
 - **Status:** [ ] In progress. [The task file](0021-proxy-api-matcher-and-shared-body-reader.md) has the cause, the plan and what is left.
 - [x] Module A, the proxy fix: merged as PR #56 (`ae724c9`, 2026-10-21 19:54 UTC)
 - [x] Module B, the shared reader: written, failing first (14 of 52 failed on the old routes), verified (whole setup, unit, integration and api projects: 1929 passed, 0 failed); merged as PR #57 (`cfef611`, 2026-10-21 22:14 UTC)
+- [x] Follow-up: every 413 closes the connection after it (`Connection: close`); the reset of the next request on a reused connection (found in AlEemaan) cannot happen; failing first on a build without it (both new tests failed), 140 specs pass; PR open
 - [ ] Module C, AlEemaan: its matcher is fixed in its task 0036; port the reader (its routes answer 500 for a body that is not JSON)
 
 ### TASK-0022: Invoice numbers are unique under concurrency (ISS-0030)

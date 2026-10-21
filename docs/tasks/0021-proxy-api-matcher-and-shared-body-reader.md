@@ -41,5 +41,7 @@
 ## 5. Notes
 - In Octalve the 16 routes already answered 400 for a body that is not JSON (each had its own try/catch); the reader's gain is the bounded read, the NUL scan and one guard test. In AlEemaan the same routes answer 500.
 
+- **Follow-up (branch `claude/fix-413-closes-connection`):** once the proxy no longer buffers API bodies, a request body over the cap is refused while the client may still be sending. AlEemaan's whole-suite run showed the effect: the request after such a refusal could be reset on a reused connection (a probe reproduced it in 6 of 9 runs; none of 25 with the fix). Every 413 now carries `Connection: close`, so the server finishes the response and closes the connection and the client does not reuse it. Octalve's own suite did not hit it; the same two new tests (the header; eight rounds of an oversize body followed by an ordinary request) failed on a build without the fix and pass with it.
+
 ## 6. Output & Deliverables
 - Module A: PR #56, merged. Module B: PR open.

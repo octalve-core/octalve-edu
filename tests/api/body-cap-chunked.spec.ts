@@ -124,6 +124,46 @@ test("the payment webhook (raw text, its own cap of 256 KiB): a chunked body pas
   expect(sent.ms).toBeLessThan(10_000);
 });
 
+const oversize = (bytes: number) => JSON.stringify({ title: "x".repeat(bytes) });
+
+/// The same kind of body as a chunked upload with no length (a streamed request body), through the client every test here uses.
+const streamedOversize = (bytes: number) =>
+  fetch(`${SAAS_URL}${path()}`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: SAAS_URL, "x-real-ip": uniqueIp(), cookie },
+    body: new ReadableStream({
+      start(controller) {
+        const chunk = new TextEncoder().encode("x".repeat(64 * 1024));
+        controller.enqueue(new TextEncoder().encode('{"title":"'));
+        for (let sent = 0; sent < bytes; sent += chunk.length) controller.enqueue(chunk);
+        controller.enqueue(new TextEncoder().encode('"}'));
+        controller.close();
+      },
+    }),
+    // @ts-expect-error `duplex` is required by Node for a streamed request body and is not in the DOM typings
+    duplex: "half",
+  });
+
+test("a refusal for size closes the connection, so the client cannot reuse one that is about to be torn down", async () => {
+  const declared = await api(path(), { method: "POST", baseUrl: SAAS_URL, cookie, rawBody: oversize(3 * MIB) });
+  expect(declared.status).toBe(413);
+  expect(declared.headers.get("connection"), "a body refused unread").toBe("close");
+  const streamed = await streamedOversize(2 * MIB);
+  expect(streamed.status).toBe(413);
+  expect(streamed.headers.get("connection"), "a chunked body refused at the cap").toBe("close");
+});
+
+test("the request after a refused oversize body is answered, never reset (repeated: it is a timing fault, not a constant one)", async () => {
+  for (let round = 1; round <= 8; round++) {
+    const declared = await api(path(), { method: "POST", baseUrl: SAAS_URL, cookie, rawBody: oversize(3 * MIB) });
+    expect(declared.status, `round ${round}: declared`).toBe(413);
+    const streamed = await streamedOversize(2 * MIB);
+    expect(streamed.status, `round ${round}: chunked`).toBe(413);
+    const next = await api(path(), { method: "POST", baseUrl: SAAS_URL, cookie, body: { title: "" } });
+    expect(next.status, `round ${round}: the request after the refusals`).toBe(400);
+  }
+});
+
 test("the server is still answering afterwards", async () => {
   const res = await api(path(), { method: "POST", baseUrl: SAAS_URL, cookie, body: { title: "" } });
   expect(res.status).toBe(400);
