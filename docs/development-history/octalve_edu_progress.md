@@ -375,8 +375,16 @@ Record: `docs/tasks/0019-a-request-that-cannot-be-valid-is-a-4xx.md` (register r
 - **Two tests:** the email-change timing check (lower quartile of 12 samples, 250 ms, 240 s of its own) and the account-menu e2e test (waits for the page the person ends up on).
 - **Verification:** see the task file. NOT run: the e2e and https projects on the NUL and proxy branches, a full suite with all three merged.
 
+## Results are approved by assignment: generally, per section or per class (2026-10-21) - ADR merged as PR #51 (Proposed), slice 1 on a local branch
+Record: `docs/tasks/0020-results-approver-scopes.md` (register row 24) and `docs/adr/0018-results-are-approved-by-assignment-generally-per-section-or-per-class.md`. The maintainer decided on 2026-10-21 that approvers are assigned General (their whole campus), per section (primary, JSS, SSS) or per class (JSS 2 ...) in the school's settings, and see and act on only what is assigned; Octalve first, AlEemaan after. PR #51 (merged 2026-10-21 01:15:31 UTC) holds the ADR with the status Proposed; three details wait for the maintainer's yes.
+- **Slice 1 (local branch `claude/results-approver-scope-rules`, not pushed):** `Section` and `ResultApprovalScope` tables with row-level security, a nullable `ClassGroup.sectionId`, migration `20261030090000_results_approval_scopes` (it backfills a General scope for every membership that holds `CAN_APPROVE_RESULTS`), `src/lib/results/approver-scope.ts` (`approverScope`, `inScopeResultIds`), the results transitions and list follow the scope (an out-of-scope result is refused as `UNAUTHORIZED` with its own wording; the author's own submit is not scoped; an `ADMIN` is held to no scope), and granting `CAN_APPROVE_RESULTS` gives a General scope.
+- **Verification so far:** build clean; a targeted run on lane 3 of 11 spec files: 192 passed, 2 failed (the audit-row list of a members test that had to expect the new row, and a staff record one test left for the next; both repaired). The whole unit, integration and api run is in progress; a failing-first run is limited by the new tables.
+- **Not started:** slice 2 (settings API), slice 3 (settings screen), slice 4 (AlEemaan).
+
 ## Next action
-1. Run one full suite on `dev` with #45 to #49 merged when the machine is quiet (the last one, 2159 passed, 23 skipped, 2 failed, predates #45 and #46; its two failures are repaired in task 0019).
-2. The maintainer runs the certificate migration on the hosted database before the certificate code is deployed there, and answers whether a teacher who approves results should keep the campus-ruled list (section 6.1 of `docs/HANDOVER.md`).
-3. After the promotion to `prod`: record the issues these fixed (tasks 0017 and 0018) in `docs/issues/README.md` (the maintainer decides the wording while the repository is public).
-4. Then the open items listed in `docs/HANDOVER.md` section 6 (the question-bank parity design comes first, as the maintainer decided on 2026-10-19).
+1. Finish slice 1 of task 0020 (whole-project run, reword the commit, push, PR, merge); the maintainer then runs `20261030090000_results_approval_scopes` on the hosted database BEFORE the code is deployed there, and answers the three proposed details of ADR 0018.
+2. Slices 2 to 4 of task 0020 (settings API, settings screen, AlEemaan).
+3. One shared way to read a body for the 16 routes that read their own (bounded read, NUL scan, a 400 for a body that is not valid JSON); one full run of every Playwright project on the current `dev` (the last one, 2159 passed, 23 skipped, 2 failed, predates #45 to #51).
+4. The maintainer runs `20261029090000_certificate_verification_token` on the hosted database before the certificate code is deployed there.
+5. The review items tracked outside the repository (it is public), each on its own branch off `dev` with a failing test first; then screens for certificates and results entry, the question-bank parity design, the `/video-guide` pages, a responsiveness audit; Task 0033 (walkthrough video and PDF) runs LAST.
+6. Read `docs/HANDOVER.md` section 6 "Start here" and section 7 (how to work here) before anything else.
