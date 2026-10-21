@@ -1,3 +1,4 @@
+import { readJsonBody } from "@/lib/api/validate";
 import { after, type NextRequest, type NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
@@ -44,13 +45,12 @@ async function handleMfaLogin(req: NextRequest): Promise<NextResponse> {
   const ipKey = `mfa:ip:${getClientIp(req)}`;
   if (!(await reserveAttempt(ipKey, MFA_IP_LIMIT))) return fail(RATE_LIMITED_MESSAGE, 429, "RATE_LIMITED");
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    await refundAttempt(ipKey);
-    return fail("Invalid JSON body", 400, "INVALID_BODY");
+  const read = await readJsonBody(req);
+  if (!read.ok) {
+    await refundAttempt(ipKey); // a refused request is not a guess
+    return read.response;
   }
+  const body = read.json;
   const parsed = schema.safeParse(body);
   const factor = parsed.success ? parseSecondFactor(parsed.data) : null;
   if (!parsed.success || !factor) {

@@ -1,4 +1,4 @@
-import type { NextRequest } from "next/server";
+import type { NextRequest, NextResponse } from "next/server";
 import { z, type ZodType } from "zod";
 import { fail, type ErrorDetail } from "@/lib/api/envelope";
 import { readBoundedText } from "@/lib/api/read-body";
@@ -17,6 +17,31 @@ import { holdsNul, NUL_MESSAGE } from "@/lib/api/no-nul";
 
 export const MAX_BODY_BYTES = 1024 * 1024; // 1 MiB — the default; the student import alone asks for more (below)
 const MAX_DETAILS = 20;
+
+/// The JSON body of a request, for a route that reads its own instead of declaring a schema (sign-in, passwords, two-step verification, invitations, setup, profile):
+/// read no further than `cap`, parsed, and refused the way validate() refuses - 413 PAYLOAD_TOO_LARGE, 400 INVALID_BODY (empty or not JSON), 400 VALIDATION for a NUL
+/// character in a key or a value. The route then checks the shape itself. This is the ONE place a body is read and parsed: parseRequest() below calls it too, and
+/// `tests/unit/route-body-guard.spec.ts` fails on a route that reads its request body any other way.
+export async function readJsonBody(
+  req: Request,
+  cap: number = MAX_BODY_BYTES,
+): Promise<{ ok: true; json: unknown } | { ok: false; response: NextResponse }> {
+  const text = await readBoundedText(req, cap);
+  if (text === null) return { ok: false, response: fail("That request is too large.", 413, "PAYLOAD_TOO_LARGE") };
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return { ok: false, response: fail("Invalid JSON body", 400, "INVALID_BODY") };
+  }
+  if (holdsNul(json)) {
+    return {
+      ok: false,
+      response: fail("Some of the fields are not valid.", 400, "VALIDATION", [{ path: "body", message: NUL_MESSAGE }]),
+    };
+  }
+  return { ok: true, json };
+}
 
 /// `maxBodyBytes` raises the cap for ONE route that has a stated reason (a CSV file of up to 1 MiB grows when it is JSON-escaped: every line break is two characters).
 /// Never lowered below the default, and never global.
@@ -54,22 +79,9 @@ export async function parseRequest<B = undefined, Q = undefined>(
 
   let body = undefined as B;
   if (schemas.body) {
-    const cap = Math.max(MAX_BODY_BYTES, schemas.maxBodyBytes ?? 0);
-    const text = await readBoundedText(req, cap);
-    if (text === null) return { ok: false, response: fail("That request is too large.", 413, "PAYLOAD_TOO_LARGE") };
-    let json: unknown;
-    try {
-      json = JSON.parse(text);
-    } catch {
-      return { ok: false, response: fail("Invalid JSON body", 400, "INVALID_BODY") };
-    }
-    if (holdsNul(json)) {
-      return {
-        ok: false,
-        response: fail("Some of the fields are not valid.", 400, "VALIDATION", [{ path: "body", message: NUL_MESSAGE }]),
-      };
-    }
-    const result = schemas.body.safeParse(json);
+    const read = await readJsonBody(req, Math.max(MAX_BODY_BYTES, schemas.maxBodyBytes ?? 0));
+    if (!read.ok) return read;
+    const result = schemas.body.safeParse(read.json);
     if (!result.success)
       return { ok: false, response: fail("Some of the fields are not valid.", 400, "VALIDATION", issuesOf(result.error, "body")) };
     body = result.data;

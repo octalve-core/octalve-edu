@@ -14,7 +14,7 @@ import {
   parseOffsetPagination,
 } from "@/lib/api/pagination";
 import { NUL_MESSAGE } from "@/lib/api/no-nul";
-import { MAX_BODY_BYTES, validate } from "@/lib/api/validate";
+import { MAX_BODY_BYTES, readJsonBody, validate } from "@/lib/api/validate";
 
 // Pagination and validation helpers (plan §0.5.3, A): strict on purpose — a malformed parameter is a 400 that names
 // the field, never silently clamped or "first value wins".
@@ -332,5 +332,79 @@ test.describe("validate()", () => {
     expect((await run(onlyBody as never, request({ body: JSON.stringify({ name: "n" }), query: "q=whatever&evil=1" }))).json).toEqual({
       body: { name: "n" },
     });
+  });
+});
+
+// The reader of a route that reads its own body (sign-in, passwords, invitations, ...): what validate() does with a body, without a schema.
+test.describe("readJsonBody()", () => {
+  const NULCHAR = String.fromCharCode(0);
+  const refusal = async (read: Awaited<ReturnType<typeof readJsonBody>>) => {
+    expect(read.ok).toBe(false);
+    if (read.ok) throw new Error("unreachable");
+    return { status: read.response.status, json: await read.response.json() };
+  };
+
+  test("a JSON body is returned parsed, whatever its shape (the route checks the shape)", async () => {
+    for (const value of [{ a: 1 }, [1, 2], "text", 7, true, null]) {
+      expect(await readJsonBody(request({ body: JSON.stringify(value) }))).toEqual({ ok: true, json: value });
+    }
+  });
+
+  test("a body that is not JSON, and an empty one, are 400 INVALID_BODY, the same answer validate() gives", async () => {
+    for (const body of ["{nope", "", "undefined", "<xml/>"]) {
+      expect(await refusal(await readJsonBody(request({ body })))).toEqual({
+        status: 400,
+        json: { data: null, meta: {}, error: { code: "INVALID_BODY", message: "Invalid JSON body" } },
+      });
+    }
+  });
+
+  test("a NUL character in a value, in a key or deep inside is 400 VALIDATION with the one message; its six-character escape is text and passes", async () => {
+    for (const value of [{ a: `x${NULCHAR}` }, { [`k${NULCHAR}`]: 1 }, { a: [{ b: { c: [`${NULCHAR}`] } }] }, `${NULCHAR}`]) {
+      expect(await refusal(await readJsonBody(request({ body: JSON.stringify(value) })))).toMatchObject({
+        status: 400,
+        json: { error: { code: "VALIDATION", details: [{ path: "body", message: NUL_MESSAGE }] } },
+      });
+    }
+    const literalEscape = ["\\", "u0000"].join("");
+    expect(await readJsonBody(request({ body: JSON.stringify({ a: literalEscape }) }))).toEqual({ ok: true, json: { a: literalEscape } });
+  });
+
+  test("a body past the cap is 413 PAYLOAD_TOO_LARGE, by its declared length and by its actual length; a streamed one is not read past the cap", async () => {
+    const big = JSON.stringify({ pad: "x".repeat(MAX_BODY_BYTES) });
+    expect(await refusal(await readJsonBody(request({ body: big })))).toMatchObject({
+      status: 413,
+      json: { error: { code: "PAYLOAD_TOO_LARGE" } },
+    });
+    const chunk = 64 * 1024;
+    let pulled = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += chunk;
+        controller.enqueue(new Uint8Array(chunk).fill(0x78));
+      },
+    });
+    const streamed = new NextRequest("http://localhost/api/x", {
+      method: "POST",
+      body: stream,
+      duplex: "half" as const,
+    } as ConstructorParameters<typeof NextRequest>[1]);
+    expect(await refusal(await readJsonBody(streamed))).toMatchObject({ status: 413 });
+    expect(pulled, "bytes taken from a stream that never ends").toBeLessThanOrEqual(MAX_BODY_BYTES + 8 * chunk);
+  });
+
+  test("a smaller cap can be asked for; it is the caller's, not a global", async () => {
+    const body = JSON.stringify({ pad: "x".repeat(100) });
+    expect(await readJsonBody(request({ body }), 50)).toMatchObject({ ok: false });
+    expect(await readJsonBody(request({ body }), 1000)).toMatchObject({ ok: true });
+  });
+
+  test("a body a million levels deep cannot overflow the stack: it is a 4xx or a value, never a thrown error", async () => {
+    const depth = 1_000_000;
+    const nested = "[".repeat(depth) + "]".repeat(depth);
+    const outcome = await readJsonBody(request({ body: nested }), nested.length + 1).catch(
+      (error: unknown) => `threw: ${String(error).slice(0, 60)}`,
+    );
+    expect(typeof outcome).toBe("object"); // either parsed (then holdsNul walked it iteratively) or refused as INVALID_BODY by JSON.parse; never a thrown RangeError
   });
 });

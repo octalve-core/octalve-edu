@@ -35,7 +35,7 @@
 | 22 | [TASK-0018](0018-teacher-assignments-for-results-and-certificate-verification.md) | Teacher assignments for results; certificates: verification by token, numbers per school, access by role and campus | [x] Completed (merged into `dev`; the certificate migration is for the maintainer to run on the hosted database BEFORE the code is deployed there) | 2026-10-20 20:31:57 UTC | 2026-10-20 21:39:38 UTC | PRs [#45](https://github.com/octalve-core/octalve-edu/pull/45), [#46](https://github.com/octalve-core/octalve-edu/pull/46) |
 | 23 | [TASK-0019](0019-a-request-that-cannot-be-valid-is-a-4xx.md) | A request that cannot be valid is a 4xx (NUL character, broken percent-encoding) and two tests that failed only under load | [x] Completed (merged into `dev`) | 2026-10-20 23:45:54 UTC | 2026-10-21 00:28:14 UTC | PRs #47, #48 and #49 |
 | 24 | [TASK-0020](0020-results-approver-scopes.md) | Results are approved by assignment: generally, per section or per class (ADR 0018) | [ ] In progress (ADR merged as PR #51, status Proposed; slice 1 merged as PR #54; slices 2 to 4 not started; the migration `20261030090000_results_approval_scopes` is for the maintainer to run BEFORE the code is deployed) | 2026-10-21 01:12:08 UTC | — | PRs #51 (ADR), #54 (slice 1) |
-| 25 | [TASK-0021](0021-proxy-api-matcher-and-shared-body-reader.md) | The proxy must not make Next wait for an API request body; one shared reader for a request body | [ ] Pending (a failing test on `dev` since PR #47; the reader is a pushed unverified branch `claude/fix-own-body-reader`) | 2026-10-21 UTC | — | — |
+| 25 | [TASK-0021](0021-proxy-api-matcher-and-shared-body-reader.md) | The proxy must not make Next wait for an API request body; one shared reader for a request body | [ ] In progress (module A merged as PR #56; module B, the reader, is verified and its PR is open; module C, AlEemaan, not started) | 2026-10-21 UTC | — | `claude/shared-body-reader` |
 ---
 
 ## Detailed Milestone Checklist
@@ -295,7 +295,7 @@
 - [ ] The maintainer: yes or changes on the three proposed details; accept the ADR; run the migration on the hosted database before the code is deployed there
 
 ### TASK-0021: The proxy must not make Next wait for an API request body; one shared reader for a request body
-- **Status:** [ ] Pending. [The task file](0021-proxy-api-matcher-and-shared-body-reader.md) has the cause, the plan and what is left. AlEemaan has the same matcher entry (not verified there).
-- [ ] The proxy fix (the stall test in `tests/api/body-cap-chunked.spec.ts` fails on `dev` today)
-- [ ] The shared reader branch: verify, reword, PR, merge
-- [ ] AlEemaan: check the matcher and port the reader
+- **Status:** [ ] In progress. [The task file](0021-proxy-api-matcher-and-shared-body-reader.md) has the cause, the plan and what is left.
+- [x] Module A, the proxy fix: merged as PR #56 (`ae724c9`, 2026-10-21 19:54 UTC)
+- [x] Module B, the shared reader: written, failing first (14 of 52 failed on the old routes), verified (whole setup, unit, integration and api projects: 1929 passed, 0 failed); PR open
+- [ ] Module C, AlEemaan: its matcher is fixed in its task 0036; port the reader (its routes answer 500 for a body that is not JSON)
