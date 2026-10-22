@@ -279,6 +279,9 @@ transaction), CSRF hardening (`Sec-Fetch-Site`; `X-Forwarded-Host` no longer tru
 fail-open **breached-password check** (k-anonymity). 896 tests pass; 44 injected bugs all caught (three survived first and drove stronger tests).
 The plan's gate — the negative tests **as `app_user`** — is met by the RLS work above.
 
+## Who may confirm which payment reference (2026-10-22) - written on `claude/fix-payment-status-access`, PR pending
+Record: `docs/tasks/0023-payment-status-who-may-confirm.md` (register row ISS-0029). The payment status route let any member of a school confirm any reference of the school and answered with the payment's and invoice's ids, and answered a reference of another school differently from an unknown one. A payment is now as visible as its invoice (`invoiceVisibility`); unknown, another school's and not theirs are the one refusal, and the gateway is not asked for them. Failing first on a build of `dev`; `tests/api/payment-status.spec.ts` (4 tests).
+
 ## Next action
 
 **Phases 0.5.1 → 0.5.F are merged to `master`** (the stacked PRs #1–#5 were merged into their stack bases rather than `master`,

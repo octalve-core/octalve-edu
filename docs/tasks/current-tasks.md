@@ -37,6 +37,7 @@
 | 24 | [TASK-0020](0020-results-approver-scopes.md) | Results are approved by assignment: generally, per section or per class (ADR 0018) | [ ] In progress (ADR merged as PR #51, status Proposed; slice 1 merged as PR #54; slices 2 to 4 not started; the migration `20261030090000_results_approval_scopes` is for the maintainer to run BEFORE the code is deployed) | 2026-10-21 01:12:08 UTC | — | PRs #51 (ADR), #54 (slice 1) |
 | 25 | [TASK-0021](0021-proxy-api-matcher-and-shared-body-reader.md) | The proxy must not make Next wait for an API request body; one shared reader for a request body | [ ] In progress (module A merged as PR #56; module B, the reader, merged as PR #57; module C, AlEemaan, not started) | 2026-10-21 UTC | — | `claude/shared-body-reader` |
 | 26 | [TASK-0022](0022-invoice-numbers-under-concurrency.md) | Invoice numbers are unique under concurrency (ISS-0030) | [ ] In progress (verified; PR #58 open, branch `claude/fix-invoice-numbers`) | 2026-10-21 | — | `claude/fix-invoice-numbers` |
+| 27 | [TASK-0023](0023-payment-status-who-may-confirm.md) | Who may confirm which payment reference (ISS-0029) | [ ] In progress (written; verification running; branch `claude/fix-payment-status-access`) | 2026-10-22 | — | `claude/fix-payment-status-access` |
 ---
 
 ## Detailed Milestone Checklist
@@ -307,3 +308,10 @@
 - [x] A bill run takes the school's invoice-number lock first and takes the next free number; `tests/integration/invoice-numbers.spec.ts` (3 tests)
 - [x] Failing first on the unfixed service (3 of 3 failed); on the branch the 3 tests, the lifecycle walk and the finance API specs (38) pass; build, tsc, eslint, prettier and the catalogs clean
 - [ ] Not run: the whole setup, unit, integration and api projects; e2e and https; a full suite on the merged `dev`
+
+### TASK-0023: Who may confirm which payment reference (ISS-0029)
+- **Status:** [ ] In progress: branch `claude/fix-payment-status-access`. [The task file](0023-payment-status-who-may-confirm.md) has the plan and what is left.
+- [x] `confirmPaymentForRequester`: only a member who may see the payment's invoice can confirm it; unknown, another school's and not theirs are the one refusal; the gateway is not asked for them; the route uses it
+- [x] Failing first on a build of `dev` (the foreign-member test and the other-school test failed; the own-guardian and pending controls passed)
+- [ ] Verification on the branch, then PR and merge
+

@@ -568,10 +568,34 @@ export class FulfilmentRefusal extends Error {
   }
 }
 
+/// What the payment status route calls: the state of payment `reference` for a member who may see its invoice (finance staff all of the school's, a pupil or a guardian
+/// their own; `invoiceVisibility`). A reference that is unknown, belongs to another school, or to an invoice this member may not see is the one refusal of an unconfirmed
+/// payment, and the gateway is not asked. A payment already fulfilled is reported without asking the gateway again.
+export async function confirmPaymentForRequester(tenantId: VerifiedTenantId, reference: string, requester: RequesterContext) {
+  const payment = await forTenant(tenantId).transaction((tx) =>
+    tx.payment.findFirst({
+      where: { tenantId, provider: PaymentProvider.PAYSTACK, providerRef: reference, invoice: { AND: [invoiceVisibility(requester)] } },
+      select: { id: true, invoiceId: true, status: true },
+    }),
+  );
+  if (!payment) throw new FulfilmentRefusal(`Payment with reference "${reference}" not found for this member`);
+  if (payment.status === PaymentStatus.SUCCESS)
+    return { success: true, alreadyFulfilled: true, paymentId: payment.id, invoiceId: payment.invoiceId };
+  return fulfillPayment(reference, { tenantIdOverride: tenantId });
+}
+
 export async function fulfillPayment(
   reference: string,
   options?: { expectedAmountKobo?: number; tenantIdOverride?: string },
 ): Promise<{ success: boolean; alreadyFulfilled: boolean; paymentId: string; invoiceId: string }> {
+  // With a school given, the payment must be one of ITS own before the gateway is asked (a reference of another school, or none, costs no gateway call).
+  if (options?.tenantIdOverride) {
+    const schoolId = trustedTenantId(options.tenantIdOverride);
+    const mine = await forTenant(schoolId).transaction((tx) =>
+      tx.payment.count({ where: { tenantId: schoolId, provider: PaymentProvider.PAYSTACK, providerRef: reference } }),
+    );
+    if (mine === 0) throw new FulfilmentRefusal(`Payment with reference "${reference}" not found`);
+  }
   const gateway = getPaystackClient();
   const verified = await gateway.verifyTransaction(reference);
 
