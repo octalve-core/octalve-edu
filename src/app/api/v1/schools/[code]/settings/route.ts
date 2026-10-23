@@ -4,6 +4,7 @@ import { validate } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { updateSettingsSchema } from "@/lib/school-settings/http";
 import { getSchoolSettingsDetail, mutateSchoolSettings, verifyStepUpProof } from "@/lib/school-settings/service";
+import { stepUpFailure } from "@/lib/school-settings/step-up";
 
 // GET /api/v1/schools/[code]/settings
 export const GET = withAuth(
@@ -24,22 +25,7 @@ export const PATCH = withAuth(
   validate({ body: updateSettingsSchema }, async (_req, auth: TenantAuthContext, _ctx: unknown, { body }) => {
     // 1. Verify step-up re-authentication proof (PRD §14, plan §1.3)
     const stepUp = await verifyStepUpProof(auth.userId, body.stepUp);
-    if (!stepUp.ok) {
-      if (stepUp.reason === "RATE_LIMITED") {
-        return fail("Too many verification attempts. Please wait a few minutes.", 429, "RATE_LIMITED");
-      }
-      if (stepUp.reason === "MFA_NOT_ENROLLED") {
-        return fail("MFA is not enrolled for this account; please provide password re-authentication.", 400, "MFA_NOT_ENROLLED");
-      }
-      if (stepUp.reason === "WRONG_PASSWORD") {
-        return fail("Incorrect password entered for step-up verification.", 403, "WRONG_PASSWORD", [
-          { path: "body.stepUp.value", message: "Incorrect password" },
-        ]);
-      }
-      return fail("Invalid two-factor authentication code entered.", 403, "INVALID_MFA_CODE", [
-        { path: "body.stepUp.value", message: "Invalid or expired code" },
-      ]);
-    }
+    if (!stepUp.ok) return stepUpFailure(stepUp);
 
     // 2. Apply settings changes atomically with immutable audit logging
     try {
