@@ -50,6 +50,7 @@ Approving results is assigned by scope instead of being one on/off permission: a
 - [ ] The maintainer runs `20261030090000_results_approval_scopes` on the hosted database before the results code is deployed there.
 
 ### Module C: Slice 2, the settings API
+- [ ] The school setting `unsectionedClassApproval` (`GENERAL_OR_CLASS_ONLY` default, or `ANY_SECTION_APPROVER`; the maintainer's decision of 2026-10-23, see the ADR's amendment): a column on `SchoolSettings` with its own migration, read by `approverScope`, changed through the settings API by an `ADMIN` with the fresh re-authentication and written to `SettingsChangeAudit`; tests of both values against each kind of scope, a class group of another campus and the unchanged default.
 - [ ] Sections: create, rename, archive and place class groups in a section; approver scopes: assign and remove. `ADMIN` only (never delegable, like permissions), every change audited with before and after, the administrator re-types their password first (as for the question-bank settings). Route-area and role guards, API tests, catalog rows.
 
 ### Module D: Slice 3, the settings screen
@@ -78,7 +79,7 @@ Approving results is assigned by scope instead of being one on/off permission: a
 - **The default that keeps today's behaviour:** every current holder of `CAN_APPROVE_RESULTS` becomes `GENERAL` in the migration, and every later grant does too until an administrator narrows it, so nothing changes on the day the migration is run.
 - **Fail closed:** a person who holds the permission and has no scope row approves nothing and sees nothing beyond their assigned arms.
 - **A dependency on the order of deployment:** the code names the new tables, so the migration is run on the hosted database BEFORE the code is deployed there (the older code ignores the new tables, so the other order is the one that breaks).
-- **Open questions for the maintainer:** the three details are answered (yes, 2026-10-23); still open: whether an approver may also approve results of a class that has no section (today: only through a General or a Class scope).
+- **Open questions for the maintainer:** none open. The three details are answered (yes, 2026-10-23) and so is whether an approver may approve a class group with no section: it is a school setting (`unsectionedClassApproval`, ADR amendment of 2026-10-23).
 
 ## 6. Output & Deliverables
 - **PRs:** #51 (the ADR; merged `b6729c8`, 2026-10-21 01:15:31 UTC); #54 (slice 1; merged `4dd25a1`, 2026-10-21 08:12 UTC).
