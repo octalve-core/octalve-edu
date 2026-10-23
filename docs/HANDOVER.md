@@ -124,7 +124,7 @@ A detailed technical blueprint is documented in:
 
 ### 6.0 ADR 0018 and task 0020: results are approved by assignment (generally, per section or per class): ADR merged as PR #51, slice 1 merged as PR #54
 
-**Where it is:** [`docs/adr/0018-results-are-approved-by-assignment-generally-per-section-or-per-class.md`](adr/0018-results-are-approved-by-assignment-generally-per-section-or-per-class.md) is on `dev` (PR #51, merge commit `b6729c8`, 2026-10-21 01:15 UTC) with the status **Proposed**. Task: [`docs/tasks/0020-results-approver-scopes.md`](tasks/0020-results-approver-scopes.md) (register row 24). Slice 1 is merged (PR #54, `4dd25a1`).
+**Where it is:** [`docs/adr/0018-results-are-approved-by-assignment-generally-per-section-or-per-class.md`](adr/0018-results-are-approved-by-assignment-generally-per-section-or-per-class.md) is on `dev` (PR #51, merge commit `b6729c8`, 2026-10-21 01:15 UTC) with the status **Accepted** (the maintainer confirmed the three details, "yes to all three", on 2026-10-23). Task: [`docs/tasks/0020-results-approver-scopes.md`](tasks/0020-results-approver-scopes.md) (register row 24). Slice 1 is merged (PR #54, `4dd25a1`).
 
 **The maintainer's decision (2026-10-21, their words):** staff can be assigned to approve results "generally or per section (JSS, SSS, primary) or per class (JSS 2, JSS 3 and so on) but based on superadmin settings: so they see what is assigned to them; General Approvers see their whole campus's results". They also said to do Octalve first and AlEemaan after, with the same design.
 

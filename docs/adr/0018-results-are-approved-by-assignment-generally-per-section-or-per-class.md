@@ -1,8 +1,8 @@
 # 0018 — Results are approved by assignment: generally, per section or per class
 
-Status: Proposed
-Decided by: the maintainer for the shape (general, per section, per class, set by the administrator; an approver sees and acts on what is assigned, a general approver on the whole campus) · Date: 2026-10-21. The details under "Proposed details" are an agent's defaults and wait for the maintainer's yes.
-Recorded: 2026-10-21 (drafted by an agent)
+Status: Accepted
+Decided by: the maintainer for the shape (general, per section, per class, set by the administrator; an approver sees and acts on what is assigned, a general approver on the whole campus) · Date: 2026-10-21. The three details under "Details" were drafted by an agent as defaults and confirmed by the maintainer ("yes to all three") on 2026-10-23.
+Recorded: 2026-10-21 (drafted by an agent); accepted 2026-10-23 on the maintainer's word
 
 ## Context
 
@@ -20,7 +20,7 @@ Recorded: 2026-10-21 (drafted by an agent)
 - **Who may change it:** only an `ADMIN` (never delegable, like permissions), every change audited with before and after, and the administrator re-types their password first, as for the question-bank settings.
 - **Unchanged:** a teacher's own submit (DRAFT to SUBMITTED) is not an approval and is not scoped by this; a teacher-approver sees the union of their assigned arms and their approver scope; the author of an entry cannot approve it (an `ADMIN` may); an `ADMIN` is held to no scope and a campus administrator to their campus.
 
-## Proposed details (need the maintainer's yes)
+## Details (drafted by an agent; confirmed by the maintainer on 2026-10-23: yes to all three)
 
 1. A section belongs to one campus (or to the school when the school has no campuses), and a class group is in at most one section.
 2. "Per class" means the class group (JSS 2 with all its arms), not a single arm.

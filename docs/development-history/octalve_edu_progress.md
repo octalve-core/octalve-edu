@@ -393,7 +393,7 @@ Record: `docs/tasks/0020-results-approver-scopes.md` (register row 24) and `docs
 Record: `docs/tasks/0022-invoice-numbers-under-concurrency.md` (register row ISS-0030). `generateInvoicesForPeriod` took each number from a count of the school's invoices, so two bill runs at the same moment took the same number and one failed on the unique index. It now takes a per-school advisory lock first (one bill run per school at a time; a second run for the same term finds the first one's invoices) and takes the next free number, passing over one already used. The format and the existing numbers do not change; no migration. `tests/integration/invoice-numbers.spec.ts` (3 tests). Verification: see the PR.
 
 ## Next action
-1. Merge the reader branch; the maintainer runs `20261030090000_results_approval_scopes` on the hosted database BEFORE the results code is deployed there, and answers the three proposed details of ADR 0018.
+1. Merge the reader branch; the maintainer runs `20261030090000_results_approval_scopes` on the hosted database BEFORE the results code is deployed there (the three details of ADR 0018 were confirmed on 2026-10-23: the ADR is Accepted).
 2. Slices 2 to 4 of task 0020 (settings API, settings screen, AlEemaan).
 3. One shared way to read a body for the 16 routes that read their own (bounded read, NUL scan, a 400 for a body that is not valid JSON); one full run of every Playwright project on the current `dev` (the last one, 2159 passed, 23 skipped, 2 failed, predates #45 to #51).
 4. The maintainer runs `20261029090000_certificate_verification_token` on the hosted database before the certificate code is deployed there.
