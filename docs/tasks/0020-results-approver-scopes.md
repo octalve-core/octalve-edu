@@ -1,7 +1,7 @@
 # 0020: Results are approved by assignment: generally, per section or per class (ADR 0018)
 
 - **Period / Focus:** 2026-10-21 onward (the maintainer's decision on how approvers are assigned, answering the open question of task 0018)
-- **Status:** In Progress (the ADR is merged as PR #51 with the status Proposed; slice 1 is merged as PR #54; slices 2 to 4 are not started)
+- **Status:** In Progress (the ADR is merged as PR #51 and accepted by the maintainer on 2026-10-23; slice 1 is merged as PR #54; slices 2 to 4 are not started)
 - **Priority:** High
 - **Assignee:** Agent (Claude); the maintainer accepts the ADR and runs the migration on the hosted database
 - **Target Branch / PR:** `dev`; PR #51 (the ADR, merged); slice 1 PR #54 (`claude/results-approver-scope-rules`)
@@ -19,11 +19,11 @@ Approving results is assigned by scope instead of being one on/off permission: a
 
 ## 2. Context & Related Docs
 
-- [ADR 0018](../adr/0018-results-are-approved-by-assignment-generally-per-section-or-per-class.md) (Proposed): the decision, the proposed details that wait for the maintainer's yes, the alternatives and what enforces it.
+- [ADR 0018](../adr/0018-results-are-approved-by-assignment-generally-per-section-or-per-class.md) (Accepted): the decision, the three details the maintainer confirmed on 2026-10-23, the alternatives and what enforces it.
 - The maintainer's words (2026-10-21): "we can assign staff for result approval generally or per section ( jss, sss, primary ) or per class (jss2 jss3 etc ) but based on superadmin settings: so they see what is assigned to them; General Approvers see their whole campus's results". And, asked whether to apply it to Octalve as well: yes, Octalve first and AlEemaan after.
 - Task 0018 (teacher assignments for results): a teacher who holds `CAN_APPROVE_RESULTS` kept the campus-wide results list as an interim exception that the maintainer was not asked about; this task replaces it.
 - `src/lib/results/rules.ts` (`canTransitionResult`), `src/lib/results/service.ts` (`transitionResultStatuses`, `queryResults`), `src/lib/attendance/access.ts` (`assignedArmIds`), `src/lib/members/service.ts` (`changeMember`), `prisma/schema/tenancy.prisma`, `academics.prisma`, `results.prisma`.
-- Three details are the agent's proposed defaults and wait for the maintainer's yes (the build follows them): a section belongs to one campus and a class group is in at most one section; "per class" means the class group (all its arms); only the school `ADMIN` assigns scopes.
+- Three details were the agent's proposed defaults and the maintainer confirmed all three on 2026-10-23 ("yes to all three"; the build follows them): a section belongs to one campus and a class group is in at most one section; "per class" means the class group (all its arms); only the school `ADMIN` assigns scopes.
 
 ---
 
@@ -31,7 +31,7 @@ Approving results is assigned by scope instead of being one on/off permission: a
 
 ### Module A: The decision (`claude/results-approver-scopes`, PR #51)
 - [x] ADR 0018 written and merged with the status Proposed (two commits; the second corrected two things found while reading `transitionResultStatuses`: an action on an out-of-scope result is refused like a missing permission, not "not found", and a teacher's own submit is not an approval and is not scoped). Merge commit `b6729c8`, 2026-10-21 01:15:31 UTC.
-- [ ] The maintainer's yes (or changes) on the three proposed details, then the ADR is accepted by a person.
+- [x] The maintainer's yes on the three details (2026-10-23): the ADR is Accepted.
 
 ### Module B: Slice 1, the model and the rules (`claude/results-approver-scope-rules`, PR #54, merged)
 - [x] Schema: `Section`, `ClassGroup.sectionId`, `ResultApprovalScope` (kind `GENERAL` | `SECTION` | `CLASS`).
@@ -78,7 +78,7 @@ Approving results is assigned by scope instead of being one on/off permission: a
 - **The default that keeps today's behaviour:** every current holder of `CAN_APPROVE_RESULTS` becomes `GENERAL` in the migration, and every later grant does too until an administrator narrows it, so nothing changes on the day the migration is run.
 - **Fail closed:** a person who holds the permission and has no scope row approves nothing and sees nothing beyond their assigned arms.
 - **A dependency on the order of deployment:** the code names the new tables, so the migration is run on the hosted database BEFORE the code is deployed there (the older code ignores the new tables, so the other order is the one that breaks).
-- **Open questions for the maintainer:** the three proposed details (section 2); whether an approver may also approve results of a class that has no section (today: only through a General or a Class scope).
+- **Open questions for the maintainer:** the three details are answered (yes, 2026-10-23); still open: whether an approver may also approve results of a class that has no section (today: only through a General or a Class scope).
 
 ## 6. Output & Deliverables
 - **PRs:** #51 (the ADR; merged `b6729c8`, 2026-10-21 01:15:31 UTC); #54 (slice 1; merged `4dd25a1`, 2026-10-21 08:12 UTC).
