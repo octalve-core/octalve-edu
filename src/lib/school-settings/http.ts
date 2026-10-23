@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { BillingCycle, DiscountWorkflowMode, FeeCostBearer, RolloverMode } from "@prisma/client";
+import { BillingCycle, DiscountWorkflowMode, FeeCostBearer, RolloverMode, UnsectionedClassApproval } from "@prisma/client";
 
 export const stepUpProofSchema = z.object({
   type: z.enum(["totp", "recovery", "password"]),
@@ -18,6 +18,7 @@ export const updateSettingsSchema = z.object({
       feeCostBearer: z.nativeEnum(FeeCostBearer).optional(),
       multiCampusEnabled: z.boolean().optional(),
       mfaRequiredForTeaching: z.boolean().optional(),
+      unsectionedClassApproval: z.nativeEnum(UnsectionedClassApproval).optional(),
     })
     .refine((obj) => Object.keys(obj).length > 0, {
       message: "At least one setting must be provided to update.",

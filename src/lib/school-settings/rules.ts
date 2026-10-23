@@ -1,4 +1,11 @@
-import { BillingCycle, DiscountWorkflowMode, FeeCostBearer, RolloverMode, type SchoolSettings } from "@prisma/client";
+import {
+  BillingCycle,
+  DiscountWorkflowMode,
+  FeeCostBearer,
+  RolloverMode,
+  UnsectionedClassApproval,
+  type SchoolSettings,
+} from "@prisma/client";
 
 export const ALLOWED_SETTING_FIELDS = [
   "resultApprovalRequired",
@@ -10,6 +17,7 @@ export const ALLOWED_SETTING_FIELDS = [
   "feeCostBearer",
   "multiCampusEnabled",
   "mfaRequiredForTeaching",
+  "unsectionedClassApproval",
 ] as const;
 
 export type UpdatableSettingField = (typeof ALLOWED_SETTING_FIELDS)[number];
@@ -24,6 +32,7 @@ export interface UpdatableSettings {
   feeCostBearer?: FeeCostBearer;
   multiCampusEnabled?: boolean;
   mfaRequiredForTeaching?: boolean;
+  unsectionedClassApproval?: UnsectionedClassApproval;
 }
 
 export interface SettingsDelta {
@@ -42,6 +51,10 @@ export function isControlWeakened(field: UpdatableSettingField, fromValue: unkno
     return true;
   }
   if (field === "discountWorkflowMode" && fromValue === "APPROVAL_REQUIRED" && toValue === "MANUAL_OVERRIDE") {
+    return true;
+  }
+  // widening who may approve results (ADR 0018, amendment of 2026-10-23)
+  if (field === "unsectionedClassApproval" && fromValue === "GENERAL_OR_CLASS_ONLY" && toValue === "ANY_SECTION_APPROVER") {
     return true;
   }
   return false;
@@ -146,6 +159,14 @@ export function validateSettingsPayload(payload: unknown):
           errors.push(`Field "${key}" must be one of: ${Object.values(DiscountWorkflowMode).join(", ")}.`);
         } else {
           clean[settingKey] = val as DiscountWorkflowMode;
+        }
+        break;
+
+      case "unsectionedClassApproval":
+        if (val !== UnsectionedClassApproval.GENERAL_OR_CLASS_ONLY && val !== UnsectionedClassApproval.ANY_SECTION_APPROVER) {
+          errors.push(`Field "${key}" must be one of: ${Object.values(UnsectionedClassApproval).join(", ")}.`);
+        } else {
+          clean[settingKey] = val as UnsectionedClassApproval;
         }
         break;
 

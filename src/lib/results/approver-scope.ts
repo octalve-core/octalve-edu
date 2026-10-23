@@ -30,12 +30,35 @@ export async function approverScope(tx: Tx, tenantId: string, userId: string): P
         OR: [
           ...(sectionIds.length > 0 ? [{ sectionId: { in: sectionIds }, section: { is: { archivedAt: null } } }] : []),
           ...(classGroupIds.length > 0 ? [{ id: { in: classGroupIds } }] : []),
+          ...(await unsectionedClassGroupsOf(tx, tenantId, sectionIds)),
         ],
       },
     },
     select: { id: true },
   });
   return { general: false, armIds: new Set(arms.map((arm) => arm.id)) };
+}
+
+/// The school setting `unsectionedClassApproval` (ADR 0018, amendment of 2026-10-23). Under `ANY_SECTION_APPROVER` a person with a live Section scope also reaches the class
+/// groups that have no section and sit in the campus of one of their sections (a section with no campus reaches the class groups with no campus). Under the default,
+/// `GENERAL_OR_CLASS_ONLY`, or with no settings row, it adds nothing: fail closed. An archived section grants nothing, so it widens nothing either.
+async function unsectionedClassGroupsOf(tx: Tx, tenantId: string, sectionIds: readonly string[]) {
+  if (sectionIds.length === 0) return [];
+  const settings = await tx.schoolSettings.findUnique({ where: { tenantId }, select: { unsectionedClassApproval: true } });
+  if (settings?.unsectionedClassApproval !== "ANY_SECTION_APPROVER") return [];
+  const sections = await tx.section.findMany({
+    where: { tenantId, id: { in: [...sectionIds] }, archivedAt: null },
+    select: { campusId: true },
+  });
+  if (sections.length === 0) return [];
+  const campusIds = [...new Set(sections.flatMap((section) => (section.campusId ? [section.campusId] : [])))];
+  const noCampus = sections.some((section) => section.campusId === null);
+  return [
+    {
+      sectionId: null,
+      OR: [...(campusIds.length > 0 ? [{ campusId: { in: campusIds } }] : []), ...(noCampus ? [{ campusId: null }] : [])],
+    },
+  ];
 }
 
 /// Which of these results the scope covers: the student has an ACTIVE enrolment, in the session of the result's period, in an arm the scope reaches. A general scope

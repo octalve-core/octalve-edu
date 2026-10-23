@@ -1,7 +1,7 @@
 # 0023: Who may confirm which payment reference (ISS-0029)
 
 - **Period / Focus:** 2026-10-22 (register row ISS-0029, seen while fixing ISS-0025)
-- **Status:** In progress (written; verification results below)
+- **Status:** Completed: merged into `dev` as PR #60 (`108849e`)
 - **Priority:** High (money route; a member of a school could read another family's payment and invoice ids)
 - **Assignee:** Agent (Claude)
 - **Target Branch / PR:** `dev`; branch `claude/fix-payment-status-access`
