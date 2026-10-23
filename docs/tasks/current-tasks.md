@@ -36,8 +36,8 @@
 | 23 | [TASK-0019](0019-a-request-that-cannot-be-valid-is-a-4xx.md) | A request that cannot be valid is a 4xx (NUL character, broken percent-encoding) and two tests that failed only under load | [x] Completed (merged into `dev`) | 2026-10-20 23:45:54 UTC | 2026-10-21 00:28:14 UTC | PRs #47, #48 and #49 |
 | 24 | [TASK-0020](0020-results-approver-scopes.md) | Results are approved by assignment: generally, per section or per class (ADR 0018) | [ ] In progress (ADR merged as PR #51 and accepted by the maintainer on 2026-10-23; slice 1 merged as PR #54; slices 2 to 4 not started; the migration `20261030090000_results_approval_scopes` is for the maintainer to run BEFORE the code is deployed) | 2026-10-21 01:12:08 UTC | — | PRs #51 (ADR), #54 (slice 1) |
 | 25 | [TASK-0021](0021-proxy-api-matcher-and-shared-body-reader.md) | The proxy must not make Next wait for an API request body; one shared reader for a request body | [ ] In progress (module A merged as PR #56; module B, the reader, merged as PR #57; module C, AlEemaan, not started) | 2026-10-21 UTC | — | `claude/shared-body-reader` |
-| 26 | [TASK-0022](0022-invoice-numbers-under-concurrency.md) | Invoice numbers are unique under concurrency (ISS-0030) | [ ] In progress (verified; PR #58 open, branch `claude/fix-invoice-numbers`) | 2026-10-21 | — | `claude/fix-invoice-numbers` |
-| 27 | [TASK-0023](0023-payment-status-who-may-confirm.md) | Who may confirm which payment reference (ISS-0029) | [ ] In progress (written; verification running; branch `claude/fix-payment-status-access`) | 2026-10-22 | — | `claude/fix-payment-status-access` |
+| 26 | [TASK-0022](0022-invoice-numbers-under-concurrency.md) | Invoice numbers are unique under concurrency (ISS-0030) | [x] Completed: merged into `dev` as PR #58 (`be0ae1a`; branch `claude/fix-invoice-numbers`) | 2026-10-21 | — | `claude/fix-invoice-numbers` |
+| 27 | [TASK-0023](0023-payment-status-who-may-confirm.md) | Who may confirm which payment reference (ISS-0029) | [x] Completed: merged into `dev` as PR #60 (`108849e`; branch `claude/fix-payment-status-access`) | 2026-10-22 | — | `claude/fix-payment-status-access` |
 ---
 
 ## Detailed Milestone Checklist
@@ -293,7 +293,8 @@
 - [x] The maintainer's decision (2026-10-21): approvers are assigned General (their whole campus), per section (primary, JSS, SSS) or per class (JSS 2 ...) in the school's settings, and see and act on only what is assigned to them; Octalve first, AlEemaan after.
 - [x] #51 `claude/results-approver-scopes`: the ADR.
 - [x] Slice 1 MERGED as PR #54 (`4dd25a1`, 2026-10-21 08:12 UTC; branch `claude/results-approver-scope-rules`): `Section`, `ResultApprovalScope`, migration `20261030090000_results_approval_scopes` (backfills a General scope for every current holder of `CAN_APPROVE_RESULTS`), `src/lib/results/approver-scope.ts`, the transitions and the list follow the scope, members get a General scope with the permission; failing-first by mutation 12 of 21 fail, 9 controls pass; the whole setup, unit, integration and api run 1832 passed, 3 failed of 1835 (two pass alone, one is a failure on `dev` since #47: the proxy makes Next wait for the end of an API request body)
-- [ ] Slice 2: the settings API (sections, scope assignment, and the school setting `unsectionedClassApproval` for class groups with no section, decided 2026-10-23; `ADMIN` only, audited, fresh password); slice 3: the settings screen; slice 4: AlEemaan
+- [x] Slice 2a: the school setting `unsectionedClassApproval` (decided 2026-10-23) with its migration `20261031090000_unsectioned_class_approval`, the rule that reads it and the settings route that carries it; failing first by mutation, 194 specs pass
+- [ ] Slice 2b: sections and approvers API (`ADMIN` only, audited, fresh re-authentication); slice 3: the settings screen; slice 4: AlEemaan
 - [x] The maintainer: yes to the three details; the ADR is accepted (2026-10-23)
 - [ ] The maintainer: run the migration on the hosted database before the code is deployed there
 
@@ -301,18 +302,18 @@
 - **Status:** [ ] In progress. [The task file](0021-proxy-api-matcher-and-shared-body-reader.md) has the cause, the plan and what is left.
 - [x] Module A, the proxy fix: merged as PR #56 (`ae724c9`, 2026-10-21 19:54 UTC)
 - [x] Module B, the shared reader: written, failing first (14 of 52 failed on the old routes), verified (whole setup, unit, integration and api projects: 1929 passed, 0 failed); merged as PR #57 (`cfef611`, 2026-10-21 22:14 UTC)
-- [x] Follow-up: every 413 closes the connection after it (`Connection: close`); the reset of the next request on a reused connection (found in AlEemaan) cannot happen; failing first on a build without it (both new tests failed), 140 specs pass; PR open
+- [x] Follow-up: every 413 closes the connection after it (`Connection: close`); the reset of the next request on a reused connection (found in AlEemaan) cannot happen; failing first on a build without it (both new tests failed), 140 specs pass; merged as PR #59 (`1c38f68`)
 - [ ] Module C, AlEemaan: its matcher is fixed in its task 0036; port the reader (its routes answer 500 for a body that is not JSON)
 
 ### TASK-0022: Invoice numbers are unique under concurrency (ISS-0030)
-- **Status:** [ ] In progress: branch `claude/fix-invoice-numbers`, PR #58 open. [The task file](0022-invoice-numbers-under-concurrency.md) has the plan and what is left.
+- **Status:** [x] Completed: merged into `dev` as PR #58 (`be0ae1a`), branch `claude/fix-invoice-numbers`. [The task file](0022-invoice-numbers-under-concurrency.md) has the plan and what is left.
 - [x] A bill run takes the school's invoice-number lock first and takes the next free number; `tests/integration/invoice-numbers.spec.ts` (3 tests)
 - [x] Failing first on the unfixed service (3 of 3 failed); on the branch the 3 tests, the lifecycle walk and the finance API specs (38) pass; build, tsc, eslint, prettier and the catalogs clean
 - [ ] Not run: the whole setup, unit, integration and api projects; e2e and https; a full suite on the merged `dev`
 
 ### TASK-0023: Who may confirm which payment reference (ISS-0029)
-- **Status:** [ ] In progress: branch `claude/fix-payment-status-access`. [The task file](0023-payment-status-who-may-confirm.md) has the plan and what is left.
+- **Status:** [x] Completed: merged into `dev` as PR #60 (`108849e`), branch `claude/fix-payment-status-access`. [The task file](0023-payment-status-who-may-confirm.md) has the plan and what is left.
 - [x] `confirmPaymentForRequester`: only a member who may see the payment's invoice can confirm it; unknown, another school's and not theirs are the one refusal; the gateway is not asked for them; the route uses it
 - [x] Failing first on a build of `dev` (the foreign-member test and the other-school test failed; the own-guardian and pending controls passed)
-- [ ] Verification on the branch, then PR and merge
+- [x] Verified on the branch (payment-status, finance, campus-admin-finance and idor-audit specs: 42 passed); PR #60 merged. Not run: the other projects on the branch; the full suite on the merged `dev` is in progress
 

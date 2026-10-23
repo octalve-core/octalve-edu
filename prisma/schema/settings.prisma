@@ -20,6 +20,13 @@ enum FeeCostBearer {
   PASSED_TO_PARENT
 }
 
+/// Whether an approver with a Section scope may also act on the class groups that have no section (ADR 0018, amendment of 2026-10-23). The default is the fail-closed
+/// one: such a class group is reached only through a General scope or a Class scope on it.
+enum UnsectionedClassApproval {
+  GENERAL_OR_CLASS_ONLY
+  ANY_SECTION_APPROVER
+}
+
 /// One row per school, BY CONSTRUCTION: the tenant id is the primary key. The row is inserted by a trigger on "Tenant", so no
 /// creation path can forget it, and the defaults below are the secure ones (results need approval; teaching staff need MFA).
 model SchoolSettings {
@@ -34,6 +41,8 @@ model SchoolSettings {
   feeCostBearer          FeeCostBearer        @default(SCHOOL_ABSORBS)
   multiCampusEnabled     Boolean              @default(false)
   mfaRequiredForTeaching Boolean              @default(true)
+  /// ADR 0018: who may approve the results of a class group that has no section.
+  unsectionedClassApproval UnsectionedClassApproval @default(GENERAL_OR_CLASS_ONLY)
 
   updatedAt DateTime @default(now()) @updatedAt
 

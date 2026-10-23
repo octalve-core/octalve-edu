@@ -1,7 +1,7 @@
 # 0022: Invoice numbers are unique under concurrency (ISS-0030)
 
 - **Period / Focus:** 2026-10-21 (register row ISS-0030, found while fixing ISS-0025)
-- **Status:** Completed on the branch (verified below; PR open)
+- **Status:** Completed: merged into `dev` as PR #58 (`be0ae1a`)
 - **Priority:** Medium (money records; a failed bill run, not a wrong charge)
 - **Assignee:** Agent (Claude)
 - **Target Branch / PR:** `dev`; branch `claude/fix-invoice-numbers`
