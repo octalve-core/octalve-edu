@@ -293,7 +293,7 @@
 - [x] The maintainer's decision (2026-10-21): approvers are assigned General (their whole campus), per section (primary, JSS, SSS) or per class (JSS 2 ...) in the school's settings, and see and act on only what is assigned to them; Octalve first, AlEemaan after.
 - [x] #51 `claude/results-approver-scopes`: the ADR.
 - [x] Slice 1 MERGED as PR #54 (`4dd25a1`, 2026-10-21 08:12 UTC; branch `claude/results-approver-scope-rules`): `Section`, `ResultApprovalScope`, migration `20261030090000_results_approval_scopes` (backfills a General scope for every current holder of `CAN_APPROVE_RESULTS`), `src/lib/results/approver-scope.ts`, the transitions and the list follow the scope, members get a General scope with the permission; failing-first by mutation 12 of 21 fail, 9 controls pass; the whole setup, unit, integration and api run 1832 passed, 3 failed of 1835 (two pass alone, one is a failure on `dev` since #47: the proxy makes Next wait for the end of an API request body)
-- [ ] Slice 2: the settings API (sections, scope assignment; `ADMIN` only, audited, fresh password); slice 3: the settings screen; slice 4: AlEemaan
+- [ ] Slice 2: the settings API (sections, scope assignment, and the school setting `unsectionedClassApproval` for class groups with no section, decided 2026-10-23; `ADMIN` only, audited, fresh password); slice 3: the settings screen; slice 4: AlEemaan
 - [x] The maintainer: yes to the three details; the ADR is accepted (2026-10-23)
 - [ ] The maintainer: run the migration on the hosted database before the code is deployed there
 

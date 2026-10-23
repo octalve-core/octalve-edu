@@ -39,6 +39,19 @@ Recorded: 2026-10-21 (drafted by an agent); accepted 2026-10-23 on the maintaine
 - Setting up a school takes one more step (define sections, assign approvers). The default that keeps today's behaviour is a General scope.
 - **Revisit if:** a school needs approval by subject or by arm, or two stages of approval (a head of department, then the principal).
 
+## Amendment, 2026-10-23: class groups with no section are a school setting
+
+The maintainer decided that whether an approver may also approve results of a class group that has no section is **a school setting, chosen by the administrator**, not a fixed rule. Until then the only rule was the fail-closed one: such a class group is reached through a General scope or a Class scope on it.
+
+- **The setting, on the school's settings row (`SchoolSettings`): `unsectionedClassApproval`, one of:**
+  - `GENERAL_OR_CLASS_ONLY` (the default, and today's behaviour): a class group with no section is reached only by a General scope or a Class scope on that class group.
+  - `ANY_SECTION_APPROVER`: an approver who holds at least one Section scope on a campus may also act on the class groups of that campus that have no section. A Class scope still adds its class group, and a General scope still covers everything.
+- **What it never does:** it does not widen an approver across campuses, it does not give anything to a person with no scope at all (no scope, no approving), and it does not touch an administrator (never scoped) or the author rule.
+- **Who changes it and how:** like every school setting, the school's `ADMIN` only, with the fresh re-authentication, written to `SettingsChangeAudit` with the old and new value. One new migration adds the column (a default, so nothing changes on the day it runs); the maintainer runs it on the hosted database like the others.
+- **Where it is read:** in `approverScope`, the one function the results list and every transition ask, so the list and the actions follow the setting together. The setting is read once per request, inside the same transaction.
+- **Build:** part of slice 2 of task 0020 (the settings API), with a test matrix of the two values against a scope of each kind, an out-of-campus class group and the unchanged default; the settings screen (slice 3) shows it next to the sections, with a sentence saying what each value means.
+- **AlEemaan:** branches stand in for campuses and its own settings mechanism carries the same choice when slice 4 ports the design.
+
 ## Enforced by
 
 Tests to be written with the code: an API matrix of scope (general, section, class, none) by action (list, approve, return, publish, revert, lock) by in-scope and out-of-scope result, `integration/rls` for the new tables, a unit test of the scope function, and the route-area guard for the new routes. Review only until they exist.
