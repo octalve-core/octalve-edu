@@ -5,6 +5,7 @@ import { BillingCycle, DiscountWorkflowMode, FeeCostBearer, RolloverMode, Unsect
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/SelectField";
+import { Switch } from "@/components/ui/Switch";
 import { AlertTriangleIcon, BuildingIcon, CalendarIcon, CheckIcon, ShieldCheckIcon, SlidersIcon } from "@/components/ui/icons";
 import { useApi } from "@/components/academics/useApi";
 import { sendJson } from "@/components/auth/postJson";
@@ -199,22 +200,11 @@ export function SchoolSettingsPanel({ schoolCode }: SchoolSettingsPanelProps) {
                     When enabled, scores must transition from DRAFT &rarr; SUBMITTED &rarr; APPROVED before publishing to parents.
                   </p>
                 </div>
-                <button
-                  type="button"
+                <Switch
                   id="result-approval-toggle"
-                  role="switch"
-                  aria-checked={effectiveSettings.resultApprovalRequired}
-                  onClick={() => handleToggle("resultApprovalRequired")}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
-                    effectiveSettings.resultApprovalRequired ? "bg-brand" : "bg-line"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-surface shadow-sm transition-transform ${
-                      effectiveSettings.resultApprovalRequired ? "translate-x-5" : "translate-x-0.5"
-                    } mt-0.5`}
-                  />
-                </button>
+                  checked={effectiveSettings.resultApprovalRequired}
+                  onChange={() => handleToggle("resultApprovalRequired")}
+                />
               </div>
 
               {/* Results of a class that has no section (ADR 0018) */}
@@ -251,22 +241,11 @@ export function SchoolSettingsPanel({ schoolCode }: SchoolSettingsPanelProps) {
                     Automatically balance and stream enrolled students into class arms based on seat capacity.
                   </p>
                 </div>
-                <button
-                  type="button"
+                <Switch
                   id="class-auto-assign-toggle"
-                  role="switch"
-                  aria-checked={effectiveSettings.classAutoAssignment}
-                  onClick={() => handleToggle("classAutoAssignment")}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
-                    effectiveSettings.classAutoAssignment ? "bg-brand" : "bg-line"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-surface shadow-sm transition-transform ${
-                      effectiveSettings.classAutoAssignment ? "translate-x-5" : "translate-x-0.5"
-                    } mt-0.5`}
-                  />
-                </button>
+                  checked={effectiveSettings.classAutoAssignment}
+                  onChange={() => handleToggle("classAutoAssignment")}
+                />
               </div>
             </div>
           </div>
@@ -330,22 +309,11 @@ export function SchoolSettingsPanel({ schoolCode }: SchoolSettingsPanelProps) {
                     Send automated payment notifications via email and WhatsApp links when invoices approach due date.
                   </p>
                 </div>
-                <button
-                  type="button"
+                <Switch
                   id="fee-reminder-toggle"
-                  role="switch"
-                  aria-checked={effectiveSettings.feeReminderEnabled}
-                  onClick={() => handleToggle("feeReminderEnabled")}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
-                    effectiveSettings.feeReminderEnabled ? "bg-brand" : "bg-line"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-surface shadow-sm transition-transform ${
-                      effectiveSettings.feeReminderEnabled ? "translate-x-5" : "translate-x-0.5"
-                    } mt-0.5`}
-                  />
-                </button>
+                  checked={effectiveSettings.feeReminderEnabled}
+                  onChange={() => handleToggle("feeReminderEnabled")}
+                />
               </div>
             </div>
           </div>
@@ -373,22 +341,11 @@ export function SchoolSettingsPanel({ schoolCode }: SchoolSettingsPanelProps) {
                     Requires two-factor authentication (TOTP or recovery codes) before teachers can enter scores or mark attendance.
                   </p>
                 </div>
-                <button
-                  type="button"
+                <Switch
                   id="mfa-teaching-toggle"
-                  role="switch"
-                  aria-checked={effectiveSettings.mfaRequiredForTeaching}
-                  onClick={() => handleToggle("mfaRequiredForTeaching")}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
-                    effectiveSettings.mfaRequiredForTeaching ? "bg-brand" : "bg-line"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-surface shadow-sm transition-transform ${
-                      effectiveSettings.mfaRequiredForTeaching ? "translate-x-5" : "translate-x-0.5"
-                    } mt-0.5`}
-                  />
-                </button>
+                  checked={effectiveSettings.mfaRequiredForTeaching}
+                  onChange={() => handleToggle("mfaRequiredForTeaching")}
+                />
               </div>
 
               {/* Multi-Campus */}
@@ -401,22 +358,11 @@ export function SchoolSettingsPanel({ schoolCode }: SchoolSettingsPanelProps) {
                     Enable branch-level campus division within this single institution, allowing campus-specific filtering.
                   </p>
                 </div>
-                <button
-                  type="button"
+                <Switch
                   id="multi-campus-toggle"
-                  role="switch"
-                  aria-checked={effectiveSettings.multiCampusEnabled}
-                  onClick={() => handleToggle("multiCampusEnabled")}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
-                    effectiveSettings.multiCampusEnabled ? "bg-brand" : "bg-line"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-surface shadow-sm transition-transform ${
-                      effectiveSettings.multiCampusEnabled ? "translate-x-5" : "translate-x-0.5"
-                    } mt-0.5`}
-                  />
-                </button>
+                  checked={effectiveSettings.multiCampusEnabled}
+                  onChange={() => handleToggle("multiCampusEnabled")}
+                />
               </div>
             </div>
           </div>
