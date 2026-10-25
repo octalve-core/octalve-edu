@@ -88,9 +88,8 @@ async function settled(page: Page) {
   );
 }
 
-/// The state on screen, in both themes, with no horizontal scroll, and on a phone every control at least 44 x 44 CSS px. `tapTargets: false` leaves the size check out for the
-/// Configuration tab, whose five on/off switches (not part of this slice) are 44 x 24 px; the new select there is measured on its own in the test.
-async function checkScreen(page: Page, what: string, isMobile: boolean, { tapTargets = true } = {}) {
+/// The state on screen, in both themes, with no horizontal scroll, and on a phone every control at least 44 x 44 CSS px.
+async function checkScreen(page: Page, what: string, isMobile: boolean) {
   await expect(page).toHaveTitle(/\S/);
   const initial = await page.evaluate(() => document.documentElement.dataset.theme ?? "dark");
   for (const theme of ["dark", "light"]) {
@@ -105,7 +104,7 @@ async function checkScreen(page: Page, what: string, isMobile: boolean, { tapTar
   }
   await page.evaluate((t) => void (document.documentElement.dataset.theme = t), initial);
   await settled(page);
-  if (!isMobile || !tapTargets) return;
+  if (!isMobile) return;
   const tooSmall = await page.evaluate(() => {
     const visible = (el: Element) => {
       const r = el.getBoundingClientRect();
@@ -295,6 +294,13 @@ test("a refusal is shown in the dialog in the server's words, and nothing is hal
   await expect(page.getByLabel("New section")).toHaveValue("JUNIOR");
   expect(await db.section.count({ where: { tenantId: school.id } })).toBe(1);
 
+  // the password typed for the refused attempt is not kept: the dialog opens empty the next time
+  await page.getByRole("button", { name: "Add section" }).click();
+  await expect(dialog(page)).toBeVisible();
+  await expect(dialog(page).getByLabel("Account Password", { exact: true })).toHaveValue("");
+  await dialog(page).getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog(page)).toBeHidden();
+
   // an empty name is stopped on the screen, before any proof is asked for
   await page.getByLabel("New section").fill("   ");
   await page.getByRole("button", { name: "Add section" }).click();
@@ -364,8 +370,7 @@ test("the setting for a class with no section: chosen in Configuration, carries 
   await expect(select).toHaveValue("GENERAL_OR_CLASS_ONLY"); // the safe default
   await select.selectOption("ANY_SECTION_APPROVER");
   await expect(page.getByText("1 unsaved change")).toBeVisible();
-  await checkScreen(page, "Configuration with the new setting staged", isMobile, { tapTargets: false });
-  if (isMobile) expect((await select.boundingBox())?.height ?? 0, "the new select is a comfortable tap target").toBeGreaterThanOrEqual(44);
+  await checkScreen(page, "Configuration with the new setting staged", isMobile); // the five on/off switches included (ISS-0033)
   await page.getByRole("button", { name: "Review & Save Changes" }).click();
   await expect(dialog(page)).toContainText("unsectionedClassApproval");
   await expect(dialog(page)).toContainText("Security Controls Modification Warning"); // it lets more people approve
