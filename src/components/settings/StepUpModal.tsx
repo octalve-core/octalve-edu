@@ -7,14 +7,16 @@ import { Dialog } from "@/components/ui/Dialog";
 import { PasswordField } from "@/components/ui/PasswordField";
 import { TextField } from "@/components/ui/TextField";
 import { AlertTriangleIcon, ShieldCheckIcon } from "@/components/ui/icons";
-import type { SettingsDelta } from "@/lib/school-settings/rules";
+
+/// What is about to change, in the words the dialog shows. A school setting's delta fits it; so does a line the caller writes itself ("New section" from "—" to "Primary").
+export type StepUpChange = { field: string; fromValue: string; toValue: string; isWeakeningSecurity: boolean };
 
 interface StepUpModalProps {
   open: boolean;
   onClose: () => void;
   onConfirm: (stepUp: { type: "totp" | "recovery" | "password"; value: string }) => Promise<void>;
   hasMfa: boolean;
-  deltas: SettingsDelta[];
+  deltas: StepUpChange[];
   saving: boolean;
   error: string | null;
 }
@@ -42,7 +44,7 @@ export function StepUpModal({ open, onClose, onConfirm, hasMfa, deltas, saving, 
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {hasWeakeningChanges && (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-600 dark:text-amber-400">
+          <div className="rounded-xl border border-warn-line bg-warn-bg p-3.5 text-xs text-warn-fg">
             <div className="flex items-center gap-2 font-semibold">
               <AlertTriangleIcon className="h-4 w-4 shrink-0" />
               <span>Security Controls Modification Warning</span>
