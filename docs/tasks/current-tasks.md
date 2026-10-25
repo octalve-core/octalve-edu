@@ -295,7 +295,8 @@
 - [x] Slice 1 MERGED as PR #54 (`4dd25a1`, 2026-10-21 08:12 UTC; branch `claude/results-approver-scope-rules`): `Section`, `ResultApprovalScope`, migration `20261030090000_results_approval_scopes` (backfills a General scope for every current holder of `CAN_APPROVE_RESULTS`), `src/lib/results/approver-scope.ts`, the transitions and the list follow the scope, members get a General scope with the permission; failing-first by mutation 12 of 21 fail, 9 controls pass; the whole setup, unit, integration and api run 1832 passed, 3 failed of 1835 (two pass alone, one is a failure on `dev` since #47: the proxy makes Next wait for the end of an API request body)
 - [x] Slice 2a: the school setting `unsectionedClassApproval` (decided 2026-10-23) with its migration `20261031090000_unsectioned_class_approval`, the rule that reads it and the settings route that carries it; failing first by mutation, 194 specs pass
 - [x] Slice 2b: sections and approvers API (five routes under `/settings`; `ADMIN` only, audited, fresh re-authentication); failing first by mutation (2 of 13 fail, 11 controls pass); 201 specs pass on the branch
-- [ ] Slice 3: the settings screen; slice 4: AlEemaan
+- [x] Slice 3: the settings screen: a Results approval tab (sections, which class is in which, where each approver approves; every write through the step-up dialog) and the `unsectionedClassApproval` select in Configuration; failing first by mutation (the campus rules removed: 5 of 20 new tests fail, 15 controls pass); unit 7 and e2e 12 (desktop and phone, both themes, axe) pass
+- [ ] Slice 4: AlEemaan
 - [x] The maintainer: yes to the three details; the ADR is accepted (2026-10-23)
 - [ ] The maintainer: run the migration on the hosted database before the code is deployed there
 
