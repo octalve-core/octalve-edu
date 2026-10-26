@@ -15,11 +15,11 @@ import { NOT_FOUND, ITEM_SELECT, factsOf, fail, lockItem, refreshOverlap, snapsh
 
 type TenantCtx = TenantAuthContext["tenant"];
 
-const ACCESS_OFF = "The question bank is switched off for your role in this campus.";
+export const ACCESS_OFF = "The question bank is switched off for your role in this campus.";
 
 /// The `bank.access.*` switches: a school-wide or campus "off" closes the bank for that group. An administrator of the campus is held to `admins`, other staff to `staff`; the
 /// school's own administrator is never shut out.
-async function bankOpenFor(tx: Tx, tenantId: string, viewer: BankViewer, campusId: string | null): Promise<boolean> {
+export async function bankOpenFor(tx: Tx, tenantId: string, viewer: BankViewer, campusId: string | null): Promise<boolean> {
   if (viewer.isSchoolAdmin) return true;
   const settings = await effectiveSettingsIn(tx, tenantId, campusId);
   const administers = viewer.memberships.some((m) => (m.role === "ADMIN" || m.role === "CAMPUS_ADMIN") && (campusId === null || m.campusId === campusId));

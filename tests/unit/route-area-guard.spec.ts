@@ -30,6 +30,7 @@ const OUT_OF_REACH: Record<string, string> = {
   "question-bank/review-queue/route.ts": "not a grantable area: the question bank is the school's own teaching material and its review, which a support view must not read",
   "question-bank/reviewers/route.ts": "not a grantable area: the question bank is the school's own teaching material and its review, which a support view must not read",
   "question-bank/settings/route.ts": "not a grantable area: the question bank is the school's own teaching material and its review, which a support view must not read",
+  "question-bank/items/[id]/images/[imageId]/route.ts": "not a grantable area: a question's picture is part of the school's own teaching material, which a support view must not read",
 };
 
 function routes(dir: string): string[] {
