@@ -547,3 +547,26 @@ test.describe("a school and its campuses", () => {
     expect(staffMaySee(teacher, thing({ campusId: B, status: "APPROVED" }), NOW)).toBe(true);
   });
 });
+
+test.describe("writing for the whole school (no campus)", () => {
+  const wholeSchool = (role: Role) => ({ campusId: null as string | null, role });
+
+  test("with no campus named, the school's administrator and teaching staff whose membership is school-wide may write; a teacher tied to a campus may not", () => {
+    expect(mayAuthorIn(who({ isSchoolAdmin: true }), null)).toBe(true);
+    expect(mayAuthorIn(who({ memberships: [wholeSchool(Role.TEACHING_STAFF)] }), null)).toBe(true);
+    expect(mayAuthorIn(who({ memberships: [wholeSchool(Role.CAMPUS_ADMIN)] }), null)).toBe(true);
+    expect(mayAuthorIn(who({ memberships: [member(Role.TEACHING_STAFF, A)] }), null)).toBe(false);
+    expect(mayAuthorIn(who({ memberships: [member(Role.CAMPUS_ADMIN, A)] }), null)).toBe(false);
+    expect(mayAuthorIn(who({ memberships: [wholeSchool(Role.STUDENT)] }), null)).toBe(false);
+    expect(mayAuthorIn(who({ memberships: [wholeSchool(Role.PARENT)] }), null)).toBe(false);
+    expect(mayAuthorIn(who(), null)).toBe(false);
+  });
+
+  test("a non-teaching member writes for the whole school only as a reviewer for every campus who is school-wide staff", () => {
+    const staff = [wholeSchool(Role.NON_TEACHING_STAFF)];
+    expect(mayAuthorIn(who({ memberships: staff }), null)).toBe(false);
+    expect(mayAuthorIn(who({ memberships: staff, reviewerRows: [reviewer({ campusId: null })] }), null)).toBe(true);
+    expect(mayAuthorIn(who({ memberships: staff, reviewerRows: [reviewer({ campusId: A })] }), null)).toBe(false); // a campus's reviewer is not the school's
+    expect(mayAuthorIn(who({ memberships: [member(Role.NON_TEACHING_STAFF, A)], reviewerRows: [reviewer({ campusId: null })] }), null)).toBe(false);
+  });
+});
