@@ -319,3 +319,6 @@
 - [x] Failing first on a build of `dev` (the foreign-member test and the other-school test failed; the own-guardian and pending controls passed)
 - [x] Verified on the branch (payment-status, finance, campus-admin-finance and idor-audit specs: 42 passed); PR #60 merged. Not run: the other projects on the branch; the full suite on the merged `dev` is in progress
 
+## TASK-0024: the question bank (parity with AlEemaan's task 0032)
+
+[Task file](0024-question-bank.md). Slice A (schema, migration, pure parts, database tests) is on `claude/qbank-1-foundation`; slices B to E (reviewers and switches, the questions and their review, pictures, the screens) are not started.

@@ -75,6 +75,15 @@ model Tenant {
   certificates          Certificate[]
   sections              Section[]
   resultApprovalScopes  ResultApprovalScope[]
+  bankItems             QuestionBankItem[]
+  bankImages            QuestionBankImage[]
+  bankVersions          QuestionBankItemVersion[]
+  bankClassTags         QuestionBankClassTag[]
+  bankReviews           QuestionBankReview[]
+  bankReviewers         QuestionBankReviewer[]
+  bankOverlapFlags      QuestionOverlapFlag[]
+  bankAudits            QuestionBankAudit[]
+  bankSettings          QuestionBankSetting[]
 }
 
 /// A branch/campus under one tenant (PRD §7) — distinct from multi-tenancy:
@@ -91,6 +100,10 @@ model Campus {
   sessions          AcademicSession[]
   classGroups       ClassGroup[]
   sections          Section[]
+  bankItems         QuestionBankItem[]
+  bankReviewers     QuestionBankReviewer[]
+  bankAudits        QuestionBankAudit[]
+  bankSettings      QuestionBankSetting[]
   staffRecords      StaffRecord[]
   studentRecords    StudentRecord[]
   announcements     Announcement[]
@@ -148,6 +161,13 @@ model TenantMembership {
   guardianRecords GuardianRecord[]
   /// Where this person may approve results (ADR 0018). Only a holder of CAN_APPROVE_RESULTS has any; none means nothing to approve.
   resultApprovalScopes ResultApprovalScope[]
+  bankItemsWritten      QuestionBankItem[]        @relation("BankItemSubmitter")
+  bankItemsApproved     QuestionBankItem[]        @relation("BankItemApprover")
+  bankVersionsWritten   QuestionBankItemVersion[] @relation("BankVersionsWritten")
+  bankReviewsGiven      QuestionBankReview[]      @relation("BankReviewsGiven")
+  bankReviewerRows      QuestionBankReviewer[]    @relation("BankReviewerMember")
+  bankReviewersAssigned QuestionBankReviewer[]    @relation("BankReviewerAssigner")
+  bankSettingsChanged   QuestionBankSetting[]     @relation("BankSettingUpdater")
 
   /// Set when an administrator deactivates the person IN THIS SCHOOL. The row stays (history, reactivation) but it is no
   /// longer a membership: every reader treats a deactivated one as absent — the resolver, the person's school list, the
