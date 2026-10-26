@@ -1,7 +1,7 @@
 # 0024: The question bank in Octalve Edu (parity with AlEemaan's task 0032, slices 1 and 2)
 
 - **Period / Focus:** 2026-10-26 onward (the maintainer's order of 2026-10-19: Octalve follows AlEemaan slice by slice, before the walkthrough)
-- **Status:** In Progress (slices A and B merged as PRs #68 and #69; C and D built and in review; E built on top of them)
+- **Status:** In Progress (slices A and B merged as PRs #68 and #69; C, D and E built and in review, stacked on each other)
 - **Priority:** High
 - **Assignee:** Agent (Claude); the maintainer runs each migration on the hosted database before the code that needs it is deployed there, and supplies the image-store credentials
 - **Target Branch / PR:** `dev`; slice A `claude/qbank-1-foundation`
@@ -60,8 +60,13 @@ The slices follow AlEemaan's, grouped so that each pull request leaves something
 - [x] Mutation checks (each failed a test, then restored; control 17 passed): the school missing from the key, a picture served without the access check, no limit check in the transaction, anyone who can see a question allowed to change its pictures, the bank-off switch ignored, no `EDITED` review row for a reviewer, the form type not checked, a description not required, the read cap too loose.
 - [ ] Not run for this slice: the browser projects (the screens are slice E), the full suite on merged `dev`. The hosted deployment needs `IMAGE_STORE` and that backend's credentials before pictures work there.
 
-### Slice E: the screens
-- [ ] Browse, My questions and Review queue, and the navigation entry for staff.
+### Slice E: the screens (`claude/qbank-5-screens`)
+- [x] The page opens for the four staff roles (a pupil or parent gets the 403 view, and the page still declares no support area). Tabs: Browse and My questions for every staff member, Review queue for a reviewer or an administrator (`canReview`), Reviewers and Settings (slice B) for the school's administrator and a campus administrator. The navigation shows "Question bank" to staff too.
+- [x] Components under `components/question-bank/`: `QuestionsPanel` (the three lists), `QuestionDetail`, `QuestionForm` (with pictures), `DecisionDialogs`, `TagInput`, `model.ts` (plain code, no zod, since a client component must not import it), `say.ts`, and `BankApi.tsx` (the school's API base through a context). A button the server's `can` flags would refuse is not drawn; the overlap warning is drawn only when the server sent it.
+- [x] Who a question is written for: a person tied to one campus is not asked; a school administrator or school-wide teacher chooses between the whole school and a campus (`mayAuthorIn` decides which are offered).
+- [x] A nested dialog's `close` event bubbled to its parent and closed it (the Approve dialog took the detail dialog with it): `Dialog` now reports only its own closing. `sendForm` added to `postJson`; `TextAreaField` added.
+- [x] Tests: `tests/e2e/question-bank-questions.spec.ts` (a teacher writes a question with a picture and sends it; a reviewer approves it with a subject and classes; a question is sent back with a reason and corrected; an exam approver sees the overlap warning and chooses who may see it while the writer never sees a word of it), `tests/e2e/question-bank-admin-screens.spec.ts` (updated: the Reviewers tab is no longer the first, a teacher now finds the page with the staff tabs only), `tests/unit/question-bank-model.spec.ts`, `tests/unit/shell-nav.spec.ts`. Axe (WCAG 2.2 A/AA) and a horizontal-overflow check on every state in both themes, on desktop and a phone.
+- [ ] Not done in this slice: mutation checks of the screens (the server rules behind them are mutation-checked in slices C and D); `bank.parents.view` is not read yet (the slice that shows questions to parents).
 
 ---
 

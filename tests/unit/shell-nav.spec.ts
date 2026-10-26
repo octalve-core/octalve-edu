@@ -57,17 +57,17 @@ test.describe("navFor", () => {
     ]);
   });
 
-  test("staff see Overview, Academics and People (to look at, never to change); students and parents see Overview only — decided by the role IN THAT SCHOOL", () => {
+  test("staff see Overview, Academics, People (to look at, never to change) and the Question bank (to write in); students and parents see Overview only — decided by the role IN THAT SCHOOL", () => {
     for (const role of ["TEACHING_STAFF", "NON_TEACHING_STAFF"] as const) {
       const items = navFor({ ...admin, role });
       expect(
         items.map((i) => i.label),
         role,
-      ).toEqual(["Overview", "Academics", "People"]);
+      ).toEqual(["Overview", "Academics", "People", "Question bank"]);
       expect(
         items.map((i) => i.href),
         role,
-      ).toEqual(["/schools/riverside", "/schools/riverside/academics", "/schools/riverside/people"]);
+      ).toEqual(["/schools/riverside", "/schools/riverside/academics", "/schools/riverside/people", "/schools/riverside/question-bank"]);
     }
     for (const role of ["STUDENT", "PARENT"] as const) {
       expect(
@@ -76,7 +76,7 @@ test.describe("navFor", () => {
       ).toEqual(["Overview"]);
     }
     // The same person is an admin in one school and a teacher in another: each school's nav follows its own role.
-    expect(navFor(teacher).map((i) => i.label)).toEqual(["Overview", "Academics", "People"]);
+    expect(navFor(teacher).map((i) => i.label)).toEqual(["Overview", "Academics", "People", "Question bank"]);
     expect(navFor(admin).map((i) => i.label)).toContain("Users");
     expect(navFor(teacher).map((i) => i.label)).not.toContain("Users"); // the Users page stays the administrators'
   });
