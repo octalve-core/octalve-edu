@@ -1,7 +1,7 @@
 # 0024: The question bank in Octalve Edu (parity with AlEemaan's task 0032, slices 1 and 2)
 
 - **Period / Focus:** 2026-10-26 onward (the maintainer's order of 2026-10-19: Octalve follows AlEemaan slice by slice, before the walkthrough)
-- **Status:** In Progress (slice A built, in review; B to E not started)
+- **Status:** In Progress (slice A merged as PR #68; slice B built, in review; C to E not started)
 - **Priority:** High
 - **Assignee:** Agent (Claude); the maintainer runs each migration on the hosted database before the code that needs it is deployed there, and supplies the image-store credentials
 - **Target Branch / PR:** `dev`; slice A `claude/qbank-1-foundation`
@@ -37,8 +37,12 @@ The slices follow AlEemaan's, grouped so that each pull request leaves something
 - [x] Mutation checks on the database itself (each restored, the control re-run green): the picture limit raised to 5, the visibility trigger dropped, the visibility rule using the server's local clock, the review append-only trigger dropped, the cascade exception removed, a switch's insert policy opened, the submitter's membership key dropped, the re-authentication check dropped, a delete policy added for items. Each failed the spec.
 - [ ] Not in this slice: no service, route or screen (slices B to E); no real image store.
 
-### Slice B: reviewers and settings (administration)
-- [ ] `viewer.ts` over `TenantMembership`, the settings and reviewers services inside `auth.tenant.run`, the routes under `/api/v1/schools/[code]/question-bank/`, every change audited and needing the fresh re-authentication (D3), the Reviewers and Settings screens.
+### Slice B: reviewers and switches (`claude/qbank-2-reviewers-settings`)
+- [x] `reviewers-service` and `settings-service` inside `auth.tenant.run`; `audit` (with the proof's time); `http` (strict bodies, the limiter, `requireFreshProof`). The routes under `/api/v1/schools/[code]/question-bank/` (`reviewers`, `reviewers/[id]`, `settings`), ADMIN and CAMPUS_ADMIN, NO support area. Every change, school-wide or campus, needs the fresh re-authentication (D3) and is audited in the same transaction.
+- [x] The campus rules: the school's administrator assigns and changes for any campus or the whole school; a campus administrator for their own campus only (another campus 403 from `createCampus`, the whole school 403, another campus's row 404, a school-wide row 403); a campus may only narrow a switch; `scope CAMPUS` with a null campus is a 400 (null is not "mine").
+- [x] The screen: `/schools/[code]/question-bank` with Reviewers and Settings tabs, the step-up dialog, the nav entry for the two roles. Covers is a select, not radio buttons (a phone control must be 44 px).
+- [x] Tests: `tests/api/question-bank-admin.spec.ts` (16: who may call, the proof, every campus rule, the audit rows, concurrency, two schools, the support view), `tests/e2e/question-bank-admin-screens.spec.ts` (desktop and phone, axe in both themes), the nav and route guard unit specs.
+- [x] Mutation checks (each restored and a control re-run green): a campus allowed to widen a switch, the fresh proof not checked, pupils and parents accepted as reviewers, the proof's time not recorded, a Remove button offered for a school-wide reviewer. Each failed the spec that names it.
 
 ### Slice C: the questions and their review (service and API)
 - [ ] `items-service`, `review-service`, the routes, and the two-school, campus and support-view tests.

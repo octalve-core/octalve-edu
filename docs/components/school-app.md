@@ -114,6 +114,16 @@ The Users page: the school's people, their invitations and the dialogs that chan
 | `UsersPanel.tsx` | Client component, props `schoolCode`, `schoolName`, `campuses`, `currentUserId`, `actorRole`. Lists members 20 per page with search (waits 300 ms), role, campus (school administrators only) and status filters, and the open invitations (first 100). Row actions: Edit and Deactivate for active people, Reactivate for deactivated ones; none on your own row or, for a campus administrator, on anyone at their level or above. Announces results in one live region and returns focus to the summary line after a change. |
 | `model.ts` | Not a component: the types `Member`, `Invitation`, `PageMeta`, and display rules shared by the dialogs: `PERMISSION_OPTIONS` (plain-language names and help for the four permissions; `CAN_MANAGE_USERS`, "Manage people", is offered but no route checks it), `canHoldPermissions` (staff roles only), `roleOptionsFor` and `mayManage` (a campus administrator gets no administrator-level role and cannot manage one), `campusChoices`, `displayName`, `expiryText`. |
 
+## `src/components/question-bank/`
+
+The Question bank administration page (task 0024 slice B). Presentation only: the question bank APIs decide who may do what and say why not; every change goes through the step-up dialog of `components/settings/`.
+
+| File | Description |
+| --- | --- |
+| `QuestionBankSections.tsx` | Client component: the page's two tabs, "Reviewers" and "Settings", as an ARIA tab list (Left, Right, Home and End move between tabs); only the active tab is mounted. Exports the props the panels share (`schoolCode`, `hasMfa`, `actorRole`, `ownCampusId`, `campuses`). |
+| `ReviewersPanel.tsx` | Client component: the reviewers of the school or one campus (`GET .../question-bank/reviewers`), "Set for every campus" for a school-wide one a campus administrator cannot remove, an add form (search staff across the four staff roles, covers every subject or one, exam approver) and Remove. Each change opens the step-up dialog first; the server's refusal (a wrong password, a duplicate) is shown in the dialog. A campus administrator has no campus choice. |
+| `SettingsPanel.tsx` | Client component: the 16 switches for the school or one campus (`GET` and `PUT .../question-bank/settings`), each with its help and which way "stricter" goes, the school's value, the campus's own and what applies. A flag is a switch, a number a field, a set size list a field of numbers, a choice a select; a campus can "use the school's value" (clears its own). "Review N changes" opens the step-up dialog listing each change (showing a parent more is flagged as a widening); the optional reason is kept with the change. |
+
 ## `src/components/settings/`
 
 The school settings screen (nine switches, step-up before saving, audit history) and a custom-domain screen that no page uses.
