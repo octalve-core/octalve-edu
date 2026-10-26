@@ -84,9 +84,15 @@ export function reviewPower(viewer: BankViewer, item: Pick<BankItemFacts, "campu
   return power.mayReview ? power : NONE;
 }
 
-/// Who may write a question into a campus: a school administrator; an administrator or teacher of that campus; a reviewer who is active staff there (a reviewer may be non-teaching).
-export function mayAuthorIn(viewer: BankViewer, campusId: string): boolean {
+/// Who may write a question into a campus: the school's administrator; an administrator or teacher of that campus (or of the whole school); a reviewer who is active staff there
+/// (a reviewer may be non-teaching). With no campus (`null`: a school-wide question, as in a school with no campuses of its own) only the school's administrator and teaching
+/// staff whose membership is school-wide, or a school-wide reviewer who is school-wide staff, may.
+export function mayAuthorIn(viewer: BankViewer, campusId: string | null): boolean {
   if (viewer.isSchoolAdmin) return true;
+  if (campusId === null) {
+    if (viewer.memberships.some((m) => m.campusId === null && TEACHING_ROLES.includes(m.role))) return true;
+    return liveReviewerRows(viewer).some((row) => row.campusId === null) && viewer.memberships.some((m) => m.campusId === null && STAFF_ROLES.includes(m.role));
+  }
   if (viewer.memberships.some((m) => covers(m, campusId) && TEACHING_ROLES.includes(m.role))) return true;
   return liveReviewerRows(viewer).some((row) => (row.campusId === null || row.campusId === campusId) && staffIn(viewer, campusId));
 }

@@ -1,7 +1,7 @@
 # 0024: The question bank in Octalve Edu (parity with AlEemaan's task 0032, slices 1 and 2)
 
 - **Period / Focus:** 2026-10-26 onward (the maintainer's order of 2026-10-19: Octalve follows AlEemaan slice by slice, before the walkthrough)
-- **Status:** In Progress (slice A merged as PR #68; slice B built, in review; C to E not started)
+- **Status:** In Progress (slices A and B merged as PRs #68 and #69; slice C built, in review; D and E not started)
 - **Priority:** High
 - **Assignee:** Agent (Claude); the maintainer runs each migration on the hosted database before the code that needs it is deployed there, and supplies the image-store credentials
 - **Target Branch / PR:** `dev`; slice A `claude/qbank-1-foundation`
@@ -44,8 +44,11 @@ The slices follow AlEemaan's, grouped so that each pull request leaves something
 - [x] Tests: `tests/api/question-bank-admin.spec.ts` (16: who may call, the proof, every campus rule, the audit rows, concurrency, two schools, the support view), `tests/e2e/question-bank-admin-screens.spec.ts` (desktop and phone, axe in both themes), the nav and route guard unit specs.
 - [x] Mutation checks (each restored and a control re-run green): a campus allowed to widen a switch, the fresh proof not checked, pupils and parents accepted as reviewers, the proof's time not recorded, a Remove button offered for a school-wide reviewer. Each failed the spec that names it.
 
-### Slice C: the questions and their review (service and API)
-- [ ] `items-service`, `review-service`, the routes, and the two-school, campus and support-view tests.
+### Slice C: the questions and their review (`claude/qbank-3-items`)
+- [x] `viewer` (an active membership of THIS school, the school's administrator, reviewer rows, the subjects taught per campus), `items-common`, `items-service`, `review-service`, `items-http`; seven routes under `/api/v1/schools/[code]/question-bank/` (`items`, `items/[id]`, `submit`, `approve`, `reject`, `retire`, `review-queue`), the four staff roles, NO support area. Every write is one transaction through `auth.tenant.run` that re-reads the person, locks the item, asks `rules.ts`, and writes the item, an append-only review row, a version snapshot and an audit row.
+- [x] What a school adds: `campusId` defaults to the writer's own campus; `null` is a school-wide question (the school's administrator, or school-wide teaching staff in a school with no campuses); a campus of another school is a 404; another school's question is "Not found" in every verb; `mayAuthorIn(viewer, null)` in `rules.ts`.
+- [x] Tests: `tests/api/question-bank-items.spec.ts` (ported from AlEemaan's 29 and extended: two schools, a school-wide membership, a school with no campuses, the support view), `rules` unit tests for the school-wide case.
+- [x] Found while building it: the review queue of a reviewer for every campus was empty because an empty `{}` inside `OR` is not "everything". Fixed here (the condition is left out) and in AlEemaan's merged code.
 
 ### Slice D: pictures
 - [ ] Add, serve and remove, with the school in every storage key (`octalve/<tenantId>/question-bank/<imageId>`) and the tenant checked before the store is asked.
