@@ -94,6 +94,7 @@ async function open(page: Page, who: TestUser) {
   await signInThroughUi(page, who);
   await page.goto(`/schools/${school.code}/question-bank`);
   await expect(page.getByRole("heading", { level: 1, name: "Question bank" })).toBeVisible();
+  await page.getByRole("tab", { name: "Reviewers" }).click(); // Browse comes first
 }
 /// Types the password in the step-up dialog and confirms; the dialog is gone when this returns.
 async function confirm(page: Page, who: TestUser) {
@@ -103,7 +104,7 @@ async function confirm(page: Page, who: TestUser) {
   await expect(dialog(page)).toBeHidden();
 }
 
-test("who sees the page: the school's administrator and a campus administrator find it in the navigation; a teacher and a pupil are told no", async ({ page, browser, isMobile }) => {
+test("who sees the page: the school's administrator and a campus administrator find it in the navigation; a teacher finds it with the staff tabs only; a pupil is told no", async ({ page, browser, isMobile }) => {
   await signInThroughUi(page, admin);
   if (isMobile) {
     const more = page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "More" });
@@ -120,18 +121,24 @@ test("who sees the page: the school's administrator and a campus administrator f
   await expect(page).toHaveURL(new RegExp(`/schools/${school.code}/question-bank$`));
   await expect(page.getByRole("heading", { level: 1, name: "Question bank" })).toBeVisible();
 
-  for (const [person, label] of [
-    [tola, "a teacher"],
-    [pupil, "a pupil"],
-  ] as const) {
-    const context = await browser.newContext({ baseURL: SAAS_URL });
-    const other = await context.newPage();
-    await signInThroughUi(other, person);
-    await other.goto(`/schools/${school.code}/question-bank`);
-    await expect(other.getByRole("heading", { level: 1, name: "Question bank" }), label).toHaveCount(0);
-    await expect(other.getByRole("tab"), label).toHaveCount(0);
-    await context.close();
-  }
+  // a teacher finds the page too, with the staff tabs and none of the administrators'; a pupil is told no
+  const teacherContext = await browser.newContext({ baseURL: SAAS_URL });
+  const teacherPage = await teacherContext.newPage();
+  await signInThroughUi(teacherPage, tola);
+  await teacherPage.goto(`/schools/${school.code}/question-bank`);
+  await expect(teacherPage.getByRole("heading", { level: 1, name: "Question bank" })).toBeVisible();
+  await expect(teacherPage.getByRole("tab", { name: "Browse" })).toBeVisible();
+  await expect(teacherPage.getByRole("tab", { name: "My questions" })).toBeVisible();
+  for (const name of ["Review queue", "Reviewers", "Settings"]) await expect(teacherPage.getByRole("tab", { name })).toHaveCount(0);
+  await teacherContext.close();
+
+  const pupilContext = await browser.newContext({ baseURL: SAAS_URL });
+  const pupilPage = await pupilContext.newPage();
+  await signInThroughUi(pupilPage, pupil);
+  await pupilPage.goto(`/schools/${school.code}/question-bank`);
+  await expect(pupilPage.getByRole("heading", { level: 1, name: "Question bank" }), "a pupil").toHaveCount(0);
+  await expect(pupilPage.getByRole("tab"), "a pupil").toHaveCount(0);
+  await pupilContext.close();
 });
 
 test("reviewers: add one through the step-up dialog, see them listed, remove them; a wrong password is told in the dialog and nothing is added", async ({ page, isMobile }) => {

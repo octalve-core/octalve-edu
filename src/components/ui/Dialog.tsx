@@ -47,7 +47,10 @@ export function Dialog({
       ref={ref}
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
-      onClose={onClose}
+      // A nested dialog's `close` event bubbles to its parent's handler: only this dialog's own closing counts.
+      onClose={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
       className={`fixed inset-0 m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] ${wide ? "max-w-3xl" : "max-w-lg"} overflow-y-auto rounded-2xl border border-line bg-surface p-0 text-fg shadow-menu backdrop:bg-black/60`}
     >
       {open && (

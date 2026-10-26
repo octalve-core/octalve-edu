@@ -116,13 +116,21 @@ The Users page: the school's people, their invitations and the dialogs that chan
 
 ## `src/components/question-bank/`
 
-The Question bank administration page (task 0024 slice B). Presentation only: the question bank APIs decide who may do what and say why not; every change goes through the step-up dialog of `components/settings/`.
+The Question bank page (task 0024 slices B and E). Staff write, browse and review questions; administrators also choose the reviewers and the switches. Presentation only: the question bank APIs decide who may do what and say why not; every administrator change goes through the step-up dialog of `components/settings/`, and a button the server's `can` flags would refuse is simply not drawn.
 
 | File | Description |
 | --- | --- |
-| `QuestionBankSections.tsx` | Client component: the page's two tabs, "Reviewers" and "Settings", as an ARIA tab list (Left, Right, Home and End move between tabs); only the active tab is mounted. Exports the props the panels share (`schoolCode`, `hasMfa`, `actorRole`, `ownCampusId`, `campuses`). |
+| `QuestionBankSections.tsx` | Client component: the page's tabs as an ARIA tab list (Left, Right, Home and End move between tabs); only the active tab is mounted. Browse and My questions for every staff member, Review queue for a reviewer or an administrator, Reviewers and Settings for the school's administrator and a campus administrator. Wraps them in `BankApiProvider`. Exports the props the panels share (`schoolCode`, `hasMfa`, `actorRole`, `ownCampusId`, `campuses`). |
 | `ReviewersPanel.tsx` | Client component: the reviewers of the school or one campus (`GET .../question-bank/reviewers`), "Set for every campus" for a school-wide one a campus administrator cannot remove, an add form (search staff across the four staff roles, covers every subject or one, exam approver) and Remove. Each change opens the step-up dialog first; the server's refusal (a wrong password, a duplicate) is shown in the dialog. A campus administrator has no campus choice. |
 | `SettingsPanel.tsx` | Client component: the 16 switches for the school or one campus (`GET` and `PUT .../question-bank/settings`), each with its help and which way "stricter" goes, the school's value, the campus's own and what applies. A flag is a switch, a number a field, a set size list a field of numbers, a choice a select; a campus can "use the school's value" (clears its own). "Review N changes" opens the step-up dialog listing each change (showing a parent more is flagged as a widening); the optional reason is kept with the change. |
+| `BankApi.tsx` | Client component `BankApiProvider({ schoolCode })` and the hook `useBankApi()`: where this school's question bank API lives (`/api/v1/schools/<code>/question-bank`), so the code is not passed through every component below the tabs. |
+| `DecisionDialogs.tsx` | Client components `ReasonDialog` (send back or retire: a reason is required) and `ApproveDialog` (confirm the subject and classes; only a person the server allows is offered who may see the question, and whether it is general). |
+| `QuestionDetail.tsx` | Client component, a dialog (props `id`, `onClose`, `onChanged`, `onEdit`, `onOpen`) showing one question: the words, the answer key, the pictures, the history, the overlap warning (present only when the server sent it) and only the buttons the server's `can` flags allow. |
+| `QuestionForm.tsx` | Client component, a dialog (props `open`, `item`, `writeCampuses`, `wholeSchool`, `onClose`, `onSaved`) to write or correct a question, and, once it is saved, to add pictures (each with a description or marked decorative) and remove them. A person tied to one campus is not asked which campus. |
+| `QuestionsPanel.tsx` | Client component for the three lists, `view` `browse`, `mine` or `queue`: filters, a page at a time, the detail dialog and the form. The lists are exactly what the server answered. |
+| `TagInput.tsx` | Client component: a list of short labels (the classes a question is for) typed and added with Enter or a button, each removable. |
+| `model.ts` | What the screens know about a question, in plain code (no zod: a client component must not import it): the API item type, status and type labels, `answerKey`, `imageUrl(api, itemId, imageId)`, `snippet`, and the question form's state with `blankForm`, `formOf` and `bodyOf` (the request the server's own parser accepts). |
+| `say.ts` | `say(reply, fallback)`: what to tell the person when a call failed, the server's own words when it gave some. |
 
 ## `src/components/settings/`
 

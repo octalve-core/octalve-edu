@@ -47,6 +47,8 @@ export function navFor(school: ShellSchool | null, platform = false): NavItem[] 
     items.push(
       { label: "Academics", href: `/schools/${school.code}/academics`, icon: CalendarIcon },
       { label: "People", href: `/schools/${school.code}/people`, icon: GraduationCapIcon },
+      // Staff write and browse questions here; whether they may review is decided on the page.
+      { label: "Question bank", href: `/schools/${school.code}/question-bank`, icon: FileTextIcon },
     );
   }
   return [...items, ...platformItem];
