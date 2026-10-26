@@ -321,4 +321,4 @@
 
 ## TASK-0024: the question bank (parity with AlEemaan's task 0032)
 
-[Task file](0024-question-bank.md). Slice A (schema, migration, pure parts, database tests) is on `claude/qbank-1-foundation`; slices B to E (reviewers and switches, the questions and their review, pictures, the screens) are not started.
+[Task file](0024-question-bank.md). Slice A (schema, migration, pure parts, database tests) is merged (PR #68). Slice B (reviewers and switches: services, routes, screen) is on `claude/qbank-2-reviewers-settings`; slices C to E (the questions and their review, pictures, the screens) are not started.
