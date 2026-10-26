@@ -321,4 +321,4 @@
 
 ## TASK-0024: the question bank (parity with AlEemaan's task 0032)
 
-[Task file](0024-question-bank.md). Slice A (schema, migration, pure parts, database tests) is merged (PR #68). Slice B (reviewers and switches) is merged (PR #69). Slice C (the questions and their review: service and API) is on `claude/qbank-3-items`; slice D (pictures) is on `claude/qbank-4-pictures`; slice E (the screens) is on `claude/qbank-5-screens`, stacked on them.
+[Task file](0024-question-bank.md). Slice A (schema, migration, pure parts, database tests) is merged (PR #68). Slice B (reviewers and switches) is merged (PR #69). Slice C (the questions and their review: service and API) is merged (PR #70). Slice D (pictures) is merged (PR #71). Slice E (the screens: Browse, My questions, Review queue, a navigation entry for staff) is merged (PR #72). All five slices are on `dev` (2026-10-26); what remains is the walkthrough, the hosted migration and image store, and the slice that reads `bank.parents.view`.

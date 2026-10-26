@@ -1,7 +1,7 @@
 # 0024: The question bank in Octalve Edu (parity with AlEemaan's task 0032, slices 1 and 2)
 
 - **Period / Focus:** 2026-10-26 onward (the maintainer's order of 2026-10-19: Octalve follows AlEemaan slice by slice, before the walkthrough)
-- **Status:** In Progress (slices A and B merged as PRs #68 and #69; C, D and E built and in review, stacked on each other)
+- **Status:** In Progress (slices A to E merged as PRs #68, #69, #70, #71 and #72 on 2026-10-26; the parent view of the bank, the hosted migration and the image store remain)
 - **Priority:** High
 - **Assignee:** Agent (Claude); the maintainer runs each migration on the hosted database before the code that needs it is deployed there, and supplies the image-store credentials
 - **Target Branch / PR:** `dev`; slice A `claude/qbank-1-foundation`
