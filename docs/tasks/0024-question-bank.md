@@ -1,7 +1,7 @@
 # 0024: The question bank in Octalve Edu (parity with AlEemaan's task 0032, slices 1 and 2)
 
 - **Period / Focus:** 2026-10-26 onward (the maintainer's order of 2026-10-19: Octalve follows AlEemaan slice by slice, before the walkthrough)
-- **Status:** In Progress (slices A and B merged as PRs #68 and #69; slice C built, in review; D and E not started)
+- **Status:** In Progress (slices A and B merged as PRs #68 and #69; C and D built and in review; E built on top of them)
 - **Priority:** High
 - **Assignee:** Agent (Claude); the maintainer runs each migration on the hosted database before the code that needs it is deployed there, and supplies the image-store credentials
 - **Target Branch / PR:** `dev`; slice A `claude/qbank-1-foundation`
@@ -49,9 +49,16 @@ The slices follow AlEemaan's, grouped so that each pull request leaves something
 - [x] What a school adds: `campusId` defaults to the writer's own campus; `null` is a school-wide question (the school's administrator, or school-wide teaching staff in a school with no campuses); a campus of another school is a 404; another school's question is "Not found" in every verb; `mayAuthorIn(viewer, null)` in `rules.ts`.
 - [x] Tests: `tests/api/question-bank-items.spec.ts` (ported from AlEemaan's 29 and extended: two schools, a school-wide membership, a school with no campuses, the support view), `rules` unit tests for the school-wide case.
 - [x] Found while building it: the review queue of a reviewer for every campus was empty because an empty `{}` inside `OR` is not "everything". Fixed here (the condition is left out) and in AlEemaan's merged code.
+- [x] Found while building it: `tests/unit/route-area-guard.spec.ts` had been failing on `dev` since slice B, because the question bank's GET routes declare no support area. They are now on the out-of-reach list with the reason (the bank is the school's own teaching material, which a support view must not read).
+- [x] Mutation checks on `question-bank-items.spec.ts` (each failed a test, then restored; control 33 passed): the list not asking `staffMaySee`, the overlap shown to everyone, the decision rule skipped, another school's campus accepted, the review queue without the every-campus condition, the right to set visibility unchecked.
 
-### Slice D: pictures
-- [ ] Add, serve and remove, with the school in every storage key (`octalve/<tenantId>/question-bank/<imageId>`) and the tenant checked before the store is asked.
+### Slice D: pictures (`claude/qbank-4-pictures`)
+- [x] `images-input` (one `file`, an `alt` of at most 300 characters, `decorative`; nothing else), `images-service` (`addImage`, `removeImage`, `readImage`, each inside `auth.tenant.run`) and three routes under `items/[id]/images`: POST (multipart), GET (the bytes) and DELETE. A picture is part of the question, so adding or removing one is an edit by the same people: a new version with a snapshot, an `EDITED` review row for a reviewer, an audit row.
+- [x] The school is in every storage key (`octalve/<tenantId>/question-bank/<imageId>`) and in every query; the item is looked up inside the school before the store is asked anything, and the file is stored before the row and removed again if the row is refused. A removed picture's file is deleted after the row. No store configured is a `503` after who is asking.
+- [x] `read-body.ts` gains `readBoundedBytes` and `readBoundedForm` (a form is read no further than the picture limit plus 64 KB and only then parsed); the test servers have `IMAGE_STORE=memory` and the test runner none, which is where the `503` is checked.
+- [x] Tests: `tests/api/question-bank-images.spec.ts` (17 with the setup project: add and serve with nothing but pixels, descriptions, hostile files, the size limits, the picture limit and a race, who may add, serve and remove, another school, the support view, removal, retired questions, no store), `tests/unit/read-body.spec.ts`.
+- [x] Mutation checks (each failed a test, then restored; control 17 passed): the school missing from the key, a picture served without the access check, no limit check in the transaction, anyone who can see a question allowed to change its pictures, the bank-off switch ignored, no `EDITED` review row for a reviewer, the form type not checked, a description not required, the read cap too loose.
+- [ ] Not run for this slice: the browser projects (the screens are slice E), the full suite on merged `dev`. The hosted deployment needs `IMAGE_STORE` and that backend's credentials before pictures work there.
 
 ### Slice E: the screens
 - [ ] Browse, My questions and Review queue, and the navigation entry for staff.

@@ -11,6 +11,8 @@ export type ApiOptions = {
   /// JSON-serialised unless `rawBody` is given.
   body?: unknown;
   rawBody?: string;
+  /// Sent as multipart/form-data (the Content-Type, with its boundary, is set by `fetch`).
+  form?: FormData;
   /// Client IP the server sees: a fresh unique one by default (own rate-limit
   /// buckets); pass a string to reuse one; `null` sends no IP header at all.
   ip?: string | null;
@@ -26,6 +28,8 @@ export type ApiResponse = {
   headers: Headers;
   setCookies: string[];
   text: string;
+  /// The body exactly as it arrived (for a picture, which `text` would damage).
+  bytes: Buffer;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   json: any;
 };
@@ -33,26 +37,27 @@ export type ApiResponse = {
 export async function api(path: string, opts: ApiOptions = {}): Promise<ApiResponse> {
   const baseUrl = opts.baseUrl ?? HTTP_URL;
   const headers: Record<string, string> = {};
-  if (opts.body !== undefined || opts.rawBody !== undefined) headers["content-type"] = "application/json";
+  if (opts.form === undefined && (opts.body !== undefined || opts.rawBody !== undefined)) headers["content-type"] = "application/json";
   if (opts.origin !== null) headers.origin = opts.origin ?? baseUrl;
   if (opts.ip !== null) headers["x-real-ip"] = opts.ip ?? uniqueIp();
   if (opts.cookie) headers.cookie = opts.cookie;
   Object.assign(headers, opts.headers);
 
   const res = await fetch(`${baseUrl}${path}`, {
-    method: opts.method ?? (opts.body !== undefined || opts.rawBody !== undefined ? "POST" : "GET"),
+    method: opts.method ?? (opts.body !== undefined || opts.rawBody !== undefined || opts.form !== undefined ? "POST" : "GET"),
     headers,
-    body: opts.rawBody ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined),
+    body: opts.form ?? opts.rawBody ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined),
     redirect: "manual",
   });
-  const text = await res.text();
+  const bytes = Buffer.from(await res.arrayBuffer());
+  const text = bytes.toString("utf8");
   let json: unknown = null;
   try {
     json = JSON.parse(text);
   } catch {
     // not JSON (e.g. a redirect or an HTML page)
   }
-  return { status: res.status, headers: res.headers, setCookies: res.headers.getSetCookie(), text, json };
+  return { status: res.status, headers: res.headers, setCookies: res.headers.getSetCookie(), text, bytes, json };
 }
 
 export type ParsedCookie = {
