@@ -1,6 +1,6 @@
 # Octalve Edu — Project Status & Handover Documentation
 
-> **Last Updated:** 2026-10-21  
+> **Last Updated:** 2026-10-27 (start with section 6.00; the sections below it are the record of 2026-10-21 and earlier)  
 > **Scope:** Octalve Edu Multi-Tenant School Management SaaS (Canonical Reference Architecture)  
 > **Repository:** `octalve-core/octalve-edu`  
 > **Active Branch:** `dev` (54 commits ahead of `master` on 2026-10-21; `master` is `dev` as of PR #30 on 2026-10-18 and `prod` is 5 commits behind `master`: nothing since #30 has been promoted)  
@@ -96,15 +96,40 @@ A detailed technical blueprint is documented in:
 
 ## 5. Verification & Test Suite Health
 
+- **Suite Status (2026-10-27): no full run since the one below; the full run of the merged `dev` (after PR #74) is still to be recorded (6.00).** The entry of 2026-10-21 follows.
 - **Suite Status (2026-10-21):** the last full run (every Playwright project, production build, 2.1 h) was on `dev` after PRs #36 to #44 on 2026-10-20: 2159 passed, 23 skipped (documented design skips), 2 failed; the two failures were test problems and are repaired by PR #48 (task 0019). It predates #45 to #51: **one full run on the current `dev` is still to be done** (when the machine is quiet; run it in its own lane, 7.3). The unit project on `dev` after #49: 396 passed.
 - **RLS Guard:** `tests/integration/tenant-rls.spec.ts` verifies all tenant tables enforce Postgres Row-Level Security.
 - **Cross-Tenant Guard:** `tests/api/tenant-boundary.spec.ts` executes automated IDOR attacks on every tenant-scoped endpoint.
 
 ---
 
-## 6. Current work (2026-10-21)
+## 6. Current work (2026-10-27)
 
-### Start here: where things stand on 2026-10-21
+### 6.00 State on 2026-10-27 (start here; this supersedes "Start here" of 2026-10-21 below, which is kept as the record)
+
+**On `dev` (tip `9fae4fa`, PR #74):** everything below is merged; nothing is promoted to `master` or `prod` (that needs the maintainer's approval), and neither product is live.
+- **Results approvers by assignment (ADR 0018, Accepted; task 0020) is complete:** slice 1 PR #54, slice 2a PR #64 (the school setting for classes in no section), 2b PR #65 (sections and approvers API), 3 PR #66 (the settings screen); the ADR and its amendment are PRs #51, #62, #63.
+- **The question bank (task 0024) is complete in the form planned, slices A to E:** A schema and pure parts (#68), B reviewers and switches (#69), C questions, review queue and decisions (#70), D pictures (#71), E the screens: Browse, My questions, Review queue, and a "Question bank" navigation entry for staff (#72). The design note is `docs/development-history/forms-and-question-bank-parity.md` (D1 to D6, all decided). Pictures need an image store (`IMAGE_STORE` and that backend's credentials) on a hosted deployment; without one the picture routes answer 503 and the rest works.
+- **`bank.parents.view`** (`NONE`, `SUMMARY`, `FULL`; default `NONE`; a campus may only choose less) is stored, edited and audited, and READ BY NOTHING yet: it is used when pupils practise and when reports exist (slices 4 and 5, not started). AlEemaan does not get a second key: its `portal_access.guardian.practice` is the same choice (a proposal for the maintainer to confirm, in the parity note D4 and in AlEemaan's task 0040 section 3).
+- Other fixes since 2026-10-21: the proxy and the shared body reader (#56, #57), a 413 closes the connection (#59), invoice numbers (#58), payment status access (#60), the 44 px settings switches and the step-up dialog (#67), and the docs PRs (#52, #55, #61, #73, #74).
+
+**Waiting on the maintainer (none blocks the next code work):**
+1. The hosted database, in this order, each BEFORE the code that needs it is deployed there: `20261029090000_certificate_verification_token`, `20261030090000_results_approval_scopes`, `20261031090000_unsectioned_class_approval`, `20261101090000_question_bank` (the AI never runs a migration on the hosted database).
+2. `IMAGE_STORE` and credentials (S3, R2 or Cloudinary) for pictures; rotating the credentials that were exposed; the held docs PR #53 (answers on ISS-0030).
+3. Clean-up of merged branches and leftover worktrees (`../octalve-edu-fixes` was reused for every question bank slice and is on a docs branch now). `../octalve-edu` holds an UNCOMMITTED saved diff (branch `claude/octalve-path-ids`): do not touch it without the maintainer.
+
+**Verification as of this entry:** per slice, on its own lane: C 33 api tests and 6 of 6 mutations caught; D 17 api, 35 unit, 49 regression and 9 of 9 mutations caught; E 53 unit and 9 desktop plus 9 phone end-to-end tests. NOT mutation-checked: the slice E screens (the server rules behind them are). **One full run of every project on the merged `dev` has not been recorded yet**; the last full run is the one in section 5, from before #45.
+
+**Next, in order:**
+1. One full run of every Playwright project on the merged `dev` in its own lane (7.3), recorded here and in section 5.
+2. The question bank slices 4 (pupil practice, which makes `bank.parents.view` do something with `FULL`) and 5 (reports, `SUMMARY`), then use in assessments (3), forms and the rest as in AlEemaan's task 0032 plan.
+3. The review items tracked outside the repository (section 7.6), the screens for certificates and results entry that are built and not mounted, the `/video-guide` pages and a responsiveness audit.
+4. **Task 0033 (the walkthrough video and PDF) runs LAST.**
+
+**Things this work found that apply to new code:** `OR: [{ ... }, {}]` in a Prisma `where` is NOT "match everything" (AlEemaan's review queue for a reviewer of every branch was empty because of it; leave the condition out instead); `contains` treats `%` and `_` as wildcards, so escape the text; a nested `<dialog>` closing fires `close` on the parent, so `Dialog` ignores a close whose target is not itself; `readBoundedForm` and `readBoundedBytes` (`src/lib/api/read-body.ts`) are the only way to read a multipart or raw body; the test servers run `IMAGE_STORE=memory` (the dev-tools server has none, for the 503 case), and a tenant route cannot be tested on the single-school dev-tools server.
+
+
+### Where things stood on 2026-10-21 (the old "start here"; see 6.00 above for now)
 
 **On `dev` (tip `4dd25a1`, PR #54, plus the docs PRs after it):** everything merged so far: PRs #36 to #54 of 2026-10-20 and 2026-10-21 (review fixes, teacher assignments for results, certificate verification by token, "a request that cannot be valid is a 4xx", the task records, the proposed ADR 0018 and slice 1 of it). `master` is `dev` as of PR #30 (2026-10-18), `prod` is 5 commits behind `master`; nothing since #30 is promoted, and promotion needs the maintainer's explicit approval. Neither product is live (maintainer, 2026-10-21): both are in development mode.
 
