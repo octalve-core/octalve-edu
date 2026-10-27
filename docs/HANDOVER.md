@@ -115,7 +115,7 @@ A detailed technical blueprint is documented in:
 
 **Waiting on the maintainer (none blocks the next code work):**
 1. The hosted database, in this order, each BEFORE the code that needs it is deployed there: `20261029090000_certificate_verification_token`, `20261030090000_results_approval_scopes`, `20261031090000_unsectioned_class_approval`, `20261101090000_question_bank` (the AI never runs a migration on the hosted database).
-2. `IMAGE_STORE` and credentials (S3, R2 or Cloudinary) for pictures; rotating the credentials that were exposed; the held docs PR #53 (answers on ISS-0030).
+2. `IMAGE_STORE` and credentials (S3, R2 or Cloudinary) for pictures; rotating the credentials that were exposed (the docs PR #53 that was once held is merged since 2026-10-21).
 3. **Clean-up (done locally on 2026-10-27, at the maintainer's request):** 37 local branches whose tip is in `dev` were deleted. Kept: `../octalve-edu-fixes` (reused for every question bank slice and for the test runs); `claude/octalve-path-ids` in `../octalve-edu`, which holds an UNCOMMITTED saved diff (`with-auth.ts`, `proxy.ts`, `proxy.spec.ts`, `ids.ts` and two new specs): do not touch it without the maintainer; and the unmerged local branches `claude/design-campus-admins-platform-superadmin`, `claude/staff-guardian-extended-fields`, `claude/ui-fixes-hydration-nav` and `docs/handover-and-operations-blueprint`. The REMOTE branches were not deleted (deleting a published branch is outward-facing; say if they should go).
 4. **Promotion:** a `dev` to `master` PR was opened on 2026-10-27 at the maintainer's request (see the PR list). It is merged only when the maintainer approves that specific PR; the full run of the merged `dev` (below) is not recorded yet, and is worth waiting for.
 
