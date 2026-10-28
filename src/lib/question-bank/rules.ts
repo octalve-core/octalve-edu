@@ -1,4 +1,4 @@
-import { Role, type BankItemStatus, type BankVisibility } from "@prisma/client";
+import { Permission, Role, type BankItemStatus, type BankVisibility } from "@prisma/client";
 
 // Who may do what with a question bank item (design note sections 6 and 7; slice 2 rules in docs/tasks/0032, section 4b). Pure functions over facts already loaded, so every rule
 // can be tested as a table without a database, and the routes and services all ask the same code. The loaders (`loadViewer`) live in `viewer.ts`; nothing here reads or writes.
@@ -17,8 +17,8 @@ export type BankViewer = {
   userId: string;
   /// Already true only for a school administrator who still holds an active membership (see `campus-access.ts`).
   isSchoolAdmin: boolean;
-  /// ACTIVE memberships only.
-  memberships: ReadonlyArray<{ campusId: string | null; role: Role }>;
+  /// ACTIVE memberships only. `permissions` are the extra capabilities an administrator gave that membership; absent means none.
+  memberships: ReadonlyArray<{ campusId: string | null; role: Role; permissions?: readonly Permission[] }>;
   reviewerRows: ReadonlyArray<{
     campusId: string | null;
     scope: "GENERAL" | "SUBJECT";
@@ -56,6 +56,45 @@ const anyAdmin = (viewer: BankViewer) => viewer.memberships.some((m) => m.role =
 export function mayReachCampus(viewer: BankViewer, campusId: string | null): boolean {
   if (viewer.isSchoolAdmin) return true;
   return campusId === null ? anyStaff(viewer) : staffIn(viewer, campusId);
+}
+
+/// How far a person reaches into a form that is named by its id (task 0024):
+///   - `view`: the form and its settings;
+///   - `read`: its results, answers, turn-ins and marking queues;
+///   - `manage`: edit, close, mark, record turn-ins and record paper work, print.
+/// Each level includes the one before it.
+export type FormAccess = "view" | "read" | "manage";
+
+export type FormFacts = { campusId: string | null; createdById: string };
+
+/// A membership reaches a form's campus EXACTLY: a campus form is reached by that campus's members and by a membership with no campus; a form of the whole school (no campus) only by
+/// a membership with no campus, because its results hold the pupils of every campus.
+const reachesFormCampus = (m: { campusId: string | null }, campusId: string | null) =>
+  campusId === null ? m.campusId === null : covers(m, campusId);
+
+/// Who reaches a form by its id, and how far. Staff reach the forms of their own campus and, to view, those of the whole school (`mayReachCampus`); another campus's staff reach
+/// nothing, and the caller answers that as a missing form. READ and MANAGE belong to the school's administrator, the administrator of the form's campus, and the form's creator while
+/// they still teach where the form is; a teaching colleague of the same campus views the form and no more. The one way to READ without managing is the grant an administrator gives
+/// (`CAN_VIEW_FORM_RESULTS`), held by a member of staff and bound to the campus rule above; it never writes.
+export function mayAccessForm(viewer: BankViewer, form: FormFacts, access: FormAccess): boolean {
+  if (!mayReachCampus(viewer, form.campusId)) return false;
+  if (access === "view") return true;
+  if (viewer.isSchoolAdmin) return true;
+  if (form.campusId !== null && adminOf(viewer, form.campusId)) return true;
+  if (
+    form.createdById === viewer.userId &&
+    viewer.memberships.some((m) => reachesFormCampus(m, form.campusId) && TEACHING_ROLES.includes(m.role))
+  )
+    return true;
+  return (
+    access === "read" &&
+    viewer.memberships.some(
+      (m) =>
+        reachesFormCampus(m, form.campusId) &&
+        STAFF_ROLES.includes(m.role) &&
+        (m.permissions ?? []).includes(Permission.CAN_VIEW_FORM_RESULTS),
+    )
+  );
 }
 
 /// The reviewer rows that still count: the person is active staff where the row says (anywhere, for an every-campus row).

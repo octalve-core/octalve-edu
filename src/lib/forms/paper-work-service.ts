@@ -8,6 +8,7 @@ import {
   computeRollCallSummary,
   RollCallSummary,
 } from "./paper-work";
+import { campusFilter, reachForm } from "./access";
 
 export class PaperWorkError extends Error {
   constructor(
@@ -16,6 +17,13 @@ export class PaperWorkError extends Error {
   ) {
     super(message);
     this.name = "PaperWorkError";
+  }
+}
+
+/// Paper work the person may not reach is answered as one that does not exist (the campus rule for forms, task 0024).
+async function requirePaperWork(tx: Tx, tenantId: string, userId: string, formId: string, access: "view" | "read" | "manage") {
+  if (!(await reachForm(tx, { tenantId, userId, formId, access, kind: FormKind.PAPER_WORK }))) {
+    throw new PaperWorkError("Paper work assignment not found.", 404);
   }
 }
 
@@ -117,17 +125,14 @@ export async function createPaperWork(tx: Tx, tenantId: string, campusId: string
 export async function listPaperWorkForStaff(tx: Tx, tenantId: string, campusId?: string | null, status?: FormStatus | "ALL") {
   const where: {
     tenantId: string;
-    campusId?: string | null;
+    OR?: Array<{ campusId: string | null }>;
     kind: FormKind;
     status?: FormStatus;
   } = {
     tenantId,
     kind: FormKind.PAPER_WORK,
+    ...campusFilter(campusId),
   };
-
-  if (campusId) {
-    where.campusId = campusId;
-  }
 
   if (status && status !== "ALL") {
     where.status = status;
@@ -170,7 +175,8 @@ export async function listPaperWorkForStaff(tx: Tx, tenantId: string, campusId?:
 /**
  * Retrieves full details and live student roll call for a single paper work.
  */
-export async function getPaperWorkForStaff(tx: Tx, tenantId: string, formId: string) {
+export async function getPaperWorkForStaff(tx: Tx, tenantId: string, userId: string, formId: string) {
+  await requirePaperWork(tx, tenantId, userId, formId, "read");
   const form = await tx.form.findFirst({
     where: { id: formId, tenantId, kind: FormKind.PAPER_WORK },
     include: {
@@ -247,6 +253,7 @@ export async function updateTurnIn(
   targetStatus: TurnInStatus,
   note?: string | null,
 ) {
+  await requirePaperWork(tx, tenantId, staffUserId, formId, "manage");
   const form = await tx.form.findFirst({
     where: { id: formId, tenantId, kind: FormKind.PAPER_WORK },
     select: { id: true, closesAt: true, status: true },
@@ -311,6 +318,7 @@ export async function batchUpdateTurnIns(
   formId: string,
   updates: Array<{ studentId: string; status: TurnInStatus; note?: string | null }>,
 ) {
+  await requirePaperWork(tx, tenantId, staffUserId, formId, "manage");
   const form = await tx.form.findFirst({
     where: { id: formId, tenantId, kind: FormKind.PAPER_WORK },
     select: { id: true, closesAt: true },
@@ -373,7 +381,8 @@ export async function batchUpdateTurnIns(
 /**
  * Synchronizes roll call roster if new students enrolled into targeted classes after creation.
  */
-export async function syncRosterForPaperWork(tx: Tx, tenantId: string, formId: string) {
+export async function syncRosterForPaperWork(tx: Tx, tenantId: string, userId: string, formId: string) {
+  await requirePaperWork(tx, tenantId, userId, formId, "manage");
   const form = await tx.form.findFirst({
     where: { id: formId, tenantId, kind: FormKind.PAPER_WORK },
     include: { audiences: true },
@@ -449,6 +458,7 @@ export async function syncRosterForPaperWork(tx: Tx, tenantId: string, formId: s
  * Closes paper work assignment.
  */
 export async function closePaperWork(tx: Tx, tenantId: string, staffUserId: string, formId: string) {
+  await requirePaperWork(tx, tenantId, staffUserId, formId, "manage");
   const form = await tx.form.findFirst({
     where: { id: formId, tenantId, kind: FormKind.PAPER_WORK },
   });

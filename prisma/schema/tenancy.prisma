@@ -155,6 +155,8 @@ enum Permission {
   CAN_MANAGE_FINANCE
   CAN_PUBLISH_CONTENT
   CAN_MANAGE_USERS
+  /// Reads form results, answers and turn-ins (task 0024): non-teaching staff do not, unless an administrator gives them this. Read only, and held to the campus rule.
+  CAN_VIEW_FORM_RESULTS
 }
 
 /// The verified membership table PRD §7's tenant-trust-boundary check reads:

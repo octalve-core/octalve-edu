@@ -7,6 +7,9 @@ import {
   canMarkResponse,
   sanitizeResponseForPupil,
 } from "./manual-marking";
+import { reachForm } from "./access";
+import { loadViewer } from "@/lib/question-bank/viewer";
+import { mayAccessForm } from "@/lib/question-bank/rules";
 
 export class ManualMarkingError extends Error {
   constructor(
@@ -19,6 +22,18 @@ export class ManualMarkingError extends Error {
   }
 }
 
+/// A response of a form the person may not reach, or one that does not belong to the form named in the URL, is answered as a response that does not exist (the campus rule for
+/// forms, task 0024): reading answers is READ, marking is MANAGE.
+async function requireResponseAccess(
+  tx: Tx,
+  p: { tenantId: string; userId: string; urlFormId: string; responseFormId: string; access: "read" | "manage" },
+) {
+  if (p.responseFormId !== p.urlFormId) throw new ManualMarkingError("Form response not found.", 404, "NOT_FOUND");
+  if (!(await reachForm(tx, { tenantId: p.tenantId, userId: p.userId, formId: p.responseFormId, access: p.access }))) {
+    throw new ManualMarkingError("Form response not found.", 404, "NOT_FOUND");
+  }
+}
+
 /**
  * Lists form responses requiring manual marking in a school/campus.
  */
@@ -26,11 +41,20 @@ export async function listPendingMarkingResponses(
   tx: Tx,
   params: {
     tenantId: string;
+    userId: string;
     campusId?: string | null;
     formId?: string;
     markingStatus?: FormMarkingStatus;
   },
 ) {
+  // The queue is made of the answers of forms the person may READ; asking for one form they may not read is the same 404 as a form that does not exist.
+  if (
+    params.formId &&
+    !(await reachForm(tx, { tenantId: params.tenantId, userId: params.userId, formId: params.formId, access: "read" }))
+  ) {
+    throw new ManualMarkingError("Form not found.", 404, "NOT_FOUND");
+  }
+  const viewer = await loadViewer(tx, params.tenantId, params.userId);
   const where: Record<string, unknown> = {
     tenantId: params.tenantId,
     status: FormResponseStatus.COMPLETED,
@@ -62,6 +86,8 @@ export async function listPendingMarkingResponses(
           id: true,
           title: true,
           kind: true,
+          campusId: true,
+          createdById: true,
         },
       },
       student: {
@@ -95,30 +121,32 @@ export async function listPendingMarkingResponses(
     },
   });
 
-  return responses.map((r) => {
-    const totalQuestions = r.answers.length;
-    const pendingQuestions = r.answers.filter((a) => a.markingStatus === FormMarkingStatus.PENDING).length;
-    const markedQuestions = r.answers.filter((a) => a.markingStatus === FormMarkingStatus.MARKED).length;
+  return responses
+    .filter((r) => mayAccessForm(viewer, r.form, "read"))
+    .map((r) => {
+      const totalQuestions = r.answers.length;
+      const pendingQuestions = r.answers.filter((a) => a.markingStatus === FormMarkingStatus.PENDING).length;
+      const markedQuestions = r.answers.filter((a) => a.markingStatus === FormMarkingStatus.MARKED).length;
 
-    return {
-      id: r.id,
-      formId: r.formId,
-      formTitle: r.form.title,
-      formKind: r.form.kind,
-      studentId: r.studentId,
-      studentName: r.student ? `${r.student.firstName} ${r.student.lastName}` : "Anonymous",
-      admissionNo: r.student?.admissionNo ?? "N/A",
-      score: r.score,
-      maxScore: r.maxScore,
-      markingStatus: r.markingStatus,
-      totalQuestions,
-      pendingQuestions,
-      markedQuestions,
-      submittedAt: r.submittedAt,
-      markedBy: r.markedBy ? { id: r.markedBy.id, name: r.markedBy.name } : null,
-      markedAt: r.markedAt,
-    };
-  });
+      return {
+        id: r.id,
+        formId: r.formId,
+        formTitle: r.form.title,
+        formKind: r.form.kind,
+        studentId: r.studentId,
+        studentName: r.student ? `${r.student.firstName} ${r.student.lastName}` : "Anonymous",
+        admissionNo: r.student?.admissionNo ?? "N/A",
+        score: r.score,
+        maxScore: r.maxScore,
+        markingStatus: r.markingStatus,
+        totalQuestions,
+        pendingQuestions,
+        markedQuestions,
+        submittedAt: r.submittedAt,
+        markedBy: r.markedBy ? { id: r.markedBy.id, name: r.markedBy.name } : null,
+        markedAt: r.markedAt,
+      };
+    });
 }
 
 /**
@@ -128,6 +156,8 @@ export async function getResponseForMarking(
   tx: Tx,
   params: {
     tenantId: string;
+    userId: string;
+    formId: string;
     responseId: string;
   },
 ) {
@@ -212,6 +242,13 @@ export async function getResponseForMarking(
   if (!response) {
     throw new ManualMarkingError("Form response not found.", 404, "NOT_FOUND");
   }
+  await requireResponseAccess(tx, {
+    tenantId: params.tenantId,
+    userId: params.userId,
+    urlFormId: params.formId,
+    responseFormId: response.formId,
+    access: "read",
+  });
 
   const check = canMarkResponse(response);
   if (!check.canMark) {
@@ -282,6 +319,7 @@ export async function markFormAnswer(
   params: {
     tenantId: string;
     responseId: string;
+    formId: string;
     answerId: string;
     teacherUserId: string;
     score: number;
@@ -303,6 +341,13 @@ export async function markFormAnswer(
   if (!answer) {
     throw new ManualMarkingError("Answer record not found.", 404, "NOT_FOUND");
   }
+  await requireResponseAccess(tx, {
+    tenantId: params.tenantId,
+    userId: params.teacherUserId,
+    urlFormId: params.formId,
+    responseFormId: answer.response.formId,
+    access: "manage",
+  });
 
   const scoreValidation = validateAnswerScore(params.score, answer.formQuestion.points);
   if (!scoreValidation.valid) {
@@ -394,6 +439,7 @@ export async function markFormAttempt(
   tx: Tx,
   params: {
     tenantId: string;
+    formId: string;
     responseId: string;
     teacherUserId: string;
     answers: Array<{
@@ -415,6 +461,13 @@ export async function markFormAttempt(
   if (!response) {
     throw new ManualMarkingError("Form response not found.", 404, "NOT_FOUND");
   }
+  await requireResponseAccess(tx, {
+    tenantId: params.tenantId,
+    userId: params.teacherUserId,
+    urlFormId: params.formId,
+    responseFormId: response.formId,
+    access: "manage",
+  });
 
   const check = canMarkResponse(response);
   if (!check.canMark) {

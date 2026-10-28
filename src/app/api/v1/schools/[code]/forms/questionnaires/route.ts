@@ -5,7 +5,7 @@ import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { FORM_STAFF_ROLES } from "@/lib/question-bank/items-http";
 import { createQuestionnaire, listQuestionnairesForStaff } from "@/lib/forms/questionnaires-service";
 import { FormsServiceError } from "@/lib/forms/forms-service";
-import { FormStatus, FormAudienceKind, BankQuestionType } from "@prisma/client";
+import { FormStatus, FormAudienceKind, BankQuestionType, Permission } from "@prisma/client";
 
 const Query = z.object({
   status: z.enum(["DRAFT", "PUBLISHED", "CLOSED", "ARCHIVED", "ALL"]).optional(),
@@ -49,7 +49,7 @@ export const GET = withAuth(
       throw err;
     }
   }),
-  { tenant: true, roles: FORM_STAFF_ROLES, area: "academics" },
+  { tenant: true, roles: FORM_STAFF_ROLES, permissions: [Permission.CAN_VIEW_FORM_RESULTS], area: "academics" },
 );
 
 export const POST = withAuth(

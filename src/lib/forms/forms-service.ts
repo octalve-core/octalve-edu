@@ -10,6 +10,7 @@ import {
 } from "@prisma/client";
 import { isFormOpen, scrubFormQuestionsForPupil, isPupilAudienceEligible, validatePracticeSetInput } from "./practice-sets";
 import { resolveMarkingMethod, evaluateSubmissionWithMarking } from "./manual-marking";
+import { campusFilter, reachForm } from "./access";
 
 export class FormsServiceError extends Error {
   constructor(
@@ -179,17 +180,14 @@ export async function listPracticeSetsForStaff(
 ) {
   const where: {
     tenantId: string;
-    campusId?: string | null;
+    OR?: Array<{ campusId: string | null }>;
     kind: FormKind;
     status?: FormStatus;
   } = {
     tenantId: params.tenantId,
     kind: FormKind.PRACTICE_SET,
+    ...campusFilter(params.campusId),
   };
-
-  if (params.campusId) {
-    where.campusId = params.campusId;
-  }
 
   if (params.status && params.status !== "ALL") {
     where.status = params.status;
@@ -230,8 +228,12 @@ export async function getPracticeSetForStaff(
   params: {
     formId: string;
     tenantId: string;
+    userId: string;
   },
 ) {
+  if (!(await reachForm(tx, { tenantId: params.tenantId, userId: params.userId, formId: params.formId, access: "view" }))) {
+    throw new FormsServiceError("Practice set not found.", 404, "NOT_FOUND");
+  }
   const form = await tx.form.findFirst({
     where: { id: params.formId, tenantId: params.tenantId },
     include: {
@@ -282,6 +284,9 @@ export async function updatePracticeSet(
     classGroupIds?: string[];
   },
 ) {
+  if (!(await reachForm(tx, { tenantId: params.tenantId, userId: params.userId, formId: params.formId, access: "manage" }))) {
+    throw new FormsServiceError("Practice set not found.", 404, "NOT_FOUND");
+  }
   const form = await tx.form.findFirst({
     where: { id: params.formId, tenantId: params.tenantId },
   });
@@ -644,8 +649,12 @@ export async function getPracticeSetResponsesForStaff(
   params: {
     formId: string;
     tenantId: string;
+    userId: string;
   },
 ) {
+  if (!(await reachForm(tx, { tenantId: params.tenantId, userId: params.userId, formId: params.formId, access: "read" }))) {
+    throw new FormsServiceError("Practice set not found.", 404, "NOT_FOUND");
+  }
   const form = await tx.form.findFirst({
     where: { id: params.formId, tenantId: params.tenantId },
   });

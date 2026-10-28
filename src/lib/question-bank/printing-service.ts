@@ -2,7 +2,7 @@ import type { Tx } from "@/lib/tenant/for-tenant";
 import { PrintTargetKind, Role, BankVisibility } from "@prisma/client";
 import { effectiveSettingsIn } from "@/lib/question-bank/settings-service";
 import { loadViewer } from "@/lib/question-bank/viewer";
-import { mayReachCampus, staffMaySee } from "@/lib/question-bank/rules";
+import { mayReachCampus, staffMaySee, mayAccessForm } from "@/lib/question-bank/rules";
 import {
   canPrintTarget,
   canPupilPrintAttempt,
@@ -216,7 +216,7 @@ export async function printTarget(
           questions: { orderBy: { sortOrder: "asc" } },
         },
       });
-      if (!form || !mayReachCampus(viewer, form.campusId)) {
+      if (!form || !mayAccessForm(viewer, form, "manage")) {
         throw new PrintingServiceError("Form not found.", 404, "NOT_FOUND");
       }
 

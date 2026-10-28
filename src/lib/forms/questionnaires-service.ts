@@ -4,6 +4,7 @@ import { trustedTenantId } from "@/lib/tenant/verified-tenant";
 import { MfaUnavailableError } from "@/lib/auth/mfa/secret-box";
 import { effectiveSettingsIn } from "@/lib/question-bank/settings-service";
 import { BankQuestionType, FormKind, FormStatus, FormAudienceKind, FormResponseStatus, Prisma } from "@prisma/client";
+import { campusFilter, reachForm } from "./access";
 import { FormsServiceError } from "./forms-service";
 import { participationCode, recordedAt } from "./participation";
 import {
@@ -152,17 +153,14 @@ export async function listQuestionnairesForStaff(
 ) {
   const where: {
     tenantId: string;
-    campusId?: string | null;
+    OR?: Array<{ campusId: string | null }>;
     kind: FormKind;
     status?: FormStatus;
   } = {
     tenantId: params.tenantId,
     kind: FormKind.QUESTIONNAIRE,
+    ...campusFilter(params.campusId),
   };
-
-  if (params.campusId) {
-    where.campusId = params.campusId;
-  }
 
   if (params.status && params.status !== "ALL") {
     where.status = params.status;
@@ -204,8 +202,20 @@ export async function getQuestionnaireForStaff(
   params: {
     formId: string;
     tenantId: string;
+    userId: string;
   },
 ) {
+  if (
+    !(await reachForm(tx, {
+      tenantId: params.tenantId,
+      userId: params.userId,
+      formId: params.formId,
+      access: "view",
+      kind: FormKind.QUESTIONNAIRE,
+    }))
+  ) {
+    throw new FormsServiceError("Questionnaire not found.", 404, "NOT_FOUND");
+  }
   const form = await tx.form.findFirst({
     where: { id: params.formId, tenantId: params.tenantId, kind: FormKind.QUESTIONNAIRE },
     include: {
@@ -258,6 +268,17 @@ export async function updateQuestionnaire(
     closesAt?: string | null;
   },
 ) {
+  if (
+    !(await reachForm(tx, {
+      tenantId: params.tenantId,
+      userId: params.userId,
+      formId: params.formId,
+      access: "manage",
+      kind: FormKind.QUESTIONNAIRE,
+    }))
+  ) {
+    throw new FormsServiceError("Questionnaire not found.", 404, "NOT_FOUND");
+  }
   const form = await tx.form.findFirst({
     where: { id: params.formId, tenantId: params.tenantId, kind: FormKind.QUESTIONNAIRE },
   });
@@ -365,8 +386,20 @@ export async function getQuestionnaireAnalytics(
   params: {
     formId: string;
     tenantId: string;
+    userId: string;
   },
 ) {
+  if (
+    !(await reachForm(tx, {
+      tenantId: params.tenantId,
+      userId: params.userId,
+      formId: params.formId,
+      access: "read",
+      kind: FormKind.QUESTIONNAIRE,
+    }))
+  ) {
+    throw new FormsServiceError("Questionnaire not found.", 404, "NOT_FOUND");
+  }
   const form = await tx.form.findFirst({
     where: { id: params.formId, tenantId: params.tenantId, kind: FormKind.QUESTIONNAIRE },
     include: {

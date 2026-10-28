@@ -77,18 +77,19 @@ test.beforeAll(async () => {
   ).id;
 
   // forms and quizzes
-  const form = async (key: string, campusId: string | null) => {
+  // a form is printed by the people who MANAGE it (task 0024, the campus rule for forms): its creator, the administrators; North's and South's are written by their own teacher
+  const form = async (key: string, campusId: string | null, by: string) => {
     const f = await db.form.create({
-      data: { tenantId: a.id, campusId, kind: "PRACTICE_SET", title: `Form ${key}`, status: "PUBLISHED", createdById: admin.user.id },
+      data: { tenantId: a.id, campusId, kind: "PRACTICE_SET", title: `Form ${key}`, status: "PUBLISHED", createdById: by },
     });
     await db.formQuestion.create({
       data: { tenantId: a.id, formId: f.id, prompt: `Question of form ${key}`, correctAnswer: "a", points: 2 },
     });
     ids[`form${key}`] = f.id;
   };
-  await form("North", north);
-  await form("South", south);
-  await form("Wide", null);
+  await form("North", north, tNorth.user.id);
+  await form("South", south, tSouth.user.id);
+  await form("Wide", null, admin.user.id);
   const maths = await db.subject.create({ data: { tenantId: a.id, name: "Mathematics", code: "MTHPRT" } });
   const quiz = async (key: string, campusId: string) => {
     const q = await db.quiz.create({
@@ -153,23 +154,27 @@ test.describe("a question", () => {
 });
 
 test.describe("a form and a quiz", () => {
-  test("a teacher prints the forms and quizzes of their own campus and the school's, not another campus's", async () => {
-    expect(isPdf(await print(tNorth, "FORM", "formNorth"))).toBe(true);
-    expect(isPdf(await print(tNorth, "FORM", "formWide"))).toBe(true);
+  test("a teacher prints the forms they wrote and the quizzes of their campus; a colleague, the whole school's forms and another campus's are a 404", async () => {
+    expect(isPdf(await print(tNorth, "FORM", "formNorth"))).toBe(true); // the creator
+    expect((await print(tNorth, "FORM", "formWide")).status).toBe(404); // a form of the whole school is the school administrator's
     expect((await print(tNorth, "FORM", "formSouth")).status).toBe(404);
+    expect((await print(tPhysics, "FORM", "formNorth")).status).toBe(404); // a colleague of the same campus does not manage it
     expect(isPdf(await print(tNorth, "QUIZ", "quizNorth"))).toBe(true);
     expect((await print(tNorth, "QUIZ", "quizSouth")).status).toBe(404);
+    expect(isPdf(await print(campusN, "FORM", "formNorth"))).toBe(true); // the administrator of the form's campus
     expect((await print(campusN, "FORM", "formSouth")).status).toBe(404);
+    expect((await print(campusN, "FORM", "formWide")).status).toBe(404);
     expect((await print(campusN, "QUIZ", "quizSouth")).status).toBe(404);
     expect(isPdf(await print(tSouth, "FORM", "formSouth"))).toBe(true);
     expect((await print(tSouth, "FORM", "formNorth")).status).toBe(404);
-    expect(await logs()).toBe(4); // three by the North teacher, one by the South teacher; every refusal left nothing
+    expect(await logs()).toBe(4); // the North teacher's form and quiz, the campus administrator's form, the South teacher's form; every refusal left nothing
   });
 
   test("the school's administrator prints any campus's", async () => {
     for (const [kind, key] of [
       ["FORM", "formSouth"],
       ["FORM", "formNorth"],
+      ["FORM", "formWide"],
       ["QUIZ", "quizSouth"],
     ] as const) {
       expect(isPdf(await print(admin, kind, key))).toBe(true);

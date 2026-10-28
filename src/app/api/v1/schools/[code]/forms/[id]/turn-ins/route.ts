@@ -4,7 +4,7 @@ import { readJsonBody } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { FORM_STAFF_ROLES } from "@/lib/question-bank/items-http";
 import { getPaperWorkForStaff, updateTurnIn, PaperWorkError } from "@/lib/forms/paper-work-service";
-import { TurnInStatus } from "@prisma/client";
+import { TurnInStatus, Permission } from "@prisma/client";
 
 const PatchBody = z.object({
   studentId: z.string().min(1),
@@ -17,7 +17,7 @@ export const GET = withAuth(
     const { id: formId } = await ctx.params;
     try {
       const details = await auth.tenant.run(async (tx) => {
-        return getPaperWorkForStaff(tx, auth.tenant.tenantId, formId);
+        return getPaperWorkForStaff(tx, auth.tenant.tenantId, auth.userId, formId);
       });
       return ok(details);
     } catch (err) {
@@ -27,7 +27,7 @@ export const GET = withAuth(
       throw err;
     }
   },
-  { tenant: true, roles: FORM_STAFF_ROLES, area: "academics" },
+  { tenant: true, roles: FORM_STAFF_ROLES, permissions: [Permission.CAN_VIEW_FORM_RESULTS], area: "academics" },
 );
 
 export const PATCH = withAuth(

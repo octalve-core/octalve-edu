@@ -3,6 +3,7 @@ import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { FORM_STAFF_ROLES } from "@/lib/question-bank/items-http";
 import { getQuestionnaireAnalytics } from "@/lib/forms/questionnaires-service";
 import { FormsServiceError } from "@/lib/forms/forms-service";
+import { Permission } from "@prisma/client";
 
 export const GET = withAuth(
   async (_req, auth: TenantAuthContext, ctx: { params: Promise<{ code: string; id: string }> }) => {
@@ -12,6 +13,7 @@ export const GET = withAuth(
         return getQuestionnaireAnalytics(tx, {
           formId,
           tenantId: auth.tenant.tenantId,
+          userId: auth.userId,
         });
       });
       return ok(analytics);
@@ -22,5 +24,5 @@ export const GET = withAuth(
       throw err;
     }
   },
-  { tenant: true, roles: FORM_STAFF_ROLES, area: "academics" },
+  { tenant: true, roles: FORM_STAFF_ROLES, permissions: [Permission.CAN_VIEW_FORM_RESULTS], area: "academics" },
 );

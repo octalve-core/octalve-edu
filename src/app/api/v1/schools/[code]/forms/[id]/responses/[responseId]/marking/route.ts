@@ -4,6 +4,7 @@ import { readJsonBody } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { FORM_STAFF_ROLES } from "@/lib/question-bank/items-http";
 import { getResponseForMarking, markFormAnswer, markFormAttempt, ManualMarkingError } from "@/lib/forms/manual-marking-service";
+import { Permission } from "@prisma/client";
 
 const AnswerMarkingItem = z.object({
   answerId: z.string().min(1),
@@ -20,11 +21,13 @@ const PatchBody = z.object({
 
 export const GET = withAuth(
   async (_req, auth: TenantAuthContext, ctx: { params: Promise<{ code: string; id: string; responseId: string }> }) => {
-    const { responseId } = await ctx.params;
+    const { id: formId, responseId } = await ctx.params;
     try {
       const response = await auth.tenant.run(async (tx) => {
         return getResponseForMarking(tx, {
           tenantId: auth.tenant.tenantId,
+          userId: auth.userId,
+          formId,
           responseId,
         });
       });
@@ -36,12 +39,12 @@ export const GET = withAuth(
       throw err;
     }
   },
-  { tenant: true, roles: FORM_STAFF_ROLES, area: "academics" },
+  { tenant: true, roles: FORM_STAFF_ROLES, permissions: [Permission.CAN_VIEW_FORM_RESULTS], area: "academics" },
 );
 
 export const PATCH = withAuth(
   async (req, auth: TenantAuthContext, ctx: { params: Promise<{ code: string; id: string; responseId: string }> }) => {
-    const { responseId } = await ctx.params;
+    const { id: formId, responseId } = await ctx.params;
     const read = await readJsonBody(req);
     if (!read.ok) return read.response;
 
@@ -56,6 +59,7 @@ export const PATCH = withAuth(
         const result = await auth.tenant.run(async (tx) => {
           return markFormAttempt(tx, {
             tenantId: auth.tenant.tenantId,
+            formId,
             responseId,
             teacherUserId: auth.userId,
             answers: parsed.data.answers!,
@@ -67,6 +71,7 @@ export const PATCH = withAuth(
         const result = await auth.tenant.run(async (tx) => {
           return markFormAnswer(tx, {
             tenantId: auth.tenant.tenantId,
+            formId,
             responseId,
             answerId: parsed.data.answerId!,
             teacherUserId: auth.userId,

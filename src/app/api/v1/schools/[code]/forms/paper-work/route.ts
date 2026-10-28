@@ -4,7 +4,7 @@ import { readJsonBody, validate, type Parsed } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { FORM_STAFF_ROLES } from "@/lib/question-bank/items-http";
 import { createPaperWork, listPaperWorkForStaff, PaperWorkError } from "@/lib/forms/paper-work-service";
-import { FormStatus } from "@prisma/client";
+import { FormStatus, Permission } from "@prisma/client";
 
 const Query = z.object({
   status: z.enum(["DRAFT", "PUBLISHED", "CLOSED", "ARCHIVED", "ALL"]).optional(),
@@ -34,7 +34,7 @@ export const GET = withAuth(
       throw err;
     }
   }),
-  { tenant: true, roles: FORM_STAFF_ROLES, area: "academics" },
+  { tenant: true, roles: FORM_STAFF_ROLES, permissions: [Permission.CAN_VIEW_FORM_RESULTS], area: "academics" },
 );
 
 export const POST = withAuth(

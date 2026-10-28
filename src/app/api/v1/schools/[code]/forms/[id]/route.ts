@@ -24,6 +24,7 @@ export const GET = withAuth(
         return getPracticeSetForStaff(tx, {
           formId,
           tenantId: auth.tenant.tenantId,
+          userId: auth.userId,
         });
       });
       return ok({ form });

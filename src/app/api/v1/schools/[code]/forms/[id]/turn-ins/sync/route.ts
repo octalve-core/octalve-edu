@@ -8,7 +8,7 @@ export const POST = withAuth(
     const { id: formId } = await ctx.params;
     try {
       const result = await auth.tenant.run(async (tx) => {
-        return syncRosterForPaperWork(tx, auth.tenant.tenantId, formId);
+        return syncRosterForPaperWork(tx, auth.tenant.tenantId, auth.userId, formId);
       });
       return ok(result);
     } catch (err) {

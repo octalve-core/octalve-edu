@@ -4,7 +4,7 @@ import { validate, type Parsed } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { FORM_STAFF_ROLES } from "@/lib/question-bank/items-http";
 import { listPendingMarkingResponses, ManualMarkingError } from "@/lib/forms/manual-marking-service";
-import { FormMarkingStatus } from "@prisma/client";
+import { FormMarkingStatus, Permission } from "@prisma/client";
 
 const Query = z.object({
   formId: z.string().optional(),
@@ -18,6 +18,7 @@ export const GET = withAuth(
       const queue = await auth.tenant.run(async (tx) => {
         return listPendingMarkingResponses(tx, {
           tenantId: auth.tenant.tenantId,
+          userId: auth.userId,
           campusId: auth.tenant.campusId,
           formId: query.formId,
           markingStatus: query.markingStatus as FormMarkingStatus | undefined,
@@ -31,5 +32,5 @@ export const GET = withAuth(
       throw err;
     }
   }),
-  { tenant: true, roles: FORM_STAFF_ROLES, area: "academics" },
+  { tenant: true, roles: FORM_STAFF_ROLES, permissions: [Permission.CAN_VIEW_FORM_RESULTS], area: "academics" },
 );

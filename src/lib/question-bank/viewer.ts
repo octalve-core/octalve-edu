@@ -13,7 +13,10 @@ import type { BankViewer } from "@/lib/question-bank/rules";
 /// Called inside a transaction when a decision is being taken, so a person removed or deactivated a moment ago is not trusted on a read from before.
 export async function loadViewer(tx: Tx, tenantId: string, userId: string): Promise<BankViewer> {
   const [memberships, reviewerRows, assignments] = await Promise.all([
-    tx.tenantMembership.findMany({ where: { tenantId, userId, deactivatedAt: null }, select: { campusId: true, role: true } }),
+    tx.tenantMembership.findMany({
+      where: { tenantId, userId, deactivatedAt: null },
+      select: { campusId: true, role: true, permissions: true },
+    }),
     tx.questionBankReviewer.findMany({
       where: { tenantId, userId },
       select: { campusId: true, scope: true, subjectKey: true, isExamApprover: true },
