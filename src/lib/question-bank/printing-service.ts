@@ -216,7 +216,8 @@ export async function printTarget(
           questions: { orderBy: { sortOrder: "asc" } },
         },
       });
-      if (!form || !mayAccessForm(viewer, form, "manage")) {
+      // a blank copy is for anyone who may view the form (and may print at all); a copy with the answer key is the managers'
+      if (!form || !mayAccessForm(viewer, form, params.includeAnswerKey ? "manage" : "view")) {
         throw new PrintingServiceError("Form not found.", 404, "NOT_FOUND");
       }
 

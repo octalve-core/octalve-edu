@@ -254,6 +254,9 @@ export async function getResponseForMarking(
   if (!check.canMark) {
     throw new ManualMarkingError(check.reason ?? "Response cannot be marked.", 400, "CANNOT_MARK");
   }
+  // a holder of the "see form results" grant reads the pupil's answers; the answer key is for those who manage the form
+  const mayKey =
+    (await reachForm(tx, { tenantId: params.tenantId, userId: params.userId, formId: response.formId, access: "manage" })) !== null;
 
   return {
     id: response.id,
@@ -278,8 +281,7 @@ export async function getResponseForMarking(
       prompt: a.formQuestion.prompt,
       questionType: a.formQuestion.questionType,
       options: a.formQuestion.options,
-      correctAnswer: a.formQuestion.correctAnswer,
-      explanation: a.formQuestion.explanation,
+      ...(mayKey ? { correctAnswer: a.formQuestion.correctAnswer, explanation: a.formQuestion.explanation } : {}),
       points: a.formQuestion.points,
       markingMethod: a.formQuestion.markingMethod,
       studentValue: a.value,

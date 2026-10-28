@@ -9,6 +9,7 @@ import {
   evaluateFormSubmission,
   isPupilAudienceEligible,
   validatePracticeSetInput,
+  withoutAnswerKey,
 } from "../../src/lib/forms/practice-sets";
 
 test.describe("Practice Sets & Forms Domain Logic (Task 0032 Slice 6)", () => {
@@ -47,6 +48,40 @@ test.describe("Practice Sets & Forms Domain Logic (Task 0032 Slice 6)", () => {
       const res = isFormOpen({ status: FormStatus.PUBLISHED, opensAt: opens, closesAt: closes }, now);
       expect(res.isOpen).toBe(true);
       expect(res.reason).toBeUndefined();
+    });
+  });
+
+  test.describe("withoutAnswerKey (what staff who may view a form but not manage it get)", () => {
+    const question = {
+      id: "q1",
+      prompt: "Which island grows cloves?",
+      questionType: BankQuestionType.SHORT,
+      options: [{ id: "a", text: "Unguja" }],
+      points: 2,
+      sortOrder: 1,
+      correctAnswer: "Pemba",
+      explanation: "Because of the soil.",
+    };
+
+    test("drops the correct answer and the explanation and nothing else", () => {
+      const clean = withoutAnswerKey(question);
+      expect(clean).not.toHaveProperty("correctAnswer");
+      expect(clean).not.toHaveProperty("explanation");
+      expect(clean).toEqual({
+        id: "q1",
+        prompt: question.prompt,
+        questionType: "SHORT",
+        options: question.options,
+        points: 2,
+        sortOrder: 1,
+      });
+      expect(JSON.stringify(clean)).not.toContain("Pemba");
+    });
+
+    test("does not change the question it is given, and copes with a question that has no key", () => {
+      withoutAnswerKey(question);
+      expect(question.correctAnswer).toBe("Pemba");
+      expect(withoutAnswerKey({ id: "q2", prompt: "Open", correctAnswer: null, explanation: null })).toEqual({ id: "q2", prompt: "Open" });
     });
   });
 

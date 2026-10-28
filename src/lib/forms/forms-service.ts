@@ -8,7 +8,13 @@ import {
   FormMarkingMethod,
   FormMarkingStatus,
 } from "@prisma/client";
-import { isFormOpen, scrubFormQuestionsForPupil, isPupilAudienceEligible, validatePracticeSetInput } from "./practice-sets";
+import {
+  isFormOpen,
+  scrubFormQuestionsForPupil,
+  isPupilAudienceEligible,
+  validatePracticeSetInput,
+  withoutAnswerKey,
+} from "./practice-sets";
 import { resolveMarkingMethod, evaluateSubmissionWithMarking } from "./manual-marking";
 import { campusFilter, reachForm } from "./access";
 
@@ -234,6 +240,9 @@ export async function getPracticeSetForStaff(
   if (!(await reachForm(tx, { tenantId: params.tenantId, userId: params.userId, formId: params.formId, access: "view" }))) {
     throw new FormsServiceError("Practice set not found.", 404, "NOT_FOUND");
   }
+  // the answer key is for those who manage the form; everyone else who may view it sees the questions without it
+  const mayKey =
+    (await reachForm(tx, { tenantId: params.tenantId, userId: params.userId, formId: params.formId, access: "manage" })) !== null;
   const form = await tx.form.findFirst({
     where: { id: params.formId, tenantId: params.tenantId },
     include: {
@@ -258,7 +267,7 @@ export async function getPracticeSetForStaff(
     closesAt: form.closesAt,
     maxDurationMinutes: form.maxDurationMinutes,
     audiences: form.audiences,
-    questions: form.questions,
+    questions: mayKey ? form.questions : form.questions.map(withoutAnswerKey),
     responseCount: form._count.responses,
     createdBy: form.createdBy,
     createdAt: form.createdAt,

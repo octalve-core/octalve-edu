@@ -144,7 +144,7 @@ const CASES: Case[] = [
     name: "POST forms/[id]/print",
     access: "manage",
     kind: "practice",
-    call: (p, f) => api(`${base()}/${f.id}/print`, { method: "POST", cookie: p.cookie, body: {} }),
+    call: (p, f) => api(`${base()}/${f.id}/print`, { method: "POST", cookie: p.cookie, body: { includeAnswerKey: true } }),
   },
   {
     name: "GET forms/[id]/analytics",

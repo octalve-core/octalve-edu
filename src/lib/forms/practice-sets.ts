@@ -75,6 +75,16 @@ export function scrubFormQuestionForPupil(question: {
   };
 }
 
+/// A question as a person who may VIEW a form but not manage it sees it (task 0024): the question, its options and its points, never the correct answer or the explanation.
+export function withoutAnswerKey<T extends { correctAnswer?: string | null; explanation?: string | null }>(
+  question: T,
+): Omit<T, "correctAnswer" | "explanation"> {
+  const copy: Partial<T> = { ...question };
+  delete copy.correctAnswer;
+  delete copy.explanation;
+  return copy as Omit<T, "correctAnswer" | "explanation">;
+}
+
 /**
  * Scrubs all questions for pupil delivery, maintaining sortOrder.
  */
