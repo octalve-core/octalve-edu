@@ -2,7 +2,7 @@ import { z } from "zod";
 import { fail, ok } from "@/lib/api/envelope";
 import { readJsonBody } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { BANK_STAFF_ROLES } from "@/lib/question-bank/items-http";
+import { FORM_STAFF_ROLES } from "@/lib/question-bank/items-http";
 import { getPaperWorkForStaff, updateTurnIn, PaperWorkError } from "@/lib/forms/paper-work-service";
 import { TurnInStatus } from "@prisma/client";
 
@@ -27,7 +27,7 @@ export const GET = withAuth(
       throw err;
     }
   },
-  { tenant: true, roles: BANK_STAFF_ROLES, area: "academics" },
+  { tenant: true, roles: FORM_STAFF_ROLES, area: "academics" },
 );
 
 export const PATCH = withAuth(
@@ -61,5 +61,5 @@ export const PATCH = withAuth(
       throw err;
     }
   },
-  { tenant: true, roles: BANK_STAFF_ROLES },
+  { tenant: true, roles: FORM_STAFF_ROLES },
 );

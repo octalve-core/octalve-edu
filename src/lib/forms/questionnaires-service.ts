@@ -1,8 +1,11 @@
 import crypto from "node:crypto";
-import type { Tx } from "@/lib/tenant/for-tenant";
-import { prisma } from "@/lib/db";
-import { BankQuestionType, FormKind, FormStatus, FormAudienceKind, FormResponseStatus } from "@prisma/client";
+import { forShareToken, setTenantContext, type Tx } from "@/lib/tenant/for-tenant";
+import { trustedTenantId } from "@/lib/tenant/verified-tenant";
+import { MfaUnavailableError } from "@/lib/auth/mfa/secret-box";
+import { effectiveSettingsIn } from "@/lib/question-bank/settings-service";
+import { BankQuestionType, FormKind, FormStatus, FormAudienceKind, FormResponseStatus, Prisma } from "@prisma/client";
 import { FormsServiceError } from "./forms-service";
+import { participationCode, recordedAt } from "./participation";
 import {
   validateQuestionnaireInput,
   isQuestionnaireOpen,
@@ -10,7 +13,35 @@ import {
   formatQuestionnaireQuestionsForRespondent,
   validateAndNormalizeAnswers,
   aggregateQuestionnaireAnalytics,
+  withholdSmallSample,
 } from "./questionnaires";
+
+/// An anonymous questionnaire needs the school's key to make its participation codes (see participation.ts); without it nothing is stored rather than an identity.
+function codeFor(form: { id: string; isAnonymous: boolean }, memberId: string): string {
+  try {
+    return participationCode(form, memberId);
+  } catch (err) {
+    if (err instanceof MfaUnavailableError) {
+      throw new FormsServiceError("Anonymous questionnaires are unavailable until the school's encryption key is set.", 503, "UNAVAILABLE");
+    }
+    throw err;
+  }
+}
+
+/// Which of `forms` the member has already answered: their participation record is under the form's code for them.
+async function submittedFormIds(
+  tx: Tx,
+  tenantId: string,
+  forms: Array<{ id: string; isAnonymous: boolean }>,
+  memberId: string,
+): Promise<Set<string>> {
+  if (forms.length === 0) return new Set();
+  const rows = await tx.formParticipation.findMany({
+    where: { tenantId, OR: forms.map((f) => ({ formId: f.id, respondentId: codeFor(f, memberId) })) },
+    select: { formId: true },
+  });
+  return new Set(rows.map((r) => r.formId));
+}
 
 /**
  * Creates a new questionnaire form.
@@ -354,8 +385,13 @@ export async function getQuestionnaireAnalytics(
       value: true,
     },
   });
+  // The number of people who answered, not the most answers any one question has: a pupil may leave questions blank, and the threshold below is about people.
+  const responses = await tx.formResponse.count({
+    where: { tenantId: params.tenantId, formId: form.id, status: FormResponseStatus.COMPLETED },
+  });
+  const settings = await effectiveSettingsIn(tx, params.tenantId, form.campusId ?? null);
 
-  return aggregateQuestionnaireAnalytics({
+  const analytics = aggregateQuestionnaireAnalytics({
     formId: form.id,
     title: form.title,
     isAnonymous: form.isAnonymous,
@@ -363,6 +399,7 @@ export async function getQuestionnaireAnalytics(
     questions: form.questions,
     answers,
   });
+  return withholdSmallSample({ ...analytics, totalResponses: responses }, settings["bank.smallSummary.min"]);
 }
 
 /**
@@ -393,32 +430,28 @@ export async function listAvailableQuestionnairesForPupil(
     include: {
       audiences: true,
       _count: { select: { questions: true } },
-      participations: {
-        where: { respondentId: params.studentId },
-        select: { id: true, createdAt: true },
-      },
     },
   });
 
   const now = new Date();
-  return forms
-    .filter((f) => {
-      const openCheck = isQuestionnaireOpen(f, now);
-      if (!openCheck.isOpen) return false;
-      const audience = f.audiences[0];
-      if (!audience) return true;
-      return isMemberEligibleForQuestionnaire(audience, "STUDENT", pupilClassGroupId);
-    })
-    .map((f) => ({
-      id: f.id,
-      title: f.title,
-      instructions: f.instructions,
-      isAnonymous: f.isAnonymous,
-      questionCount: f._count.questions,
-      opensAt: f.opensAt,
-      closesAt: f.closesAt,
-      hasSubmitted: f.participations.length > 0,
-    }));
+  const open = forms.filter((f) => {
+    const openCheck = isQuestionnaireOpen(f, now);
+    if (!openCheck.isOpen) return false;
+    const audience = f.audiences[0];
+    if (!audience) return true;
+    return isMemberEligibleForQuestionnaire(audience, "STUDENT", pupilClassGroupId);
+  });
+  const answered = await submittedFormIds(tx, params.tenantId, open, params.studentId);
+  return open.map((f) => ({
+    id: f.id,
+    title: f.title,
+    instructions: f.instructions,
+    isAnonymous: f.isAnonymous,
+    questionCount: f._count.questions,
+    opensAt: f.opensAt,
+    closesAt: f.closesAt,
+    hasSubmitted: answered.has(f.id),
+  }));
 }
 
 /**
@@ -439,10 +472,6 @@ export async function getQuestionnaireForMember(
     include: {
       audiences: true,
       questions: { orderBy: { sortOrder: "asc" } },
-      participations: {
-        where: { respondentId: params.memberId },
-        select: { id: true, createdAt: true },
-      },
     },
   });
 
@@ -464,7 +493,7 @@ export async function getQuestionnaireForMember(
     throw new FormsServiceError("You are not eligible for this questionnaire.", 403, "FORBIDDEN");
   }
 
-  const hasSubmitted = form.participations.length > 0;
+  const hasSubmitted = (await submittedFormIds(tx, params.tenantId, [form], params.memberId)).has(form.id);
   const formattedQuestions = formatQuestionnaireQuestionsForRespondent(form.questions);
 
   return {
@@ -524,15 +553,11 @@ export async function submitQuestionnaireForMember(
     throw new FormsServiceError("You are not eligible for this questionnaire.", 403, "FORBIDDEN");
   }
 
-  // Deduplication check: verify member has not already submitted
+  // What the participation record holds in place of the member: their own id, or on an anonymous questionnaire a code that cannot be turned back into them (participation.ts).
+  const code = codeFor(form, params.memberId);
   const alreadyParticipated = await tx.formParticipation.findFirst({
-    where: {
-      tenantId: params.tenantId,
-      formId: form.id,
-      respondentId: params.memberId,
-    },
+    where: { tenantId: params.tenantId, formId: form.id, respondentId: code },
   });
-
   if (alreadyParticipated) {
     throw new FormsServiceError("You have already submitted this questionnaire.", 400, "ALREADY_SUBMITTED");
   }
@@ -545,20 +570,25 @@ export async function submitQuestionnaireForMember(
 
   const normalizedAnswers = validation.normalizedAnswers;
   const submittedAt = new Date();
+  // Anonymity: on an anonymous questionnaire the three records carry the day only, so none can be matched to another by the instant.
+  const at = recordedAt(form, submittedAt);
 
   // Anonymity: if form.isAnonymous is true, response respondentId & studentId are null
   const respondentId = form.isAnonymous ? null : params.memberId;
   const studentId = form.isAnonymous ? null : params.isStudent ? params.memberId : null;
 
-  // 1. Record participation for deduplication
-  await tx.formParticipation.create({
-    data: {
-      tenantId: params.tenantId,
-      formId: form.id,
-      respondentId: params.memberId,
-      createdAt: submittedAt,
-    },
-  });
+  // 1. Record participation for deduplication. The unique index (school, form, respondent) is the real guard: two answers sent together both pass the check above, and the second
+  //    one's insert waits for the first and then fails; that is "already submitted" (a 400), not a server error.
+  try {
+    await tx.formParticipation.create({
+      data: { tenantId: params.tenantId, formId: form.id, respondentId: code, createdAt: at },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      throw new FormsServiceError("You have already submitted this questionnaire.", 400, "ALREADY_SUBMITTED");
+    }
+    throw err;
+  }
 
   // 2. Record response session
   const response = await tx.formResponse.create({
@@ -569,8 +599,8 @@ export async function submitQuestionnaireForMember(
       respondentId,
       studentId,
       status: FormResponseStatus.COMPLETED,
-      startedAt: submittedAt,
-      submittedAt,
+      startedAt: at,
+      submittedAt: at,
     },
   });
 
@@ -581,7 +611,7 @@ export async function submitQuestionnaireForMember(
       responseId: response.id,
       formQuestionId: na.formQuestionId,
       value: na.value as never,
-      createdAt: submittedAt,
+      createdAt: at,
     })),
   });
 
@@ -591,115 +621,110 @@ export async function submitQuestionnaireForMember(
     isAnonymous: form.isAnonymous,
     submittedAt,
   };
+}
+
+const SHARE_TOKEN = /^[0-9a-f]{32}$/;
+const PUBLIC_NOT_FOUND = () => new FormsServiceError("Questionnaire not found or not publicly available.", 404, "NOT_FOUND");
+
+/**
+ * Runs `fn` for the public questionnaire a link names, in the SCHOOL's context.
+ *
+ * A link carries no session, so there is no school until the token has been looked up. The lookup runs in the share context (it can read exactly the one published questionnaire
+ * whose token the caller holds, nothing else); from the row it found the school context is set, like an accepted invitation, and the questions and the answer are read and written
+ * under the ordinary school policies. The school in the address (`code`) must be the school that owns the survey, and a suspended school has no public surveys: both are the same
+ * "not found" as an unknown token, so a link says nothing about what it is not.
+ */
+async function withPublicQuestionnaire<T>(
+  code: string,
+  token: string,
+  fn: (tx: Tx, form: Prisma.FormGetPayload<{ include: { audiences: true; questions: true } }>) => Promise<T>,
+): Promise<T> {
+  if (!SHARE_TOKEN.test(token)) throw PUBLIC_NOT_FOUND();
+  return forShareToken(token).transaction(async (tx) => {
+    const found = await tx.form.findUnique({ where: { shareToken: token }, select: { id: true, tenantId: true } });
+    if (!found) throw PUBLIC_NOT_FOUND();
+
+    // From here the school is the one the survey names (the token is a 128-bit secret that only its owner shared).
+    await setTenantContext(tx, trustedTenantId(found.tenantId));
+    const school = await tx.tenant.findUnique({ where: { id: found.tenantId }, select: { code: true, suspendedAt: true } });
+    if (!school || school.suspendedAt || school.code !== code) throw PUBLIC_NOT_FOUND();
+
+    const form = await tx.form.findFirst({
+      where: { id: found.id, tenantId: found.tenantId, kind: FormKind.QUESTIONNAIRE, status: FormStatus.PUBLISHED },
+      include: { audiences: true, questions: { orderBy: { sortOrder: "asc" } } },
+    });
+    if (!form) throw PUBLIC_NOT_FOUND();
+
+    const audience = form.audiences[0];
+    if (audience && audience.kind !== FormAudienceKind.PUBLIC) {
+      throw new FormsServiceError("This questionnaire is restricted to authenticated school members.", 403, "RESTRICTED");
+    }
+    const openCheck = isQuestionnaireOpen(form);
+    if (!openCheck.isOpen) {
+      throw new FormsServiceError("This questionnaire is closed.", 403, openCheck.reason);
+    }
+    return fn(tx, form);
+  });
 }
 
 /**
  * Retrieves a public questionnaire via shareToken.
  */
-export async function getPublicQuestionnaireByToken(token: string) {
-  if (!token || token.trim().length === 0) {
-    throw new FormsServiceError("Public token is required.", 400, "VALIDATION");
-  }
-
-  const form = await prisma.form.findFirst({
-    where: {
-      shareToken: token,
-      kind: FormKind.QUESTIONNAIRE,
-      status: FormStatus.PUBLISHED,
-    },
-    include: {
-      audiences: true,
-      questions: { orderBy: { sortOrder: "asc" } },
-    },
-  });
-
-  if (!form) {
-    throw new FormsServiceError("Questionnaire not found or not publicly available.", 404, "NOT_FOUND");
-  }
-
-  const audience = form.audiences[0];
-  if (audience && audience.kind !== FormAudienceKind.PUBLIC) {
-    throw new FormsServiceError("This questionnaire is restricted to authenticated school members.", 403, "RESTRICTED");
-  }
-
-  const openCheck = isQuestionnaireOpen(form);
-  if (!openCheck.isOpen) {
-    throw new FormsServiceError("This questionnaire is closed.", 403, openCheck.reason);
-  }
-
-  return {
+export async function getPublicQuestionnaireByToken(code: string, token: string) {
+  return withPublicQuestionnaire(code, token, async (_tx, form) => ({
     id: form.id,
     title: form.title,
     instructions: form.instructions,
     isAnonymous: form.isAnonymous,
     questions: formatQuestionnaireQuestionsForRespondent(form.questions),
-  };
+  }));
 }
 
 /**
  * Submits answers to a public questionnaire via shareToken.
  */
-export async function submitPublicQuestionnaire(params: { token: string; answers: Array<{ formQuestionId: string; value: unknown }> }) {
-  const form = await prisma.form.findFirst({
-    where: {
-      shareToken: params.token,
-      kind: FormKind.QUESTIONNAIRE,
-      status: FormStatus.PUBLISHED,
-    },
-    include: {
-      audiences: true,
-      questions: { orderBy: { sortOrder: "asc" } },
-    },
-  });
+export async function submitPublicQuestionnaire(params: {
+  code: string;
+  token: string;
+  answers: Array<{ formQuestionId: string; value: unknown }>;
+}) {
+  return withPublicQuestionnaire(params.code, params.token, async (tx, form) => {
+    const validation = validateAndNormalizeAnswers(form.questions, params.answers);
+    if (!validation.ok || !validation.normalizedAnswers) {
+      throw new FormsServiceError(validation.message ?? "Invalid answer submission.", 400, "VALIDATION");
+    }
 
-  if (!form) {
-    throw new FormsServiceError("Questionnaire not found.", 404, "NOT_FOUND");
-  }
+    const submittedAt = new Date();
+    const at = recordedAt(form, submittedAt);
 
-  const audience = form.audiences[0];
-  if (audience && audience.kind !== FormAudienceKind.PUBLIC) {
-    throw new FormsServiceError("This questionnaire is restricted to authenticated members.", 403, "RESTRICTED");
-  }
+    const response = await tx.formResponse.create({
+      data: {
+        tenantId: form.tenantId,
+        campusId: form.campusId ?? null,
+        formId: form.id,
+        respondentId: null,
+        studentId: null,
+        status: FormResponseStatus.COMPLETED,
+        startedAt: at,
+        submittedAt: at,
+      },
+    });
 
-  const openCheck = isQuestionnaireOpen(form);
-  if (!openCheck.isOpen) {
-    throw new FormsServiceError("This questionnaire is closed.", 403, openCheck.reason);
-  }
+    await tx.formAnswer.createMany({
+      data: validation.normalizedAnswers.map((na) => ({
+        tenantId: form.tenantId,
+        responseId: response.id,
+        formQuestionId: na.formQuestionId,
+        value: na.value as never,
+        createdAt: at,
+      })),
+    });
 
-  const validation = validateAndNormalizeAnswers(form.questions, params.answers);
-  if (!validation.ok || !validation.normalizedAnswers) {
-    throw new FormsServiceError(validation.message ?? "Invalid answer submission.", 400, "VALIDATION");
-  }
-
-  const submittedAt = new Date();
-
-  const response = await prisma.formResponse.create({
-    data: {
-      tenantId: form.tenantId,
-      campusId: form.campusId ?? null,
+    return {
+      ok: true,
       formId: form.id,
-      respondentId: null,
-      studentId: null,
-      status: FormResponseStatus.COMPLETED,
-      startedAt: submittedAt,
-      submittedAt,
-    },
-  });
-
-  await prisma.formAnswer.createMany({
-    data: validation.normalizedAnswers.map((na) => ({
-      tenantId: form.tenantId,
       responseId: response.id,
-      formQuestionId: na.formQuestionId,
-      value: na.value as never,
-      createdAt: submittedAt,
-    })),
+      submittedAt,
+    };
   });
-
-  return {
-    ok: true,
-    formId: form.id,
-    responseId: response.id,
-    submittedAt,
-  };
 }

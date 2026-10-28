@@ -29,6 +29,7 @@ export const POST = withAuth(
         }
         return submitPracticeAnswer(tx, {
           tenantId: auth.tenant.tenantId,
+          campusId: student.campusId,
           studentId: student.id,
           role: auth.tenant.role,
           sessionId,

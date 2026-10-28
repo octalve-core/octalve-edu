@@ -2,7 +2,7 @@ import { z } from "zod";
 import { fail } from "@/lib/api/envelope";
 import { readJsonBody } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { BANK_STAFF_ROLES } from "@/lib/question-bank/items-http";
+import { FORM_STAFF_ROLES } from "@/lib/question-bank/items-http";
 import { printTarget, PrintingServiceError } from "@/lib/question-bank/printing-service";
 import { PrintTargetKind } from "@prisma/client";
 
@@ -59,5 +59,5 @@ export const POST = withAuth(
       throw err;
     }
   },
-  { tenant: true, roles: BANK_STAFF_ROLES },
+  { tenant: true, roles: FORM_STAFF_ROLES },
 );

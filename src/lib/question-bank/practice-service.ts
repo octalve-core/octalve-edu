@@ -79,17 +79,36 @@ export async function getStudentClassGroup(tx: Tx, tenantId: string, studentId: 
 }
 
 /**
- * Counts questions attempted by student today in UTC.
+ * Counts the questions a student has used of today's allowance (UTC day): the ones already answered, plus the ones still to answer in sets opened today and not yet finished.
+ * A set is drawn when it is opened, so counting only the answers lets a pupil open any number of sets before answering one and draw far more than the cap.
  */
 async function countTodayAttempts(tx: Tx, tenantId: string, studentId: string, now = new Date()): Promise<number> {
   const todayUtc = getStartOfTodayUtc(now);
-  return tx.practiceAttempt.count({
-    where: {
-      tenantId,
-      studentId,
-      answeredAt: { gte: todayUtc },
-    },
-  });
+  const [answered, open] = await Promise.all([
+    tx.practiceAttempt.count({ where: { tenantId, studentId, answeredAt: { gte: todayUtc } } }),
+    tx.practiceSession.findMany({
+      where: { tenantId, studentId, finishedAt: null, startedAt: { gte: todayUtc } },
+      select: { size: true, _count: { select: { attempts: true } } },
+    }),
+  ]);
+  const reserved = open.reduce((sum, session) => sum + Math.max(0, session.size - session._count.attempts), 0);
+  return answered + reserved;
+}
+
+/**
+ * Takes a lock for `key` that lasts until the end of the transaction. Two requests that ask for the same key are made to wait for one another, so a check followed by a write
+ * (is there room? is it answered already?) cannot be passed by both at the same moment.
+ */
+async function lockFor(tx: Tx, key: string): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}::text))`;
+}
+
+/**
+ * The questions of the class pool a pupil may be offered: those for every class, and those tagged for the pupil's own class. A pupil with no class is offered only those for
+ * every class, never the ones written for a class that is not theirs.
+ */
+function classFilter(classKey: string | null): Prisma.QuestionBankItemWhereInput {
+  return classKey ? { OR: [{ classTags: { none: {} } }, { classTags: { some: { labelKey: classKey } } }] } : { classTags: { none: {} } };
 }
 
 /**
@@ -130,11 +149,7 @@ export async function getPracticeOptions(
     ],
   };
 
-  if (classKey) {
-    (where.AND as Prisma.QuestionBankItemWhereInput[]).push({
-      OR: [{ classTags: { none: {} } }, { classTags: { some: { labelKey: classKey } } }],
-    });
-  }
+  (where.AND as Prisma.QuestionBankItemWhereInput[]).push(classFilter(classKey));
 
   const items = await tx.questionBankItem.findMany({
     where,
@@ -211,6 +226,9 @@ export async function startPracticeSession(
     throw new PracticeError("Practice is currently closed.", 403, "PRACTICE_CLOSED");
   }
 
+  // The room left in today's allowance is read under a lock for this pupil, and the set is written before the lock is let go (it lasts to the end of the transaction), so sets
+  // opened at the same moment cannot each see room and together draw more than the cap.
+  await lockFor(tx, `practice:${params.tenantId}:${params.studentId}`);
   const todayAttempts = await countTodayAttempts(tx, params.tenantId, params.studentId, now);
   const dailyCap = settings["bank.practice.dailyCap"];
   const dailyCapRemaining = computeDailyCapRemaining(todayAttempts, dailyCap);
@@ -233,11 +251,7 @@ export async function startPracticeSession(
     ],
   };
 
-  if (classKey) {
-    (where.AND as Prisma.QuestionBankItemWhereInput[]).push({
-      OR: [{ classTags: { none: {} } }, { classTags: { some: { labelKey: classKey } } }],
-    });
-  }
+  (where.AND as Prisma.QuestionBankItemWhereInput[]).push(classFilter(classKey));
   if (params.subjectLabel) {
     where.subjectKey = normalizeLabel(params.subjectLabel);
   }
@@ -322,6 +336,7 @@ export async function submitPracticeAnswer(
   tx: Tx,
   params: {
     tenantId: string;
+    campusId?: string | null;
     studentId: string;
     role: Role;
     sessionId: string;
@@ -331,6 +346,12 @@ export async function submitPracticeAnswer(
 ) {
   if (params.role !== Role.STUDENT && params.role !== Role.ADMIN) {
     throw new PracticeError("Your sign-in does not include student practice.", 403, "PORTAL_ACCESS");
+  }
+
+  // A set opened before the school switched pupil access off is not finished after: the switch is read again at every answer.
+  const settings = await effectiveSettingsIn(tx, params.tenantId, params.campusId ?? null);
+  if (!settings["bank.access.pupils"]) {
+    throw new PracticeError("Practice is currently closed.", 403, "PRACTICE_CLOSED");
   }
 
   const session = await tx.practiceSession.findFirst({
@@ -350,6 +371,8 @@ export async function submitPracticeAnswer(
     throw new PracticeError("Question is not part of this practice session.", 400, "INVALID_QUESTION");
   }
 
+  // One answer per question: the check and the write are made together under a lock for this set, so two answers sent at the same moment cannot both be written.
+  await lockFor(tx, `practice-answer:${params.tenantId}:${session.id}`);
   const existing = await tx.practiceAttempt.findFirst({
     where: { tenantId: params.tenantId, sessionId: session.id, bankItemId: params.bankItemId },
   });

@@ -1,6 +1,8 @@
 import type { Tx } from "@/lib/tenant/for-tenant";
 import { PrintTargetKind, Role, BankVisibility } from "@prisma/client";
 import { effectiveSettingsIn } from "@/lib/question-bank/settings-service";
+import { loadViewer } from "@/lib/question-bank/viewer";
+import { mayReachCampus, staffMaySee } from "@/lib/question-bank/rules";
 import {
   canPrintTarget,
   canPupilPrintAttempt,
@@ -109,6 +111,10 @@ export async function printTarget(
   });
   const userRole = membership?.role ?? Role.TEACHING_STAFF;
 
+  // Printing hands out the question text and, when asked, the answer key, so what a person may print is what they may READ: the same rules as the bank itself, decided in this
+  // transaction. Anything they may not read is "not found", never "forbidden" (a refusal must not confirm that it exists).
+  const viewer = await loadViewer(tx, params.tenantId, params.userId);
+
   const [isApprover, nearExamDays] = await Promise.all([
     isUserExamApprover(tx, params.tenantId, params.userId, params.campusId),
     getNearExamDays(tx, params.tenantId, params.campusId),
@@ -147,7 +153,21 @@ export async function printTarget(
       const item = await tx.questionBankItem.findFirst({
         where: { id: params.targetId, tenantId: params.tenantId },
       });
-      if (!item) {
+      if (
+        !item ||
+        !staffMaySee(
+          viewer,
+          {
+            campusId: item.campusId,
+            subjectKey: item.subjectKey,
+            status: item.status,
+            visibility: item.visibility,
+            visibleFrom: item.visibleFrom,
+            submittedById: item.submittedById,
+          },
+          now,
+        )
+      ) {
         throw new PrintingServiceError("Question bank item not found.", 404, "NOT_FOUND");
       }
 
@@ -196,7 +216,7 @@ export async function printTarget(
           questions: { orderBy: { sortOrder: "asc" } },
         },
       });
-      if (!form) {
+      if (!form || !mayReachCampus(viewer, form.campusId)) {
         throw new PrintingServiceError("Form not found.", 404, "NOT_FOUND");
       }
 
@@ -227,7 +247,7 @@ export async function printTarget(
           questions: { orderBy: { sortOrder: "asc" } },
         },
       });
-      if (!quiz) {
+      if (!quiz || !mayReachCampus(viewer, quiz.campusId)) {
         throw new PrintingServiceError("Quiz not found.", 404, "NOT_FOUND");
       }
 

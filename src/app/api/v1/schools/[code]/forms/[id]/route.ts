@@ -2,7 +2,7 @@ import { z } from "zod";
 import { fail, ok } from "@/lib/api/envelope";
 import { readJsonBody } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { BANK_STAFF_ROLES } from "@/lib/question-bank/items-http";
+import { BANK_STAFF_ROLES, FORM_STAFF_ROLES } from "@/lib/question-bank/items-http";
 import { getPracticeSetForStaff, updatePracticeSet, FormsServiceError } from "@/lib/forms/forms-service";
 import { FormStatus } from "@prisma/client";
 
@@ -71,5 +71,5 @@ export const PATCH = withAuth(
       throw err;
     }
   },
-  { tenant: true, roles: BANK_STAFF_ROLES },
+  { tenant: true, roles: FORM_STAFF_ROLES },
 );

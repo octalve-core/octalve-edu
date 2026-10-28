@@ -1,6 +1,6 @@
 import { fail, ok } from "@/lib/api/envelope";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { BANK_STAFF_ROLES } from "@/lib/question-bank/items-http";
+import { FORM_STAFF_ROLES } from "@/lib/question-bank/items-http";
 import { syncRosterForPaperWork, PaperWorkError } from "@/lib/forms/paper-work-service";
 
 export const POST = withAuth(
@@ -18,5 +18,5 @@ export const POST = withAuth(
       throw err;
     }
   },
-  { tenant: true, roles: BANK_STAFF_ROLES },
+  { tenant: true, roles: FORM_STAFF_ROLES },
 );

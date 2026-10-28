@@ -189,7 +189,7 @@ test.describe("adding and serving a picture", () => {
       { alt: "ok", decorative: "true" },
       { alt: "ok", decorative: "yes" },
       { alt: "bad\u0000text" },
-      { alt: "hidden‮text" },
+      { alt: "hidden\u202etext" },
     ];
     for (const fields of refused) {
       const res = await upload("writer", item.id, form(file, fields));

@@ -168,7 +168,7 @@ test.describe("assigning a reviewer", () => {
     expect((await addReviewer("admin", { ...base0, scope: "SUBJECT" })).status).toBe(400);
     expect((await addReviewer("admin", { ...base0, scope: "SUBJECT", subjectLabel: "!!!" })).status).toBe(400);
     expect((await addReviewer("admin", { ...base0, scope: "SUBJECT", subjectLabel: "x".repeat(81) })).status).toBe(400);
-    expect((await addReviewer("admin", { ...base0, scope: "SUBJECT", subjectLabel: "Maths‮" })).status).toBe(400);
+    expect((await addReviewer("admin", { ...base0, scope: "SUBJECT", subjectLabel: "Maths\u202e" })).status).toBe(400);
     expect((await addReviewer("admin", { ...base0, scope: "GENERAL", subjectLabel: "Maths" })).status).toBe(400);
     expect((await addReviewer("admin", { ...base0, scope: "GENERAL", surprise: true })).status).toBe(400);
     expect((await addReviewer("admin", { userId: people.teacherNorth.id, scope: "GENERAL" })).status).toBe(400); // the campus must be said: null is a choice, not a default

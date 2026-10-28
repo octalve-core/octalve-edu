@@ -53,6 +53,10 @@ export interface QuestionnaireAnalytics {
   isAnonymous: boolean;
   status: FormStatus;
   questions: QuestionAnalyticsItem[];
+  /// True when the breakdown was held back because too few people answered an anonymous questionnaire (see `withholdSmallSample`).
+  suppressed?: boolean;
+  /// With `suppressed`: how many answers it takes before a breakdown is shown.
+  minimumResponses?: number;
 }
 
 /**
@@ -375,5 +379,23 @@ export function aggregateQuestionnaireAnalytics(params: {
     status,
     totalResponses: totalSubmissions,
     questions: questionAnalytics,
+  };
+}
+
+/// The results of an ANONYMOUS questionnaire with fewer answers than `minimum` (the switch bank.smallSummary.min, never below 3) say too much: with two answers in a class of thirty,
+/// "one said yes and one said no" tells each of them what the other answered. Below the minimum every question keeps its text and nothing else; at or above it the analytics are
+/// returned as they are. A questionnaire that is not anonymous is never withheld.
+export function withholdSmallSample(analytics: QuestionnaireAnalytics, minimum: number): QuestionnaireAnalytics {
+  if (!analytics.isAnonymous || analytics.totalResponses >= minimum) return analytics;
+  return {
+    ...analytics,
+    suppressed: true,
+    minimumResponses: minimum,
+    questions: analytics.questions.map((q) => ({
+      formQuestionId: q.formQuestionId,
+      prompt: q.prompt,
+      questionType: q.questionType,
+      totalAnswers: 0,
+    })),
   };
 }

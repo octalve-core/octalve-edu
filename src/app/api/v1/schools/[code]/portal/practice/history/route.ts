@@ -2,7 +2,7 @@ import { z } from "zod";
 import { fail, ok } from "@/lib/api/envelope";
 import { readJsonBody, validate, type Parsed } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { PORTAL_ALL_ROLES, getStudentFromAuth } from "@/lib/portal/portal-helpers";
+import { PORTAL_ALL_ROLES, getStudentForViewer, getStudentFromAuth } from "@/lib/portal/portal-helpers";
 import { getPracticeHistory, archivePracticeAttempt, PracticeError } from "@/lib/question-bank/practice-service";
 
 const Query = z.object({
@@ -20,7 +20,13 @@ export const GET = withAuth(
   validate({ query: Query }, async (_req, auth: TenantAuthContext, _ctx: unknown, { query }: QueryParsed) => {
     try {
       const history = await auth.tenant.run(async (tx) => {
-        const student = await getStudentFromAuth(tx, auth.tenant.tenantId, auth.userId, query.studentId);
+        // Whose history it may be is decided by getStudentForViewer: the pupil's own, a linked guardian's pupils, any pupil for the administrator.
+        const student = await getStudentForViewer(tx, {
+          tenantId: auth.tenant.tenantId,
+          userId: auth.userId,
+          role: auth.tenant.role,
+          requestedStudentId: query.studentId,
+        });
         if (!student) {
           throw new PracticeError("Student record not found.", 404, "NOT_FOUND");
         }

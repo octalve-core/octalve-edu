@@ -1,6 +1,6 @@
 import { fail, ok } from "@/lib/api/envelope";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { BANK_STAFF_ROLES } from "@/lib/question-bank/items-http";
+import { FORM_STAFF_ROLES } from "@/lib/question-bank/items-http";
 import { getQuestionnaireAnalytics } from "@/lib/forms/questionnaires-service";
 import { FormsServiceError } from "@/lib/forms/forms-service";
 
@@ -22,5 +22,5 @@ export const GET = withAuth(
       throw err;
     }
   },
-  { tenant: true, roles: BANK_STAFF_ROLES, area: "academics" },
+  { tenant: true, roles: FORM_STAFF_ROLES, area: "academics" },
 );

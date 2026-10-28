@@ -2,7 +2,7 @@ import { z } from "zod";
 import { fail, ok } from "@/lib/api/envelope";
 import { readJsonBody, validate, type Parsed } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { BANK_STAFF_ROLES } from "@/lib/question-bank/items-http";
+import { FORM_STAFF_ROLES } from "@/lib/question-bank/items-http";
 import { createQuestionnaire, listQuestionnairesForStaff } from "@/lib/forms/questionnaires-service";
 import { FormsServiceError } from "@/lib/forms/forms-service";
 import { FormStatus, FormAudienceKind, BankQuestionType } from "@prisma/client";
@@ -49,7 +49,7 @@ export const GET = withAuth(
       throw err;
     }
   }),
-  { tenant: true, roles: BANK_STAFF_ROLES, area: "academics" },
+  { tenant: true, roles: FORM_STAFF_ROLES, area: "academics" },
 );
 
 export const POST = withAuth(
@@ -92,5 +92,5 @@ export const POST = withAuth(
       throw err;
     }
   },
-  { tenant: true, roles: BANK_STAFF_ROLES },
+  { tenant: true, roles: FORM_STAFF_ROLES },
 );

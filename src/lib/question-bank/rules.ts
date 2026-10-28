@@ -50,6 +50,14 @@ const adminOf = (viewer: BankViewer, campusId: string) =>
   viewer.memberships.some((m) => m.role === Role.ADMIN || (m.role === Role.CAMPUS_ADMIN && m.campusId === campusId));
 const anyAdmin = (viewer: BankViewer) => viewer.memberships.some((m) => m.role === Role.ADMIN || m.role === Role.CAMPUS_ADMIN);
 
+/// Whether a member of staff reaches what is kept for a campus: the school's administrator everything; what belongs to the whole school (no campus), any active member of staff;
+/// what belongs to a campus, the staff of that campus (a membership with no campus covers every campus). The rule printing uses for a form or a quiz; a question's own, finer rule is
+/// `staffMaySee`.
+export function mayReachCampus(viewer: BankViewer, campusId: string | null): boolean {
+  if (viewer.isSchoolAdmin) return true;
+  return campusId === null ? anyStaff(viewer) : staffIn(viewer, campusId);
+}
+
 /// The reviewer rows that still count: the person is active staff where the row says (anywhere, for an every-campus row).
 function liveReviewerRows(viewer: BankViewer) {
   return viewer.reviewerRows.filter((row) => (row.campusId === null ? anyStaff(viewer) : staffIn(viewer, row.campusId)));
