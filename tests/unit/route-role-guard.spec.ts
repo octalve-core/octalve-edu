@@ -36,6 +36,8 @@ allow(
   "POST v1/setup/route.ts",
   "GET v1/verify/[token]/route.ts",
   "GET v1/verify-certificate/[token]/route.ts",
+  "GET v1/schools/[code]/forms/public/[token]/route.ts",
+  "POST v1/schools/[code]/forms/public/[token]/submit/route.ts",
 );
 allow(
   "a payment provider calls it: the SIGNATURE of the body is the credential (lib/finance/crypto.ts)",

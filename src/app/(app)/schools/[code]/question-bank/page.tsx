@@ -22,7 +22,11 @@ export default async function QuestionBankPage({ params }: { params: Promise<{ c
   const isAdmin = tenant.role === "ADMIN" || tenant.role === "CAMPUS_ADMIN";
 
   const { campuses, viewer } = await tenant.run(async (tx) => ({
-    campuses: await tx.campus.findMany({ where: { tenantId: tenant.tenantId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    campuses: await tx.campus.findMany({
+      where: { tenantId: tenant.tenantId },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
     viewer: await loadViewer(tx, tenant.tenantId, session.userId),
   }));
   const hasMfa = isAdmin ? await hasActiveMfa(session.userId) : false;

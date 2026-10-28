@@ -149,9 +149,7 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-fg">Invoicing & Collections</h2>
-          <p className="text-sm text-fg-muted">
-            Track student fee balances, online Paystack payments, and automated reconciliations.
-          </p>
+          <p className="text-sm text-fg-muted">Track student fee balances, online Paystack payments, and automated reconciliations.</p>
         </div>
 
         {canManageFinance && (

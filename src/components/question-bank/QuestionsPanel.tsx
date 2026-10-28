@@ -31,7 +31,15 @@ const EMPTY: Record<QuestionsView, string> = {
   queue: "Nothing is waiting for you.",
 };
 
-export function QuestionsPanel({ view, writeCampuses, wholeSchool }: { view: QuestionsView; writeCampuses: { id: string; name: string }[]; wholeSchool: boolean }) {
+export function QuestionsPanel({
+  view,
+  writeCampuses,
+  wholeSchool,
+}: {
+  view: QuestionsView;
+  writeCampuses: { id: string; name: string }[];
+  wholeSchool: boolean;
+}) {
   const api = useBankApi();
   const [items, setItems] = useState<ApiItem[] | null>(null);
   const [next, setNext] = useState<string | null>(null);
@@ -109,7 +117,12 @@ export function QuestionsPanel({ view, writeCampuses, wholeSchool }: { view: Que
       {view !== "queue" && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="min-w-0 flex-1">
-            <TextField label="Search the questions" value={text} onChange={(e) => changeFilter(() => setText(e.target.value))} maxLength={100} />
+            <TextField
+              label="Search the questions"
+              value={text}
+              onChange={(e) => changeFilter(() => setText(e.target.value))}
+              maxLength={100}
+            />
           </div>
           <div className="sm:w-44">
             <TextField label="Subject" value={subject} onChange={(e) => changeFilter(() => setSubject(e.target.value))} maxLength={80} />
@@ -122,7 +135,10 @@ export function QuestionsPanel({ view, writeCampuses, wholeSchool }: { view: Que
               label="State"
               value={status}
               onChange={(e) => changeFilter(() => setStatus(e.target.value as "" | ItemStatus))}
-              options={[{ value: "", label: "Any state" }, ...(Object.keys(STATUS_LABEL) as ItemStatus[]).map((s) => ({ value: s, label: STATUS_LABEL[s] }))]}
+              options={[
+                { value: "", label: "Any state" },
+                ...(Object.keys(STATUS_LABEL) as ItemStatus[]).map((s) => ({ value: s, label: STATUS_LABEL[s] })),
+              ]}
             />
           </div>
           <Button onClick={() => setWriting(true)} className="sm:shrink-0">

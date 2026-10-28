@@ -5,7 +5,15 @@ export type ItemType = "SINGLE" | "MULTI" | "TRUE_FALSE" | "SHORT";
 export type ItemStatus = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED" | "RETIRED";
 export type ItemVisibility = "TEACHERS_ONLY" | "PRACTICE" | "TEACHERS_ONLY_UNTIL";
 
-export type ItemImage = { id: string; alt: string; decorative: boolean; width: number; height: number; contentType: string; sortOrder: number };
+export type ItemImage = {
+  id: string;
+  alt: string;
+  decorative: boolean;
+  width: number;
+  height: number;
+  contentType: string;
+  sortOrder: number;
+};
 export type ItemOverlap = { id: string; score: number; similarTo: { kind: "BANK_ITEM" | "ASSESSMENT_QUESTION"; id: string } };
 
 export type ApiItem = {
@@ -52,7 +60,12 @@ export const TYPE_LABEL: Record<ItemType, string> = {
   TRUE_FALSE: "True or false",
   SHORT: "Short answer",
 };
-export const OUTCOME_LABEL: Record<string, string> = { APPROVED: "Approved", REJECTED: "Sent back", RETIRED: "Retired", EDITED: "Corrected by a reviewer" };
+export const OUTCOME_LABEL: Record<string, string> = {
+  APPROVED: "Approved",
+  REJECTED: "Sent back",
+  RETIRED: "Retired",
+  EDITED: "Corrected by a reviewer",
+};
 
 const dateText = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 export const whenText = dateText;
@@ -72,7 +85,8 @@ export function answerKey(item: Pick<ApiItem, "type" | "options" | "correctAnswe
   return (item.options ?? []).filter((option) => ids.has(option.id)).map((option) => option.text);
 }
 
-export const imageUrl = (api: string, itemId: string, imageId: string) => `${api}/items/${encodeURIComponent(itemId)}/images/${encodeURIComponent(imageId)}`;
+export const imageUrl = (api: string, itemId: string, imageId: string) =>
+  `${api}/items/${encodeURIComponent(itemId)}/images/${encodeURIComponent(imageId)}`;
 
 /// A short line of the prompt for a list: the first line, cut at a word.
 export function snippet(prompt: string, max = 140): string {

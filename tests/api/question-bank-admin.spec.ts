@@ -42,7 +42,8 @@ const removeReviewer = (who: string, id: string, withProof = true) =>
   api(`${base()}/reviewers/${id}`, { ...as(who), method: "DELETE", body: withProof ? { stepUp: proof(who) } : {} });
 const change = (who: string, body: Record<string, unknown>, withProof = true) =>
   api(`${base()}/settings`, { ...as(who), method: "PUT", body: { ...body, ...(withProof ? { stepUp: proof(who) } : {}) } });
-const audits = (entity?: string) => db.questionBankAudit.findMany({ where: { tenantId: a.id, ...(entity ? { entity } : {}) }, orderBy: { createdAt: "asc" } });
+const audits = (entity?: string) =>
+  db.questionBankAudit.findMany({ where: { tenantId: a.id, ...(entity ? { entity } : {}) }, orderBy: { createdAt: "asc" } });
 const sessionFor = async (user: TestUser) => cookieHeader((await createSession(user.id)).token);
 
 test.beforeAll(async () => {
@@ -50,7 +51,20 @@ test.beforeAll(async () => {
   a = await createTenant({ name: "Alpha Question Bank", campuses: ["North", "South"] });
   b = await createTenant({ name: "Beta Question Bank", campuses: ["Elsewhere"] });
   [north, south] = a.campuses;
-  for (const key of ["admin", "adminB", "campusNorth", "campusSouth", "teacherNorth", "teacherSouth", "teacherWide", "pupil", "parent", "gone", "teacherB", "platform"])
+  for (const key of [
+    "admin",
+    "adminB",
+    "campusNorth",
+    "campusSouth",
+    "teacherNorth",
+    "teacherSouth",
+    "teacherWide",
+    "pupil",
+    "parent",
+    "gone",
+    "teacherB",
+    "platform",
+  ])
     people[key] = await createUser({ platformAdmin: key === "platform" });
   await addMembership(people.admin.id, a.id, Role.ADMIN);
   await addMembership(people.adminB.id, b.id, Role.ADMIN);
@@ -83,7 +97,10 @@ test.describe("who may call at all", () => {
       ["PUT", "/settings"],
       ["DELETE", "/reviewers/x"],
     ] as const) {
-      expect((await api(`${base()}${path}`, { ...SAAS, method, body: method === "GET" ? undefined : {} })).status, `${method} ${path} signed out`).toBe(401);
+      expect(
+        (await api(`${base()}${path}`, { ...SAAS, method, body: method === "GET" ? undefined : {} })).status,
+        `${method} ${path} signed out`,
+      ).toBe(401);
       for (const who of ["teacherNorth", "teacherWide", "pupil", "parent", "adminB", "teacherB", "gone", "platform"]) {
         const res = await api(`${base()}${path}`, { ...as(who), method, body: method === "GET" ? undefined : { stepUp: proof(who) } });
         expect(res.status, `${method} ${path} as ${who}`).toBe(403);
@@ -97,7 +114,11 @@ test.describe("assigning a reviewer", () => {
   test("it needs the fresh proof: none is a 400, a wrong password a 403, and nothing is written either way", async () => {
     const body = { campusId: north.id, userId: people.teacherNorth.id, scope: "GENERAL" };
     expect((await addReviewer("admin", body, false)).status).toBe(400);
-    const wrong = await api(`${base()}/reviewers`, { ...as("admin"), method: "POST", body: { ...body, stepUp: { type: "password", value: "not-the-password-1" } } });
+    const wrong = await api(`${base()}/reviewers`, {
+      ...as("admin"),
+      method: "POST",
+      body: { ...body, stepUp: { type: "password", value: "not-the-password-1" } },
+    });
     expect([wrong.status, wrong.json.error.code]).toEqual([403, "WRONG_PASSWORD"]);
     expect(await db.questionBankReviewer.count()).toBe(0);
     expect(await audits()).toHaveLength(0);
@@ -108,11 +129,19 @@ test.describe("assigning a reviewer", () => {
     const one = await addReviewer("admin", { campusId: north.id, userId: people.teacherNorth.id, scope: "GENERAL" });
     expect(one.status, one.text).toBe(201);
     expect(one.json.data.reviewer).toMatchObject({ campusId: north.id, scope: "GENERAL", isExamApprover: false, inherited: false });
-    const wide = await addReviewer("admin", { campusId: null, userId: people.teacherWide.id, scope: "SUBJECT", subjectLabel: "  Mathematics ", isExamApprover: true });
+    const wide = await addReviewer("admin", {
+      campusId: null,
+      userId: people.teacherWide.id,
+      scope: "SUBJECT",
+      subjectLabel: "  Mathematics ",
+      isExamApprover: true,
+    });
     expect(wide.status, wide.text).toBe(201);
     expect(wide.json.data.reviewer).toMatchObject({ campusId: null, scope: "SUBJECT", subjectLabel: "Mathematics", isExamApprover: true });
     expect((await addReviewer("admin", { campusId: north.id, userId: people.teacherNorth.id, scope: "GENERAL" })).status).toBe(409);
-    expect((await addReviewer("admin", { campusId: null, userId: people.teacherWide.id, scope: "SUBJECT", subjectLabel: "mathematics" })).status).toBe(409);
+    expect(
+      (await addReviewer("admin", { campusId: null, userId: people.teacherWide.id, scope: "SUBJECT", subjectLabel: "mathematics" })).status,
+    ).toBe(409);
 
     const rows = await audits("REVIEWER");
     expect(rows.map((r) => r.action)).toEqual(["ASSIGNED", "ASSIGNED"]);
@@ -123,7 +152,8 @@ test.describe("assigning a reviewer", () => {
   });
 
   test("a person who is not active staff of this school, or of that campus, cannot be a reviewer; a campus must be this school's", async () => {
-    const ask = (who: string, over: Record<string, unknown> = {}) => addReviewer("admin", { campusId: north.id, userId: people[who].id, scope: "GENERAL", ...over });
+    const ask = (who: string, over: Record<string, unknown> = {}) =>
+      addReviewer("admin", { campusId: north.id, userId: people[who].id, scope: "GENERAL", ...over });
     for (const who of ["pupil", "parent", "gone", "teacherB", "adminB", "teacherSouth"]) expect((await ask(who)).status, who).toBe(400);
     expect((await ask("teacherWide")).status).toBe(201); // a membership with no campus belongs to every campus
     expect((await addReviewer("admin", { campusId: null, userId: people.teacherSouth.id, scope: "GENERAL" })).status).toBe(201);
@@ -198,7 +228,11 @@ test.describe("seeing and removing reviewers", () => {
 
   test("an unknown id, another school's reviewer and an id that cannot be one are the same 404; two removals at once write one audit row", async () => {
     const ids = await seed();
-    const other = await api(`/api/v1/schools/${b.code}/question-bank/reviewers/${ids.north}`, { ...as("adminB"), method: "DELETE", body: { stepUp: proof("adminB") } });
+    const other = await api(`/api/v1/schools/${b.code}/question-bank/reviewers/${ids.north}`, {
+      ...as("adminB"),
+      method: "DELETE",
+      body: { stepUp: proof("adminB") },
+    });
     expect(other.status).toBe(404);
     for (const id of ["no-such-id", "a".repeat(300), "%00", "x y"]) expect((await removeReviewer("admin", id)).status, id).toBe(404);
     expect(await db.questionBankReviewer.count()).toBe(3);
@@ -212,9 +246,22 @@ test.describe("the switches", () => {
   test("the view lists every switch with its default, the school's value, the campus's own and what applies, including what a parent may see (NONE to start)", async () => {
     const res = await get("/settings");
     expect(res.status, res.text).toBe(200);
-    const rows = res.json.data.settings as { key: string; default: unknown; school: unknown; override: unknown; effective: unknown; kind: string }[];
+    const rows = res.json.data.settings as {
+      key: string;
+      default: unknown;
+      school: unknown;
+      override: unknown;
+      effective: unknown;
+      kind: string;
+    }[];
     expect(rows).toHaveLength(16);
-    expect(rows.find((r) => r.key === "bank.parents.view")).toMatchObject({ default: "NONE", school: "NONE", override: null, effective: "NONE", kind: "choice" });
+    expect(rows.find((r) => r.key === "bank.parents.view")).toMatchObject({
+      default: "NONE",
+      school: "NONE",
+      override: null,
+      effective: "NONE",
+      kind: "choice",
+    });
     expect(rows.find((r) => r.key === "bank.images.max")).toMatchObject({ default: 3, school: 3, effective: 3 });
     const mine = await get("/settings", "campusNorth");
     expect(mine.json.data.campusId).toBe(north.id);
@@ -224,9 +271,17 @@ test.describe("the switches", () => {
   });
 
   test("a change needs the fresh proof (none 400, wrong 403, nothing written); the school's administrator changes the school's value, audited with the old and new value and the proof's time", async () => {
-    const body = { scope: "SCHOOL", changes: { "bank.images.max": 4, "bank.parents.view": "SUMMARY" }, reason: "Pictures matter for maths" };
+    const body = {
+      scope: "SCHOOL",
+      changes: { "bank.images.max": 4, "bank.parents.view": "SUMMARY" },
+      reason: "Pictures matter for maths",
+    };
     expect((await change("admin", body, false)).status).toBe(400);
-    const wrong = await api(`${base()}/settings`, { ...as("admin"), method: "PUT", body: { ...body, stepUp: { type: "password", value: "not-the-password-1" } } });
+    const wrong = await api(`${base()}/settings`, {
+      ...as("admin"),
+      method: "PUT",
+      body: { ...body, stepUp: { type: "password", value: "not-the-password-1" } },
+    });
     expect(wrong.status).toBe(403);
     expect(await db.questionBankSetting.count()).toBe(0);
     expect(await audits()).toHaveLength(0);
@@ -254,10 +309,23 @@ test.describe("the switches", () => {
   });
 
   test("a campus may only narrow: a campus administrator makes a switch stricter for their own campus, not looser, not for the school, not for another campus", async () => {
-    expect((await change("admin", { scope: "SCHOOL", changes: { "bank.access.staff": true, "bank.images.max": 4, "bank.parents.view": "SUMMARY" } })).status).toBe(200);
-    const narrow = await change("campusNorth", { scope: "CAMPUS", campusId: north.id, changes: { "bank.images.max": 3, "bank.parents.view": "NONE", "bank.access.staff": false, "bank.practice.maxQuestions": 30 } });
+    expect(
+      (
+        await change("admin", {
+          scope: "SCHOOL",
+          changes: { "bank.access.staff": true, "bank.images.max": 4, "bank.parents.view": "SUMMARY" },
+        })
+      ).status,
+    ).toBe(200);
+    const narrow = await change("campusNorth", {
+      scope: "CAMPUS",
+      campusId: north.id,
+      changes: { "bank.images.max": 3, "bank.parents.view": "NONE", "bank.access.staff": false, "bank.practice.maxQuestions": 30 },
+    });
     expect(narrow.status, narrow.text).toBe(200);
-    const view = (narrow.json.data.settings as { key: string; school: unknown; override: unknown; effective: unknown }[]).find((r) => r.key === "bank.parents.view")!;
+    const view = (narrow.json.data.settings as { key: string; school: unknown; override: unknown; effective: unknown }[]).find(
+      (r) => r.key === "bank.parents.view",
+    )!;
     expect(view).toMatchObject({ school: "SUMMARY", override: "NONE", effective: "NONE" });
     // the school's other campus is untouched
     const southView = (await get("/settings?campusId=" + south.id)).json.data.settings as { key: string; effective: unknown }[];
@@ -266,7 +334,9 @@ test.describe("the switches", () => {
     const looser = await change("campusNorth", { scope: "CAMPUS", campusId: north.id, changes: { "bank.parents.view": "FULL" } });
     expect(looser.status).toBe(400);
     expect(looser.json.error.details[0].path).toBe("changes.bank.parents.view");
-    expect((await change("campusNorth", { scope: "CAMPUS", campusId: north.id, changes: { "bank.practice.maxQuestions": 150 } })).status).toBe(400); // the school allows 100: a campus cannot raise it
+    expect(
+      (await change("campusNorth", { scope: "CAMPUS", campusId: north.id, changes: { "bank.practice.maxQuestions": 150 } })).status,
+    ).toBe(400); // the school allows 100: a campus cannot raise it
     expect((await change("campusNorth", { scope: "SCHOOL", changes: { "bank.images.max": 3 } })).status).toBe(403);
     expect((await change("campusNorth", { scope: "CAMPUS", campusId: south.id, changes: { "bank.images.max": 3 } })).status).toBe(403);
     expect((await change("campusNorth", { scope: "CAMPUS", campusId: null, changes: { "bank.images.max": 3 } })).status).toBe(400); // null is not "my campus"
@@ -280,7 +350,8 @@ test.describe("the switches", () => {
   });
 
   test("a value must fit its switch: the wrong type, out of bounds, an unknown switch, a value that is not one of the choices, school numbers that disagree, too many at once, a NUL byte", async () => {
-    const bad = async (changes: Record<string, unknown>, status = 400) => expect((await change("admin", { scope: "SCHOOL", changes })).status, JSON.stringify(changes).slice(0, 80)).toBe(status);
+    const bad = async (changes: Record<string, unknown>, status = 400) =>
+      expect((await change("admin", { scope: "SCHOOL", changes })).status, JSON.stringify(changes).slice(0, 80)).toBe(status);
     await bad({ "bank.access.staff": "yes" });
     await bad({ "bank.images.max": 5 });
     await bad({ "bank.images.max": "4" });
@@ -290,14 +361,30 @@ test.describe("the switches", () => {
     await bad({ "bank.parents.view": "EVERYTHING" });
     await bad({ "bank.parents.view": "none" });
     await bad({ "bank.nope": 1 });
-    await bad({ "__proto__": 1 });
+    await bad({ __proto__: 1 });
     await bad({ "bank.practice.maxQuestions": 10 }); // below the default set size of 20: the numbers must agree, so the administrator fixes them together
     await bad({});
     await bad(Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`bank.k${i}`, 1])));
-    const nul = await api(`${base()}/settings`, { ...as("admin"), method: "PUT", rawBody: '{"scope":"SCHOOL","changes":{"bank.images.max":4},"reason":"a\\u0000b","stepUp":{"type":"password","value":"x"}}' });
+    const nul = await api(`${base()}/settings`, {
+      ...as("admin"),
+      method: "PUT",
+      rawBody: '{"scope":"SCHOOL","changes":{"bank.images.max":4},"reason":"a\\u0000b","stepUp":{"type":"password","value":"x"}}',
+    });
     expect(nul.status).toBeLessThan(500);
     expect(await db.questionBankSetting.count()).toBe(0);
-    expect((await change("admin", { scope: "SCHOOL", changes: { "bank.practice.maxQuestions": 10, "bank.practice.defaultQuestions": 10, "bank.practice.presets": [5, 10], "bank.practice.dailyCap": 10 } })).status).toBe(200);
+    expect(
+      (
+        await change("admin", {
+          scope: "SCHOOL",
+          changes: {
+            "bank.practice.maxQuestions": 10,
+            "bank.practice.defaultQuestions": 10,
+            "bank.practice.presets": [5, 10],
+            "bank.practice.dailyCap": 10,
+          },
+        })
+      ).status,
+    ).toBe(200);
   });
 
   test("two changes at once do not lose one", async () => {
@@ -320,7 +407,11 @@ test.describe("one school never reaches another's", () => {
     expect((await api(`${otherBase}/reviewers`, as("adminB"))).json.data.reviewers).toEqual([]);
     const view = (await api(`${otherBase}/settings`, as("adminB"))).json.data.settings as { key: string; school: unknown }[];
     expect(view.find((r) => r.key === "bank.images.max")!.school).toBe(3);
-    const mine = await api(`${otherBase}/settings`, { ...as("adminB"), method: "PUT", body: { scope: "SCHOOL", changes: { "bank.images.max": 4, "bank.parents.view": "FULL" }, stepUp: proof("adminB") } });
+    const mine = await api(`${otherBase}/settings`, {
+      ...as("adminB"),
+      method: "PUT",
+      body: { scope: "SCHOOL", changes: { "bank.images.max": 4, "bank.parents.view": "FULL" }, stepUp: proof("adminB") },
+    });
     expect(mine.status, mine.text).toBe(200);
     expect(await db.questionBankSetting.count({ where: { tenantId: b.id } })).toBe(2);
     expect(await db.questionBankSetting.count({ where: { tenantId: a.id } })).toBe(1);
@@ -334,10 +425,19 @@ test.describe("a platform administrator's support view reaches none of it", () =
     const grant = await api(`/api/v1/schools/${a.code}/support-grants`, {
       ...as("admin"),
       method: "POST",
-      body: { areas: ["settings", "academics", "people", "attendance", "results"], hours: 2, reason: "Ticket 1: checking the question bank", stepUp: proof("admin") },
+      body: {
+        areas: ["settings", "academics", "people", "attendance", "results"],
+        hours: 2,
+        reason: "Ticket 1: checking the question bank",
+        stepUp: proof("admin"),
+      },
     });
     expect(grant.status, grant.text).toBe(201);
-    const opened = await api("/api/v1/platform/support/open", { ...as("platform"), method: "POST", body: { code: a.code, password: DEFAULT_PASSWORD } });
+    const opened = await api("/api/v1/platform/support/open", {
+      ...as("platform"),
+      method: "POST",
+      body: { code: a.code, password: DEFAULT_PASSWORD },
+    });
     expect(opened.status, opened.text).toBe(200);
     for (const [method, path] of [
       ["GET", "/reviewers"],

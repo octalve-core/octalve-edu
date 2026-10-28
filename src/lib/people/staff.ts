@@ -410,8 +410,7 @@ export async function updateStaff(
                 : null
               : input.employmentDate,
           nextOfKinName: input.nextOfKinName === undefined ? current.nextOfKinName : input.nextOfKinName,
-          nextOfKinRelationship:
-            input.nextOfKinRelationship === undefined ? current.nextOfKinRelationship : input.nextOfKinRelationship,
+          nextOfKinRelationship: input.nextOfKinRelationship === undefined ? current.nextOfKinRelationship : input.nextOfKinRelationship,
           nextOfKinPhone: input.nextOfKinPhone === undefined ? current.nextOfKinPhone : input.nextOfKinPhone,
           nextOfKinAddress: input.nextOfKinAddress === undefined ? current.nextOfKinAddress : input.nextOfKinAddress,
         },

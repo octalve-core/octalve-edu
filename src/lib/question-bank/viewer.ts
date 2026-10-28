@@ -14,7 +14,10 @@ import type { BankViewer } from "@/lib/question-bank/rules";
 export async function loadViewer(tx: Tx, tenantId: string, userId: string): Promise<BankViewer> {
   const [memberships, reviewerRows, assignments] = await Promise.all([
     tx.tenantMembership.findMany({ where: { tenantId, userId, deactivatedAt: null }, select: { campusId: true, role: true } }),
-    tx.questionBankReviewer.findMany({ where: { tenantId, userId }, select: { campusId: true, scope: true, subjectKey: true, isExamApprover: true } }),
+    tx.questionBankReviewer.findMany({
+      where: { tenantId, userId },
+      select: { campusId: true, scope: true, subjectKey: true, isExamApprover: true },
+    }),
     tx.staffSubjectAssignment.findMany({
       where: { tenantId, staffRecord: { userId, archivedAt: null }, subject: { archivedAt: null } },
       select: { staffRecord: { select: { campusId: true } }, subject: { select: { name: true } } },

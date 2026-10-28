@@ -141,7 +141,10 @@ test.describe("deciding", () => {
       const item = { ...own, status } as BankItemFacts;
       const reviewerSelf = mayDecide(reviewerOfA, item, action);
       expect(reviewerSelf, action).toEqual({ ok: false, why: "SELF" });
-      expect(mayDecide(who({ memberships: [member(Role.CAMPUS_ADMIN)] }), item, action), `admin ${action}`).toEqual({ ok: false, why: "SELF" });
+      expect(mayDecide(who({ memberships: [member(Role.CAMPUS_ADMIN)] }), item, action), `admin ${action}`).toEqual({
+        ok: false,
+        why: "SELF",
+      });
       expect(mayDecide(who({ isSchoolAdmin: true }), item, action), `school administrator ${action}`).toEqual({ ok: true });
     }
   });
@@ -180,7 +183,9 @@ test.describe("deciding", () => {
     expect(maySeeOverlap(who({ isSchoolAdmin: true }), item)).toBe(true);
     expect(maySeeOverlap(who({ memberships: [member(Role.TEACHING_STAFF)], reviewerRows: [reviewer()] }), item)).toBe(false);
     expect(maySeeOverlap(who({ memberships: [member(Role.CAMPUS_ADMIN)] }), item)).toBe(false);
-    expect(maySeeOverlap(who({ userId: "someone-else", memberships: [member(Role.CAMPUS_ADMIN)], reviewerRows: [reviewer()] }), item)).toBe(false);
+    expect(maySeeOverlap(who({ userId: "someone-else", memberships: [member(Role.CAMPUS_ADMIN)], reviewerRows: [reviewer()] }), item)).toBe(
+      false,
+    );
     expect(maySeeOverlap(reviewerOfA, thing({ campusId: B }))).toBe(false);
     expect(
       maySeeOverlap(
@@ -474,7 +479,8 @@ test.describe("properties over random people and items", () => {
       if (!power.mayReview || viewer.isSchoolAdmin) continue;
       const viaEveryBranchRow = viewer.reviewerRows.some((r) => r.campusId === null);
       const viaBranchRow = item.campusId !== null && viewer.reviewerRows.some((r) => r.campusId === item.campusId);
-      const viaAdmin = item.campusId !== null && viewer.memberships.some((m) => m.campusId === item.campusId && m.role === Role.CAMPUS_ADMIN);
+      const viaAdmin =
+        item.campusId !== null && viewer.memberships.some((m) => m.campusId === item.campusId && m.role === Role.CAMPUS_ADMIN);
       if (!viaEveryBranchRow && !viaBranchRow && !viaAdmin) problems.push(`case ${i}: review power from nowhere`);
       if (item.campusId === null && !viaEveryBranchRow) problems.push(`case ${i}: a campus person reached a general item`);
     }
@@ -567,6 +573,8 @@ test.describe("writing for the whole school (no campus)", () => {
     expect(mayAuthorIn(who({ memberships: staff }), null)).toBe(false);
     expect(mayAuthorIn(who({ memberships: staff, reviewerRows: [reviewer({ campusId: null })] }), null)).toBe(true);
     expect(mayAuthorIn(who({ memberships: staff, reviewerRows: [reviewer({ campusId: A })] }), null)).toBe(false); // a campus's reviewer is not the school's
-    expect(mayAuthorIn(who({ memberships: [member(Role.NON_TEACHING_STAFF, A)], reviewerRows: [reviewer({ campusId: null })] }), null)).toBe(false);
+    expect(
+      mayAuthorIn(who({ memberships: [member(Role.NON_TEACHING_STAFF, A)], reviewerRows: [reviewer({ campusId: null })] }), null),
+    ).toBe(false);
   });
 });

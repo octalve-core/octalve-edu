@@ -69,7 +69,12 @@ export async function listReviewers(tenant: TenantCtx, campusId: string | null):
   });
 }
 
-export type Fail = { ok: false; status: 400 | 403 | 404 | 409; code: "VALIDATION" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT"; message: string };
+export type Fail = {
+  ok: false;
+  status: 400 | 403 | 404 | 409;
+  code: "VALIDATION" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT";
+  message: string;
+};
 const refuse = (status: Fail["status"], code: Fail["code"], message: string): Fail => ({ ok: false, status, code, message });
 const NOT_FOUND = refuse(404, "NOT_FOUND", "Not found");
 
@@ -89,7 +94,8 @@ export async function addReviewer(tenant: TenantCtx, input: AddReviewerInput): P
   const isAdmin = input.actorRole === "ADMIN";
   if (!isAdmin) {
     // a campus administrator assigns for their own campus only: not for the whole school, and any other campus is no campus of theirs
-    if (input.actorRole !== "CAMPUS_ADMIN" || input.actorCampusId === null) return refuse(403, "FORBIDDEN", "Only an administrator can assign reviewers.");
+    if (input.actorRole !== "CAMPUS_ADMIN" || input.actorCampusId === null)
+      return refuse(403, "FORBIDDEN", "Only an administrator can assign reviewers.");
     if (input.campusId === null) return refuse(403, "FORBIDDEN", "Only a school administrator can assign a reviewer for every campus.");
     if (input.campusId !== input.actorCampusId) return NOT_FOUND;
   }
@@ -99,7 +105,8 @@ export async function addReviewer(tenant: TenantCtx, input: AddReviewerInput): P
   if (input.scope === "SUBJECT") {
     subjectLabel = (input.subjectLabel ?? "").replace(/\s+/g, " ").trim();
     subjectKey = normalizeLabel(subjectLabel);
-    if (!subjectLabel || !subjectKey) return refuse(400, "VALIDATION", "A subject reviewer needs a subject name with at least one letter or digit.");
+    if (!subjectLabel || !subjectKey)
+      return refuse(400, "VALIDATION", "A subject reviewer needs a subject name with at least one letter or digit.");
     if (subjectLabel.length > 80 || hasForbiddenCharacters(subjectLabel))
       return refuse(400, "VALIDATION", "A subject name is at most 80 characters, without control or invisible characters.");
   } else if (input.subjectLabel) {
@@ -125,7 +132,11 @@ export async function addReviewer(tenant: TenantCtx, input: AddReviewerInput): P
         select: { id: true },
       });
       if (!staff)
-        return refuse(400, "VALIDATION", input.campusId ? "That person is not active staff on this campus." : "That person is not active staff in this school.");
+        return refuse(
+          400,
+          "VALIDATION",
+          input.campusId ? "That person is not active staff on this campus." : "That person is not active staff in this school.",
+        );
 
       const row = await tx.questionBankReviewer.create({
         data: {
@@ -172,8 +183,10 @@ export async function removeReviewer(tenant: TenantCtx, input: RemoveReviewerInp
     });
     if (!row) return NOT_FOUND;
     if (input.actorRole !== "ADMIN") {
-      if (input.actorRole !== "CAMPUS_ADMIN" || input.actorCampusId === null) return refuse(403, "FORBIDDEN", "Only an administrator can remove reviewers.");
-      if (row.campusId === null) return refuse(403, "FORBIDDEN", "That reviewer is set for the whole school. Only a school administrator can remove them.");
+      if (input.actorRole !== "CAMPUS_ADMIN" || input.actorCampusId === null)
+        return refuse(403, "FORBIDDEN", "Only an administrator can remove reviewers.");
+      if (row.campusId === null)
+        return refuse(403, "FORBIDDEN", "That reviewer is set for the whole school. Only a school administrator can remove them.");
       if (row.campusId !== input.actorCampusId) return NOT_FOUND;
     }
     // deleteMany, not delete: two people removing the same row at once must not make the second a 500 or write a second audit row.

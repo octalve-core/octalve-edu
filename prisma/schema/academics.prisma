@@ -105,6 +105,8 @@ model ClassGroup {
   learningMaterials LearningMaterial[]
   quizzes           Quiz[]
   approvalScopes    ResultApprovalScope[]
+  practiceSessions  PracticeSession[]
+  formAudiences     FormAudience[]
 
   @@unique([tenantId, id])
   @@index([tenantId])

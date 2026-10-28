@@ -46,7 +46,19 @@ export function QuestionDetail({
   );
 }
 
-function DetailBody({ id, onClose, onChanged, onEdit, onOpen }: { id: string; onClose: () => void; onChanged: (message: string | null) => void; onEdit: (item: ApiItem) => void; onOpen: (id: string) => void }) {
+function DetailBody({
+  id,
+  onClose,
+  onChanged,
+  onEdit,
+  onOpen,
+}: {
+  id: string;
+  onClose: () => void;
+  onChanged: (message: string | null) => void;
+  onEdit: (item: ApiItem) => void;
+  onOpen: (id: string) => void;
+}) {
   const api = useBankApi();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +71,8 @@ function DetailBody({ id, onClose, onChanged, onEdit, onOpen }: { id: string; on
     void (async () => {
       const reply = await getJson(`${api}/items/${encodeURIComponent(id)}`);
       if (!current) return;
-      if (!reply.ok) return setError(reply.status === 404 ? "This question is no longer available to you." : say(reply, "Couldn't load the question."));
+      if (!reply.ok)
+        return setError(reply.status === 404 ? "This question is no longer available to you." : say(reply, "Couldn't load the question."));
       setError(null);
       setLoaded({ item: reply.data!.item as ApiItem, history: reply.data!.history as HistoryEntry[] });
     })();
@@ -114,7 +127,9 @@ function DetailBody({ id, onClose, onChanged, onEdit, onOpen }: { id: string; on
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="rounded-full border border-line-strong px-3 py-1 font-semibold text-fg">{STATUS_LABEL[item.status]}</span>
         <span className="text-fg-2">{TYPE_LABEL[item.type]}</span>
-        <span className="text-fg-2">· {item.points} {item.points === 1 ? "point" : "points"}</span>
+        <span className="text-fg-2">
+          · {item.points} {item.points === 1 ? "point" : "points"}
+        </span>
         {item.difficulty !== null && <span className="text-fg-2">· Difficulty {item.difficulty} of 5</span>}
       </div>
 
@@ -128,7 +143,13 @@ function DetailBody({ id, onClose, onChanged, onEdit, onOpen }: { id: string; on
             {item.images.map((image) => (
               <li key={image.id} className="rounded-xl border border-line bg-surface-2 p-2">
                 {/* eslint-disable-next-line @next/next/no-img-element -- our own route, same origin, private: the image optimiser would fetch it without the sign-in */}
-                <img src={imageUrl(api, item.id, image.id)} alt={image.decorative ? "" : image.alt} width={image.width} height={image.height} className="mx-auto h-auto max-h-64 w-auto max-w-full" />
+                <img
+                  src={imageUrl(api, item.id, image.id)}
+                  alt={image.decorative ? "" : image.alt}
+                  width={image.width}
+                  height={image.height}
+                  className="mx-auto h-auto max-h-64 w-auto max-w-full"
+                />
               </li>
             ))}
           </ul>
@@ -144,7 +165,10 @@ function DetailBody({ id, onClose, onChanged, onEdit, onOpen }: { id: string; on
             {item.options.map((option) => {
               const correct = key.includes(option.text);
               return (
-                <li key={option.id} className={`rounded-lg border px-3 py-2 text-sm ${correct ? "border-ok-line bg-ok-bg text-ok-fg" : "border-line text-fg"}`}>
+                <li
+                  key={option.id}
+                  className={`rounded-lg border px-3 py-2 text-sm ${correct ? "border-ok-line bg-ok-bg text-ok-fg" : "border-line text-fg"}`}
+                >
                   {option.text}
                   {correct && <span className="font-semibold"> (correct)</span>}
                 </li>
@@ -211,14 +235,13 @@ function DetailBody({ id, onClose, onChanged, onEdit, onOpen }: { id: string; on
 
       {similar.length > 0 && (
         <Alert variant="warning">
-          <p className="font-semibold">
-            This question is very close to {similar.length === 1 ? "another" : `${similar.length} others`}.
-          </p>
+          <p className="font-semibold">This question is very close to {similar.length === 1 ? "another" : `${similar.length} others`}.</p>
           <ul className="mt-1 space-y-1">
             {similar.map((flag) => (
               <li key={flag.id} className="flex flex-wrap items-center gap-2">
                 <span>
-                  {percent(flag.score)} the same as {flag.similarTo.kind === "BANK_ITEM" ? "a question in the bank" : "a question in a published quiz"}
+                  {percent(flag.score)} the same as{" "}
+                  {flag.similarTo.kind === "BANK_ITEM" ? "a question in the bank" : "a question in a published quiz"}
                 </span>
                 {flag.similarTo.kind === "BANK_ITEM" && (
                   <Button variant="secondary" onClick={() => onOpen(flag.similarTo.id)} className="min-h-11 text-sm">
@@ -274,7 +297,11 @@ function DetailBody({ id, onClose, onChanged, onEdit, onOpen }: { id: string; on
         {item.can.approve && <Button onClick={() => setDeciding("approve")}>Approve</Button>}
       </div>
 
-      <ApproveDialog item={deciding === "approve" ? item : null} onClose={() => setDeciding(null)} onDone={(reply) => decided(reply, "Approved.")} />
+      <ApproveDialog
+        item={deciding === "approve" ? item : null}
+        onClose={() => setDeciding(null)}
+        onDone={(reply) => decided(reply, "Approved.")}
+      />
       <ReasonDialog
         item={deciding === "reject" || deciding === "retire" ? item : null}
         action={deciding === "retire" ? "retire" : "reject"}

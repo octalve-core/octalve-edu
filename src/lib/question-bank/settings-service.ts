@@ -121,12 +121,14 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stri
 
 export async function changeBankSettings(tenant: TenantCtx, input: ChangeInput): Promise<ChangeResult> {
   const isAdmin = input.actorRole === "ADMIN";
-  if (input.scope === "SCHOOL" && !isAdmin) return refuse(403, "FORBIDDEN", "Only a school administrator can change the school's own settings.");
+  if (input.scope === "SCHOOL" && !isAdmin)
+    return refuse(403, "FORBIDDEN", "Only a school administrator can change the school's own settings.");
   if (input.scope === "SCHOOL" && input.campusId) return refuse(400, "VALIDATION", "A school-wide change does not name a campus.");
   if (input.scope === "CAMPUS" && !input.campusId) return refuse(400, "VALIDATION", "A campus change needs the campus.");
   if (input.scope === "CAMPUS" && !isAdmin) {
     // a campus administrator changes their own campus only; any other campus is a campus that does not exist, to them
-    if (input.actorRole !== "CAMPUS_ADMIN" || input.actorCampusId === null) return refuse(403, "FORBIDDEN", "Only an administrator can change these settings.");
+    if (input.actorRole !== "CAMPUS_ADMIN" || input.actorCampusId === null)
+      return refuse(403, "FORBIDDEN", "Only an administrator can change these settings.");
     if (input.campusId !== input.actorCampusId) return refuse(404, "NOT_FOUND", "Not found");
   }
 
@@ -177,7 +179,10 @@ export async function changeBankSettings(tenant: TenantCtx, input: ChangeInput):
         const value = parsed[key];
         if (value === null) continue;
         if (!isNarrowing(key, school[key] as never, value as never))
-          widening.push({ path: `changes.${key}`, message: `A campus can only make this stricter than the school's setting. ${BANK_SETTING_META[key].stricter}` });
+          widening.push({
+            path: `changes.${key}`,
+            message: `A campus can only make this stricter than the school's setting. ${BANK_SETTING_META[key].stricter}`,
+          });
       }
       if (widening.length > 0) return refuse(400, "VALIDATION", "A campus can only narrow a setting, not widen it.", widening);
     }
@@ -192,7 +197,12 @@ export async function changeBankSettings(tenant: TenantCtx, input: ChangeInput):
       }
       const problems = settingProblems(completeBankSettings(after));
       if (problems.length > 0)
-        return refuse(400, "VALIDATION", problems[0], problems.map((message) => ({ path: "changes", message })));
+        return refuse(
+          400,
+          "VALIDATION",
+          problems[0],
+          problems.map((message) => ({ path: "changes", message })),
+        );
     }
 
     const campusId = input.scope === "SCHOOL" ? null : input.campusId;
@@ -205,9 +215,14 @@ export async function changeBankSettings(tenant: TenantCtx, input: ChangeInput):
       if (next === null) {
         await tx.questionBankSetting.deleteMany({ where: { tenantId, campusId, key } });
       } else if (existing) {
-        await tx.questionBankSetting.update({ where: { id: existing.id }, data: { value: next as Prisma.InputJsonValue, updatedById: input.actorUserId } });
+        await tx.questionBankSetting.update({
+          where: { id: existing.id },
+          data: { value: next as Prisma.InputJsonValue, updatedById: input.actorUserId },
+        });
       } else {
-        await tx.questionBankSetting.create({ data: { tenantId, campusId, key, value: next as Prisma.InputJsonValue, updatedById: input.actorUserId } });
+        await tx.questionBankSetting.create({
+          data: { tenantId, campusId, key, value: next as Prisma.InputJsonValue, updatedById: input.actorUserId },
+        });
       }
       await writeBankAudit(tx, {
         tenantId,

@@ -358,7 +358,8 @@ test.describe("what a parent can see (decision D4)", () => {
 
   test("only NONE, SUMMARY and FULL are values; anything else is refused, and a stored bad value is the default", () => {
     for (const ok of ["NONE", "SUMMARY", "FULL"]) expect(parseBankSetting("bank.parents.view", ok).ok, ok).toBe(true);
-    for (const bad of ["none", "ALL", "", null, 0, true, ["FULL"], { level: "FULL" }]) expect(parseBankSetting("bank.parents.view", bad).ok, JSON.stringify(bad)).toBe(false);
+    for (const bad of ["none", "ALL", "", null, 0, true, ["FULL"], { level: "FULL" }])
+      expect(parseBankSetting("bank.parents.view", bad).ok, JSON.stringify(bad)).toBe(false);
     expect(effectiveBankSettings(SCHOOL("EVERYTHING"), {})["bank.parents.view"]).toBe("NONE");
   });
 

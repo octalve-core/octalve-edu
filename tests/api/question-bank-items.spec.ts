@@ -41,7 +41,9 @@ const ck = {} as Record<Who | "teacherB" | "platform", string>;
 
 const sessionFor = async (user: TestUser) => cookieHeader((await createSession(user.id)).token);
 const addReviewer = (user: TestUser, over: Record<string, unknown>) =>
-  db.questionBankReviewer.create({ data: { tenantId: a.id, userId: user.id, assignedById: users.admin.id, scope: "GENERAL", campusId: north.id, ...over } as never });
+  db.questionBankReviewer.create({
+    data: { tenantId: a.id, userId: user.id, assignedById: users.admin.id, scope: "GENERAL", campusId: north.id, ...over } as never,
+  });
 
 test.beforeAll(async () => {
   await seedInstance();
@@ -111,14 +113,21 @@ const submitted = async (who: Who = "writer", over: Record<string, unknown> = {}
   return item;
 };
 const get = (who: Who | undefined, id: string) => api(`${ITEMS}/${id}`, { cookie: who ? ck[who] : undefined });
-const audits = (action?: string) => db.questionBankAudit.findMany({ where: action ? { action } : {}, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
+const audits = (action?: string) =>
+  db.questionBankAudit.findMany({ where: action ? { action } : {}, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
 
 test.describe("writing a question", () => {
   test("a teacher writes a draft only they can see; the stored shape, the version and the audit row are there", async () => {
     const item = await create("writer");
     expect(item).toMatchObject({ status: "DRAFT", version: 1 });
     const stored = await db.questionBankItem.findUniqueOrThrow({ where: { id: item.id }, include: { classTags: true } });
-    expect(stored).toMatchObject({ campusId: north.id, bank: "ASSESSMENT", status: "DRAFT", submittedById: users.writer.id, subjectKey: "mathematics" });
+    expect(stored).toMatchObject({
+      campusId: north.id,
+      bank: "ASSESSMENT",
+      status: "DRAFT",
+      submittedById: users.writer.id,
+      subjectKey: "mathematics",
+    });
     expect(stored.classTags.map((t) => t.label)).toEqual(["JSS 1"]);
     expect(await db.questionBankItemVersion.count({ where: { itemId: item.id, version: 1 } })).toBe(1);
     expect((await audits("ITEM_CREATED"))[0]).toMatchObject({ itemId: item.id, actorUserId: users.writer.id, campusId: north.id });
@@ -148,11 +157,18 @@ test.describe("writing a question", () => {
   });
 
   test("a bad body is a 400 naming the field; nothing is stored; an unknown key (status, bank, campus, owner) is refused", async () => {
-    const post = (extra: Record<string, unknown>) => api(ITEMS, { method: "POST", cookie: ck.writer, body: { campusId: north.id, ...body(), ...extra } });
+    const post = (extra: Record<string, unknown>) =>
+      api(ITEMS, { method: "POST", cookie: ck.writer, body: { campusId: north.id, ...body(), ...extra } });
     const noPrompt = await post({ prompt: "   " });
     expect(noPrompt.status).toBe(400);
     expect(JSON.stringify(noPrompt.json.error.details)).toContain("prompt");
-    for (const extra of [{ status: "APPROVED" }, { bank: "QUESTIONNAIRE" }, { visibility: "PRACTICE" }, { submittedById: users.admin.id }, { approvedById: users.admin.id }]) {
+    for (const extra of [
+      { status: "APPROVED" },
+      { bank: "QUESTIONNAIRE" },
+      { visibility: "PRACTICE" },
+      { submittedById: users.admin.id },
+      { approvedById: users.admin.id },
+    ]) {
       expect((await post(extra)).status, JSON.stringify(extra)).toBe(400);
     }
     expect((await api(ITEMS, { method: "POST", cookie: ck.writer, body: { campusId: "bad id!", ...body() } })).status).toBe(400);
@@ -160,7 +176,9 @@ test.describe("writing a question", () => {
   });
 
   test("with the question bank switched off for staff in this campus, writing is refused with its own code", async () => {
-    await db.questionBankSetting.create({ data: { tenantId: a.id, campusId: north.id, key: "bank.access.staff", value: false, updatedById: users.admin.id } });
+    await db.questionBankSetting.create({
+      data: { tenantId: a.id, campusId: north.id, key: "bank.access.staff", value: false, updatedById: users.admin.id },
+    });
     const res = await api(ITEMS, { method: "POST", cookie: ck.writer, body: { campusId: north.id, ...body() } });
     expect(res.status).toBe(403);
     expect(res.json.error.code).toBe("BANK_OFF");
@@ -171,7 +189,11 @@ test.describe("writing a question", () => {
 test.describe("editing", () => {
   test("the writer edits a draft: a new version with a snapshot; the class tags are replaced; the audit says what changed", async () => {
     const item = await create("writer");
-    const res = await api(`${ITEMS}/${item.id}`, { method: "PATCH", cookie: ck.writer, body: body({ classTags: ["JSS 2", "SS 1"], points: 3 }) });
+    const res = await api(`${ITEMS}/${item.id}`, {
+      method: "PATCH",
+      cookie: ck.writer,
+      body: body({ classTags: ["JSS 2", "SS 1"], points: 3 }),
+    });
     expect(res.status, res.text).toBe(200);
     expect(res.json.data.item).toMatchObject({ version: 2, status: "DRAFT", points: 3, classTags: ["JSS 2", "SS 1"] });
     expect(await db.questionBankItemVersion.count({ where: { itemId: item.id } })).toBe(2);
@@ -244,7 +266,10 @@ test.describe("approving", () => {
     expect(row).toMatchObject({ approvedById: users.reviewer.id, status: "APPROVED" });
     expect(row.approvedAt).not.toBeNull();
     expect(await db.questionBankReview.count({ where: { itemId: item.id, outcome: "APPROVED", reviewerId: users.reviewer.id } })).toBe(1);
-    expect((await audits("ITEM_APPROVED"))[0]).toMatchObject({ itemId: item.id, newValue: { status: "APPROVED", visibility: "TEACHERS_ONLY", general: false } });
+    expect((await audits("ITEM_APPROVED"))[0]).toMatchObject({
+      itemId: item.id,
+      newValue: { status: "APPROVED", visibility: "TEACHERS_ONLY", general: false },
+    });
   });
 
   test("nobody approves their own question (403); a plain teacher is told 'Not found'; a second approval is a 409; an unknown key is refused", async () => {
@@ -300,7 +325,10 @@ test.describe("approving", () => {
     const c = await submitted();
     expect((await act("exam", c.id, "approve", { visibility: "TEACHERS_ONLY_UNTIL" })).status).toBe(400);
     expect((await act("exam", c.id, "approve", { visibility: "PRACTICE", visibleFrom: until })).status).toBe(400);
-    expect((await act("exam", c.id, "approve", { visibility: "TEACHERS_ONLY_UNTIL", visibleFrom: new Date(Date.now() - 1000).toISOString() })).status).toBe(400);
+    expect(
+      (await act("exam", c.id, "approve", { visibility: "TEACHERS_ONLY_UNTIL", visibleFrom: new Date(Date.now() - 1000).toISOString() }))
+        .status,
+    ).toBe(400);
     expect((await act("exam", c.id, "approve", { visibility: "TEACHERS_ONLY_UNTIL", visibleFrom: "not a date" })).status).toBe(400);
   });
 
@@ -336,7 +364,11 @@ test.describe("rejecting and retiring", () => {
     expect(fixed.json.data.item).toMatchObject({ status: "REJECTED", version: 2 });
     const again = await act("writer", item.id, "submit");
     expect(again.json.data.item.status).toBe("PENDING");
-    expect((await audits("ITEM_REJECTED"))[0]).toMatchObject({ reason: "Option B is also correct.", oldValue: { status: "PENDING" }, newValue: { status: "REJECTED" } });
+    expect((await audits("ITEM_REJECTED"))[0]).toMatchObject({
+      reason: "Option B is also correct.",
+      oldValue: { status: "PENDING" },
+      newValue: { status: "REJECTED" },
+    });
   });
 
   test("only a pending question can be rejected, only an approved one retired; a reason is needed; images and the row stay", async () => {
@@ -364,9 +396,15 @@ test.describe("rejecting and retiring", () => {
 
 test.describe("the overlap flag is a secret kept from everyone but exam approvers", () => {
   test("a near-copy is flagged silently: the writer's answers carry no overlap key at all, a plain reviewer sees none, an exam approver and a school administrator see it", async () => {
-    const first = await submitted("writer", { prompt: "Name the process by which green plants make their own food using sunlight, water and carbon dioxide.", options: ["Photosynthesis", "Respiration", "Digestion"] });
+    const first = await submitted("writer", {
+      prompt: "Name the process by which green plants make their own food using sunlight, water and carbon dioxide.",
+      options: ["Photosynthesis", "Respiration", "Digestion"],
+    });
     expect((await act("reviewer", first.id, "approve", {})).status).toBe(200);
-    const copy = await create("writer2", { prompt: "Name the process by which green plants make their own food using sunlight, water and carbon dioxide.", options: ["Photosynthesis", "Respiration", "Digestion"] });
+    const copy = await create("writer2", {
+      prompt: "Name the process by which green plants make their own food using sunlight, water and carbon dioxide.",
+      options: ["Photosynthesis", "Respiration", "Digestion"],
+    });
     const sent = await act("writer2", copy.id, "submit");
     expect(sent.status).toBe(200);
     expect(await db.questionOverlapFlag.count({ where: { itemId: copy.id } })).toBe(1);
@@ -394,9 +432,15 @@ test.describe("the overlap flag is a secret kept from everyone but exam approver
   });
 
   test("a corrected question stops being flagged; an unrelated question is never flagged", async () => {
-    const first = await submitted("writer", { prompt: "Name the process by which green plants make their own food using sunlight, water and carbon dioxide.", options: ["Photosynthesis", "Respiration", "Digestion"] });
+    const first = await submitted("writer", {
+      prompt: "Name the process by which green plants make their own food using sunlight, water and carbon dioxide.",
+      options: ["Photosynthesis", "Respiration", "Digestion"],
+    });
     expect(first.id).toBeTruthy();
-    const copy = await submitted("writer2", { prompt: "Name the process by which green plants make their own food using sunlight, water and carbon dioxide.", options: ["Photosynthesis", "Respiration", "Digestion"] });
+    const copy = await submitted("writer2", {
+      prompt: "Name the process by which green plants make their own food using sunlight, water and carbon dioxide.",
+      options: ["Photosynthesis", "Respiration", "Digestion"],
+    });
     expect(await db.questionOverlapFlag.count({ where: { itemId: copy.id } })).toBe(1);
     const edit = await api(`${ITEMS}/${copy.id}`, { method: "PATCH", cookie: ck.writer2, body: body() });
     expect(edit.status).toBe(200);
@@ -408,10 +452,16 @@ test.describe("the overlap flag is a secret kept from everyone but exam approver
 test.describe("authority taken away a moment ago", () => {
   test("a reviewer who was deactivated, or whose assignment was removed, can no longer decide, even with a cookie issued before", async () => {
     const first = await submitted();
-    await db.tenantMembership.update({ where: { userId_tenantId: { userId: users.reviewer.id, tenantId: a.id } }, data: { deactivatedAt: new Date() } });
+    await db.tenantMembership.update({
+      where: { userId_tenantId: { userId: users.reviewer.id, tenantId: a.id } },
+      data: { deactivatedAt: new Date() },
+    });
     expect((await act("reviewer", first.id, "approve", {})).status).toBeGreaterThanOrEqual(401);
     expect((await db.questionBankItem.findUniqueOrThrow({ where: { id: first.id } })).status).toBe("PENDING");
-    await db.tenantMembership.update({ where: { userId_tenantId: { userId: users.reviewer.id, tenantId: a.id } }, data: { deactivatedAt: null } });
+    await db.tenantMembership.update({
+      where: { userId_tenantId: { userId: users.reviewer.id, tenantId: a.id } },
+      data: { deactivatedAt: null },
+    });
 
     const b = await submitted();
     await db.questionBankReviewer.deleteMany({ where: { userId: users.maths.id } });
@@ -426,7 +476,8 @@ test.describe("listing and reading", () => {
     const pending = await submitted("writer");
     const approved = await submitted("writer");
     await act("reviewer", approved.id, "approve", {});
-    const ids = async (who: Who, query = "") => ((await api(`${ITEMS}${query}`, { cookie: ck[who] })).json.data.items as { id: string }[]).map((i) => i.id).sort();
+    const ids = async (who: Who, query = "") =>
+      ((await api(`${ITEMS}${query}`, { cookie: ck[who] })).json.data.items as { id: string }[]).map((i) => i.id).sort();
 
     expect(await ids("writer")).toEqual([draft.id, pending.id, approved.id].sort());
     expect(await ids("writer2")).toEqual([]); // teachers only: this teacher does not teach the subject, so a secret one is hidden
@@ -441,10 +492,14 @@ test.describe("listing and reading", () => {
     expect(await ids("writer2")).toEqual([open.id]);
 
     const subject = await db.subject.create({ data: { tenantId: a.id, name: "Mathematics", code: "MTH" } });
-    const staff = await db.staffRecord.create({ data: { tenantId: a.id, campusId: north.id, userId: users.writer2.id, category: "TEACHING", firstName: "Wura", lastName: "Writer" } });
+    const staff = await db.staffRecord.create({
+      data: { tenantId: a.id, campusId: north.id, userId: users.writer2.id, category: "TEACHING", firstName: "Wura", lastName: "Writer" },
+    });
     const group = await db.classGroup.create({ data: { tenantId: a.id, campusId: north.id, name: "JSS 1" } });
     const arm = await db.classArm.create({ data: { tenantId: a.id, classGroupId: group.id, name: "Gold" } });
-    await db.staffSubjectAssignment.create({ data: { tenantId: a.id, staffRecordId: staff.id, subjectId: subject.id, classArmId: arm.id } });
+    await db.staffSubjectAssignment.create({
+      data: { tenantId: a.id, staffRecordId: staff.id, subjectId: subject.id, classArmId: arm.id },
+    });
     expect(await ids("writer2")).toEqual([secret.id, open.id].sort());
   });
 
@@ -462,8 +517,10 @@ test.describe("listing and reading", () => {
 
   test("filters and pages: by status, text, subject and class; a page of two with a cursor visits every question once", async () => {
     const items = [];
-    for (let i = 0; i < 5; i++) items.push(await create("writer", { subject: i < 3 ? "Mathematics" : "English", classTags: [i % 2 ? "JSS 2" : "JSS 1"] }));
-    const mine = async (query: string) => ((await api(`${ITEMS}?mine=1&${query}`, { cookie: ck.writer })).json.data.items as { id: string }[]).map((i) => i.id);
+    for (let i = 0; i < 5; i++)
+      items.push(await create("writer", { subject: i < 3 ? "Mathematics" : "English", classTags: [i % 2 ? "JSS 2" : "JSS 1"] }));
+    const mine = async (query: string) =>
+      ((await api(`${ITEMS}?mine=1&${query}`, { cookie: ck.writer })).json.data.items as { id: string }[]).map((i) => i.id);
     expect((await mine("subjectKey=english")).length).toBe(2);
     expect((await mine("classTagKey=jss2")).length).toBe(2);
     expect((await mine("status=PENDING")).length).toBe(0);
@@ -475,7 +532,10 @@ test.describe("listing and reading", () => {
     const seen: string[] = [];
     let cursor: string | null = null;
     for (let page = 0; page < 5; page++) {
-      const res: { json: { data: { items: { id: string }[] }; meta: { nextCursor: string | null } } } = await api(`${ITEMS}?mine=1&limit=2${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, { cookie: ck.writer });
+      const res: { json: { data: { items: { id: string }[] }; meta: { nextCursor: string | null } } } = await api(
+        `${ITEMS}?mine=1&limit=2${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+        { cookie: ck.writer },
+      );
       seen.push(...res.json.data.items.map((i) => i.id));
       cursor = res.json.meta.nextCursor;
       if (!cursor) break;
@@ -554,7 +614,9 @@ test.describe("what a school adds", () => {
     await addMembership(writerS.id, solo.id, Role.TEACHING_STAFF);
     await addMembership(reviewerS.id, solo.id, Role.TEACHING_STAFF);
     await addMembership(readerS.id, solo.id, Role.TEACHING_STAFF);
-    await db.questionBankReviewer.create({ data: { tenantId: solo.id, userId: reviewerS.id, assignedById: adminS.id, scope: "GENERAL", campusId: null } });
+    await db.questionBankReviewer.create({
+      data: { tenantId: solo.id, userId: reviewerS.id, assignedById: adminS.id, scope: "GENERAL", campusId: null },
+    });
     const url = `/api/v1/schools/${solo.code}/question-bank`;
     const cookie = async (u: TestUser) => sessionFor(u);
     const writer = await cookie(writerS);
@@ -582,15 +644,35 @@ test.describe("what a school adds", () => {
     const grant = await api(`/api/v1/schools/${a.code}/support-grants`, {
       method: "POST",
       cookie: ck.admin,
-      body: { areas: ["settings", "academics", "people", "attendance", "results"], hours: 2, reason: "Ticket 2: checking the question bank", stepUp: { type: "password", value: DEFAULT_PASSWORD } },
+      body: {
+        areas: ["settings", "academics", "people", "attendance", "results"],
+        hours: 2,
+        reason: "Ticket 2: checking the question bank",
+        stepUp: { type: "password", value: DEFAULT_PASSWORD },
+      },
     });
     expect(grant.status, grant.text).toBe(201);
-    const opened = await api("/api/v1/platform/support/open", { method: "POST", cookie: ck.platform, body: { code: a.code, password: DEFAULT_PASSWORD } });
+    const opened = await api("/api/v1/platform/support/open", {
+      method: "POST",
+      cookie: ck.platform,
+      body: { code: a.code, password: DEFAULT_PASSWORD },
+    });
     expect(opened.status, opened.text).toBe(200);
     const item = await submitted();
-    for (const [path, method] of [[ITEMS, "GET"], [`${ITEMS}/${item.id}`, "GET"], [QUEUE, "GET"], [ITEMS, "POST"], [`${ITEMS}/${item.id}/approve`, "POST"]] as const) {
+    for (const [path, method] of [
+      [ITEMS, "GET"],
+      [`${ITEMS}/${item.id}`, "GET"],
+      [QUEUE, "GET"],
+      [ITEMS, "POST"],
+      [`${ITEMS}/${item.id}/approve`, "POST"],
+    ] as const) {
       const res = await api(path, { method, cookie: ck.platform, ...(method === "POST" ? { body: {} } : {}) });
-      expect([method, path.split("/question-bank")[1], res.status, res.json?.error?.code]).toEqual([method, path.split("/question-bank")[1], 403, "FORBIDDEN"]);
+      expect([method, path.split("/question-bank")[1], res.status, res.json?.error?.code]).toEqual([
+        method,
+        path.split("/question-bank")[1],
+        403,
+        "FORBIDDEN",
+      ]);
     }
   });
 });

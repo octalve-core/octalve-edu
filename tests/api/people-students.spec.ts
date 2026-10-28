@@ -164,7 +164,19 @@ test.describe("creating and changing a student", () => {
     });
     expect(made.json.data.student.admissionNo).toMatch(/^\d{4}\/\d{4,}$/);
     expect(Object.keys(made.json.data.student).sort()).toEqual(
-      ["admissionNo", "archived", "campusId", "campusName", "dateOfBirth", "enrolment", "firstName", "gender", "id", "lastName", "middleName"].sort(),
+      [
+        "admissionNo",
+        "archived",
+        "campusId",
+        "campusName",
+        "dateOfBirth",
+        "enrolment",
+        "firstName",
+        "gender",
+        "id",
+        "lastName",
+        "middleName",
+      ].sort(),
     );
     const typed = await api(students(), as("admin", { method: "POST", body: newStudent({ admissionNo: uniq("OLD/") }) }));
     expect(typed.status).toBe(201);

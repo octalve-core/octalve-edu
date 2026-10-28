@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // The light/dark choice is a cookie so the server renders the right theme on the FIRST
   // paint — no flash, no inline script (see lib/theme.ts). Reading it also makes every
   // page dynamic, which the nonce-based CSP (0.5.B) needs anyway.

@@ -4,7 +4,15 @@ import { writeBankAudit } from "@/lib/question-bank/audit";
 import { cleanText } from "@/lib/question-bank/item-input";
 import { normalizeLabel } from "@/lib/question-bank/labels";
 import { loadViewer } from "@/lib/question-bank/viewer";
-import { mayDecide, mayMakeGeneral, maySetVisibility, reviewPower, staffMaySee, type BankViewer, type DecisionAction } from "@/lib/question-bank/rules";
+import {
+  mayDecide,
+  mayMakeGeneral,
+  maySetVisibility,
+  reviewPower,
+  staffMaySee,
+  type BankViewer,
+  type DecisionAction,
+} from "@/lib/question-bank/rules";
 import {
   ITEM_SELECT,
   NOT_FOUND,
@@ -61,7 +69,11 @@ const why = (verdict: ReturnType<typeof mayDecide>, action: DecisionAction): Fai
   if (verdict.why === "SCOPE") return NOT_FOUND;
   if (verdict.why === "SELF") return fail(403, "OWN_QUESTION", "You cannot decide on your own question.");
   const wanted = action === "approve" || action === "reject" ? "pending review" : "approved";
-  return fail(409, "WRONG_STATE", `Only a question that is ${wanted} can be ${action === "approve" ? "approved" : action === "reject" ? "rejected" : action === "retire" ? "retired" : "edited"}.`);
+  return fail(
+    409,
+    "WRONG_STATE",
+    `Only a question that is ${wanted} can be ${action === "approve" ? "approved" : action === "reject" ? "rejected" : action === "retire" ? "retired" : "edited"}.`,
+  );
 };
 
 type Begun = { ok: false; failure: Fail } | { ok: true; row: ItemRow; viewer: BankViewer };
@@ -88,26 +100,38 @@ export async function approveItem(tenant: TenantCtx, input: { userId: string; id
 
     const wantsVisibility = body.visibility !== undefined && body.visibility !== "TEACHERS_ONLY";
     if (wantsVisibility && !maySetVisibility(viewer, factsOf(row))) {
-      return fail(403, "FORBIDDEN", "Only an exam approver, the administrator of the campus or the school's administrator can make a question visible to pupils.");
+      return fail(
+        403,
+        "FORBIDDEN",
+        "Only an exam approver, the administrator of the campus or the school's administrator can make a question visible to pupils.",
+      );
     }
-    if (body.general && !mayMakeGeneral(viewer, factsOf(row))) return fail(403, "FORBIDDEN", "Only a reviewer for every campus or the school's administrator can make a question general.");
+    if (body.general && !mayMakeGeneral(viewer, factsOf(row)))
+      return fail(403, "FORBIDDEN", "Only a reviewer for every campus or the school's administrator can make a question general.");
 
     const visibility = body.visibility ?? "TEACHERS_ONLY";
-    if (visibility === "TEACHERS_ONLY_UNTIL" && !body.visibleFrom) return fail(400, "VALIDATION", "Give the date and time from which pupils may see the question.");
-    if (visibility !== "TEACHERS_ONLY_UNTIL" && body.visibleFrom) return fail(400, "VALIDATION", "A date is only for a question that becomes visible on a date.");
+    if (visibility === "TEACHERS_ONLY_UNTIL" && !body.visibleFrom)
+      return fail(400, "VALIDATION", "Give the date and time from which pupils may see the question.");
+    if (visibility !== "TEACHERS_ONLY_UNTIL" && body.visibleFrom)
+      return fail(400, "VALIDATION", "A date is only for a question that becomes visible on a date.");
     const visibleFrom = visibility === "TEACHERS_ONLY_UNTIL" ? new Date(body.visibleFrom!) : null;
-    if (visibleFrom && visibleFrom.getTime() <= Date.now()) return fail(400, "VALIDATION", "The date a question becomes visible must be in the future.");
+    if (visibleFrom && visibleFrom.getTime() <= Date.now())
+      return fail(400, "VALIDATION", "The date a question becomes visible must be in the future.");
 
     const subjectLabel = body.subject === undefined ? row.subjectLabel : body.subject;
     const subjectKey = subjectLabel ? normalizeLabel(subjectLabel) : null;
     const tags =
       body.classTags === undefined
         ? row.classTags.map((tag) => ({ label: tag.label, labelKey: tag.labelKey }))
-        : [...new Map(body.classTags.map((tag) => [normalizeLabel(tag), { label: tag, labelKey: normalizeLabel(tag) }])).values()].filter((tag) => tag.labelKey !== "");
+        : [...new Map(body.classTags.map((tag) => [normalizeLabel(tag), { label: tag, labelKey: normalizeLabel(tag) }])).values()].filter(
+            (tag) => tag.labelKey !== "",
+          );
     if (!subjectKey) return fail(400, "VALIDATION", "Choose the subject of the question before approving it.");
     if (tags.length === 0) return fail(400, "VALIDATION", "Choose at least one class for the question before approving it.");
 
-    const changedContent = subjectLabel !== row.subjectLabel || JSON.stringify(tags.map((t) => t.labelKey).sort()) !== JSON.stringify(row.classTags.map((t) => t.labelKey).sort());
+    const changedContent =
+      subjectLabel !== row.subjectLabel ||
+      JSON.stringify(tags.map((t) => t.labelKey).sort()) !== JSON.stringify(row.classTags.map((t) => t.labelKey).sort());
     const version = changedContent ? row.version + 1 : row.version;
     const scopeCampus = body.general ? null : row.campusId;
 
@@ -127,10 +151,15 @@ export async function approveItem(tenant: TenantCtx, input: { userId: string; id
     });
     if (body.classTags !== undefined) {
       await tx.questionBankClassTag.deleteMany({ where: { tenantId, itemId: row.id } });
-      await tx.questionBankClassTag.createMany({ data: tags.map((tag) => ({ tenantId, itemId: row.id, label: tag.label, labelKey: tag.labelKey })) });
+      await tx.questionBankClassTag.createMany({
+        data: tags.map((tag) => ({ tenantId, itemId: row.id, label: tag.label, labelKey: tag.labelKey })),
+      });
     }
     const after = await tx.questionBankItem.findFirstOrThrow({ where: { id: row.id, tenantId }, select: ITEM_SELECT });
-    if (changedContent) await tx.questionBankItemVersion.create({ data: { tenantId, itemId: row.id, version, snapshot: snapshotOf(after), actorUserId: input.userId } });
+    if (changedContent)
+      await tx.questionBankItemVersion.create({
+        data: { tenantId, itemId: row.id, version, snapshot: snapshotOf(after), actorUserId: input.userId },
+      });
     await tx.questionBankReview.create({ data: { tenantId, itemId: row.id, version, reviewerId: input.userId, outcome: "APPROVED" } });
     await writeBankAudit(tx, {
       tenantId,
@@ -140,13 +169,22 @@ export async function approveItem(tenant: TenantCtx, input: { userId: string; id
       entity: "ITEM",
       action: "ITEM_APPROVED",
       oldValue: { status: row.status, visibility: row.visibility, general: row.campusId === null },
-      newValue: { status: "APPROVED", visibility, visibleFrom: visibleFrom ? visibleFrom.toISOString() : null, general: scopeCampus === null },
+      newValue: {
+        status: "APPROVED",
+        visibility,
+        visibleFrom: visibleFrom ? visibleFrom.toISOString() : null,
+        general: scopeCampus === null,
+      },
     });
     return { ok: true, item: await viewOf(tx, viewer, after) } as const;
   });
 }
 
-async function decide(tenant: TenantCtx, input: { userId: string; id: string; reason: string }, action: "reject" | "retire"): Promise<DecisionResult> {
+async function decide(
+  tenant: TenantCtx,
+  input: { userId: string; id: string; reason: string },
+  action: "reject" | "retire",
+): Promise<DecisionResult> {
   const { tenantId } = tenant;
   return tenant.run(async (tx): Promise<DecisionResult> => {
     const step = await begin(tx, tenantId, input.userId, input.id, action);
@@ -158,10 +196,22 @@ async function decide(tenant: TenantCtx, input: { userId: string; id: string; re
       data:
         action === "reject"
           ? { status }
-          : { status, retiredReason: input.reason, approvedById: row.approvedById ?? input.userId, approvedAt: row.approvedAt ?? new Date() },
+          : {
+              status,
+              retiredReason: input.reason,
+              approvedById: row.approvedById ?? input.userId,
+              approvedAt: row.approvedAt ?? new Date(),
+            },
     });
     await tx.questionBankReview.create({
-      data: { tenantId, itemId: row.id, version: row.version, reviewerId: input.userId, outcome: action === "reject" ? "REJECTED" : "RETIRED", reason: input.reason },
+      data: {
+        tenantId,
+        itemId: row.id,
+        version: row.version,
+        reviewerId: input.userId,
+        outcome: action === "reject" ? "REJECTED" : "RETIRED",
+        reason: input.reason,
+      },
     });
     await writeBankAudit(tx, {
       tenantId,
@@ -189,7 +239,9 @@ export async function reviewQueue(tenant: TenantCtx, input: { userId: string; ca
   return tenant.run(async (tx) => {
     const viewer = await loadViewer(tx, tenantId, input.userId);
     const reviewerCampuses = new Set<string | null>(viewer.reviewerRows.map((row) => row.campusId));
-    const administered = viewer.memberships.flatMap((m) => (m.role === "ADMIN" ? [null] : m.role === "CAMPUS_ADMIN" && m.campusId ? [m.campusId] : []));
+    const administered = viewer.memberships.flatMap((m) =>
+      m.role === "ADMIN" ? [null] : m.role === "CAMPUS_ADMIN" && m.campusId ? [m.campusId] : [],
+    );
     // A person who administers the whole school, or reviews for every campus, is not narrowed by campus; anyone else only reaches the campuses they administer or review for.
     // (Built as plain conditions: an empty `{}` inside `OR` is not a reliable "everything".)
     const everyCampus = viewer.isSchoolAdmin || administered.includes(null) || reviewerCampuses.has(null);
@@ -209,7 +261,9 @@ export async function reviewQueue(tenant: TenantCtx, input: { userId: string; ca
       take: 200,
     });
     // The rule decides, row by row: scope (an every-campus reviewer reaches a general question, a subject reviewer only their subject) and the self-decision rule.
-    const mine = rows.filter((row: ItemRow) => reviewPower(viewer, factsOf(row)).mayReview && (viewer.isSchoolAdmin || row.submittedById !== viewer.userId));
+    const mine = rows.filter(
+      (row: ItemRow) => reviewPower(viewer, factsOf(row)).mayReview && (viewer.isSchoolAdmin || row.submittedById !== viewer.userId),
+    );
     return { items: await Promise.all(mine.map((row) => viewOf(tx, viewer, row))) };
   });
 }

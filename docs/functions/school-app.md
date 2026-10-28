@@ -412,6 +412,13 @@ The parts that need no database, copied from AlEemaan with their unit tests (tas
 | `rules.ts` | Who may do what with a question, pure functions over facts already loaded (slice 2): `reviewPower`, `mayDecide(viewer, item, action)` (status, the self-decision rule, scope; scope is asked before status), `maySetVisibility`, `maySeeOverlap`, `mayMakeGeneral`, `mayAuthorIn`, `mayEditAsSubmitter`, `maySubmit`, `pupilsMaySee(item, now)`, `staffMaySee(viewer, item, now)`. A school administrator may do everything; nobody but a school administrator decides their own submission; a general item is reached only by an every-campus reviewer. |
 | `settings.ts` | The pure part of the switches, no database: the 16 `BANK_SETTING_KEYS` (the 15 of AlEemaan and `bank.parents.view`: NONE, SUMMARY or FULL, default NONE, a campus may only choose less than the school; used from slice 4) with `BANK_DEFAULTS`, `parseBankSetting` (type and bounds per key), `isNarrowing` (which way "stricter" goes: flags off, lower maximums, higher minimums, fewer presets), `effectiveBankSettings` (defaults, then the school's rows, then a campus's rows only where they narrow, then default size and presets cut to fit the maximum and daily cap), `settingProblems`, `completeBankSettings` and `BANK_SETTING_META` (screen labels and bounds). An invalid stored value is ignored. Four values are placeholders awaiting confirmation (`dailyCap`, `minPoolSize`, `nearExamDays`, the lower bound of `smallSummary.min`). |
 | `validation.ts` | `idSchema` (zod: the shape of an id, from `ID_PATTERN` in `lib/api/ids.ts`) and `hasForbiddenCharacters` (true for any control, format, zero-width, bidi, private-use, unassigned or lone-surrogate character, `\p{C}`). |
+| `assessments.ts` | Question Bank integration with LMS Assessments (Slice 3): item types mapping (`toBankQuestionType`, `toAssessmentQuestionType`), deep copy (`copyFromBankItem`), exam template secrecy (`isExamTemplateHidden`), and offer-back payload generation (`prepareOfferBackPayload`). |
+| `practice.ts` | Pupil Practice pure domain logic (Slice 4): `isItemAvailableForPractice`, student question scrubbing (`scrubQuestionForPupil`), answer evaluation (`evaluatePracticeAnswer`), daily cap limits (`calculateDailyCapRemaining`), session clamping (`determineSessionSize`), and guardian practice summaries (`buildGuardianPracticeSummary`). |
+| `practice-service.ts` | Tenant-scoped pupil practice services (Slice 4): `getPracticeOptions`, `startPracticeSession`, `submitPracticeAnswer`, `finishPracticeSession`, `getPracticeHistory`, `archivePracticeHistory`. Respects `bank.parents.view` (NONE, SUMMARY, FULL) for guardians. |
+| `reports.ts` | Question reporting domain rules (Slice 5): report reason sanitization (stripping URLs/markdown and control chars), NDPA reviewer masking (`maskReporterForReviewer`), regrade impact calculation (`computeRegradeImpact`), and outcome validation (`validateReportOutcome`). |
+| `reports-service.ts` | Tenant-scoped question report management (Slice 5): reporting items for teachers and pupils, reviewer queues with masked identities, resolution with regrade calculations. |
+| `printing.ts` | Zero-dependency ISO 32000-1 / PDF-1.4 binary engine and watermarking rules (Slice 10): near-exam window checks (`isNearExamWindow`), permission evaluation (`mayPrintDocument`), watermark generation (`generateWatermarkText`), and PDF generation (`generatePdfBinary`). |
+| `printing-service.ts` | Tenant-scoped PDF printing and audit trails (Slice 10): target document compilation (questions, quizzes, forms, practice sessions, student submissions), watermarking, exam approver checks, and append-only logging to `QuestionBankPrintLog`. |
 
 ## `src/lib/storage/`
 
@@ -445,6 +452,13 @@ Slices B and C of the question bank (task 0024): who reviews and the switches (s
 | GET, PUT | `/api/v1/schools/[code]/question-bank/settings` | `schools/[code]/question-bank/settings/route.ts` | Roles ADMIN and CAMPUS_ADMIN | GET `?campusId=`: the 16 switches with default, school value, the campus's own value and what applies (a campus administrator: their campus only). PUT `{ scope: SCHOOL or CAMPUS, campusId?, changes: { key: value or null }, reason?, stepUp }`, strict: the school's own values are the school administrator's alone (403); a campus value may only be stricter than the school's (400 naming each key); `null` clears (a campus then follows the school); the wrong type, out of bounds, an unknown key, a list that does not fit together or more than 20 changes is a 400; `scope CAMPUS` with a `null` campus is a 400. Returns `{ changed, settings }`. |
 | POST | `/api/v1/schools/[code]/question-bank/items/[id]/images` | `schools/[code]/question-bank/items/[id]/images/route.ts` | Same roles as the other item routes | `multipart/form-data`: `file` (one JPEG, PNG or WebP, at most 8 MB), `alt`, `decorative`. The form is read no further than the picture limit plus 64 KB (`413` over it, `415` for a body that is not a form, `400` for a broken form or a field it does not name). `201 { item, imageId }`; `409 IMAGE_LIMIT` at the campus's maximum (3 by default, 4 at most); `400 IMAGE_REJECTED` for a file that is not a picture by its content, is animated or too large in pixels. |
 | GET, DELETE | `/api/v1/schools/[code]/question-bank/items/[id]/images/[imageId]` | `schools/[code]/question-bank/items/[id]/images/[imageId]/route.ts` | Same roles; the GET declares NO support area | GET: the picture's bytes, as the type OUR record holds, `Cache-Control: private, no-store`, `nosniff`, same-origin only; the same `404` for what the person may not see. DELETE: removes a picture from a question the caller may edit; `200 { item }`. |
+| POST | `/api/v1/schools/[code]/question-bank/items/[id]/report` | `schools/[code]/question-bank/items/[id]/report/route.ts` | Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF, NON_TEACHING_STAFF | Submits a report about a question bank item as a teacher; strips URLs, markdown, and forbidden characters; masks reporter identity for NDPA compliance. |
+| POST | `/api/v1/schools/[code]/question-bank/items/offer-back` | `schools/[code]/question-bank/items/offer-back/route.ts` | Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF, NON_TEACHING_STAFF | Offers back a quiz question to the question bank as a new DRAFT item with version 1 and an append-only audit entry. |
+| POST | `/api/v1/schools/[code]/question-bank/print` | `schools/[code]/question-bank/print/route.ts` | Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF, NON_TEACHING_STAFF | Compiles and renders a watermarked ISO 32000-1 / PDF-1.4 binary document for an item, quiz, or form; returns `application/pdf`. |
+| GET | `/api/v1/schools/[code]/question-bank/print-logs` | `schools/[code]/question-bank/print-logs/route.ts` | Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF, NON_TEACHING_STAFF; support area `academics` | Lists tenant-scoped print logs from `QuestionBankPrintLog` with target kind, date, and user. |
+| GET | `/api/v1/schools/[code]/question-bank/reports` | `schools/[code]/question-bank/reports/route.ts` | Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF, NON_TEACHING_STAFF; support area `academics` | Lists question reports pending review for reviewers in scope with NDPA masked reporters. |
+| PATCH | `/api/v1/schools/[code]/question-bank/reports/[id]` | `schools/[code]/question-bank/reports/[id]/route.ts` | Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF, NON_TEACHING_STAFF | Resolves a question report with outcome (`FIXED`, `NOT_AN_ERROR`, `NEEDS_DISCUSSION`) and optional regrade trigger. |
+
 
 ## `src/lib/support/`
 
@@ -465,3 +479,75 @@ The school's control over who may look (ADR 0017): all three handlers are school
 | POST | `/api/v1/schools/[code]/support-grants/[id]/revoke` | `schools/[code]/support-grants/[id]/revoke/route.ts` | Roles ADMIN. Not reachable from a support view. | Ends a grant at once (sets `revokedAt` if still open). No step-up, because revoking only reduces access. 404 `NOT_FOUND` for an implausible, unknown, other school's or already revoked id. Audited `SUPPORT_GRANT_REVOKED`; a support session using it is refused on its next request. Returns `{ grant }`. |
 | GET | `/api/v1/schools/[code]/support-grants/activity` | `schools/[code]/support-grants/activity/route.ts` | Roles ADMIN. Not reachable from a support view. | What platform support did in this school: the newest 100 `SUPPORT_OPENED`, `SUPPORT_ACCESS` and `SUPPORT_CLOSED` audit rows with the actor's name and a detail text (method and path, or the areas opened). |
 | GET, POST | `/api/v1/schools/[code]/support-grants` | `schools/[code]/support-grants/route.ts` | Roles ADMIN (not a campus administrator, not a platform administrator). Not reachable from a support view. POST step-up: an authenticator or recovery code if the caller has two-step verification, else their password. | GET lists the school's newest 100 grants with derived status LIVE, EXPIRED or REVOKED, areas, reason, creator and grantee. POST (201) strict body `{ areas, hours, reason, granteeEmail?, stepUp }`: at least one area, each once, from the five grantable ones; whole `hours` 1 to 24, default 4; reason 1 to 300 characters. After the step-up (403 `INVALID_MFA_CODE` or `WRONG_PASSWORD`, 429), a `granteeEmail` that is not a platform administrator is 400 `INVALID_GRANTEE`. Audits `SUPPORT_GRANT_CREATED`. |
+
+## `src/lib/forms/`
+
+School Forms and evaluations (Forms & Question Bank parity, slices 6-9): multi-purpose forms (`Form`, `FormAudience`, `FormQuestion`, `FormResponse`, `FormResponseAnswer`), offline paper work tracking (`FormTurnInRecord`, `FormTurnInAudit`), interactive practice sets, internal and public questionnaires (`FormPublicToken`), and manual teacher marking (`FormMarkingAudit`). Services operate strictly inside `auth.tenant.run` with multi-tenant isolation.
+
+| File | Description |
+| --- | --- |
+| `forms-service.ts` | Multi-purpose form management: creation, lifecycle (DRAFT, PUBLISHED, CLOSED, ARCHIVED), audiences, responses, turn-ins, and analytics. |
+| `manual-marking.ts` | Pure domain logic for manual marking: score clamping, percentage calculation, status transitions (`UNMARKED`, `PARTIALLY_MARKED`, `MARKED`), and reviewer note sanitization. |
+| `manual-marking-service.ts` | Tenant-scoped manual marking workflow: queue retrieval, response grading, and append-only audit trail logging to `FormMarkingAudit`. |
+| `paper-work.ts` | Pure domain rules for offline paper work: status derivation (`PENDING`, `COLLECTED`, `MARKED`, `RETURNED`), score validation, and turn-in receipt verification. |
+| `paper-work-service.ts` | Tenant-scoped offline paper work tracking: batch turn-in sync, individual turn-ins, and student portal turn-in views. |
+| `practice-sets.ts` | Pure domain rules for pupil practice sets: auto-marking against question bank keys, retry policies, and time limit clamping. |
+| `questionnaires.ts` | Pure domain rules for public and internal questionnaires: anonymous token hashing, audience matching, and single-submission constraints. |
+| `questionnaires-service.ts` | Tenant-scoped questionnaire services: public link generation with verification tokens, anonymous response collection, and response analytics. |
+
+## API routes: Forms (`/api/v1/schools/[code]/forms/`)
+
+Forms endpoints for staff management, paper work tracking, manual marking, and public questionnaires. GET endpoints declare support area `academics`.
+
+| Method | Route | File | Who | Description |
+| --- | --- | --- | --- | --- |
+| GET, POST | `/api/v1/schools/[code]/forms` | `schools/[code]/forms/route.ts` | GET: Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF, NON_TEACHING_STAFF; support area `academics`. POST: Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF. | GET lists school forms with type and status filters. POST creates a form with audience and question definitions. |
+| GET, PATCH | `/api/v1/schools/[code]/forms/[id]` | `schools/[code]/forms/[id]/route.ts` | GET: Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF, NON_TEACHING_STAFF; support area `academics`. PATCH: Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF. | GET retrieves form details and structure. PATCH updates form metadata, instructions, or status. |
+| GET | `/api/v1/schools/[code]/forms/[id]/analytics` | `schools/[code]/forms/[id]/analytics/route.ts` | Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF; support area `academics` | Aggregates response counts, average scores, and question-level choice distributions. |
+| POST | `/api/v1/schools/[code]/forms/[id]/close` | `schools/[code]/forms/[id]/close/route.ts` | Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF | Closes an active form to new turn-ins and responses. |
+| GET | `/api/v1/schools/[code]/forms/[id]/marking-queue` | `schools/[code]/forms/[id]/marking-queue/route.ts` | Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF; support area `academics` | Lists responses for a specific form that require manual teacher evaluation. |
+| POST | `/api/v1/schools/[code]/forms/[id]/print` | `schools/[code]/forms/[id]/print/route.ts` | Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF | Generates an official printable PDF binary for paper administration of the form. |
+| GET, PATCH | `/api/v1/schools/[code]/forms/[id]/responses/[responseId]/marking` | `schools/[code]/forms/[id]/responses/[responseId]/marking/route.ts` | Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF; GET support area `academics` | GET retrieves student answers for marking. PATCH saves teacher scores, notes, and records an append-only `FormMarkingAudit` entry. |
+| GET, PATCH | `/api/v1/schools/[code]/forms/[id]/turn-ins` | `schools/[code]/forms/[id]/turn-ins/route.ts` | Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF; GET support area `academics` | GET lists paper turn-in records for enrolled students. PATCH updates single student turn-in status. |
+| POST | `/api/v1/schools/[code]/forms/[id]/turn-ins/batch` | `schools/[code]/forms/[id]/turn-ins/batch/route.ts` | Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF | Batch updates paper turn-in statuses with append-only audit logging. |
+| POST | `/api/v1/schools/[code]/forms/[id]/turn-ins/sync` | `schools/[code]/forms/[id]/turn-ins/sync/route.ts` | Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF | Synchronizes offline paper work roster with current student enrolments. |
+| GET | `/api/v1/schools/[code]/forms/marking-queue` | `schools/[code]/forms/marking-queue/route.ts` | Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF; support area `academics` | School-wide queue of all pending form and practice set responses requiring manual marking. |
+| GET, POST | `/api/v1/schools/[code]/forms/paper-work` | `schools/[code]/forms/paper-work/route.ts` | GET: Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF; support area `academics`. POST: Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF. | GET lists paper work assignments. POST creates a paper work assignment with print templates. |
+| GET | `/api/v1/schools/[code]/forms/public/[token]` | `schools/[code]/forms/public/[token]/route.ts` | Public (no authentication) | Fetches a public survey/questionnaire structure using an unguessable public token. |
+| POST | `/api/v1/schools/[code]/forms/public/[token]/submit` | `schools/[code]/forms/public/[token]/submit/route.ts` | Public (no authentication) | Submits an anonymous response to a public questionnaire. |
+| GET, POST | `/api/v1/schools/[code]/forms/questionnaires` | `schools/[code]/forms/questionnaires/route.ts` | GET: Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF; support area `academics`. POST: Roles ADMIN, CAMPUS_ADMIN, TEACHING_STAFF. | GET lists questionnaires. POST creates a questionnaire and generates public access tokens if enabled. |
+
+## `src/lib/portal/`
+
+Portal helper routines for resolving student and guardian contexts in student-facing endpoints.
+
+| File | Description |
+| --- | --- |
+| `portal-helpers.ts` | `resolvePortalStudentId`: resolves caller student id for STUDENT role, or verifies approved relationship for PARENT role. |
+
+## API routes: Portal (`/api/v1/schools/[code]/portal/`)
+
+Student and guardian portal endpoints for offline paper work, practice sets, questionnaires, and pupil question bank practice.
+
+| Method | Route | File | Who | Description |
+| --- | --- | --- | --- | --- |
+| GET | `/api/v1/schools/[code]/portal/forms/paper-work` | `schools/[code]/portal/forms/paper-work/route.ts` | Roles STUDENT, PARENT | Lists assigned paper work and turn-in statuses for the student. |
+| GET | `/api/v1/schools/[code]/portal/forms/paper-work/[id]` | `schools/[code]/portal/forms/paper-work/[id]/route.ts` | Roles STUDENT, PARENT | Retrieves details and status history of a specific paper work assignment. |
+| POST | `/api/v1/schools/[code]/portal/forms/paper-work/[id]/request-marking` | `schools/[code]/portal/forms/paper-work/[id]/request-marking/route.ts` | Roles STUDENT | Requests teacher marking for a completed paper work assignment. |
+| GET | `/api/v1/schools/[code]/portal/forms/practice-sets` | `schools/[code]/portal/forms/practice-sets/route.ts` | Roles STUDENT, PARENT | Lists practice sets available to the student's class group. |
+| GET | `/api/v1/schools/[code]/portal/forms/practice-sets/[id]` | `schools/[code]/portal/forms/practice-sets/[id]/route.ts` | Roles STUDENT, PARENT | Retrieves practice set details and previous attempt summaries. |
+| POST | `/api/v1/schools/[code]/portal/forms/practice-sets/[id]/start` | `schools/[code]/portal/forms/practice-sets/[id]/start/route.ts` | Roles STUDENT | Starts a new interactive attempt on a practice set. |
+| POST | `/api/v1/schools/[code]/portal/forms/practice-sets/[id]/submit` | `schools/[code]/portal/forms/practice-sets/[id]/submit/route.ts` | Roles STUDENT | Submits practice set answers for automated grading and instant feedback. |
+| GET | `/api/v1/schools/[code]/portal/forms/practice-sets/responses/[responseId]` | `schools/[code]/portal/forms/practice-sets/responses/[responseId]/route.ts` | Roles STUDENT, PARENT | Views detailed results, scores, and teacher feedback for a completed practice set response. |
+| GET | `/api/v1/schools/[code]/portal/forms/practice-sets/responses/[responseId]/print` | `schools/[code]/portal/forms/practice-sets/responses/[responseId]/print/route.ts` | Roles STUDENT, PARENT | Downloads a watermarked PDF report of a completed practice set response. |
+| GET | `/api/v1/schools/[code]/portal/forms/questionnaires` | `schools/[code]/portal/forms/questionnaires/route.ts` | Roles STUDENT, PARENT | Lists questionnaires targeted to the student or guardian audience. |
+| GET | `/api/v1/schools/[code]/portal/forms/questionnaires/[id]` | `schools/[code]/portal/forms/questionnaires/[id]/route.ts` | Roles STUDENT, PARENT | Retrieves questions for a targeted questionnaire. |
+| POST | `/api/v1/schools/[code]/portal/forms/questionnaires/[id]/submit` | `schools/[code]/portal/forms/questionnaires/[id]/submit/route.ts` | Roles STUDENT, PARENT | Submits portal response to a targeted questionnaire. |
+| GET, PATCH | `/api/v1/schools/[code]/portal/practice/history` | `schools/[code]/portal/practice/history/route.ts` | Roles STUDENT, PARENT | GET lists practice session history (respects `bank.parents.view`). PATCH archives completed sessions. |
+| GET | `/api/v1/schools/[code]/portal/practice/options` | `schools/[code]/portal/practice/options/route.ts` | Roles STUDENT | Returns available subjects and topics for pupil self-directed practice with daily cap status. |
+| GET, POST | `/api/v1/schools/[code]/portal/practice/reports` | `schools/[code]/portal/practice/reports/route.ts` | Roles STUDENT; GET also PARENT | GET lists reports filed on practice questions. POST files a student report on an erroneous practice item. |
+| POST | `/api/v1/schools/[code]/portal/practice/sessions` | `schools/[code]/portal/practice/sessions/route.ts` | Roles STUDENT | Starts a new self-directed pupil practice session within daily quota. |
+| POST | `/api/v1/schools/[code]/portal/practice/sessions/[id]/answers` | `schools/[code]/portal/practice/sessions/[id]/answers/route.ts` | Roles STUDENT | Submits an answer to a question in an active practice session and returns instant evaluation. |
+| POST | `/api/v1/schools/[code]/portal/practice/sessions/[id]/finish` | `schools/[code]/portal/practice/sessions/[id]/finish/route.ts` | Roles STUDENT | Concludes an active practice session, records mastery score, and updates daily practice counts. |
+| GET | `/api/v1/schools/[code]/portal/practice/sessions/[id]/print` | `schools/[code]/portal/practice/sessions/[id]/print/route.ts` | Roles STUDENT, PARENT | Downloads watermarked PDF binary of practice session questions or completed results. |
+

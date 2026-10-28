@@ -34,7 +34,11 @@ const asText = (value: Value): string => (Array.isArray(value) ? value.join(", "
 /// A typed value as the API takes it (the server checks it and says what is wrong: a number that is not one stays a string so it is refused, not guessed).
 function parseDraft(row: BankSettingRow, draft: Draft): unknown {
   if (draft === null || typeof draft === "boolean") return draft;
-  if (row.kind === "presets") return draft.split(/[\s,]+/).filter(Boolean).map(Number);
+  if (row.kind === "presets")
+    return draft
+      .split(/[\s,]+/)
+      .filter(Boolean)
+      .map(Number);
   if (row.kind === "choice") return draft;
   return draft.trim() === "" ? draft : Number(draft);
 }
@@ -69,7 +73,8 @@ export function SettingsPanel({ schoolCode, hasMfa, actorRole, ownCampusId, camp
     for (const row of rows ?? []) {
       if (!Object.hasOwn(drafts, row.key)) continue;
       const value = parseDraft(row, drafts[row.key]);
-      if (value === null ? stored(row) !== null : !same(value, stored(row) ?? (editingSchool ? row.school : null))) out.push({ row, value });
+      if (value === null ? stored(row) !== null : !same(value, stored(row) ?? (editingSchool ? row.school : null)))
+        out.push({ row, value });
     }
     return out;
     // `stored` only reads `editingSchool`, which is in the list
@@ -111,7 +116,12 @@ export function SettingsPanel({ schoolCode, hasMfa, actorRole, ownCampusId, camp
     await api.reload(true);
   };
 
-  if (api.loading && !rows) return <p className="text-sm text-fg-muted" aria-busy="true">Loading the settings…</p>;
+  if (api.loading && !rows)
+    return (
+      <p className="text-sm text-fg-muted" aria-busy="true">
+        Loading the settings…
+      </p>
+    );
   if (api.error || !rows) {
     return (
       <div className="space-y-3">
@@ -167,20 +177,50 @@ export function SettingsPanel({ schoolCode, hasMfa, actorRole, ownCampusId, camp
                 )}
               </div>
               {row.kind === "whole" && (
-                <TextField label={row.unit ? `${row.label} (${row.unit})` : row.label} inputMode="numeric" value={String(draft ?? "")} onChange={(e) => set(row.key, e.target.value)} hint={`From ${row.min} to ${row.max}.`} />
+                <TextField
+                  label={row.unit ? `${row.label} (${row.unit})` : row.label}
+                  inputMode="numeric"
+                  value={String(draft ?? "")}
+                  onChange={(e) => set(row.key, e.target.value)}
+                  hint={`From ${row.min} to ${row.max}.`}
+                />
               )}
               {row.kind === "presets" && (
-                <TextField label={row.label} value={String(draft ?? "")} onChange={(e) => set(row.key, e.target.value)} hint="Whole numbers in ascending order, separated by commas." />
+                <TextField
+                  label={row.label}
+                  value={String(draft ?? "")}
+                  onChange={(e) => set(row.key, e.target.value)}
+                  hint="Whole numbers in ascending order, separated by commas."
+                />
               )}
               {row.kind === "images" && (
-                <SelectField label={row.label} value={String(draft)} onChange={(e) => set(row.key, e.target.value)} options={[{ value: "3", label: "3 pictures" }, { value: "4", label: "4 pictures" }]} />
+                <SelectField
+                  label={row.label}
+                  value={String(draft)}
+                  onChange={(e) => set(row.key, e.target.value)}
+                  options={[
+                    { value: "3", label: "3 pictures" },
+                    { value: "4", label: "4 pictures" },
+                  ]}
+                />
               )}
               {row.kind === "choice" && (
-                <SelectField label={row.label} value={String(draft)} onChange={(e) => set(row.key, e.target.value)} options={(row.choices ?? []).map((c) => ({ value: c.value, label: c.label }))} />
+                <SelectField
+                  label={row.label}
+                  value={String(draft)}
+                  onChange={(e) => set(row.key, e.target.value)}
+                  options={(row.choices ?? []).map((c) => ({ value: c.value, label: c.label }))}
+                />
               )}
               <p className="text-sm text-fg-muted">
                 School: {show(row, row.school)}
-                {!editingSchool && <> · {campusName}: {show(row, row.override)}</>} · Applies: {show(row, row.effective)}
+                {!editingSchool && (
+                  <>
+                    {" "}
+                    · {campusName}: {show(row, row.override)}
+                  </>
+                )}{" "}
+                · Applies: {show(row, row.effective)}
               </p>
               {hasOwn && (
                 <Button variant="ghost" onClick={() => set(row.key, null)} disabled={drafts[row.key] === null}>
@@ -193,7 +233,13 @@ export function SettingsPanel({ schoolCode, hasMfa, actorRole, ownCampusId, camp
       </ul>
 
       <div className="space-y-3 rounded-2xl border border-line bg-surface p-4">
-        <TextField label="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} hint="Kept with the change, so the next person knows why." />
+        <TextField
+          label="Reason (optional)"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          maxLength={500}
+          hint="Kept with the change, so the next person knows why."
+        />
         <Button
           disabled={changes.length === 0}
           onClick={() => {
@@ -205,7 +251,15 @@ export function SettingsPanel({ schoolCode, hasMfa, actorRole, ownCampusId, camp
         </Button>
       </div>
 
-      <StepUpModal open={asking} onClose={() => setAsking(false)} onConfirm={confirm} hasMfa={hasMfa} deltas={deltas} saving={saving} error={saveError} />
+      <StepUpModal
+        open={asking}
+        onClose={() => setAsking(false)}
+        onConfirm={confirm}
+        hasMfa={hasMfa}
+        deltas={deltas}
+        saving={saving}
+        error={saveError}
+      />
     </div>
   );
 }

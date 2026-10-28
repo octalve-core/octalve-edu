@@ -11,7 +11,12 @@ export const BANK_STAFF_ROLES = [Role.ADMIN, Role.CAMPUS_ADMIN, Role.TEACHING_ST
 /// A failure as a response. A validation failure carries its field problems.
 export function failure(result: Fail | (Fail & { details?: { path: string; message: string }[] })) {
   const details = "details" in result ? result.details : undefined;
-  return fail(result.message, result.status, result.code, details?.map((d) => ({ path: d.path, message: d.message })));
+  return fail(
+    result.message,
+    result.status,
+    result.code,
+    details?.map((d) => ({ path: d.path, message: d.message })),
+  );
 }
 
 /// An id from the URL path that cannot be an id is the same 404 as one that does not exist (a NUL byte would be a database error, not a missing row).

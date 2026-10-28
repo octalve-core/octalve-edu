@@ -42,7 +42,8 @@ export type DecisionAction = "approve" | "reject" | "edit" | "retire";
 
 /// A membership with no campus belongs to the whole school (an ADMIN always; a teacher in a school with one campus), so it covers every campus.
 const covers = (m: { campusId: string | null }, campusId: string) => m.campusId === null || m.campusId === campusId;
-const staffIn = (viewer: BankViewer, campusId: string) => viewer.memberships.some((m) => covers(m, campusId) && STAFF_ROLES.includes(m.role));
+const staffIn = (viewer: BankViewer, campusId: string) =>
+  viewer.memberships.some((m) => covers(m, campusId) && STAFF_ROLES.includes(m.role));
 const anyStaff = (viewer: BankViewer) => viewer.memberships.some((m) => STAFF_ROLES.includes(m.role));
 /// The school's administrator, or the administrator of that campus.
 const adminOf = (viewer: BankViewer, campusId: string) =>
@@ -91,7 +92,10 @@ export function mayAuthorIn(viewer: BankViewer, campusId: string | null): boolea
   if (viewer.isSchoolAdmin) return true;
   if (campusId === null) {
     if (viewer.memberships.some((m) => m.campusId === null && TEACHING_ROLES.includes(m.role))) return true;
-    return liveReviewerRows(viewer).some((row) => row.campusId === null) && viewer.memberships.some((m) => m.campusId === null && STAFF_ROLES.includes(m.role));
+    return (
+      liveReviewerRows(viewer).some((row) => row.campusId === null) &&
+      viewer.memberships.some((m) => m.campusId === null && STAFF_ROLES.includes(m.role))
+    );
   }
   if (viewer.memberships.some((m) => covers(m, campusId) && TEACHING_ROLES.includes(m.role))) return true;
   return liveReviewerRows(viewer).some((row) => (row.campusId === null || row.campusId === campusId) && staffIn(viewer, campusId));
@@ -161,5 +165,7 @@ export function staffMaySee(viewer: BankViewer, item: BankItemFacts, now: Date):
   );
   if (!teachesHere) return false;
   if (item.subjectKey === null) return true;
-  return viewer.teaches.some((t) => t.subjectKey === item.subjectKey && (item.campusId === null || t.campusId === null || t.campusId === item.campusId));
+  return viewer.teaches.some(
+    (t) => t.subjectKey === item.subjectKey && (item.campusId === null || t.campusId === null || t.campusId === item.campusId),
+  );
 }

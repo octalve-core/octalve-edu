@@ -46,7 +46,17 @@ export function ReasonDialog({
   );
 }
 
-function ReasonForm({ item, action, onClose, onDone }: { item: ApiItem; action: "reject" | "retire"; onClose: () => void; onDone: (reply: Reply, action: "reject" | "retire") => void }) {
+function ReasonForm({
+  item,
+  action,
+  onClose,
+  onDone,
+}: {
+  item: ApiItem;
+  action: "reject" | "retire";
+  onClose: () => void;
+  onDone: (reply: Reply, action: "reject" | "retire") => void;
+}) {
   const api = useBankApi();
   const [reason, setReason] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
@@ -96,7 +106,8 @@ export function ApproveDialog({ item, onClose, onDone }: { item: ApiItem | null;
   );
 }
 
-const localInput = (iso: string | null) => (iso ? new Date(new Date(iso).getTime() - new Date(iso).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "");
+const localInput = (iso: string | null) =>
+  iso ? new Date(new Date(iso).getTime() - new Date(iso).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
 
 function ApproveForm({ item, onClose, onDone }: { item: ApiItem; onClose: () => void; onDone: (reply: Reply) => void }) {
   const api = useBankApi();
@@ -121,7 +132,9 @@ function ApproveForm({ item, onClose, onDone }: { item: ApiItem; onClose: () => 
     const reply = await sendJson(actionUrl(api, item.id, "approve"), "POST", {
       subject,
       classTags: classes,
-      ...(item.can.setVisibility ? { visibility, ...(visibility === "TEACHERS_ONLY_UNTIL" ? { visibleFrom: new Date(from).toISOString() } : {}) } : {}),
+      ...(item.can.setVisibility
+        ? { visibility, ...(visibility === "TEACHERS_ONLY_UNTIL" ? { visibleFrom: new Date(from).toISOString() } : {}) }
+        : {}),
       ...(item.can.makeGeneral && general ? { general: true } : {}),
     });
     setPending(false);
@@ -140,32 +153,68 @@ function ApproveForm({ item, onClose, onDone }: { item: ApiItem; onClose: () => 
           </ul>
         </Alert>
       )}
-      <TextField label="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={80} hint="For example Mathematics." />
+      <TextField
+        label="Subject"
+        value={subject}
+        onChange={(e) => setSubject(e.target.value)}
+        maxLength={80}
+        hint="For example Mathematics."
+      />
       <TagInput label="Classes" tags={classes} onChange={setClasses} hint="For example JSS 1. Type one and press Enter." />
       {item.can.setVisibility ? (
         <fieldset className="space-y-2">
           <legend className="text-sm font-semibold text-fg">Who may see it</legend>
           <label className="flex items-start gap-2 text-sm text-fg">
-            <input type="radio" name="visibility" className="mt-1" checked={visibility === "TEACHERS_ONLY"} onChange={() => setVisibility("TEACHERS_ONLY")} />
+            <input
+              type="radio"
+              name="visibility"
+              className="mt-1"
+              checked={visibility === "TEACHERS_ONLY"}
+              onChange={() => setVisibility("TEACHERS_ONLY")}
+            />
             Teachers only
           </label>
           <label className="flex items-start gap-2 text-sm text-fg">
-            <input type="radio" name="visibility" className="mt-1" checked={visibility === "PRACTICE"} onChange={() => setVisibility("PRACTICE")} />
+            <input
+              type="radio"
+              name="visibility"
+              className="mt-1"
+              checked={visibility === "PRACTICE"}
+              onChange={() => setVisibility("PRACTICE")}
+            />
             Pupils can practise with it now
           </label>
           <label className="flex items-start gap-2 text-sm text-fg">
-            <input type="radio" name="visibility" className="mt-1" checked={visibility === "TEACHERS_ONLY_UNTIL"} onChange={() => setVisibility("TEACHERS_ONLY_UNTIL")} />
+            <input
+              type="radio"
+              name="visibility"
+              className="mt-1"
+              checked={visibility === "TEACHERS_ONLY_UNTIL"}
+              onChange={() => setVisibility("TEACHERS_ONLY_UNTIL")}
+            />
             Teachers only until a date
           </label>
           {visibility === "TEACHERS_ONLY_UNTIL" && (
-            <TextField label="Pupils may see it from" type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} hint="It cannot be hidden again once it is visible." />
+            <TextField
+              label="Pupils may see it from"
+              type="datetime-local"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              hint="It cannot be hidden again once it is visible."
+            />
           )}
         </fieldset>
       ) : (
-        <p className="text-sm text-fg-2">Approved questions are visible to teachers only. An exam approver decides when pupils may see them.</p>
+        <p className="text-sm text-fg-2">
+          Approved questions are visible to teachers only. An exam approver decides when pupils may see them.
+        </p>
       )}
       {item.can.makeGeneral && (
-        <CheckboxField label="Make it general: the whole school can use it" checked={general} onChange={(e) => setGeneral(e.target.checked)} />
+        <CheckboxField
+          label="Make it general: the whole school can use it"
+          checked={general}
+          onChange={(e) => setGeneral(e.target.checked)}
+        />
       )}
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <Button variant="ghost" onClick={onClose} disabled={pending}>

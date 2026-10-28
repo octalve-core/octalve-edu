@@ -10,10 +10,11 @@ export type ImageUpload = { bytes: Uint8Array; alt: string; decorative: boolean 
 export type ImageUploadParsed = { ok: true; upload: ImageUpload } | { ok: false; message: string };
 
 export async function parseImageForm(form: FormData): Promise<ImageUploadParsed> {
-  for (const key of form.keys()) if (!FIELDS.has(key)) return { ok: false, message: `The field "${key.slice(0, 40).replace(/[^\w .-]/g, "?")}" is not accepted.` };
+  for (const key of form.keys())
+    if (!FIELDS.has(key)) return { ok: false, message: `The field "${key.slice(0, 40).replace(/[^\w .-]/g, "?")}" is not accepted.` };
 
   const files = form.getAll("file");
-  if (files.length !== 1 || typeof files[0] === "string") return { ok: false, message: "Send exactly one picture in the field \"file\"." };
+  if (files.length !== 1 || typeof files[0] === "string") return { ok: false, message: 'Send exactly one picture in the field "file".' };
   const alts = form.getAll("alt");
   const flags = form.getAll("decorative");
   if (alts.length > 1 || flags.length > 1 || alts.some((v) => typeof v !== "string") || flags.some((v) => typeof v !== "string")) {
@@ -28,8 +29,10 @@ export async function parseImageForm(form: FormData): Promise<ImageUploadParsed>
   const alt = cleanText(rawAlt, { multiline: false });
   if (alt === null) return { ok: false, message: "The description contains a character that cannot be used." };
   if (alt.length > ALT_MAX) return { ok: false, message: `The description can be at most ${ALT_MAX} characters.` };
-  if (decorative && alt !== "") return { ok: false, message: "A decorative picture has no description. Clear it, or say the picture is not decorative." };
-  if (!decorative && alt === "") return { ok: false, message: "Describe the picture for someone who cannot see it, or say it is decorative." };
+  if (decorative && alt !== "")
+    return { ok: false, message: "A decorative picture has no description. Clear it, or say the picture is not decorative." };
+  if (!decorative && alt === "")
+    return { ok: false, message: "Describe the picture for someone who cannot see it, or say it is decorative." };
 
   const blob = files[0] as Blob;
   return { ok: true, upload: { bytes: new Uint8Array(await blob.arrayBuffer()), alt, decorative } };

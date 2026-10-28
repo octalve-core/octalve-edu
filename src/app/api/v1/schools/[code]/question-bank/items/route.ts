@@ -38,7 +38,10 @@ export const POST = withAuth(
   async (req, auth: TenantAuthContext) => {
     const read = await readJsonBody(req);
     if (!read.ok) return read.response;
-    const { campusId, ...item } = (read.json && typeof read.json === "object" && !Array.isArray(read.json) ? read.json : {}) as Record<string, unknown>;
+    const { campusId, ...item } = (read.json && typeof read.json === "object" && !Array.isArray(read.json) ? read.json : {}) as Record<
+      string,
+      unknown
+    >;
     let where: string | null;
     if (campusId === undefined) where = auth.tenant.campusId;
     else if (campusId === null) where = null;

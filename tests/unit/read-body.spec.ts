@@ -3,7 +3,8 @@ import { readBoundedBytes, readBoundedForm, readBoundedText } from "../../src/li
 
 // The one reader of a request body (lib/api/read-body.ts): bytes, text and a multipart form, none read further than the cap. No server, no database.
 
-const post = (body: BodyInit | null, headers: Record<string, string> = {}) => new Request("http://localhost/x", { method: "POST", body, headers });
+const post = (body: BodyInit | null, headers: Record<string, string> = {}) =>
+  new Request("http://localhost/x", { method: "POST", body, headers });
 const streamOf = (chunks: Uint8Array[]) =>
   new ReadableStream<Uint8Array>({
     start(controller) {
@@ -43,8 +44,14 @@ test("a multipart form is parsed only after it is known to fit; anything else sa
     expect(parsed.form.get("alt")).toBe("hello");
     expect(Array.from(new Uint8Array(await (parsed.form.get("file") as Blob).arrayBuffer()))).toEqual([1, 2, 3]);
   }
-  expect(await readBoundedForm(new Request("http://localhost/x", { method: "POST", body: data }), 50)).toEqual({ ok: false, reason: "TOO_BIG" });
+  expect(await readBoundedForm(new Request("http://localhost/x", { method: "POST", body: data }), 50)).toEqual({
+    ok: false,
+    reason: "TOO_BIG",
+  });
   expect(await readBoundedForm(post("{}", { "content-type": "application/json" }), 100)).toEqual({ ok: false, reason: "NOT_MULTIPART" });
   expect(await readBoundedForm(post("{}"), 100)).toEqual({ ok: false, reason: "NOT_MULTIPART" });
-  expect(await readBoundedForm(post("garbage", { "content-type": "multipart/form-data; boundary=xyz" }), 100)).toEqual({ ok: false, reason: "UNREADABLE" });
+  expect(await readBoundedForm(post("garbage", { "content-type": "multipart/form-data; boundary=xyz" }), 100)).toEqual({
+    ok: false,
+    reason: "UNREADABLE",
+  });
 });

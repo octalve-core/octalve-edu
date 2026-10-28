@@ -64,6 +64,15 @@ setup("test database is created, migrated and empty", async () => {
       DO $$
       BEGIN
         IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${APP_DB_ROLE}') THEN
+          IF to_regclass('public."_prisma_migrations"') IS NOT NULL THEN
+            REVOKE ALL ON TABLE public."_prisma_migrations" FROM ${APP_DB_ROLE};
+          END IF;
+          IF to_regclass('public."AuditLog"') IS NOT NULL THEN
+            REVOKE UPDATE, DELETE, TRUNCATE ON TABLE public."AuditLog" FROM ${APP_DB_ROLE};
+          END IF;
+          IF to_regclass('public."ResultAudit"') IS NOT NULL THEN
+            REVOKE UPDATE, DELETE, TRUNCATE ON TABLE public."ResultAudit" FROM ${APP_DB_ROLE};
+          END IF;
           IF to_regclass('public."SettingsChangeAudit"') IS NOT NULL THEN
             REVOKE UPDATE, DELETE, TRUNCATE ON TABLE public."SettingsChangeAudit" FROM ${APP_DB_ROLE};
           END IF;

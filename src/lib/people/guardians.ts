@@ -445,9 +445,9 @@ export async function updateGuardian(
       });
       if (!merged.ok) return merged;
       const next = merged.value;
-      const changedFields = (
-        ["firstName", "middleName", "lastName", "phone", "email", "address", "occupation"] as const
-      ).filter((field) => next[field] !== current[field]);
+      const changedFields = (["firstName", "middleName", "lastName", "phone", "email", "address", "occupation"] as const).filter(
+        (field) => next[field] !== current[field],
+      );
       const view = async () => toGuardian(await tx.guardianRecord.findUniqueOrThrow({ where: { id }, select: GUARDIAN_SELECT }));
       if (changedFields.length === 0) return { ok: true as const, guardian: await view(), changed: false };
       await tx.guardianRecord.update({ where: { id }, data: next });

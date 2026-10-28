@@ -54,6 +54,9 @@ export const quizQuestionSchema = z.object({
   correctAnswer: z.string().min(1),
   points: z.number().int().min(1).default(1),
   sortOrder: z.number().int().default(0),
+  sourceItemId: z.string().optional().nullable(),
+  sourceVersion: z.number().int().optional().nullable(),
+  exposedToPractice: z.boolean().default(false),
 });
 
 export const createQuizSchema = z.object({
@@ -64,7 +67,21 @@ export const createQuizSchema = z.object({
   timeLimitMinutes: z.number().int().min(1).max(300).optional().nullable(),
   passingScore: z.number().min(0).max(100).optional().nullable(),
   status: z.enum(["DRAFT", "PUBLISHED"]).default("DRAFT"),
+  isExamTemplate: z.boolean().default(false),
+  examWindowStart: z.coerce.date().optional().nullable(),
+  examWindowEnd: z.coerce.date().optional().nullable(),
   questions: z.array(quizQuestionSchema).min(1, "Quiz must contain at least one question"),
+});
+
+export const updateQuizSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  instructions: z.string().max(2000).optional().nullable(),
+  timeLimitMinutes: z.number().int().min(1).max(300).optional().nullable(),
+  passingScore: z.number().min(0).max(100).optional().nullable(),
+  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).optional(),
+  isExamTemplate: z.boolean().optional(),
+  examWindowStart: z.coerce.date().optional().nullable(),
+  examWindowEnd: z.coerce.date().optional().nullable(),
 });
 
 export const submitQuizAttemptSchema = z.object({
