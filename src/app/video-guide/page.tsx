@@ -104,7 +104,7 @@ export default function VideoGuidePage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Video Player Column */}
           <div className="lg:col-span-8 flex flex-col gap-4">
-            <div className="relative rounded-2xl overflow-hidden border border-line bg-surface shadow-2xl aspect-[16/9] flex items-center justify-center">
+            <div className="relative rounded-2xl overflow-hidden border border-line bg-surface shadow-2xl aspect-video flex items-center justify-center">
               {hasVideo ? (
                 <video
                   ref={videoRef}
@@ -176,7 +176,7 @@ export default function VideoGuidePage() {
                 <span className="text-xs text-fg-muted font-medium">{chapters.length} Sections</span>
               </div>
 
-              <div className="mt-4 flex flex-col gap-2 max-h-[500px] overflow-y-auto pr-1">
+              <div className="mt-4 flex flex-col gap-2 max-h-125 overflow-y-auto pr-1">
                 {chapters.length > 0 ? (
                   chapters.map((ch) => {
                     const isActive = ch.id === activeChapterId;
