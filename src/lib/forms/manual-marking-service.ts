@@ -1,10 +1,11 @@
 import type { Tx } from "@/lib/tenant/for-tenant";
-import { FormMarkingStatus, FormResponseStatus } from "@prisma/client";
+import { FormMarkingMethod, FormMarkingStatus, FormResponseStatus } from "@prisma/client";
 import {
   validateAnswerScore,
   validateTeacherFeedback,
   computeAttemptMarkingSummary,
   canMarkResponse,
+  isFullMarks,
   sanitizeResponseForPupil,
 } from "./manual-marking";
 import { reachForm } from "./access";
@@ -313,8 +314,17 @@ export async function getResponseForMarking(
   };
 }
 
+/// Serialises everyone who writes to the same attempt: the teachers marking it and the pupil submitting it. The total of an attempt is the sum of its answers AS THEY ARE when a mark is written, so two marks of one attempt must not be
+/// written from the same stale picture, and two submissions of one attempt must not both find it open: the lock is held until the transaction ends, and the attempt is read after it is taken.
+export async function lockAttempt(tx: Tx, responseId: string) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`mark:${responseId}`}::text))`;
+}
+
+const NOT_MANUAL = "Only a question set for hand marking can be marked by hand.";
+
 /**
- * Marks an individual question answer within a form response.
+ * Marks an individual question answer within a form response. Only a person who manages the form marks; only a question set for hand marking is marked by hand, and only in an
+ * attempt the pupil has finished; the answer counts as correct only for full marks of a question worth marks; the total is worked out from the answers as they are under the attempt's lock.
  */
 export async function markFormAnswer(
   tx: Tx,
@@ -328,28 +338,45 @@ export async function markFormAnswer(
     feedback?: string | null;
   },
 ) {
-  const answer = await tx.formAnswer.findFirst({
-    where: {
-      id: params.answerId,
-      responseId: params.responseId,
-      tenantId: params.tenantId,
-    },
-    include: {
-      formQuestion: true,
-      response: true,
-    },
-  });
+  const findAnswer = () =>
+    tx.formAnswer.findFirst({
+      where: {
+        id: params.answerId,
+        responseId: params.responseId,
+        tenantId: params.tenantId,
+      },
+      include: {
+        formQuestion: true,
+        response: true,
+      },
+    });
 
-  if (!answer) {
+  const seen = await findAnswer();
+  if (!seen) {
     throw new ManualMarkingError("Answer record not found.", 404, "NOT_FOUND");
   }
   await requireResponseAccess(tx, {
     tenantId: params.tenantId,
     userId: params.teacherUserId,
     urlFormId: params.formId,
-    responseFormId: answer.response.formId,
+    responseFormId: seen.response.formId,
     access: "manage",
   });
+
+  // The attempt is read again after its lock is taken, so what follows is the attempt as it is now, not as it was when the request arrived.
+  await lockAttempt(tx, params.responseId);
+  const answer = await findAnswer();
+  if (!answer) {
+    throw new ManualMarkingError("Answer record not found.", 404, "NOT_FOUND");
+  }
+
+  const markCheck = canMarkResponse(answer.response);
+  if (!markCheck.canMark) {
+    throw new ManualMarkingError(markCheck.reason ?? "Response cannot be marked.", 400, "CANNOT_MARK");
+  }
+  if (answer.formQuestion.markingMethod !== FormMarkingMethod.MANUAL) {
+    throw new ManualMarkingError(NOT_MANUAL, 400, "NOT_MANUAL");
+  }
 
   const scoreValidation = validateAnswerScore(params.score, answer.formQuestion.points);
   if (!scoreValidation.valid) {
@@ -363,7 +390,7 @@ export async function markFormAnswer(
 
   const now = new Date();
   const trimmedFeedback = params.feedback?.trim() || null;
-  const isCorrect = params.score >= answer.formQuestion.points;
+  const isCorrect = isFullMarks(params.score, answer.formQuestion.points);
 
   // 1. Update the answer
   await tx.formAnswer.update({
@@ -435,7 +462,7 @@ export async function markFormAnswer(
 }
 
 /**
- * Marks multiple or all manual answers in an attempt in one batch.
+ * Marks multiple or all manual answers in an attempt in one batch. The same rules as a single mark, for every answer named; a batch names each answer once, and it is all or nothing.
  */
 export async function markFormAttempt(
   tx: Tx,
@@ -451,25 +478,38 @@ export async function markFormAttempt(
     }>;
   },
 ) {
-  const response = await tx.formResponse.findFirst({
-    where: { id: params.responseId, tenantId: params.tenantId },
-    include: {
-      answers: {
-        include: { formQuestion: true },
-      },
-    },
-  });
+  if (new Set(params.answers.map((a) => a.answerId)).size !== params.answers.length) {
+    throw new ManualMarkingError("A batch names each answer once.", 400, "DUPLICATE_ANSWER");
+  }
 
-  if (!response) {
+  const findResponse = () =>
+    tx.formResponse.findFirst({
+      where: { id: params.responseId, tenantId: params.tenantId },
+      include: {
+        answers: {
+          include: { formQuestion: true },
+        },
+      },
+    });
+
+  const seen = await findResponse();
+  if (!seen) {
     throw new ManualMarkingError("Form response not found.", 404, "NOT_FOUND");
   }
   await requireResponseAccess(tx, {
     tenantId: params.tenantId,
     userId: params.teacherUserId,
     urlFormId: params.formId,
-    responseFormId: response.formId,
+    responseFormId: seen.formId,
     access: "manage",
   });
+
+  // The attempt is read again after its lock is taken, so what follows is the attempt as it is now, not as it was when the request arrived.
+  await lockAttempt(tx, params.responseId);
+  const response = await findResponse();
+  if (!response) {
+    throw new ManualMarkingError("Form response not found.", 404, "NOT_FOUND");
+  }
 
   const check = canMarkResponse(response);
   if (!check.canMark) {
@@ -485,6 +525,9 @@ export async function markFormAttempt(
     if (!ans) {
       throw new ManualMarkingError(`Answer ID ${item.answerId} not found in this response.`, 404, "NOT_FOUND");
     }
+    if (ans.formQuestion.markingMethod !== FormMarkingMethod.MANUAL) {
+      throw new ManualMarkingError(NOT_MANUAL, 400, "NOT_MANUAL");
+    }
     const scoreVal = validateAnswerScore(item.score, ans.formQuestion.points);
     if (!scoreVal.valid) {
       throw new ManualMarkingError(`Question '${ans.formQuestion.prompt}': ${scoreVal.reason}`, 400, "VALIDATION");
@@ -498,7 +541,7 @@ export async function markFormAttempt(
   // Update answers and audit logs
   for (const item of params.answers) {
     const ans = answerMap.get(item.answerId)!;
-    const isCorrect = item.score >= ans.formQuestion.points;
+    const isCorrect = isFullMarks(item.score, ans.formQuestion.points);
     const trimmedFb = item.feedback?.trim() || null;
 
     await tx.formAnswer.update({

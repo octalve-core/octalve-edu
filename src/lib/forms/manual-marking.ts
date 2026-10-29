@@ -79,6 +79,11 @@ export function validateAnswerScore(awardedScore: number, maxPoints: number): { 
   return { valid: true };
 }
 
+/// An answer counts as CORRECT only for full marks: part marks are part marks (a question worth nothing has no full marks to give).
+export function isFullMarks(score: number, points: number): boolean {
+  return points > 0 && score >= points;
+}
+
 /**
  * Validates teacher feedback length (optional, up to 2000 characters).
  */
