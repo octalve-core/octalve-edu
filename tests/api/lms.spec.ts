@@ -13,6 +13,7 @@ import {
   type TestUser,
 } from "../support/db";
 import { api, cookieHeader, loginAs, type ApiOptions } from "../support/http";
+import { approvedItem } from "../support/qbank-world";
 
 let a: TestTenant;
 let b: TestTenant;
@@ -258,6 +259,43 @@ test.describe("LMS API — Course Materials & Online Quizzes", () => {
     expect(res.status).toBe(201);
     expect(res.json.data.id).toBeTruthy();
     quizId = res.json.data.id;
+  });
+
+  test("a quiz can be made with a question copied from the question bank, and the copy keeps its source", async () => {
+    const item = await approvedItem(a.id, null, teacherA.id, {
+      prompt: "A question from the bank?",
+      subjectLabel: "Mathematics",
+      subjectKey: "mathematics",
+    });
+    const res = await lmsApi(`/api/v1/schools/${a.code}/lms/quizzes`, {
+      method: "POST",
+      cookie: cookie.teacherA,
+      body: {
+        title: "A quiz with a copied question",
+        subjectId: subjectAId,
+        status: "DRAFT",
+        questions: [
+          {
+            prompt: "A question from the bank?",
+            questionType: "MULTIPLE_CHOICE",
+            options: [
+              { id: "a", text: "First" },
+              { id: "b", text: "Second" },
+            ],
+            correctAnswer: "a",
+            points: 1,
+            sourceItemId: item.id,
+            sourceVersion: 1,
+          },
+          { prompt: "A question of the teacher's own.", questionType: "SHORT_ANSWER", correctAnswer: "x", points: 1 },
+        ],
+      },
+    });
+    expect(res.status, res.text.slice(0, 200)).toBe(201);
+    expect(res.json.data.questions).toHaveLength(2);
+    const rows = await db.quizQuestion.findMany({ where: { quizId: res.json.data.id } });
+    expect(rows.find((r) => r.sourceItemId === item.id)).toMatchObject({ tenantId: a.id, sourceVersion: 1 });
+    expect(rows.find((r) => r.sourceItemId === null)).toMatchObject({ tenantId: a.id, sourceVersion: null });
   });
 
   test("student can attempt quiz and receive automated grading", async () => {

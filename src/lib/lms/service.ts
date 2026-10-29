@@ -488,7 +488,7 @@ export async function createQuiz(tenantId: string, userId: string, data: CreateQ
       select: { id: true },
     });
 
-    return tx.quiz.create({
+    const quiz = await tx.quiz.create({
       data: {
         tenantId,
         subjectId: data.subjectId,
@@ -502,25 +502,28 @@ export async function createQuiz(tenantId: string, userId: string, data: CreateQ
         examWindowStart: data.examWindowStart ?? null,
         examWindowEnd: data.examWindowEnd ?? null,
         createdById: staff?.id ?? null,
-        questions: {
-          create: data.questions.map((q, idx) => ({
-            tenantId,
-            prompt: q.prompt,
-            questionType: q.questionType,
-            options: q.options as unknown as Prisma.InputJsonValue,
-            correctAnswer: q.correctAnswer,
-            points: q.points ?? 1,
-            sortOrder: q.sortOrder ?? idx,
-            sourceItemId: q.sourceItemId ?? null,
-            sourceVersion: q.sourceVersion ?? null,
-            exposedToPractice: q.exposedToPractice ?? false,
-          })),
-        },
-      },
-      include: {
-        questions: true,
       },
     });
+
+    // The questions are written with their own statement, not as a nested create: a question that may name its source in the bank (`sourceItemId`) is tied to the school by a
+    // second composite key, and a nested create then refuses `tenantId` ("Unknown argument"), which answered every quiz creation with a 500.
+    await tx.quizQuestion.createMany({
+      data: data.questions.map((q, idx) => ({
+        tenantId,
+        quizId: quiz.id,
+        prompt: q.prompt,
+        questionType: q.questionType,
+        options: q.options as unknown as Prisma.InputJsonValue,
+        correctAnswer: q.correctAnswer,
+        points: q.points ?? 1,
+        sortOrder: q.sortOrder ?? idx,
+        sourceItemId: q.sourceItemId ?? null,
+        sourceVersion: q.sourceVersion ?? null,
+        exposedToPractice: q.exposedToPractice ?? false,
+      })),
+    });
+
+    return tx.quiz.findFirstOrThrow({ where: { tenantId, id: quiz.id }, include: { questions: true } });
   });
 }
 
