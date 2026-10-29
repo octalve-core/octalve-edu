@@ -52,10 +52,37 @@ export function maskReporterForReviewer(params: {
   reporterRole: "TEACHER" | "PUPIL";
   reporterSection?: string | null;
   branchName?: string | null;
+  /// False names the role only (see `pupilCellsAtMinimum`). Default true.
+  showSection?: boolean;
 }): string {
   const roleLabel = params.reporterRole === "PUPIL" ? "Pupil" : "Teacher";
+  if (params.showSection === false) return roleLabel;
   const sectionLabel = params.reporterSection?.trim() || params.branchName?.trim() || "General";
   return `${roleLabel} in ${sectionLabel}`;
+}
+
+/// One question and one place (here a campus): the group of pupils a reviewer could narrow a pupil's report down to.
+export function reportCell(itemId: string, section: string): string {
+  return `${itemId}|${section}`; // an item id is letters and digits, so the first bar always ends it
+}
+
+/**
+ * The questions and places (as `reportCell`s) that at least `minimum` DIFFERENT pupils have reported, so that naming the place no longer points at one child. The same threshold as an
+ * anonymous questionnaire (`bank.smallSummary.min`, never below 3). One pupil reporting twice counts once; reports whose pupil has since been removed (no id) count as one person
+ * together, so the number is never overstated.
+ */
+export function pupilCellsAtMinimum(
+  reports: Array<{ itemId: string; reporterSection: string; reporterStudentId: string | null }>,
+  minimum: number,
+): Set<string> {
+  const pupils = new Map<string, Set<string>>();
+  for (const r of reports) {
+    const cell = reportCell(r.itemId, r.reporterSection);
+    const who = pupils.get(cell) ?? new Set<string>();
+    who.add(r.reporterStudentId ?? "?");
+    pupils.set(cell, who);
+  }
+  return new Set([...pupils].filter(([, who]) => who.size >= minimum).map(([cell]) => cell));
 }
 
 export interface RegradeTarget {
