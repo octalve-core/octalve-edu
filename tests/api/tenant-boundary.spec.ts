@@ -190,21 +190,46 @@ test.describe("EVERY tenant route enforces the boundary", () => {
       return entry.name === "route.ts" ? [full] : [];
     });
   }
-  const routes = discover(root).map((file) => {
+  /// The only routes under /schools/ that are open to someone with no session, on purpose: a survey shared by a link outside the school, where the link is the credential and
+  /// the route finds the school from the code and the token together (tests/api/forms-public-questionnaire.spec.ts). Nothing else may be public: a route that is not wrapped
+  /// in withAuth and is not named here fails the sweep below, so opening one is a decision written in this list and reviewed, never a thing that slips in.
+  const PUBLIC = new Set([
+    "src/app/api/v1/schools/[code]/forms/public/[token]/route.ts",
+    "src/app/api/v1/schools/[code]/forms/public/[token]/submit/route.ts",
+  ]);
+
+  const allRoutes = discover(root).map((file) => {
     const source = fs.readFileSync(file, "utf8");
-    const methods = [...source.matchAll(/export const (GET|POST|PUT|PATCH|DELETE)\b/g)].map((m) => m[1]);
+    // Both ways of writing a handler: `export const GET = ...` and `export async function GET(...)`. Seeing only the first is how a route written the second way was invisible here.
+    const methods = [...new Set([...source.matchAll(/^export (?:const|async function) (GET|POST|PUT|PATCH|DELETE)\b/gm)].map((m) => m[1]))];
     const urlPath = "/api/v1/schools/" + path.relative(path.join(root), path.dirname(file)).split(path.sep).join("/");
     return { file: path.relative(process.cwd(), file), source, methods, urlPath: urlPath.replace(/\/$/, "") };
   });
+  const routes = allRoutes.filter((route) => !PUBLIC.has(route.file));
 
   test("the discovery found the routes it is meant to guard", () => {
     expect(routes.length).toBeGreaterThanOrEqual(1);
-    for (const route of routes) expect(route.methods.length, route.file).toBeGreaterThan(0);
+    for (const route of allRoutes) expect(route.methods.length, route.file).toBeGreaterThan(0);
+  });
+
+  test("the public routes are exactly the ones named, and each is there (a renamed or removed one must leave this list)", () => {
+    expect(
+      allRoutes
+        .filter((route) => PUBLIC.has(route.file))
+        .map((route) => route.file)
+        .sort(),
+    ).toEqual([...PUBLIC].sort());
+    for (const route of allRoutes.filter((r) => PUBLIC.has(r.file))) {
+      expect(route.source, `${route.file}: a public route must not be wrapped in withAuth (it would then not be public)`).not.toMatch(
+        /\bwithAuth\(/,
+      );
+      expect(route.source, `${route.file}: a public route must not reach for the raw client`).not.toMatch(/from "@\/lib\/db"/);
+    }
   });
 
   test("every route file wraps ALL its handlers in withAuth(…, { tenant: true … })", () => {
     for (const route of routes) {
-      const exported = [...route.source.matchAll(/export const (GET|POST|PUT|PATCH|DELETE) = withAuth\(/g)].map((m) => m[1]);
+      const exported = [...route.source.matchAll(/^export const (GET|POST|PUT|PATCH|DELETE) = withAuth\(/gm)].map((m) => m[1]);
       expect(exported.sort(), `${route.file}: a handler is not wrapped in withAuth`).toEqual([...route.methods].sort());
       const tenantOptions = [...route.source.matchAll(/\{\s*tenant:\s*true\b/g)].length;
       expect(tenantOptions, `${route.file}: a handler is missing { tenant: true }`).toBeGreaterThanOrEqual(route.methods.length);
