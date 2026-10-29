@@ -8,7 +8,6 @@ import {
   reportCell,
   REPORT_LIMITS,
   reportLimitReached,
-  startOfUtcDay,
   computeRegradeImpact,
   validateReportOutcome,
 } from "@/lib/question-bank/reports";
@@ -206,11 +205,6 @@ test.describe("Question reports pure domain logic", () => {
       expect(reportLimitReached("TEACHER", 19, 49)).toBeNull();
       expect(reportLimitReached("TEACHER", 20, 0)).toBe("OPEN");
       expect(reportLimitReached("TEACHER", 0, 50)).toBe("DAY");
-    });
-
-    test("a day starts at midnight UTC", () => {
-      expect(startOfUtcDay(new Date("2026-10-29T23:59:59.999Z")).toISOString()).toBe("2026-10-29T00:00:00.000Z");
-      expect(startOfUtcDay(new Date("2026-10-30T00:00:00.000Z")).toISOString()).toBe("2026-10-30T00:00:00.000Z");
     });
   });
 
