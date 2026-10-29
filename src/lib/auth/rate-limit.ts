@@ -254,6 +254,7 @@ export async function checkRateLimit(identifier: string, limit: number = DEFAULT
 // school-wide limit — so it warns once in production.
 
 const MAX_IP_LENGTH = 64;
+const UNPROXIED = "unproxied";
 let warnedNoProxy = false;
 
 function nthFromRight(value: string, hops: number): string | null {
@@ -287,7 +288,17 @@ export function getClientIp(req: { headers: { get(name: string): string | null }
           "Configure the reverse proxy to set it (see CLIENT_IP_HEADER in .env.example).",
       );
     }
-    return "unproxied";
+    return UNPROXIED;
   }
   return ip.slice(0, MAX_IP_LENGTH);
+}
+
+const MAX_USER_AGENT_LENGTH = 256;
+
+/// What an audit record keeps about the caller: the address the proxy reports (the same one the limits use, never the browser's own X-Forwarded-For list, which anyone
+/// can write), nothing at all when there is none (so a log never holds a made-up address), and the browser's description of itself cut to a sensible length.
+export function auditClientInfo(req: { headers: { get(name: string): string | null } }): { ipAddress?: string; userAgent?: string } {
+  const ip = getClientIp(req);
+  const agent = req.headers.get("user-agent")?.trim().slice(0, MAX_USER_AGENT_LENGTH);
+  return { ipAddress: ip === UNPROXIED ? undefined : ip, userAgent: agent || undefined };
 }

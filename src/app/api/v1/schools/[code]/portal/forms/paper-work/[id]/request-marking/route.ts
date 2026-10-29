@@ -14,7 +14,9 @@ export const POST = withAuth(
   async (req, auth: TenantAuthContext, ctx: { params: Promise<{ code: string; id: string }> }) => {
     const { id: formId } = await ctx.params;
     const read = await readJsonBody(req);
-    const parsed = Body.safeParse(read.ok ? read.json : {});
+    if (!read.ok) return read.response;
+    const parsed = Body.safeParse(read.json);
+    if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid request", 400, "VALIDATION");
 
     try {
       const result = await auth.tenant.run(async (tx) => {
@@ -22,7 +24,7 @@ export const POST = withAuth(
         if (!student) {
           throw new PracticeError("Student profile not found.", 404, "NOT_FOUND");
         }
-        return requestMarkingForPupil(tx, auth.tenant.tenantId, formId, student.id, parsed.success ? parsed.data.note : undefined);
+        return requestMarkingForPupil(tx, auth.tenant.tenantId, formId, student.id, parsed.data.note);
       });
       return ok(result);
     } catch (err) {

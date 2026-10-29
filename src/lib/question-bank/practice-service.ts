@@ -528,11 +528,11 @@ export async function getPracticeHistory(
         where: { tenantId: params.tenantId, studentId: params.studentId },
       });
 
+      // Every attempt counts, archived or not: archiving tidies the pupil's own list, it does not take an answer out of what is reported.
       const attempts = await tx.practiceAttempt.findMany({
         where: {
           tenantId: params.tenantId,
           studentId: params.studentId,
-          archivedAt: null,
         },
         include: {
           bankItem: { select: { subjectLabel: true, topic: true } },

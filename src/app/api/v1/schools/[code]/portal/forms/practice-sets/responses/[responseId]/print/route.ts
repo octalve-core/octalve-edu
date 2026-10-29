@@ -3,12 +3,12 @@ import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { PORTAL_STUDENT_ROLES, getStudentFromAuth } from "@/lib/portal/portal-helpers";
 import { printPupilFormResponse, PrintingServiceError } from "@/lib/question-bank/printing-service";
 import { PracticeError } from "@/lib/question-bank/practice-service";
+import { auditClientInfo } from "@/lib/auth/rate-limit";
 
 export const GET = withAuth(
   async (req, auth: TenantAuthContext, ctx: { params: Promise<{ code: string; responseId: string }> }) => {
     const { responseId } = await ctx.params;
-    const ipAddress = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || undefined;
-    const userAgent = req.headers.get("user-agent") || undefined;
+    const { ipAddress, userAgent } = auditClientInfo(req);
 
     try {
       const result = await auth.tenant.run(async (tx) => {

@@ -5,6 +5,7 @@ import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { FORM_STAFF_ROLES } from "@/lib/question-bank/items-http";
 import { printTarget, PrintingServiceError } from "@/lib/question-bank/printing-service";
 import { PrintTargetKind } from "@prisma/client";
+import { auditClientInfo } from "@/lib/auth/rate-limit";
 
 const Body = z.object({
   targetKind: z.enum(["QUESTION_BANK_ITEM", "FORM", "QUIZ"]),
@@ -24,8 +25,7 @@ export const POST = withAuth(
       return fail(parsed.error.issues[0]?.message || "Invalid print request payload", 400, "VALIDATION");
     }
 
-    const ipAddress = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || undefined;
-    const userAgent = req.headers.get("user-agent") || undefined;
+    const { ipAddress, userAgent } = auditClientInfo(req);
 
     try {
       const result = await auth.tenant.run(async (tx) => {

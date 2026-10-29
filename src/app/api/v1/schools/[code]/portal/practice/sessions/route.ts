@@ -16,7 +16,9 @@ const Body = z.object({
 export const POST = withAuth(
   async (req, auth: TenantAuthContext) => {
     const read = await readJsonBody(req);
-    const parsed = Body.safeParse(read.ok ? read.json : {});
+    if (!read.ok) return read.response;
+    const parsed = Body.safeParse(read.json);
+    if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid practice request", 400, "VALIDATION");
 
     try {
       const result = await auth.tenant.run(async (tx) => {
@@ -29,10 +31,10 @@ export const POST = withAuth(
           campusId: student.campusId,
           studentId: student.id,
           role: auth.tenant.role,
-          subjectLabel: parsed.success ? parsed.data.subjectLabel : undefined,
-          topic: parsed.success ? parsed.data.topic : undefined,
-          size: parsed.success ? parsed.data.size : undefined,
-          feedbackMode: parsed.success ? (parsed.data.feedbackMode as PracticeFeedbackMode) : undefined,
+          subjectLabel: parsed.data.subjectLabel,
+          topic: parsed.data.topic,
+          size: parsed.data.size,
+          feedbackMode: parsed.data.feedbackMode as PracticeFeedbackMode | undefined,
         });
       });
       return ok(result, {}, 201);

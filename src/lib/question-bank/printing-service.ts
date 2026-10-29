@@ -1,5 +1,5 @@
 import type { Tx } from "@/lib/tenant/for-tenant";
-import { PrintTargetKind, Role, BankVisibility } from "@prisma/client";
+import { PrintTargetKind, Role } from "@prisma/client";
 import { effectiveSettingsIn } from "@/lib/question-bank/settings-service";
 import { loadViewer } from "@/lib/question-bank/viewer";
 import { mayReachCampus, staffMaySee, mayAccessForm } from "@/lib/question-bank/rules";

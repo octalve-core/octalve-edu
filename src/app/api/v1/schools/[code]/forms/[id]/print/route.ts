@@ -5,6 +5,7 @@ import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { FORM_STAFF_ROLES } from "@/lib/question-bank/items-http";
 import { printTarget, PrintingServiceError } from "@/lib/question-bank/printing-service";
 import { PrintTargetKind } from "@prisma/client";
+import { auditClientInfo } from "@/lib/auth/rate-limit";
 
 const Body = z.object({
   includeAnswerKey: z.boolean().optional(),
@@ -16,10 +17,11 @@ export const POST = withAuth(
   async (req, auth: TenantAuthContext, ctx: { params: Promise<{ code: string; id: string }> }) => {
     const { id: formId } = await ctx.params;
     const read = await readJsonBody(req);
-    const parsed = Body.safeParse(read.ok ? read.json : {});
+    if (!read.ok) return read.response;
+    const parsed = Body.safeParse(read.json);
+    if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid print request payload", 400, "VALIDATION");
 
-    const ipAddress = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || undefined;
-    const userAgent = req.headers.get("user-agent") || undefined;
+    const { ipAddress, userAgent } = auditClientInfo(req);
 
     try {
       const result = await auth.tenant.run(async (tx) => {
@@ -29,9 +31,9 @@ export const POST = withAuth(
           userId: auth.userId,
           targetKind: PrintTargetKind.FORM,
           targetId: formId,
-          includeAnswerKey: parsed.success ? parsed.data.includeAnswerKey : false,
-          recipientStudentId: parsed.success ? parsed.data.recipientStudentId : undefined,
-          reason: parsed.success ? parsed.data.reason : undefined,
+          includeAnswerKey: parsed.data.includeAnswerKey ?? false,
+          recipientStudentId: parsed.data.recipientStudentId,
+          reason: parsed.data.reason,
           ipAddress,
           userAgent,
         });
