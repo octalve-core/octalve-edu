@@ -231,6 +231,52 @@ test.describe("submitting an attempt", () => {
     expect(await answersOf(set.formId)).toBe(0);
   });
 
+  test("a pupil who is no longer in the set's audience cannot submit an attempt they began", async () => {
+    const set = await makeSet();
+    const { responseId } = (await start(p1, set.formId)).json.data;
+    // the teacher narrows the audience to another class after the pupil has started
+    await db.formAudience.updateMany({
+      where: { formId: set.formId },
+      data: { classGroupIds: [(await classArm(t, north, "JSS 2")).groupId] },
+    });
+
+    const res = await submit(p1, set, responseId);
+    expect(res.status, res.text.slice(0, 160)).toBe(403);
+    expect((await db.formResponse.findUniqueOrThrow({ where: { id: responseId } })).status).toBe("IN_PROGRESS");
+    expect(await answersOf(set.formId)).toBe(0);
+  });
+
+  test("nor can a pupil who has been moved to another class", async () => {
+    const set = await makeSet();
+    const { responseId } = (await start(p1, set.formId)).json.data;
+    await db.studentEnrollment.updateMany({
+      where: { studentId: p1.student.id },
+      data: { classArmId: (await classArm(t, north, "JSS 2")).armId },
+    });
+
+    const res = await submit(p1, set, responseId);
+    expect(res.status, res.text.slice(0, 160)).toBe(403);
+    expect(await answersOf(set.formId)).toBe(0);
+    // put back for the tests that follow
+    await db.studentEnrollment.updateMany({
+      where: { studentId: p1.student.id },
+      data: { classArmId: (await classArm(t, north, "JSS 1")).armId },
+    });
+  });
+
+  test("nor can a pupil who has been moved to another campus: the set is then not found", async () => {
+    const set = await makeSet({ forGroup: null });
+    const { responseId } = (await start(p1, set.formId)).json.data;
+    await db.studentRecord.update({ where: { id: p1.student.id }, data: { campusId: south } });
+    try {
+      const res = await submit(p1, set, responseId);
+      expect(res.status, res.text.slice(0, 160)).toBe(404);
+      expect(await answersOf(set.formId)).toBe(0);
+    } finally {
+      await db.studentRecord.update({ where: { id: p1.student.id }, data: { campusId: north } });
+    }
+  });
+
   test("a set put back to draft takes no more answers", async () => {
     const set = await makeSet();
     const { responseId } = (await start(p1, set.formId)).json.data;

@@ -6,9 +6,13 @@ import {
   maskReporterForReviewer,
   pupilCellsAtMinimum,
   reportCell,
+  REPORT_LIMITS,
+  reportLimitReached,
+  startOfUtcDay,
   computeRegradeImpact,
   validateReportOutcome,
 } from "@/lib/question-bank/reports";
+import { MAX_REGRADE_ATTEMPTS, planAttemptRegrade, groupChanges } from "@/lib/question-bank/regrade";
 
 test.describe("Question reports pure domain logic", () => {
   test.describe("sanitizeReportReason", () => {
@@ -185,6 +189,88 @@ test.describe("Question reports pure domain logic", () => {
       expect(maskReporterForReviewer({ reporterRole: "PUPIL", reporterSection: "North", showSection: false })).toBe("Pupil");
       expect(maskReporterForReviewer({ reporterRole: "PUPIL", reporterSection: "North", showSection: true })).toBe("Pupil in North");
       expect(maskReporterForReviewer({ reporterRole: "TEACHER", branchName: "North", showSection: false })).toBe("Teacher");
+    });
+  });
+
+  test.describe("report limits", () => {
+    test("a pupil is held to 10 waiting and 20 a day, a teacher to 20 and 50", () => {
+      expect(REPORT_LIMITS.PUPIL).toEqual({ open: 10, perDay: 20 });
+      expect(REPORT_LIMITS.TEACHER).toEqual({ open: 20, perDay: 50 });
+    });
+
+    test("the limit that is reached is named, the waiting limit first", () => {
+      expect(reportLimitReached("PUPIL", 9, 19)).toBeNull();
+      expect(reportLimitReached("PUPIL", 10, 10)).toBe("OPEN");
+      expect(reportLimitReached("PUPIL", 3, 20)).toBe("DAY");
+      expect(reportLimitReached("PUPIL", 10, 20)).toBe("OPEN");
+      expect(reportLimitReached("TEACHER", 19, 49)).toBeNull();
+      expect(reportLimitReached("TEACHER", 20, 0)).toBe("OPEN");
+      expect(reportLimitReached("TEACHER", 0, 50)).toBe("DAY");
+    });
+
+    test("a day starts at midnight UTC", () => {
+      expect(startOfUtcDay(new Date("2026-10-29T23:59:59.999Z")).toISOString()).toBe("2026-10-29T00:00:00.000Z");
+      expect(startOfUtcDay(new Date("2026-10-30T00:00:00.000Z")).toISOString()).toBe("2026-10-30T00:00:00.000Z");
+    });
+  });
+
+  test.describe("re-grading attempts after a corrected key", () => {
+    const questions = [
+      { id: "q1", questionType: "MULTIPLE_CHOICE" as const, correctAnswer: "A", points: 2 },
+      { id: "q2", questionType: "SHORT_ANSWER" as const, correctAnswer: "x", points: 2 },
+    ];
+    const attempt = (id: string, first: string, score: number, isPassed: boolean) => ({
+      id,
+      answers: [
+        { questionId: "q1", answer: first },
+        { questionId: "q2", answer: "x" },
+      ],
+      score,
+      isPassed,
+    });
+
+    test("only the attempts whose score or pass mark changes are returned, with from and to", () => {
+      const plan = planAttemptRegrade(questions, 60, [
+        attempt("same", "A", 100, true),
+        attempt("up", "A", 50, false),
+        attempt("down", "B", 100, true),
+      ]);
+      expect(plan.unreadable).toBe(0);
+      expect(plan.changes).toEqual([
+        { attemptId: "up", fromScore: 50, toScore: 100, fromPassed: false, toPassed: true },
+        { attemptId: "down", fromScore: 100, toScore: 50, fromPassed: true, toPassed: false },
+      ]);
+    });
+
+    test("an attempt whose answers cannot be read is counted and left alone", () => {
+      const plan = planAttemptRegrade(questions, 60, [
+        { id: "a", answers: "not a list", score: 10, isPassed: false },
+        { id: "b", answers: [{ questionId: "q1" }], score: 10, isPassed: false },
+        { id: "c", answers: null, score: 10, isPassed: false },
+      ]);
+      expect(plan.changes).toEqual([]);
+      expect(plan.unreadable).toBe(3);
+    });
+
+    test("without a pass mark the quiz's default of 50 applies, as when it was taken", () => {
+      const plan = planAttemptRegrade(questions, null, [attempt("x", "B", 100, true)]);
+      expect(plan.changes).toEqual([{ attemptId: "x", fromScore: 100, toScore: 50, fromPassed: true, toPassed: true }]);
+    });
+
+    test("changes with the same new result are grouped so they can be written together", () => {
+      const grouped = groupChanges([
+        { attemptId: "a", fromScore: 100, toScore: 50, fromPassed: true, toPassed: false },
+        { attemptId: "b", fromScore: 90, toScore: 50, fromPassed: true, toPassed: false },
+        { attemptId: "c", fromScore: 50, toScore: 100, fromPassed: false, toPassed: true },
+      ]);
+      expect(grouped).toEqual([
+        { score: 50, isPassed: false, attemptIds: ["a", "b"] },
+        { score: 100, isPassed: true, attemptIds: ["c"] },
+      ]);
+    });
+
+    test("the most a correction will re-grade is 5000 attempts", () => {
+      expect(MAX_REGRADE_ATTEMPTS).toBe(5000);
     });
   });
 });
