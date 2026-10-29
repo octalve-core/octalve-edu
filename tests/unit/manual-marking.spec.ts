@@ -8,6 +8,7 @@ import {
   computeAttemptMarkingSummary,
   canMarkResponse,
   sanitizeResponseForPupil,
+  isFullMarks,
 } from "../../src/lib/forms/manual-marking";
 
 test.describe("Forms Manual Marking - Pure Domain Logic (Task 0032 Slice 9)", () => {
@@ -222,6 +223,19 @@ test.describe("Forms Manual Marking - Pure Domain Logic (Task 0032 Slice 9)", ()
       expect(markedAns.score).toBe(8);
       expect(markedAns.feedback).toBe("Great explanation");
       expect(markedAns.explanation).toBe("Detailed answer");
+    });
+  });
+
+  test.describe("isFullMarks", () => {
+    test("correct means full marks of a question that is worth marks", () => {
+      expect(isFullMarks(10, 10)).toBe(true);
+      expect(isFullMarks(9, 10)).toBe(false);
+      expect(isFullMarks(0, 10)).toBe(false);
+    });
+
+    test("a question worth nothing is never correct", () => {
+      expect(isFullMarks(0, 0)).toBe(false);
+      expect(isFullMarks(3, 0)).toBe(false);
     });
   });
 });

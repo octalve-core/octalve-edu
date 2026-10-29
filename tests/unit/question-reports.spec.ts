@@ -1,7 +1,14 @@
 import "../support/env";
 import { test, expect } from "@playwright/test";
 import { QuestionReportOutcome, QuestionReportStatus } from "@prisma/client";
-import { sanitizeReportReason, maskReporterForReviewer, computeRegradeImpact, validateReportOutcome } from "@/lib/question-bank/reports";
+import {
+  sanitizeReportReason,
+  maskReporterForReviewer,
+  pupilCellsAtMinimum,
+  reportCell,
+  computeRegradeImpact,
+  validateReportOutcome,
+} from "@/lib/question-bank/reports";
 
 test.describe("Question reports pure domain logic", () => {
   test.describe("sanitizeReportReason", () => {
@@ -138,6 +145,46 @@ test.describe("Question reports pure domain logic", () => {
     test("rejects invalid outcome and short reasons", () => {
       expect(validateReportOutcome("INVALID", "Valid explanation").ok).toBe(false);
       expect(validateReportOutcome(QuestionReportOutcome.FIXED, "ab").ok).toBe(false);
+    });
+  });
+
+  test.describe("pupil report groups (the small-summary threshold)", () => {
+    const report = (itemId: string, reporterSection: string, reporterStudentId: string | null) => ({
+      itemId,
+      reporterSection,
+      reporterStudentId,
+    });
+
+    test("a question and campus reach the minimum with that many DIFFERENT pupils", () => {
+      const reports = ["a", "b", "c"].map((pupil) => report("q1", "north", pupil));
+      expect(pupilCellsAtMinimum(reports, 3).has(reportCell("q1", "north"))).toBe(true);
+      expect(pupilCellsAtMinimum(reports, 4).has(reportCell("q1", "north"))).toBe(false);
+    });
+
+    test("one pupil reporting twice counts once", () => {
+      const reports = [report("q1", "north", "a"), report("q1", "north", "a"), report("q1", "north", "b")];
+      expect(pupilCellsAtMinimum(reports, 3).size).toBe(0);
+      expect(pupilCellsAtMinimum(reports, 2).has(reportCell("q1", "north"))).toBe(true);
+    });
+
+    test("another campus, or another question, is another group", () => {
+      const reports = [report("q1", "north", "a"), report("q1", "north", "b"), report("q1", "south", "c"), report("q2", "north", "d")];
+      const cells = pupilCellsAtMinimum(reports, 2);
+      expect(cells.has(reportCell("q1", "north"))).toBe(true);
+      expect(cells.has(reportCell("q1", "south"))).toBe(false);
+      expect(cells.has(reportCell("q2", "north"))).toBe(false);
+    });
+
+    test("reports whose pupil is gone count as one person, not several", () => {
+      const reports = [report("q1", "north", null), report("q1", "north", null), report("q1", "north", "a")];
+      expect(pupilCellsAtMinimum(reports, 3).size).toBe(0);
+      expect(pupilCellsAtMinimum(reports, 2).has(reportCell("q1", "north"))).toBe(true);
+    });
+
+    test("a pupil's report names no campus when asked not to", () => {
+      expect(maskReporterForReviewer({ reporterRole: "PUPIL", reporterSection: "North", showSection: false })).toBe("Pupil");
+      expect(maskReporterForReviewer({ reporterRole: "PUPIL", reporterSection: "North", showSection: true })).toBe("Pupil in North");
+      expect(maskReporterForReviewer({ reporterRole: "TEACHER", branchName: "North", showSection: false })).toBe("Teacher");
     });
   });
 });
