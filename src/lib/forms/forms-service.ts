@@ -607,7 +607,7 @@ export async function startPracticeSetForPupil(
 
 /**
  * Submits pupil answers, evaluates accuracy, and reveals explanations. An attempt is submitted once: the attempt is read under its lock, inside the transaction, so two submissions at
- * the same moment cannot both find it open. The set must be a practice set that is open now (published, inside its opening and closing times; a teacher who closes a set closes it for an
+ * the same moment cannot both find it open. The pupil must still be one the set is for (its campus and audience are checked again, not only at the start). The set must be a practice set that is open now (published, inside its opening and closing times; a teacher who closes a set closes it for an
  * attempt in flight too) and the attempt must be inside the set's time limit; a refusal writes nothing.
  */
 export async function submitPracticeSetForPupil(
@@ -623,7 +623,10 @@ export async function submitPracticeSetForPupil(
   await lockAttempt(tx, params.responseId);
 
   const [form, response] = await Promise.all([
-    tx.form.findFirst({ where: { id: params.formId, tenantId: params.tenantId, kind: FormKind.PRACTICE_SET } }),
+    tx.form.findFirst({
+      where: { id: params.formId, tenantId: params.tenantId, kind: FormKind.PRACTICE_SET },
+      include: { audiences: true },
+    }),
     tx.formResponse.findFirst({
       where: { id: params.responseId, formId: params.formId, studentId: params.studentId, tenantId: params.tenantId },
     }),
@@ -635,6 +638,17 @@ export async function submitPracticeSetForPupil(
 
   if (response.status !== FormResponseStatus.IN_PROGRESS) {
     throw new FormsServiceError("This practice set has already been completed.", 400, "ALREADY_COMPLETED");
+  }
+
+  // The pupil must still be one the set is for: a pupil moved to another campus, or to a class the audience no longer names (or an audience narrowed), after the attempt began ends it. (Asked
+  // first, so that someone who is not entitled learns nothing about the set's state.)
+  const pupil = await pupilStandingOf(tx, params.tenantId, params.studentId);
+  if (!isFormForPupilCampus(form.campusId, pupil.campusId)) {
+    throw new FormsServiceError("Active practice set response not found.", 404, "NOT_FOUND");
+  }
+  const audience = form.audiences[0];
+  if (audience && !isPupilAudienceEligible(audience, pupil.classGroupId)) {
+    throw new FormsServiceError("You are not eligible for this practice set.", 403, "FORBIDDEN");
   }
 
   const completedAt = new Date();
