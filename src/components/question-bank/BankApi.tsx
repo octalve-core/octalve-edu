@@ -6,7 +6,9 @@ import { createContext, useContext, type ReactNode } from "react";
 const BankApiContext = createContext<string | null>(null);
 
 export function BankApiProvider({ schoolCode, children }: { schoolCode: string; children: ReactNode }) {
-  return <BankApiContext.Provider value={`/api/v1/schools/${encodeURIComponent(schoolCode)}/question-bank`}>{children}</BankApiContext.Provider>;
+  return (
+    <BankApiContext.Provider value={`/api/v1/schools/${encodeURIComponent(schoolCode)}/question-bank`}>{children}</BankApiContext.Provider>
+  );
 }
 
 /// The base of the question bank API, e.g. `/api/v1/schools/abc/question-bank`.

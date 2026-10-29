@@ -129,6 +129,12 @@ model StudentRecord {
   quizAttempts        QuizAttempt[]
   courseRegistrations CourseRegistration[]
   certificates        Certificate[]
+  practiceSessions    PracticeSession[]
+  practiceAttempts    PracticeAttempt[]
+  questionReports     QuestionReport[]
+  formResponses       FormResponse[]         @relation("StudentFormResponses")
+  formTurnIns         FormTurnIn[]           @relation("StudentTurnIns")
+  receivedPrintLogs   QuestionBankPrintLog[] @relation("PrintLogRecipient")
 
   @@unique([tenantId, id])
   @@index([tenantId])

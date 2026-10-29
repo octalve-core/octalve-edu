@@ -1,5 +1,14 @@
 import { test, expect } from "@playwright/test";
-import { answerKey, blankForm, bodyOf, formOf, percent, snippet, visibilityText, type ApiItem } from "../../src/components/question-bank/model";
+import {
+  answerKey,
+  blankForm,
+  bodyOf,
+  formOf,
+  percent,
+  snippet,
+  visibilityText,
+  type ApiItem,
+} from "../../src/components/question-bank/model";
 import { parseItem, toEditable } from "../../src/lib/question-bank/item-input";
 
 // The plain rules the question bank screens use (components/question-bank/model.ts): the form a person edits, the request it becomes, and the words for what the server sent. The
@@ -49,15 +58,30 @@ test("what the form sends is accepted by the server's parser, for every kind of 
     const parsed = parseItem(bodyOf(formOf(kind)));
     expect(parsed.ok, `${kind.type}: ${JSON.stringify(parsed)}`).toBe(true);
   }
-  expect(parseItem(bodyOf({ ...blankForm(), prompt: "A question?", options: ["Yes", "No"], subject: "Art", classTags: ["JSS 1"] })).ok).toBe(true);
+  expect(
+    parseItem(bodyOf({ ...blankForm(), prompt: "A question?", options: ["Yes", "No"], subject: "Art", classTags: ["JSS 1"] })).ok,
+  ).toBe(true);
 });
 
 test("reading a question into the form and out again says the same thing as the server's own editable shape", () => {
   for (const kind of KINDS) {
-    const stored = { ...kind, subjectLabel: kind.subject, classTags: kind.classTags.map((label) => ({ label })), options: kind.options ?? [], correctAnswer: kind.correctAnswer ?? "" };
+    const stored = {
+      ...kind,
+      subjectLabel: kind.subject,
+      classTags: kind.classTags.map((label) => ({ label })),
+      options: kind.options ?? [],
+      correctAnswer: kind.correctAnswer ?? "",
+    };
     const expected = toEditable(stored as never);
     const sent = bodyOf(formOf(kind));
-    expect(sent).toMatchObject({ type: kind.type, prompt: kind.prompt, points: kind.points, subject: kind.subject, classTags: kind.classTags, correct: expected.correct });
+    expect(sent).toMatchObject({
+      type: kind.type,
+      prompt: kind.prompt,
+      points: kind.points,
+      subject: kind.subject,
+      classTags: kind.classTags,
+      correct: expected.correct,
+    });
     if (kind.type === "SINGLE" || kind.type === "MULTI") expect(sent.options).toEqual(expected.options);
   }
 });

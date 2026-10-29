@@ -20,7 +20,9 @@ export const GET = withAuth(
     // a campus administrator who names no campus is shown their own
     const campusId = asked ?? (auth.tenant.role === "CAMPUS_ADMIN" ? auth.tenant.campusId : null);
     if (campusId !== null) {
-      const known = await auth.tenant.run((tx) => tx.campus.findFirst({ where: { id: campusId, tenantId: auth.tenant.tenantId }, select: { id: true } }));
+      const known = await auth.tenant.run((tx) =>
+        tx.campus.findFirst({ where: { id: campusId, tenantId: auth.tenant.tenantId }, select: { id: true } }),
+      );
       if (!known) return fail("No such campus.", 404, "NOT_FOUND");
     }
     return ok({ reviewers: await listReviewers(auth.tenant, campusId) });

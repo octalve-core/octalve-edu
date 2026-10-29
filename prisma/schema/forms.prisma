@@ -1,0 +1,284 @@
+// --- Forms Module, Practice Sets, Questionnaires, Paper Work & Marking (PRD §6, Parity Build Slices 6-9) ---
+//
+// Tenant-isolated forms module for practice sets, questionnaires, and paper work.
+// Enforces tenant isolation with composite keys @@unique([tenantId, id]),
+// composite foreign keys on (tenantId, parentId), and Postgres Row-Level Security (RLS).
+
+enum FormKind {
+  PRACTICE_SET
+  QUESTIONNAIRE
+  PAPER_WORK
+}
+
+enum FormStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+  ARCHIVED
+}
+
+enum FormAudienceKind {
+  MEMBERS
+  PUBLIC
+}
+
+enum FormResponseStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+enum FormMarkingMethod {
+  AUTO
+  MANUAL
+}
+
+enum FormMarkingStatus {
+  NOT_REQUIRED
+  PENDING
+  PARTIALLY_MARKED
+  MARKED
+}
+
+enum TurnInStatus {
+  PENDING
+  HANDED_IN
+  LATE
+}
+
+/// A published form (practice set, questionnaire, or paper work).
+model Form {
+  id                 String     @id @default(cuid())
+  tenantId           String
+  campusId           String?
+  kind               FormKind   @default(PRACTICE_SET)
+  title              String
+  instructions       String?
+  status             FormStatus @default(DRAFT)
+  isAnonymous        Boolean    @default(false)
+  shareToken         String?    @unique
+  opensAt            DateTime?
+  closesAt           DateTime?
+  maxDurationMinutes Int?
+  createdById        String
+  closedById         String?
+  closedAt           DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @default(now()) @updatedAt
+
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus         Campus?             @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  createdBy      User                @relation("FormsCreated", fields: [createdById], references: [id], onDelete: NoAction)
+  closedBy       User?               @relation("FormsClosed", fields: [closedById], references: [id], onDelete: SetNull)
+  audiences      FormAudience[]
+  questions      FormQuestion[]
+  responses      FormResponse[]
+  participations FormParticipation[]
+  turnIns        FormTurnIn[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, kind, status])
+  @@index([tenantId, createdAt])
+}
+
+/// Participation record for members on forms to prevent double-answering on anonymous questionnaires.
+model FormParticipation {
+  id           String   @id @default(cuid())
+  tenantId     String
+  formId       String
+  respondentId String
+  createdAt    DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  form   Form   @relation(fields: [tenantId, formId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, formId, respondentId])
+  @@index([tenantId, formId])
+  @@index([tenantId, respondentId])
+}
+
+/// Target audience for a form: members by roles and class groups, or public.
+model FormAudience {
+  id            String           @id @default(cuid())
+  tenantId      String
+  formId        String
+  kind          FormAudienceKind @default(MEMBERS)
+  roles         Json             @default("[]")
+  classGroupId  String?
+  classGroupIds Json             @default("[]")
+  createdAt     DateTime         @default(now())
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  form       Form        @relation(fields: [tenantId, formId], references: [tenantId, id], onDelete: Cascade)
+  classGroup ClassGroup? @relation(fields: [tenantId, classGroupId], references: [tenantId, id], onDelete: SetNull)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, formId])
+}
+
+/// A question inside a form. Copies bank item provenance or holds ad-hoc prompts.
+model FormQuestion {
+  id            String            @id @default(cuid())
+  tenantId      String
+  formId        String
+  sourceItemId  String?
+  sourceVersion Int?
+  prompt        String
+  questionType  BankQuestionType  @default(SINGLE)
+  options       Json              @default("[]")
+  correctAnswer String?
+  explanation   String?
+  points        Int               @default(1)
+  markingMethod FormMarkingMethod @default(AUTO)
+  sortOrder     Int               @default(0)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @default(now()) @updatedAt
+
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  form       Form              @relation(fields: [tenantId, formId], references: [tenantId, id], onDelete: Cascade)
+  sourceItem QuestionBankItem? @relation(fields: [tenantId, sourceItemId], references: [tenantId, id], onDelete: SetNull)
+  answers    FormAnswer[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, formId])
+  @@index([tenantId, sourceItemId])
+}
+
+/// A response or completion of a form by a member or public respondent.
+model FormResponse {
+  id            String             @id @default(cuid())
+  tenantId      String
+  campusId      String?
+  formId        String
+  respondentId  String?
+  studentId     String?
+  status        FormResponseStatus @default(IN_PROGRESS)
+  score         Float?             @default(0)
+  maxScore      Float?             @default(0)
+  markingStatus FormMarkingStatus  @default(NOT_REQUIRED)
+  markedById    String?
+  markedAt      DateTime?
+  startedAt     DateTime           @default(now())
+  submittedAt   DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @default(now()) @updatedAt
+
+  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus   Campus?            @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  form     Form               @relation(fields: [tenantId, formId], references: [tenantId, id], onDelete: Cascade)
+  student  StudentRecord?     @relation("StudentFormResponses", fields: [tenantId, studentId], references: [tenantId, id], onDelete: Cascade)
+  markedBy User?              @relation("ResponsesMarked", fields: [markedById], references: [id], onDelete: SetNull)
+  answers  FormAnswer[]
+  audits   FormMarkingAudit[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, formId, status])
+  @@index([tenantId, formId, markingStatus])
+  @@index([tenantId, studentId])
+}
+
+/// An individual question answer within a form response.
+model FormAnswer {
+  id             String            @id @default(cuid())
+  tenantId       String
+  responseId     String
+  formQuestionId String
+  value          Json
+  isCorrect      Boolean?
+  score          Float?            @default(0)
+  markingStatus  FormMarkingStatus @default(NOT_REQUIRED)
+  markedById     String?
+  markedAt       DateTime?
+  feedback       String?
+  createdAt      DateTime          @default(now())
+
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  response     FormResponse       @relation(fields: [tenantId, responseId], references: [tenantId, id], onDelete: Cascade)
+  formQuestion FormQuestion       @relation(fields: [tenantId, formQuestionId], references: [tenantId, id], onDelete: Cascade)
+  markedBy     User?              @relation("AnswersMarked", fields: [markedById], references: [id], onDelete: SetNull)
+  audits       FormMarkingAudit[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, responseId])
+  @@index([tenantId, formQuestionId])
+  @@index([tenantId, markingStatus])
+}
+
+/// Audit log for manual marking actions on form responses and answers (append-only trigger).
+model FormMarkingAudit {
+  id           String   @id @default(cuid())
+  tenantId     String
+  responseId   String
+  answerId     String?
+  formId       String
+  studentId    String?
+  scoreAwarded Float
+  maxScore     Float
+  feedback     String?
+  action       String
+  actorUserId  String
+  createdAt    DateTime @default(now())
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  response FormResponse @relation(fields: [tenantId, responseId], references: [tenantId, id], onDelete: Cascade)
+  answer   FormAnswer?  @relation(fields: [tenantId, answerId], references: [tenantId, id], onDelete: Cascade)
+  actor    User         @relation("MarkingAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, responseId])
+  @@index([tenantId, answerId])
+  @@index([tenantId, formId])
+  @@index([tenantId, createdAt])
+}
+
+/// Paper work roll call tracking physical submission per student.
+model FormTurnIn {
+  id          String       @id @default(cuid())
+  tenantId    String
+  campusId    String?
+  formId      String
+  studentId   String
+  status      TurnInStatus @default(PENDING)
+  markedById  String?
+  markedAt    DateTime?
+  requestedAt DateTime?
+  note        String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @default(now()) @updatedAt
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus   Campus?           @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  form     Form              @relation(fields: [tenantId, formId], references: [tenantId, id], onDelete: Cascade)
+  student  StudentRecord     @relation("StudentTurnIns", fields: [tenantId, studentId], references: [tenantId, id], onDelete: Cascade)
+  markedBy User?             @relation("TurnInsMarked", fields: [markedById], references: [id], onDelete: SetNull)
+  audits   FormTurnInAudit[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, formId, studentId])
+  @@index([tenantId, formId, status])
+  @@index([tenantId, studentId])
+}
+
+/// Audit log for roll call status changes on paper work (append-only trigger).
+model FormTurnInAudit {
+  id          String       @id @default(cuid())
+  tenantId    String
+  turnInId    String
+  formId      String
+  studentId   String
+  status      TurnInStatus
+  action      String
+  actorUserId String?
+  note        String?
+  createdAt   DateTime     @default(now())
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  turnIn FormTurnIn @relation(fields: [tenantId, turnInId], references: [tenantId, id], onDelete: Cascade)
+  actor  User?      @relation("TurnInAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, formId])
+  @@index([tenantId, turnInId])
+  @@index([tenantId, createdAt])
+}

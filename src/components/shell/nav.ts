@@ -1,6 +1,15 @@
 import type { ComponentType, SVGProps } from "react";
 import type { Role } from "@prisma/client";
-import { BuildingIcon, CalendarIcon, FileTextIcon, GraduationCapIcon, HomeIcon, MailIcon, SlidersIcon, UsersIcon } from "@/components/ui/icons";
+import {
+  BuildingIcon,
+  CalendarIcon,
+  FileTextIcon,
+  GraduationCapIcon,
+  HomeIcon,
+  MailIcon,
+  SlidersIcon,
+  UsersIcon,
+} from "@/components/ui/icons";
 import { isValidTenantCode } from "@/lib/tenant/validate-code";
 
 /// A school the signed-in person belongs to, as the shell needs it. Display data only (see lib/auth/page-session.ts).

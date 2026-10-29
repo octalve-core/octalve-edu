@@ -184,4 +184,3 @@ test.describe("extended people rules (employee & guardian)", () => {
     expect(computeAge("1990-10-08", NOW)).toBe(35);
   });
 });
-

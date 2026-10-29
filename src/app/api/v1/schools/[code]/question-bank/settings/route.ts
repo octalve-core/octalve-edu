@@ -18,7 +18,9 @@ export const GET = withAuth(
     if (refused) return refused;
     const campusId = query.campusId ?? (auth.tenant.role === "CAMPUS_ADMIN" ? auth.tenant.campusId : null);
     if (campusId !== null) {
-      const known = await auth.tenant.run((tx) => tx.campus.findFirst({ where: { id: campusId, tenantId: auth.tenant.tenantId }, select: { id: true } }));
+      const known = await auth.tenant.run((tx) =>
+        tx.campus.findFirst({ where: { id: campusId, tenantId: auth.tenant.tenantId }, select: { id: true } }),
+      );
       if (!known) return fail("No such campus.", 404, "NOT_FOUND");
     }
     return ok({ campusId, settings: await bankSettingsView(auth.tenant, campusId) });

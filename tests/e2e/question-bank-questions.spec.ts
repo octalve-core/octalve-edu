@@ -4,7 +4,17 @@ import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import sharp from "sharp";
 import { test, expect } from "../support/fixtures";
-import { Role, addMembership, createTenant, createUser, db, removeCreatedTenants, seedInstance, type TestTenant, type TestUser } from "../support/db";
+import {
+  Role,
+  addMembership,
+  createTenant,
+  createUser,
+  db,
+  removeCreatedTenants,
+  seedInstance,
+  type TestTenant,
+  type TestUser,
+} from "../support/db";
 import { SAAS_URL } from "../support/env";
 import { api as rawApi, cookieHeader, loginAs as rawLogin } from "../support/http";
 import { signInThroughUi } from "./helpers";
@@ -22,7 +32,10 @@ async function expectAccessible(page: Page, what: string) {
   ).toEqual([]);
 }
 async function expectNoHorizontalScroll(page: Page, what: string) {
-  const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+  const { scrollWidth, innerWidth } = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    innerWidth: window.innerWidth,
+  }));
   expect(scrollWidth, `horizontal overflow on ${what}`).toBeLessThanOrEqual(innerWidth);
 }
 async function checkBothThemes(page: Page, what: string) {
@@ -73,13 +86,21 @@ async function people() {
   await addMembership(reviewer.id, school.id, Role.NON_TEACHING_STAFF, north.id);
   const exam = await createUser({ name: `${tag} Exam` });
   await addMembership(exam.id, school.id, Role.TEACHING_STAFF, north.id);
-  await db.questionBankReviewer.create({ data: { tenantId: school.id, userId: reviewer.id, assignedById: sup.id, scope: "GENERAL", campusId: north.id } });
-  await db.questionBankReviewer.create({ data: { tenantId: school.id, userId: exam.id, assignedById: sup.id, scope: "GENERAL", campusId: north.id, isExamApprover: true } });
+  await db.questionBankReviewer.create({
+    data: { tenantId: school.id, userId: reviewer.id, assignedById: sup.id, scope: "GENERAL", campusId: north.id },
+  });
+  await db.questionBankReviewer.create({
+    data: { tenantId: school.id, userId: exam.id, assignedById: sup.id, scope: "GENERAL", campusId: north.id, isExamApprover: true },
+  });
   return { north, writer, reviewer, exam };
 }
 
-const picture = () => sharp({ create: { width: 120, height: 80, channels: 3, background: "#3366aa" } }).png().toBuffer();
-const promptFor = (n: number) => `${tag} number ${n}: which of these words belongs with the entry w${n}x${n * 13} in the little alphabet book?`;
+const picture = () =>
+  sharp({ create: { width: 120, height: 80, channels: 3, background: "#3366aa" } })
+    .png()
+    .toBuffer();
+const promptFor = (n: number) =>
+  `${tag} number ${n}: which of these words belongs with the entry w${n}x${n * 13} in the little alphabet book?`;
 
 /// A question made through the API (quicker than clicking for the flows that are about something else).
 async function seedQuestion(who: TestUser, campusId: string, n: number, submit = true) {
@@ -87,7 +108,15 @@ async function seedQuestion(who: TestUser, campusId: string, n: number, submit =
   const created = await api(ITEMS(), {
     method: "POST",
     cookie,
-    body: { campusId, type: "SINGLE", prompt: promptFor(n), options: [`alpha${n}`, `beta${n}`, `gamma${n}`], correct: 0, subject: "Mathematics", classTags: ["JSS 1"] },
+    body: {
+      campusId,
+      type: "SINGLE",
+      prompt: promptFor(n),
+      options: [`alpha${n}`, `beta${n}`, `gamma${n}`],
+      correct: 0,
+      subject: "Mathematics",
+      classTags: ["JSS 1"],
+    },
   });
   expect(created.status, created.text).toBe(201);
   const id = created.json.data.item.id as string;
@@ -162,7 +191,11 @@ test.describe("writing, sending and approving", () => {
     expect(audited.map((a) => a.action)).toEqual(["ITEM_CREATED", "IMAGE_ADDED", "ITEM_SUBMITTED"]);
   });
 
-  test("a reviewer sees the queue, approves a question with its subject and classes, and its writer sees it approved", async ({ page, browser, baseURL }) => {
+  test("a reviewer sees the queue, approves a question with its subject and classes, and its writer sees it approved", async ({
+    page,
+    browser,
+    baseURL,
+  }) => {
     const { north, writer, reviewer } = await people();
     await seedQuestion(writer, north.id, 1);
 
@@ -245,7 +278,11 @@ test.describe("writing, sending and approving", () => {
 });
 
 test.describe("exam approvers", () => {
-  test("an exam approver sees the overlap warning and chooses who may see the question; the writer never sees a word about it", async ({ page, browser, baseURL }) => {
+  test("an exam approver sees the overlap warning and chooses who may see the question; the writer never sees a word about it", async ({
+    page,
+    browser,
+    baseURL,
+  }) => {
     const { north, writer, exam } = await people();
     const original = await seedQuestion(writer, north.id, 3);
     // a near copy: the same question with a short sentence added
@@ -253,7 +290,15 @@ test.describe("exam approvers", () => {
     const copy = await api(ITEMS(), {
       method: "POST",
       cookie,
-      body: { campusId: north.id, type: "SINGLE", prompt: `${promptFor(3)} Choose one.`, options: ["alpha3", "beta3", "gamma3"], correct: 0, subject: "Mathematics", classTags: ["JSS 1"] },
+      body: {
+        campusId: north.id,
+        type: "SINGLE",
+        prompt: `${promptFor(3)} Choose one.`,
+        options: ["alpha3", "beta3", "gamma3"],
+        correct: 0,
+        subject: "Mathematics",
+        classTags: ["JSS 1"],
+      },
     });
     expect(copy.status, copy.text).toBe(201);
     expect((await api(`${ITEMS()}/${copy.json.data.item.id}/submit`, { method: "POST", cookie, body: {} })).status).toBe(200);

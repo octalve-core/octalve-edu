@@ -5,7 +5,19 @@ import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
 
 /// A short list of labels typed one at a time (Enter or a comma adds one; each can be removed). Used for the classes of a question.
-export function TagInput({ label, tags, onChange, hint, max = 10 }: { label: string; tags: string[]; onChange: (tags: string[]) => void; hint?: string; max?: number }) {
+export function TagInput({
+  label,
+  tags,
+  onChange,
+  hint,
+  max = 10,
+}: {
+  label: string;
+  tags: string[];
+  onChange: (tags: string[]) => void;
+  hint?: string;
+  max?: number;
+}) {
   const [text, setText] = useState("");
   const listId = useId();
 

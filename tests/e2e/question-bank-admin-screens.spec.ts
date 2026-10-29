@@ -1,7 +1,17 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { test, expect } from "../support/fixtures";
-import { Role, addMembership, createTenant, createUser, db, removeCreatedTenants, seedInstance, type TestTenant, type TestUser } from "../support/db";
+import {
+  Role,
+  addMembership,
+  createTenant,
+  createUser,
+  db,
+  removeCreatedTenants,
+  seedInstance,
+  type TestTenant,
+  type TestUser,
+} from "../support/db";
 import { SAAS_URL } from "../support/env";
 import { signInThroughUi } from "./helpers";
 
@@ -46,14 +56,23 @@ test.afterEach(async () => {
 async function expectAccessible(page: Page, what: string) {
   const results = await new AxeBuilder({ page }).withTags(WCAG).analyze();
   const report = results.violations.map(
-    (v) => `${v.id} [${v.impact}] ${v.help}\n      ${v.nodes.slice(0, 4).map((n) => `${n.target.join(" ")} :: ${(n.failureSummary ?? "").split("\n")[1] ?? ""}`).join("\n      ")}`,
+    (v) =>
+      `${v.id} [${v.impact}] ${v.help}\n      ${v.nodes
+        .slice(0, 4)
+        .map((n) => `${n.target.join(" ")} :: ${(n.failureSummary ?? "").split("\n")[1] ?? ""}`)
+        .join("\n      ")}`,
   );
   expect(report, `accessibility violations on ${what}`).toEqual([]);
 }
 /// Colours transition when the theme flips, and axe would sample the in-between values: wait for the running transitions first.
 async function settled(page: Page) {
   await page.evaluate(() =>
-    Promise.all(document.getAnimations().filter((a) => a instanceof CSSTransition).map((a) => a.finished.catch(() => undefined))),
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a instanceof CSSTransition)
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
   );
 }
 async function checkScreen(page: Page, what: string, isMobile: boolean) {
@@ -63,7 +82,10 @@ async function checkScreen(page: Page, what: string, isMobile: boolean) {
     await page.evaluate((t) => void (document.documentElement.dataset.theme = t), theme);
     await settled(page);
     await expectAccessible(page, `${what} [${theme} theme]`);
-    const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+    const { scrollWidth, innerWidth } = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+    }));
     expect(scrollWidth, `horizontal overflow on ${what} [${theme} theme]`).toBeLessThanOrEqual(innerWidth);
   }
   await page.evaluate((t) => void (document.documentElement.dataset.theme = t), initial);
@@ -104,7 +126,11 @@ async function confirm(page: Page, who: TestUser) {
   await expect(dialog(page)).toBeHidden();
 }
 
-test("who sees the page: the school's administrator and a campus administrator find it in the navigation; a teacher finds it with the staff tabs only; a pupil is told no", async ({ page, browser, isMobile }) => {
+test("who sees the page: the school's administrator and a campus administrator find it in the navigation; a teacher finds it with the staff tabs only; a pupil is told no", async ({
+  page,
+  browser,
+  isMobile,
+}) => {
   await signInThroughUi(page, admin);
   if (isMobile) {
     const more = page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "More" });
@@ -141,7 +167,10 @@ test("who sees the page: the school's administrator and a campus administrator f
   await pupilContext.close();
 });
 
-test("reviewers: add one through the step-up dialog, see them listed, remove them; a wrong password is told in the dialog and nothing is added", async ({ page, isMobile }) => {
+test("reviewers: add one through the step-up dialog, see them listed, remove them; a wrong password is told in the dialog and nothing is added", async ({
+  page,
+  isMobile,
+}) => {
   test.slow();
   await open(page, admin);
   await expect(page.getByText("No reviewers yet.")).toBeVisible();
@@ -203,7 +232,9 @@ test("reviewers: add one through the step-up dialog, see them listed, remove the
   expect(await db.questionBankAudit.count({ where: { tenantId: school.id, entity: "REVIEWER" } })).toBe(2);
 });
 
-test("a campus administrator sees their own campus's reviewers and the school-wide ones, and can remove only their own campus's", async ({ page }) => {
+test("a campus administrator sees their own campus's reviewers and the school-wide ones, and can remove only their own campus's", async ({
+  page,
+}) => {
   const [north] = school.campuses;
   const adminId = admin.id;
   await db.questionBankReviewer.createMany({
@@ -223,7 +254,10 @@ test("a campus administrator sees their own campus's reviewers and the school-wi
   await expect(tolasRow).toContainText("This campus");
 });
 
-test("settings: the school's administrator changes two values together through the step-up dialog; a campus narrows one and then goes back to the school's value", async ({ page, isMobile }) => {
+test("settings: the school's administrator changes two values together through the step-up dialog; a campus narrows one and then goes back to the school's value", async ({
+  page,
+  isMobile,
+}) => {
   test.slow();
   await open(page, admin);
   await page.getByRole("tab", { name: "Settings" }).click();
@@ -242,7 +276,9 @@ test("settings: the school's administrator changes two values together through t
   await expect(page.getByText(/^Saved \d+ settings?\.$/)).toBeVisible();
   const row = await db.questionBankSetting.findFirstOrThrow({ where: { tenantId: school.id, key: "bank.parents.view" } });
   expect(row.value).toBe("SUMMARY");
-  expect((await db.questionBankAudit.findMany({ where: { tenantId: school.id, entity: "SETTING", ref: "bank.parents.view" } }))[0].reason).toBe("Pupils learn from diagrams");
+  expect(
+    (await db.questionBankAudit.findMany({ where: { tenantId: school.id, entity: "SETTING", ref: "bank.parents.view" } }))[0].reason,
+  ).toBe("Pupils learn from diagrams");
 
   // the campus: narrow it to NONE, then go back to the school's value
   await page.getByLabel("Settings for").selectOption({ label: "North" });

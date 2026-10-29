@@ -10,6 +10,7 @@ import type {
   gradeSubmissionSchema,
   createLearningMaterialSchema,
   createQuizSchema,
+  updateQuizSchema,
   submitQuizAttemptSchema,
 } from "./validation";
 import { z } from "zod";
@@ -20,6 +21,7 @@ export type SubmitAssignmentInput = z.infer<typeof submitAssignmentSchema>;
 export type GradeSubmissionInput = z.infer<typeof gradeSubmissionSchema>;
 export type CreateMaterialInput = z.infer<typeof createLearningMaterialSchema>;
 export type CreateQuizInput = z.infer<typeof createQuizSchema>;
+export type UpdateQuizInput = z.infer<typeof updateQuizSchema>;
 export type SubmitQuizInput = z.infer<typeof submitQuizAttemptSchema>;
 
 /// Who is calling: the person and the role they hold IN THIS SCHOOL.
@@ -418,6 +420,8 @@ export async function listQuizzes(tenantId: string, viewer: Actor, filters: { su
   });
 }
 
+import { isTemplateHidden } from "@/lib/question-bank/assessments";
+
 export async function getQuiz(tenantId: string, quizId: string, viewer: Actor) {
   const tId = trustedTenantId(tenantId);
 
@@ -433,6 +437,28 @@ export async function getQuiz(tenantId: string, quizId: string, viewer: Actor) {
         },
       },
     });
+
+    const staffRecord = staff
+      ? await tx.staffRecord.findFirst({
+          where: { tenantId, userId: viewer.userId, archivedAt: null },
+          select: { id: true },
+        })
+      : null;
+
+    if (
+      staff &&
+      isTemplateHidden(quiz, {
+        userId: viewer.userId,
+        role: viewer.role,
+        staffRecordId: staffRecord?.id,
+      })
+    ) {
+      // Exam template secrecy: hide questions from other staff members during the window
+      return {
+        ...quiz,
+        questions: [],
+      };
+    }
 
     if (!staff) {
       // Only staff see the answer key; everyone else gets the quiz without it
@@ -462,7 +488,7 @@ export async function createQuiz(tenantId: string, userId: string, data: CreateQ
       select: { id: true },
     });
 
-    return tx.quiz.create({
+    const quiz = await tx.quiz.create({
       data: {
         tenantId,
         subjectId: data.subjectId,
@@ -472,17 +498,56 @@ export async function createQuiz(tenantId: string, userId: string, data: CreateQ
         timeLimitMinutes: data.timeLimitMinutes ?? null,
         passingScore: data.passingScore ?? null,
         status: data.status,
+        isExamTemplate: data.isExamTemplate ?? false,
+        examWindowStart: data.examWindowStart ?? null,
+        examWindowEnd: data.examWindowEnd ?? null,
         createdById: staff?.id ?? null,
-        questions: {
-          create: data.questions.map((q, idx) => ({
-            prompt: q.prompt,
-            questionType: q.questionType,
-            options: q.options as unknown as Prisma.InputJsonValue,
-            correctAnswer: q.correctAnswer,
-            points: q.points ?? 1,
-            sortOrder: q.sortOrder ?? idx,
-          })),
-        },
+      },
+    });
+
+    // The questions are written with their own statement, not as a nested create: a question that may name its source in the bank (`sourceItemId`) is tied to the school by a
+    // second composite key, and a nested create then refuses `tenantId` ("Unknown argument"), which answered every quiz creation with a 500.
+    await tx.quizQuestion.createMany({
+      data: data.questions.map((q, idx) => ({
+        tenantId,
+        quizId: quiz.id,
+        prompt: q.prompt,
+        questionType: q.questionType,
+        options: q.options as unknown as Prisma.InputJsonValue,
+        correctAnswer: q.correctAnswer,
+        points: q.points ?? 1,
+        sortOrder: q.sortOrder ?? idx,
+        sourceItemId: q.sourceItemId ?? null,
+        sourceVersion: q.sourceVersion ?? null,
+        exposedToPractice: q.exposedToPractice ?? false,
+      })),
+    });
+
+    return tx.quiz.findFirstOrThrow({ where: { tenantId, id: quiz.id }, include: { questions: true } });
+  });
+}
+
+export async function updateQuiz(tenantId: string, quizId: string, data: UpdateQuizInput) {
+  const tId = trustedTenantId(tenantId);
+
+  return forTenant(tId).transaction(async (tx) => {
+    const existing = await tx.quiz.findFirst({
+      where: { tenantId, id: quizId, archivedAt: null },
+      select: { id: true },
+    });
+    if (!existing) return null;
+
+    return tx.quiz.update({
+      where: { tenantId_id: { tenantId, id: quizId } },
+      data: {
+        title: data.title,
+        instructions: data.instructions,
+        timeLimitMinutes: data.timeLimitMinutes,
+        passingScore: data.passingScore,
+        status: data.status,
+        isExamTemplate: data.isExamTemplate,
+        examWindowStart: data.examWindowStart,
+        examWindowEnd: data.examWindowEnd,
       },
       include: {
         questions: true,
