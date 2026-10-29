@@ -147,6 +147,12 @@ test.describe("Phase 5 — Vocational Certification Rules", () => {
     expect(formatCertificateNumber("A&B", 2026, 999)).toBe("AB-VOC-2026-00999");
   });
 
+  test("a prefix with no letter or digit in it is the default prefix, never an empty one", () => {
+    for (const prefix of ["", "   ", "---", "!!!", "é ü", "_ _"]) {
+      expect(formatCertificateNumber(prefix, 2026, 7), JSON.stringify(prefix)).toBe("OCT-VOC-2026-00007");
+    }
+  });
+
   test("verifyCertificateIntegrity detects altered data accurately", () => {
     const input = {
       tenantId: "tenant_abc123",

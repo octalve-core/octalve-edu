@@ -155,6 +155,9 @@ export function serverEnv(appUrl: string): Record<string, string> {
     APP_ENV: "production",
     DEV_TOOLS: "",
     DEV_TOOLS_TOKEN: "",
+    // Question pictures are kept in the server's own memory (the test harness is the only thing allowed to ask for this on a production-shaped server).
+    IMAGE_STORE: "memory",
+    ALLOW_MEMORY_IMAGE_STORE_IN_PRODUCTION: "true",
   };
 }
 
@@ -193,5 +196,7 @@ export function devToolsServerEnv(): Record<string, string> {
     APP_ENV: "staging",
     DEV_TOOLS: "true",
     DEV_TOOLS_TOKEN: DEV_TOOLS_TEST_TOKEN,
+    // The one server with NO image store: the pictures routes must answer 503 there.
+    IMAGE_STORE: "",
   };
 }

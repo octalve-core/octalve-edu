@@ -135,3 +135,52 @@ test.describe("DEFAULT_SCHOOL_TYPE", () => {
     }
   });
 });
+
+test.describe("extended people rules (employee & guardian)", () => {
+  test("cleanOptionalGender recognizes MALE and FEMALE case-insensitively, trims whitespace, returns null when absent", async () => {
+    const { cleanOptionalGender } = await import("@/lib/people/rules");
+    expect(cleanOptionalGender(undefined)).toBeNull();
+    expect(cleanOptionalGender(null)).toBeNull();
+    expect(cleanOptionalGender("")).toBeNull();
+    expect(cleanOptionalGender("   ")).toBeNull();
+    expect(cleanOptionalGender("male")).toBe("MALE");
+    expect(cleanOptionalGender(" FEMALE ")).toBe("FEMALE");
+    expect(cleanOptionalGender("other")).toBeUndefined();
+    expect(cleanOptionalGender(123)).toBeUndefined();
+  });
+
+  test("cleanOptionalText trims, bounds length, and returns null when empty", async () => {
+    const { cleanOptionalText } = await import("@/lib/people/rules");
+    expect(cleanOptionalText(undefined)).toBeNull();
+    expect(cleanOptionalText(null)).toBeNull();
+    expect(cleanOptionalText("   ")).toBeNull();
+    expect(cleanOptionalText("  123 Main St, Lagos  ")).toBe("123 Main St, Lagos");
+    expect(cleanOptionalText("a".repeat(200), 200)).toBe("a".repeat(200));
+    expect(cleanOptionalText("a".repeat(201), 200)).toBeUndefined();
+    expect(cleanOptionalText(42)).toBeUndefined();
+  });
+
+  test("checkEmploymentDate verifies ISO date within valid bounds", async () => {
+    const { checkEmploymentDate } = await import("@/lib/people/rules");
+    expect(checkEmploymentDate(undefined, NOW)).toBeNull();
+    expect(checkEmploymentDate(null, NOW)).toBeNull();
+    expect(checkEmploymentDate("", NOW)).toBeNull();
+    expect(checkEmploymentDate("2020-09-01", NOW)).toBeNull();
+    expect(checkEmploymentDate("2026-10-07", NOW)).toBeNull();
+    expect(checkEmploymentDate("2026-10-08", NOW)).toBe("IN_FUTURE");
+    expect(checkEmploymentDate("1899-12-31", NOW)).toBe("TOO_EARLY");
+    expect(checkEmploymentDate("invalid-date", NOW)).toBe("INVALID");
+  });
+
+  test("computeAge calculates completed years correctly across birthday boundaries", async () => {
+    const { computeAge } = await import("@/lib/people/rules");
+    // Birthday earlier in year: 1990-05-15 at 2026-10-07 -> 36 years
+    expect(computeAge("1990-05-15", NOW)).toBe(36);
+    // Birthday later in year: 1990-11-20 at 2026-10-07 -> 35 years
+    expect(computeAge("1990-11-20", NOW)).toBe(35);
+    // Exact birthday: 1990-10-07 at 2026-10-07 -> 36 years
+    expect(computeAge("1990-10-07", NOW)).toBe(36);
+    // Birthday tomorrow: 1990-10-08 at 2026-10-07 -> 35 years
+    expect(computeAge("1990-10-08", NOW)).toBe(35);
+  });
+});

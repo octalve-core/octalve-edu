@@ -9,12 +9,12 @@ import { recordStudentResults, queryResults } from "@/lib/results/service";
 export const GET = withAuth(
   validate({ query: resultsQuerySchema }, async (_req, auth: TenantAuthContext, _ctx: unknown, { query }) => {
     const results = await auth.tenant.run((tx) =>
-      queryResults(tx, auth.tenant.tenantId, {
-        periodId: query.periodId,
-        subjectId: query.subjectId,
-        classArmId: query.classArmId,
-        status: query.status,
-      }),
+      queryResults(
+        tx,
+        auth.tenant.tenantId,
+        { periodId: query.periodId, subjectId: query.subjectId, classArmId: query.classArmId, status: query.status },
+        { role: auth.tenant.role, campusId: auth.tenant.campusId, userId: auth.userId, permissions: auth.tenant.permissions ?? [] },
+      ),
     );
 
     return ok({ results });
@@ -26,7 +26,9 @@ export const GET = withAuth(
 // Staff records score entries
 export const POST = withAuth(
   validate({ body: recordResultsSchema }, async (_req, auth: TenantAuthContext, _ctx: unknown, { body }) => {
-    const res = await auth.tenant.run((tx) => recordStudentResults(tx, auth.tenant.tenantId, auth.userId, body));
+    const res = await auth.tenant.run((tx) =>
+      recordStudentResults(tx, auth.tenant.tenantId, auth.userId, body, { role: auth.tenant.role, campusId: auth.tenant.campusId }),
+    );
 
     if (!res.ok) {
       return resultFailure(res.failure, res.message);

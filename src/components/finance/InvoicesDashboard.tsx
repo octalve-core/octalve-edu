@@ -148,10 +148,8 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-foreground">Invoicing & Collections</h2>
-          <p className="text-sm text-muted-foreground">
-            Track student fee balances, online Paystack payments, and automated reconciliations.
-          </p>
+          <h2 className="text-xl font-bold tracking-tight text-fg">Invoicing & Collections</h2>
+          <p className="text-sm text-fg-muted">Track student fee balances, online Paystack payments, and automated reconciliations.</p>
         </div>
 
         {canManageFinance && (
@@ -163,21 +161,21 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl border border-border bg-card shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Invoiced</p>
-          <p className="mt-1 text-xl sm:text-2xl font-bold text-foreground">{formatNaira(totalInvoiced)}</p>
+        <div className="p-4 rounded-xl border border-line bg-surface shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-fg-muted">Total Invoiced</p>
+          <p className="mt-1 text-xl sm:text-2xl font-bold text-fg">{formatNaira(totalInvoiced)}</p>
         </div>
-        <div className="p-4 rounded-xl border border-border bg-card shadow-sm">
+        <div className="p-4 rounded-xl border border-line bg-surface shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Total Collected</p>
           <p className="mt-1 text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400">{formatNaira(totalCollected)}</p>
         </div>
-        <div className="p-4 rounded-xl border border-border bg-card shadow-sm">
+        <div className="p-4 rounded-xl border border-line bg-surface shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400">Outstanding</p>
           <p className="mt-1 text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400">{formatNaira(totalOutstanding)}</p>
         </div>
-        <div className="p-4 rounded-xl border border-border bg-card shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-primary">Collection Rate</p>
-          <p className="mt-1 text-xl sm:text-2xl font-bold text-foreground">{collectionRate.toFixed(1)}%</p>
+        <div className="p-4 rounded-xl border border-line bg-surface shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand-fg">Collection Rate</p>
+          <p className="mt-1 text-xl sm:text-2xl font-bold text-fg">{collectionRate.toFixed(1)}%</p>
         </div>
       </div>
 
@@ -189,7 +187,7 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
               key={st}
               type="button"
               className={`min-h-11 px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors ${
-                selectedStatus === st ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                selectedStatus === st ? "bg-brand-strong text-white shadow-sm" : "bg-surface-2 text-fg-muted hover:bg-surface-2"
               }`}
               onClick={() => setSelectedStatus(st)}
             >
@@ -202,7 +200,7 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
           {periods.length > 1 && (
             <select
               aria-label="Filter by academic period"
-              className="min-h-11 rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="min-h-11 rounded-lg border border-line-strong bg-field px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
               value={selectedPeriod}
               onChange={(e) => setSelectedPeriod(e.target.value)}
             >
@@ -216,7 +214,7 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
           )}
           <input
             type="text"
-            className="min-h-11 rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary w-full md:w-64"
+            className="min-h-11 rounded-lg border border-line-strong bg-field px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring w-full md:w-64"
             placeholder="Search student or invoice..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -225,10 +223,10 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
       </div>
 
       {/* Invoices Roll */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+      <div className="rounded-xl border border-line bg-surface overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-muted/50 border-b border-border text-muted-foreground font-semibold">
+            <thead className="bg-surface-2 border-b border-line text-fg-muted font-semibold">
               <tr>
                 <th className="px-4 py-3">Invoice #</th>
                 <th className="px-4 py-3">Student Name</th>
@@ -239,25 +237,25 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-line">
               {filteredInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-4 py-8 text-center text-fg-muted">
                     No matching invoices found.
                   </td>
                 </tr>
               ) : (
                 filteredInvoices.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-4 font-mono font-medium text-foreground">{inv.invoiceNo}</td>
+                  <tr key={inv.id} className="hover:bg-surface-2 transition-colors">
+                    <td className="px-4 py-4 font-mono font-medium text-fg">{inv.invoiceNo}</td>
                     <td className="px-4 py-4">
-                      <p className="font-medium text-foreground">
+                      <p className="font-medium text-fg">
                         {inv.student.firstName} {inv.student.lastName}
                       </p>
-                      <p className="font-mono text-xs text-muted-foreground">{inv.student.admissionNo}</p>
+                      <p className="font-mono text-xs text-fg-muted">{inv.student.admissionNo}</p>
                     </td>
-                    <td className="px-4 py-4 text-muted-foreground">{inv.period.label}</td>
-                    <td className="px-4 py-4 text-right font-medium text-foreground">{formatNaira(inv.totalAmount)}</td>
+                    <td className="px-4 py-4 text-fg-muted">{inv.period.label}</td>
+                    <td className="px-4 py-4 text-right font-medium text-fg">{formatNaira(inv.totalAmount)}</td>
                     <td className="px-4 py-4 text-right text-emerald-600 dark:text-emerald-400 font-medium">
                       {formatNaira(inv.amountPaid)}
                     </td>
@@ -265,7 +263,7 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
                     <td className="px-4 py-4 text-right">
                       <Link
                         href={`/schools/${schoolCode}/finance/invoices/${inv.id}`}
-                        className="inline-flex items-center justify-center min-h-9 px-3 text-xs font-semibold rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                        className="inline-flex items-center justify-center min-h-9 px-3 text-xs font-semibold rounded-md bg-surface-2 text-fg hover:bg-line transition-colors"
                       >
                         View & Pay
                       </Link>
@@ -282,13 +280,13 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
       <Dialog open={isGenerateOpen} onClose={() => setIsGenerateOpen(false)} title="Batch Generate Term Invoices">
         <form onSubmit={handleGenerate} className="space-y-4 py-2">
           {generateMessage && (
-            <div className="p-3 text-sm rounded bg-primary/10 text-primary border border-primary/20">{generateMessage}</div>
+            <div className="p-3 text-sm rounded bg-brand-tint text-brand-fg border border-brand-fg">{generateMessage}</div>
           )}
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground">Academic Period</label>
+            <label className="text-sm font-medium text-fg">Academic Period</label>
             <select
-              className="w-full min-h-11 rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full min-h-11 rounded-lg border border-line-strong bg-field px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
               value={generatePeriodId}
               onChange={(e) => setGeneratePeriodId(e.target.value)}
               required
@@ -302,16 +300,16 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground">Due Date (Optional)</label>
+            <label className="text-sm font-medium text-fg">Due Date (Optional)</label>
             <input
               type="date"
-              className="w-full min-h-11 rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full min-h-11 rounded-lg border border-line-strong bg-field px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
               value={generateDueDate}
               onChange={(e) => setGenerateDueDate(e.target.value)}
             />
           </div>
 
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-fg-muted">
             This action creates invoices for all active students enrolled in this period. Existing invoices are safely skipped (idempotent
             operation).
           </p>

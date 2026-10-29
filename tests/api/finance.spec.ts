@@ -531,4 +531,16 @@ test.describe("Phase 1.5: Finance, Invoicing & Dual-Mode Paystack Integration", 
     expect(Number(invoice?.totalAmount)).toBe(45000);
     expect(invoice?.status).toBe("UNPAID");
   });
+
+  test("9. Payment status: a payment the gateway has not confirmed (still waiting, or unknown) is a 400 REFUSED with no detail, never a 5xx", async () => {
+    const waiting = await db.payment.findFirst({ where: { invoiceId: invoice1Id, status: "PENDING" } }); // the one test 4 started
+    expect(waiting).toBeTruthy();
+    for (const ref of [waiting?.providerRef ?? "", "oct_pay_0_unknown"]) {
+      const res = await api(`/api/v1/schools/${a.code}/finance/payments/${ref}/status`, as("parent1"));
+      expect(res.status, ref).toBe(400);
+      expect(res.json.error.code).toBe("REFUSED");
+      expect(res.json.error.message).toBe("The payment could not be confirmed.");
+    }
+    expect(await db.payment.findUnique({ where: { id: waiting?.id ?? "" } })).toMatchObject({ status: "PENDING" });
+  });
 });

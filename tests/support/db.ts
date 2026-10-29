@@ -118,6 +118,16 @@ export async function addMembership(userId: string, tenantId: string, role: Role
   return db.tenantMembership.create({ data: { userId, tenantId, role, campusId } });
 }
 
+/// Where `userId` approves results in `tenantId` (ADR 0018). Granting CAN_APPROVE_RESULTS through the members API gives a GENERAL scope; a test that writes the
+/// permission straight to the database says the scope itself with this, because no scope means nothing to approve.
+export async function grantApprovalScope(
+  userId: string,
+  tenantId: string,
+  scope: { kind: "GENERAL" } | { kind: "SECTION"; sectionId: string } | { kind: "CLASS"; classGroupId: string } = { kind: "GENERAL" },
+) {
+  return db.resultApprovalScope.create({ data: { userId, tenantId, ...scope } });
+}
+
 /// Deactivates `userId`'s membership of `tenantId` (what an administrator does on the Users page): the row stays, but it
 /// is no longer a membership. `reactivateMembership` is the reverse.
 export async function deactivateMembership(userId: string, tenantId: string) {

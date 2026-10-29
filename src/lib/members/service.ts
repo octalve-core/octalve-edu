@@ -248,6 +248,42 @@ export async function changeMember(
         },
       });
     }
+    // Where this person approves results (ADR 0018) follows the permission: granting CAN_APPROVE_RESULTS gives a GENERAL scope (the whole campus, as before) until an
+    // administrator narrows it; losing the permission, by choice or by a role that cannot hold it, removes every scope. Same transaction, audited.
+    const approvedBefore = before.includes("CAN_APPROVE_RESULTS");
+    const approvesNow = after.includes("CAN_APPROVE_RESULTS");
+    if (approvesNow && !approvedBefore) {
+      await tx.resultApprovalScope.createMany({
+        data: [{ tenantId, userId: targetUserId, kind: "GENERAL", createdById: actorUserId }],
+        skipDuplicates: true,
+      });
+      await tx.auditLog.create({
+        data: {
+          tenantId,
+          actorUserId,
+          action: "RESULT_APPROVAL_SCOPE_CHANGED",
+          targetType: "User",
+          targetId: targetUserId,
+          beforeValue: { scopes: [] },
+          afterValue: { scopes: [{ kind: "GENERAL" }], grantedWith: "CAN_APPROVE_RESULTS" },
+        },
+      });
+    } else if (!approvesNow && approvedBefore) {
+      const removed = await tx.resultApprovalScope.deleteMany({ where: { tenantId, userId: targetUserId } });
+      if (removed.count > 0) {
+        await tx.auditLog.create({
+          data: {
+            tenantId,
+            actorUserId,
+            action: "RESULT_APPROVAL_SCOPE_CHANGED",
+            targetType: "User",
+            targetId: targetUserId,
+            beforeValue: { scopeCount: removed.count },
+            afterValue: { scopes: [], removedWith: "CAN_APPROVE_RESULTS" },
+          },
+        });
+      }
+    }
     return { ok: true, member: toPublic(updated), changed: true };
   });
 }

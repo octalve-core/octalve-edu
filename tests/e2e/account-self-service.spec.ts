@@ -82,7 +82,7 @@ test.describe("edit your name", () => {
     await expect(page.getByText("Enter your name.")).toBeVisible();
     await expect(page.getByLabel("Name", { exact: true })).toHaveAttribute("aria-invalid", "true");
 
-    await page.getByLabel("Name", { exact: true }).fill("Amina‮Yusuf");
+    await page.getByLabel("Name", { exact: true }).fill("Amina\u202eYusuf");
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page.getByText("That name contains characters that can't be used.")).toBeVisible();
 

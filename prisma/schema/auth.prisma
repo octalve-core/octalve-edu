@@ -40,6 +40,17 @@ model User {
   mfaRecoveryCodes      MfaRecoveryCode[]
   mfaChallenges         MfaChallenge[]
   notificationDispatches NotificationDispatch[]
+  bankAudits             QuestionBankAudit[]    @relation("BankAudits")
+  formsCreated           Form[]                 @relation("FormsCreated")
+  formsClosed            Form[]                 @relation("FormsClosed")
+  questionReportsFiled   QuestionReport[]       @relation("QuestionReportsFiled")
+  questionReportsResolved QuestionReport[]      @relation("QuestionReportsResolved")
+  printLogs              QuestionBankPrintLog[] @relation("UserPrintLogs")
+  responsesMarked        FormResponse[]         @relation("ResponsesMarked")
+  answersMarked          FormAnswer[]           @relation("AnswersMarked")
+  markingAudits          FormMarkingAudit[]     @relation("MarkingAuditActor")
+  turnInsMarked          FormTurnIn[]           @relation("TurnInsMarked")
+  turnInAudits           FormTurnInAudit[]      @relation("TurnInAuditActor")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

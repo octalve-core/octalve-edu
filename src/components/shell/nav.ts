@@ -1,6 +1,15 @@
 import type { ComponentType, SVGProps } from "react";
 import type { Role } from "@prisma/client";
-import { BuildingIcon, CalendarIcon, GraduationCapIcon, HomeIcon, MailIcon, SlidersIcon, UsersIcon } from "@/components/ui/icons";
+import {
+  BuildingIcon,
+  CalendarIcon,
+  FileTextIcon,
+  GraduationCapIcon,
+  HomeIcon,
+  MailIcon,
+  SlidersIcon,
+  UsersIcon,
+} from "@/components/ui/icons";
 import { isValidTenantCode } from "@/lib/tenant/validate-code";
 
 /// A school the signed-in person belongs to, as the shell needs it. Display data only (see lib/auth/page-session.ts).
@@ -30,6 +39,7 @@ export function navFor(school: ShellSchool | null, platform = false): NavItem[] 
       { label: "People", href: `/schools/${school.code}/people`, icon: GraduationCapIcon },
       { label: "Communication", href: `/schools/${school.code}/communication`, icon: MailIcon },
       { label: "Users", href: `/schools/${school.code}/users`, icon: UsersIcon },
+      { label: "Question bank", href: `/schools/${school.code}/question-bank`, icon: FileTextIcon },
       { label: "Settings", href: `/schools/${school.code}/settings`, icon: SlidersIcon },
     );
   } else if (school.role === "CAMPUS_ADMIN") {
@@ -39,12 +49,15 @@ export function navFor(school: ShellSchool | null, platform = false): NavItem[] 
       { label: "People", href: `/schools/${school.code}/people`, icon: GraduationCapIcon },
       { label: "Communication", href: `/schools/${school.code}/communication`, icon: MailIcon },
       { label: "Users", href: `/schools/${school.code}/users`, icon: UsersIcon },
+      { label: "Question bank", href: `/schools/${school.code}/question-bank`, icon: FileTextIcon },
     );
   } else if (school.role === "TEACHING_STAFF" || school.role === "NON_TEACHING_STAFF") {
     // Staff may look at the school year and at the school's people (read-only; plan 1.2, decisions P2 and P9) — they change none of it.
     items.push(
       { label: "Academics", href: `/schools/${school.code}/academics`, icon: CalendarIcon },
       { label: "People", href: `/schools/${school.code}/people`, icon: GraduationCapIcon },
+      // Staff write and browse questions here; whether they may review is decided on the page.
+      { label: "Question bank", href: `/schools/${school.code}/question-bank`, icon: FileTextIcon },
     );
   }
   return [...items, ...platformItem];
@@ -73,6 +86,7 @@ const SCHOOL_PAGES: Record<string, string> = {
   academics: "Academics",
   people: "People",
   communication: "Communication",
+  "question-bank": "Question bank",
   settings: "Settings",
   support: "Support access",
 };

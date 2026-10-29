@@ -1,11 +1,15 @@
-import type { NextRequest } from "next/server";
+import type { NextRequest, NextResponse } from "next/server";
 import { z, type ZodType } from "zod";
 import { fail, type ErrorDetail } from "@/lib/api/envelope";
+import { readBoundedText } from "@/lib/api/read-body";
+import { holdsNul, NUL_MESSAGE } from "@/lib/api/no-nul";
 
 // Input validation for route handlers (domain-implementation-plan.md §0.5.3, A). A route declares the zod schema for
 // its body and/or query string; this wrapper does the rest, the same way every time:
 //   - body that is not JSON                      → 400 INVALID_BODY
-//   - body bigger than MAX_BODY_BYTES (declared or actual) → 413 PAYLOAD_TOO_LARGE
+//   - a NUL character in a key or a value of the body → 400 VALIDATION (lib/api/no-nul.ts), before the schema. (The path and the query string are checked by withAuth.)
+//   - body bigger than MAX_BODY_BYTES (declared or actual) → 413 PAYLOAD_TOO_LARGE; a body with no declared length is read
+//     no further than the cap (lib/api/read-body.ts), so the answer does not wait for the end of it
 //   - a schema failure                           → 400 VALIDATION, with `details` naming each field (max 20)
 //   - keys the schema does not name              → STRIPPED, never passed on (no mass assignment)
 // The same schema objects are what the generated API docs (zod-openapi) will describe, so validation and
@@ -13,6 +17,31 @@ import { fail, type ErrorDetail } from "@/lib/api/envelope";
 
 export const MAX_BODY_BYTES = 1024 * 1024; // 1 MiB — the default; the student import alone asks for more (below)
 const MAX_DETAILS = 20;
+
+/// The JSON body of a request, for a route that reads its own instead of declaring a schema (sign-in, passwords, two-step verification, invitations, setup, profile):
+/// read no further than `cap`, parsed, and refused the way validate() refuses - 413 PAYLOAD_TOO_LARGE, 400 INVALID_BODY (empty or not JSON), 400 VALIDATION for a NUL
+/// character in a key or a value. The route then checks the shape itself. This is the ONE place a body is read and parsed: parseRequest() below calls it too, and
+/// `tests/unit/route-body-guard.spec.ts` fails on a route that reads its request body any other way.
+export async function readJsonBody(
+  req: Request,
+  cap: number = MAX_BODY_BYTES,
+): Promise<{ ok: true; json: unknown } | { ok: false; response: NextResponse }> {
+  const text = await readBoundedText(req, cap);
+  if (text === null) return { ok: false, response: fail("That request is too large.", 413, "PAYLOAD_TOO_LARGE") };
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return { ok: false, response: fail("Invalid JSON body", 400, "INVALID_BODY") };
+  }
+  if (holdsNul(json)) {
+    return {
+      ok: false,
+      response: fail("Some of the fields are not valid.", 400, "VALIDATION", [{ path: "body", message: NUL_MESSAGE }]),
+    };
+  }
+  return { ok: true, json };
+}
 
 /// `maxBodyBytes` raises the cap for ONE route that has a stated reason (a CSV file of up to 1 MiB grows when it is JSON-escaped: every line break is two characters).
 /// Never lowered below the default, and never global.
@@ -50,19 +79,9 @@ export async function parseRequest<B = undefined, Q = undefined>(
 
   let body = undefined as B;
   if (schemas.body) {
-    const cap = Math.max(MAX_BODY_BYTES, schemas.maxBodyBytes ?? 0);
-    const declared = Number(req.headers.get("content-length"));
-    if (Number.isFinite(declared) && declared > cap)
-      return { ok: false, response: fail("That request is too large.", 413, "PAYLOAD_TOO_LARGE") };
-    const text = await req.text();
-    if (Buffer.byteLength(text) > cap) return { ok: false, response: fail("That request is too large.", 413, "PAYLOAD_TOO_LARGE") };
-    let json: unknown;
-    try {
-      json = JSON.parse(text);
-    } catch {
-      return { ok: false, response: fail("Invalid JSON body", 400, "INVALID_BODY") };
-    }
-    const result = schemas.body.safeParse(json);
+    const read = await readJsonBody(req, Math.max(MAX_BODY_BYTES, schemas.maxBodyBytes ?? 0));
+    if (!read.ok) return read;
+    const result = schemas.body.safeParse(read.json);
     if (!result.success)
       return { ok: false, response: fail("Some of the fields are not valid.", 400, "VALIDATION", issuesOf(result.error, "body")) };
     body = result.data;

@@ -1,0 +1,410 @@
+// --- Question bank (task 0024; design notes docs/development-history/forms-and-question-bank-parity.md here and AlEemaan's design note) ---
+//
+// Only the tables the foundation and the bank core need. Forms, practice and reports arrive with their own slices so each migration stays reviewable. Every table carries
+// `tenantId`, children point at their parent by (tenantId, id), and the migration enables and forces row-level security in the same file as each CREATE TABLE.
+//
+// "General" means every campus of ONE school: `campusId` null, and the composite foreign key to Campus is simply not enforced for a null (a row of no campus). It never
+// crosses a school (decision D1).
+
+/// Which of the two banks an item lives in.
+enum BankKind {
+  ASSESSMENT
+  QUESTIONNAIRE
+}
+
+/// Named BankQuestionType because the quiz already owns `QuestionType`.
+enum BankQuestionType {
+  SINGLE
+  MULTI
+  TRUE_FALSE
+  SHORT
+  RATING
+  TEXT
+}
+
+/// Decided once, at approval, by someone senior ("a question may appear later, never disappear"). The default is the safest one: a row that nobody classified is never
+/// shown to a pupil.
+enum BankVisibility {
+  PRACTICE
+  TEACHERS_ONLY
+  TEACHERS_ONLY_UNTIL
+}
+
+enum BankItemStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  RETIRED
+}
+
+enum BankReviewOutcome {
+  APPROVED
+  EDITED
+  REJECTED
+  RETIRED
+}
+
+enum BankReviewerScope {
+  GENERAL
+  SUBJECT
+}
+
+/// A reusable question. `campusId` null = general (every campus of the school), set = that campus only. Class and subject tags are TEXT (a label as typed plus a key from
+/// `normalizeLabel`), never foreign keys: ClassGroup and Subject rows belong to one campus, a general item to all of them.
+model QuestionBankItem {
+  id            String           @id @default(cuid())
+  tenantId      String
+  campusId      String?
+  bank          BankKind         @default(ASSESSMENT)
+  type          BankQuestionType
+  prompt        String
+  explanation   String?
+  points        Int              @default(1)
+  difficulty    Int?
+  topic         String?
+  options       Json             @default("[]")
+  /// A string, or an array of strings for MULTI; null for questionnaire items. Never sent to a pupil before the question is answered.
+  correctAnswer Json?
+  subjectLabel  String?
+  subjectKey    String?
+  visibility    BankVisibility   @default(TEACHERS_ONLY)
+  /// For TEACHERS_ONLY_UNTIL: the date from which pupils may see it (the "until an assessment closes" form arrives with slice 3).
+  visibleFrom        DateTime?
+  visibleAfterQuizId String?
+  status             BankItemStatus   @default(DRAFT)
+  /// A fix creates a new version; old versions are kept.
+  version            Int              @default(1)
+  submittedById      String
+  approvedById       String?
+  approvedAt         DateTime?
+  retiredReason      String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @default(now()) @updatedAt
+
+  tenant           Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus           Campus?                   @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  submittedBy      TenantMembership          @relation("BankItemSubmitter", fields: [submittedById, tenantId], references: [userId, tenantId], onDelete: NoAction)
+  approvedBy       TenantMembership?         @relation("BankItemApprover", fields: [approvedById, tenantId], references: [userId, tenantId], onDelete: NoAction)
+  visibleAfterQuiz Quiz?                     @relation(fields: [tenantId, visibleAfterQuizId], references: [tenantId, id], onDelete: SetNull)
+  images           QuestionBankImage[]
+  classTags        QuestionBankClassTag[]
+  reviews          QuestionBankReview[]
+  versions         QuestionBankItemVersion[]
+  flags            QuestionOverlapFlag[]     @relation("FlagItem")
+  similarTo        QuestionOverlapFlag[]     @relation("FlagSimilarTo")
+  copiedQuestions  QuizQuestion[]
+  practiceAttempts PracticeAttempt[]
+  reports          QuestionReport[]
+  formQuestions    FormQuestion[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, campusId, status])
+  @@index([tenantId, status, visibility])
+  @@index([tenantId, bank, subjectKey])
+  @@index([tenantId, visibleAfterQuizId])
+}
+
+/// At most 4 per item (a trigger; the school's setting, 3 or 4, is enforced by the service). Alt text is required unless the image is marked decorative (a check).
+model QuestionBankImage {
+  id          String   @id @default(cuid())
+  tenantId    String
+  itemId      String
+  /// Unique: two rows can never point at one stored file.
+  storageKey  String   @unique
+  /// Which backend holds the file (`s3`, `r2`, `cloudinary` or `memory`; a check, kept equal to `STORE_NAMES` by a test). A row says where its own file is, so changing the
+  /// configured store later does not orphan the images already saved.
+  store       String
+  /// What OUR record says the file is (`image/jpeg`, `image/png` or `image/webp`; a check). It is the type the image is served as: the store is never asked.
+  contentType String
+  alt         String   @default("")
+  decorative  Boolean  @default(false)
+  bytes       Int
+  width       Int
+  height      Int
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  item   QuestionBankItem @relation(fields: [tenantId, itemId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([itemId, sortOrder])
+  @@index([tenantId, itemId])
+}
+
+/// What the question looked like at one version ("a fix creates a new version, old versions are kept"). Written in the same transaction as the change; never updated or
+/// deleted (a trigger), like the review and audit rows. The snapshot holds the whole question including its answer key, so it is read by staff only.
+model QuestionBankItemVersion {
+  id          String   @id @default(cuid())
+  tenantId    String
+  itemId      String
+  version     Int
+  snapshot    Json
+  actorUserId String
+  createdAt   DateTime @default(now())
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  item   QuestionBankItem @relation(fields: [tenantId, itemId], references: [tenantId, id], onDelete: NoAction)
+  actor  TenantMembership @relation("BankVersionsWritten", fields: [actorUserId, tenantId], references: [userId, tenantId], onDelete: NoAction)
+
+  @@unique([itemId, version])
+  @@index([tenantId, itemId])
+}
+
+/// A class tag: the label as typed and its key. A campus's class matches when `normalizeLabel(ClassGroup.name)` equals `labelKey`.
+model QuestionBankClassTag {
+  id       String @id @default(cuid())
+  tenantId String
+  itemId   String
+  label    String
+  labelKey String
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  item   QuestionBankItem @relation(fields: [tenantId, itemId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([itemId, labelKey])
+  @@index([tenantId, labelKey])
+}
+
+/// Every decision on an item, immutable: UPDATE and DELETE are refused by a trigger.
+model QuestionBankReview {
+  id         String            @id @default(cuid())
+  tenantId   String
+  itemId     String
+  version    Int
+  reviewerId String
+  outcome    BankReviewOutcome
+  reason     String?
+  createdAt  DateTime          @default(now())
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  item     QuestionBankItem @relation(fields: [tenantId, itemId], references: [tenantId, id], onDelete: NoAction)
+  reviewer TenantMembership @relation("BankReviewsGiven", fields: [reviewerId, tenantId], references: [userId, tenantId], onDelete: NoAction)
+
+  @@index([tenantId, itemId, createdAt])
+}
+
+/// Who may review. `campusId` null = a reviewer for every campus (assigned by the school's administrator); set = that campus's reviewer (assigned by its campus
+/// administrator). GENERAL covers all subjects; SUBJECT names one (label as typed plus key). `isExamApprover` marks someone who sees overlap warnings and sets visibility.
+/// One row per person, campus, scope and subject (a unique index in the migration, because the columns are nullable). A reviewer is a membership with a scope, not a new
+/// `Permission` value: ADMIN implying every permission (ADR 0006) does not apply to reviewing.
+model QuestionBankReviewer {
+  id             String            @id @default(cuid())
+  tenantId       String
+  userId         String
+  campusId       String?
+  scope          BankReviewerScope
+  subjectLabel   String?
+  subjectKey     String?
+  isExamApprover Boolean           @default(false)
+  assignedById   String
+  createdAt      DateTime          @default(now())
+
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus     Campus?          @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: Cascade)
+  member     TenantMembership @relation("BankReviewerMember", fields: [userId, tenantId], references: [userId, tenantId], onDelete: Cascade)
+  assignedBy TenantMembership @relation("BankReviewerAssigner", fields: [assignedById, tenantId], references: [userId, tenantId], onDelete: NoAction)
+
+  @@index([tenantId, userId])
+  @@index([tenantId, campusId, scope])
+}
+
+/// A silent similarity hit, visible to exam approvers only. `similarToAssessmentQuestionId` has no foreign key yet: the assessment questions it points at arrive with
+/// slice 3. Items are archived, never deleted, so the second reference needs no "set null".
+model QuestionOverlapFlag {
+  id                            String   @id @default(cuid())
+  tenantId                      String
+  itemId                        String
+  similarToItemId               String?
+  similarToAssessmentQuestionId String?
+  score                         Float
+  createdAt                     DateTime @default(now())
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  item      QuestionBankItem  @relation("FlagItem", fields: [tenantId, itemId], references: [tenantId, id], onDelete: Cascade)
+  similarTo QuestionBankItem? @relation("FlagSimilarTo", fields: [tenantId, similarToItemId], references: [tenantId, id], onDelete: NoAction)
+
+  @@index([tenantId, itemId])
+}
+
+/// Append-only trail of every approval, rejection, retirement, visibility change, reviewer assignment and switch change: who, what, when, old and new value. UPDATE and
+/// DELETE are refused by a trigger. `campusId` null = a school-wide change. `itemId` carries no foreign key on purpose (like ResultAudit): the trail outlives the row.
+model QuestionBankAudit {
+  id               String    @id @default(cuid())
+  tenantId         String
+  campusId         String?
+  itemId           String?
+  actorUserId      String?
+  /// What kind of thing changed: "ITEM", "REVIEWER" or "SETTING".
+  entity           String
+  action           String
+  /// The setting key, or the reviewer row's id, when the entity is not an item.
+  ref              String?
+  oldValue         Json?
+  newValue         Json?
+  reason           String?
+  /// For a settings change: when the person last proved who they are (the fresh re-authentication every such change needs, D3).
+  stepUpVerifiedAt DateTime?
+  createdAt        DateTime  @default(now())
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus Campus? @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  actor  User?   @relation("BankAudits", fields: [actorUserId], references: [id], onDelete: NoAction)
+
+  @@index([tenantId, campusId, createdAt])
+  @@index([tenantId, itemId])
+  @@index([tenantId, createdAt])
+}
+
+/// One value of one of the bank's switches (the 15 keys of `bank.*`, and `bank.parents.view`): the school's value (`campusId` null) or a campus's narrowing of it. The value
+/// is JSON validated by the same pure resolver as AlEemaan; a campus may only narrow. One row per school, campus and key (a unique index in the migration, because
+/// `campusId` is nullable). Not the typed `SchoolSettings` row: the switches have a school value AND a per-campus one.
+model QuestionBankSetting {
+  id          String   @id @default(cuid())
+  tenantId    String
+  campusId    String?
+  key         String
+  value       Json
+  updatedById String
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus    Campus?          @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: Cascade)
+  updatedBy TenantMembership @relation("BankSettingUpdater", fields: [updatedById, tenantId], references: [userId, tenantId], onDelete: NoAction)
+
+  @@index([tenantId, campusId])
+}
+
+enum PracticeFeedbackMode {
+  EACH
+  END
+}
+
+model PracticeSession {
+  id           String               @id @default(cuid())
+  tenantId     String
+  campusId     String?
+  studentId    String
+  classGroupId String?
+  subjectLabel String
+  subjectKey   String
+  topic        String?
+  size         Int
+  feedbackMode PracticeFeedbackMode @default(EACH)
+  itemIds      Json                 @default("[]")
+  startedAt    DateTime             @default(now())
+  finishedAt   DateTime?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @default(now()) @updatedAt
+
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus     Campus?           @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  student    StudentRecord     @relation(fields: [tenantId, studentId], references: [tenantId, id], onDelete: Cascade)
+  classGroup ClassGroup?       @relation(fields: [tenantId, classGroupId], references: [tenantId, id], onDelete: SetNull)
+  attempts   PracticeAttempt[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, studentId, startedAt])
+  @@index([tenantId, subjectKey])
+}
+
+model PracticeAttempt {
+  id         String    @id @default(cuid())
+  tenantId   String
+  sessionId  String
+  studentId  String
+  bankItemId String
+  version    Int
+  answer     Json
+  correct    Boolean
+  answeredAt DateTime  @default(now())
+  archivedAt DateTime?
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  session  PracticeSession  @relation(fields: [tenantId, sessionId], references: [tenantId, id], onDelete: Cascade)
+  student  StudentRecord    @relation(fields: [tenantId, studentId], references: [tenantId, id], onDelete: Cascade)
+  bankItem QuestionBankItem @relation(fields: [tenantId, bankItemId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, studentId, answeredAt])
+  @@index([tenantId, sessionId])
+  @@index([tenantId, bankItemId])
+}
+
+enum QuestionReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+enum QuestionReportOutcome {
+  FIXED
+  NOT_AN_ERROR
+  NEEDS_DISCUSSION
+}
+
+model QuestionReport {
+  id                String                 @id @default(cuid())
+  tenantId          String
+  campusId          String?
+  bankItemId        String
+  reporterUserId    String
+  reporterRole      String
+  reporterStudentId String?
+  reason            String
+  status            QuestionReportStatus   @default(OPEN)
+  resolvedById      String?
+  resolvedAt        DateTime?
+  outcome           QuestionReportOutcome?
+  explanation       String?
+  regradeImpact     Json?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @default(now()) @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus          Campus?          @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  bankItem        QuestionBankItem @relation(fields: [tenantId, bankItemId], references: [tenantId, id], onDelete: Cascade)
+  reporter        User             @relation("QuestionReportsFiled", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  reporterStudent StudentRecord?   @relation(fields: [tenantId, reporterStudentId], references: [tenantId, id], onDelete: SetNull)
+  resolvedBy      User?            @relation("QuestionReportsResolved", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, bankItemId, status])
+  @@index([tenantId, reporterUserId])
+}
+
+enum PrintTargetKind {
+  QUESTION_BANK_ITEM
+  FORM
+  QUIZ
+  PRACTICE_SESSION
+  FORM_RESPONSE
+}
+
+model QuestionBankPrintLog {
+  id                 String          @id @default(cuid())
+  tenantId           String
+  campusId           String?
+  targetKind         PrintTargetKind
+  targetId           String
+  title              String
+  watermark          String
+  pageCount          Int             @default(1)
+  reason             String?
+  recipientStudentId String?
+  printedById        String
+  ipAddress          String?
+  userAgent          String?
+  printedAt          DateTime        @default(now())
+
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus           Campus?        @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  printedBy        User           @relation("UserPrintLogs", fields: [printedById], references: [id], onDelete: Restrict)
+  recipientStudent StudentRecord? @relation("PrintLogRecipient", fields: [tenantId, recipientStudentId], references: [tenantId, id], onDelete: SetNull)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, targetKind, targetId])
+  @@index([tenantId, printedById])
+  @@index([tenantId, printedAt])
+}
+

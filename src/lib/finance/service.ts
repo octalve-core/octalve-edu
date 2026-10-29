@@ -120,6 +120,20 @@ export async function queryFeeStructures(tenantId: VerifiedTenantId, filter?: { 
   });
 }
 
+const INVOICE_NUMBER_SKIP_LIMIT = 50;
+
+/// The next free invoice number for a school: one past the number of invoices it holds, and on past any number already used (an invoice that was removed, or a number typed
+/// by hand), at most INVOICE_NUMBER_SKIP_LIMIT times, then the bill run is refused and rolled back. The caller holds the school's invoice-number lock.
+async function allocateInvoiceNo(tx: Tx, tenantId: string, schoolCode: string, year: number): Promise<string> {
+  const held = await tx.invoice.count({ where: { tenantId } });
+  for (let seq = held + 1; seq <= held + 1 + INVOICE_NUMBER_SKIP_LIMIT; seq++) {
+    const candidate = generateInvoiceNumber(schoolCode, year, seq);
+    const used = await tx.invoice.findUnique({ where: { tenantId_invoiceNo: { tenantId, invoiceNo: candidate } }, select: { id: true } });
+    if (!used) return candidate;
+  }
+  throw new FinanceRefusal("Could not allocate an invoice number. Please try again.");
+}
+
 /**
  * Idempotently generates term invoices for all enrolled students in a period.
  * (Roadmap §1.5 T2: idempotent per student+period).
@@ -131,6 +145,10 @@ export async function generateInvoicesForPeriod(
   options?: { dueDate?: Date | null; actorUserId?: string },
 ): Promise<{ created: number; skipped: number }> {
   return forTenant(tenantId).transaction(async (tx) => {
+    // One bill run per school at a time (the lock is released when this transaction ends). The numbers are taken from what the school already holds, so two runs at the same
+    // moment would take the same one, and one of them would fail on the unique index; and a second run for the same term must find the first one's invoices, not race them.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`invoice-number:${tenantId}`}::text))`;
+
     const period = await tx.academicPeriod.findFirstOrThrow({
       where: { tenantId, id: periodId },
     });
@@ -195,8 +213,7 @@ export async function generateInvoicesForPeriod(
         };
       });
 
-      const count = await tx.invoice.count({ where: { tenantId } });
-      const invoiceNo = generateInvoiceNumber(schoolCode, year, count + 1);
+      const invoiceNo = await allocateInvoiceNo(tx, tenantId, schoolCode, year);
 
       const createdInvoice = await tx.invoice.create({
         data: {
@@ -551,10 +568,34 @@ export class FulfilmentRefusal extends Error {
   }
 }
 
+/// What the payment status route calls: the state of payment `reference` for a member who may see its invoice (finance staff all of the school's, a pupil or a guardian
+/// their own; `invoiceVisibility`). A reference that is unknown, belongs to another school, or to an invoice this member may not see is the one refusal of an unconfirmed
+/// payment, and the gateway is not asked. A payment already fulfilled is reported without asking the gateway again.
+export async function confirmPaymentForRequester(tenantId: VerifiedTenantId, reference: string, requester: RequesterContext) {
+  const payment = await forTenant(tenantId).transaction((tx) =>
+    tx.payment.findFirst({
+      where: { tenantId, provider: PaymentProvider.PAYSTACK, providerRef: reference, invoice: { AND: [invoiceVisibility(requester)] } },
+      select: { id: true, invoiceId: true, status: true },
+    }),
+  );
+  if (!payment) throw new FulfilmentRefusal(`Payment with reference "${reference}" not found for this member`);
+  if (payment.status === PaymentStatus.SUCCESS)
+    return { success: true, alreadyFulfilled: true, paymentId: payment.id, invoiceId: payment.invoiceId };
+  return fulfillPayment(reference, { tenantIdOverride: tenantId });
+}
+
 export async function fulfillPayment(
   reference: string,
   options?: { expectedAmountKobo?: number; tenantIdOverride?: string },
 ): Promise<{ success: boolean; alreadyFulfilled: boolean; paymentId: string; invoiceId: string }> {
+  // With a school given, the payment must be one of ITS own before the gateway is asked (a reference of another school, or none, costs no gateway call).
+  if (options?.tenantIdOverride) {
+    const schoolId = trustedTenantId(options.tenantIdOverride);
+    const mine = await forTenant(schoolId).transaction((tx) =>
+      tx.payment.count({ where: { tenantId: schoolId, provider: PaymentProvider.PAYSTACK, providerRef: reference } }),
+    );
+    if (mine === 0) throw new FulfilmentRefusal(`Payment with reference "${reference}" not found`);
+  }
   const gateway = getPaystackClient();
   const verified = await gateway.verifyTransaction(reference);
 

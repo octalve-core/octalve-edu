@@ -145,8 +145,8 @@ test.describe("POST /campuses", () => {
       [{ name: "" }, /Enter the campus name/],
       [{ name: "   " }, /Enter the campus name/],
       [{ name: "x".repeat(101) }, /at most 100/],
-      [{ name: "Bad\u0000Name" }, /can't be used/],
-      [{ name: "Bidi‮Name" }, /can't be used/],
+      [{ name: "Bad\u0000Name" }, /cannot be stored/], // a NUL is refused before the schema is asked (lib/api/no-nul.ts)
+      [{ name: "Bidi\u202eName" }, /can't be used/],
       [{}, /Enter the campus name/],
       [{ name: 42 }, /Enter the campus name|expected string/i],
       [{ name: null }, /Enter the campus name|expected string/i],

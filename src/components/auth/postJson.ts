@@ -40,6 +40,11 @@ export function sendJson(path: string, method: "POST" | "PUT" | "PATCH" | "DELET
   });
 }
 
+/// POST a multipart form (a picture and its description). The browser sets the Content-Type with its boundary; nothing else about the reply differs.
+export function sendForm(path: string, form: FormData): Promise<Reply> {
+  return request(path, { method: "POST", body: form });
+}
+
 export function getJson(path: string, signal?: AbortSignal): Promise<Reply> {
   return request(path, { method: "GET", signal });
 }

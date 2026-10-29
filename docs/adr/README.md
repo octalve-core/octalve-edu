@@ -49,3 +49,4 @@ Plans and phase records link to the ADR instead of re-arguing the reason.
 | [0015](0015-dev-is-development-master-is-staging-prod-is-production.md) | `dev` is development, `master` is staging, `prod` is production | accepted |
 | [0016](0016-campus-administrators-and-the-platform-administrator.md) | Campus administrators run one campus; a platform administrator runs schools, not their data | accepted |
 | [0017](0017-support-access-is-granted-by-the-school-read-only-and-audited.md) | A platform administrator sees a school's data only when the school grants it: read-only, time-limited, scoped and audited | accepted |
+| [0018](0018-results-are-approved-by-assignment-generally-per-section-or-per-class.md) | Results are approved by assignment: generally, per section or per class | accepted |

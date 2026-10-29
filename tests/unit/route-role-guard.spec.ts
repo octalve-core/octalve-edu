@@ -35,7 +35,9 @@ allow(
   "GET v1/setup/route.ts",
   "POST v1/setup/route.ts",
   "GET v1/verify/[token]/route.ts",
-  "GET v1/verify-certificate/[certificateNo]/route.ts",
+  "GET v1/verify-certificate/[token]/route.ts",
+  "GET v1/schools/[code]/forms/public/[token]/route.ts",
+  "POST v1/schools/[code]/forms/public/[token]/submit/route.ts",
 );
 allow(
   "a payment provider calls it: the SIGNATURE of the body is the credential (lib/finance/crypto.ts)",
@@ -87,6 +89,7 @@ const CAMPUS_HELPERS = [
   "timetableSlotScope",
   "armsScope",
   "invoiceScope",
+  "certificateScope",
 ];
 /// Does the handler let a campus administrator WRITE? It uses the constant that promises a campus check, or lists the role itself.
 const LETS_CAMPUS_ADMIN_ACT = /CAMPUS_WRITE_ROLES|\bCAMPUS_ADMIN\b|Role\.CAMPUS_ADMIN/;
@@ -149,13 +152,11 @@ elsewhere(
   "PATCH v1/schools/[code]/lms/assignments/[id]/route.ts",
   "DELETE v1/schools/[code]/lms/assignments/[id]/route.ts",
   "PATCH v1/schools/[code]/lms/assignments/[id]/submissions/[submissionId]/grade/route.ts",
-  "POST v1/schools/[code]/lms/assignments/[id]/submissions/route.ts",
   "GET v1/schools/[code]/lms/assignments/route.ts",
   "POST v1/schools/[code]/lms/assignments/route.ts",
   "DELETE v1/schools/[code]/lms/materials/[id]/route.ts",
   "GET v1/schools/[code]/lms/materials/route.ts",
   "POST v1/schools/[code]/lms/materials/route.ts",
-  "POST v1/schools/[code]/lms/quizzes/[id]/attempt/route.ts",
   "GET v1/schools/[code]/lms/quizzes/[id]/route.ts",
   "GET v1/schools/[code]/lms/quizzes/route.ts",
   "POST v1/schools/[code]/lms/quizzes/route.ts",
@@ -172,10 +173,8 @@ elsewhere(
   "GET v1/schools/[code]/higher-ed/transcript/[studentId]/route.ts",
 );
 elsewhere(
-  "lib/certificates/service.ts: vocational certificates are scoped to tenant and validated by student record",
+  "lib/certificates/service.ts listCertificates: a student reads their own certificates, anyone else anchored to a campus reads that campus's students' and the school-wide ones' (issuing and revoking call studentScope and certificateScope in the routes)",
   "GET v1/schools/[code]/certificates/route.ts",
-  "POST v1/schools/[code]/certificates/route.ts",
-  "POST v1/schools/[code]/certificates/[id]/revoke/route.ts",
 );
 
 function routeFiles(dir: string): string[] {

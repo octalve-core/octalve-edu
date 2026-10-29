@@ -12,6 +12,34 @@ enum ResultStatus {
   LOCKED
 }
 
+/// What an approver's scope covers (ADR 0018): GENERAL = every class of their campus (the whole school when the membership has no campus), SECTION = every class
+/// group in one section, CLASS = one class group (all its arms).
+enum ApprovalScopeKind {
+  GENERAL
+  SECTION
+  CLASS
+}
+
+/// Where one person approves results (ADR 0018). Only a holder of CAN_APPROVE_RESULTS has rows; no rows means nothing to approve. Rows are added and removed, never
+/// edited. The migration adds what the schema cannot say: the kind/target CHECK and the unique index on (person, kind, target).
+model ResultApprovalScope {
+  id           String            @id @default(cuid())
+  tenantId     String
+  userId       String
+  kind         ApprovalScopeKind
+  sectionId    String?
+  classGroupId String?
+  createdById  String?
+  createdAt    DateTime          @default(now())
+
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  membership TenantMembership @relation(fields: [userId, tenantId], references: [userId, tenantId], onDelete: Cascade)
+  section    Section?         @relation(fields: [tenantId, sectionId], references: [tenantId, id], onDelete: NoAction)
+  classGroup ClassGroup?      @relation(fields: [tenantId, classGroupId], references: [tenantId, id], onDelete: NoAction)
+
+  @@index([tenantId, userId])
+}
+
 /// A term/period subject result for a student.
 model Result {
   id                String       @id @default(cuid())

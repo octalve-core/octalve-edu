@@ -17,7 +17,8 @@ const querySchema = z.object({
 // GET /api/v1/schools/[code]/lms/assignments
 export const GET = withAuth(
   validate({ query: querySchema }, async (_req, auth: TenantAuthContext, _ctx: unknown, { query }) => {
-    const assignments = await listAssignments(auth.tenant.tenantId, query);
+    // what the caller may see depends on their role: drafts and other students' submissions are for staff (the service decides)
+    const assignments = await listAssignments(auth.tenant.tenantId, { userId: auth.userId, role: auth.tenant.role }, query);
     return ok(assignments);
   }),
   {

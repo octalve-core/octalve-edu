@@ -178,9 +178,27 @@ export async function markArmAttendance(
     return { ok: false, failure: "NOT_FOUND" };
   }
 
+  // 3. Every student must be on THIS arm's roll (the one getArmRollCall shows): an ACTIVE enrolment in the active session, not archived, each once. Decided
+  // before the first write, so a refused request changes nothing.
+  const activeSession = await tx.academicSession.findFirst({
+    where: { tenantId, status: SessionStatus.ACTIVE, archivedAt: null },
+    select: { id: true },
+  });
+  if (!activeSession) {
+    return { ok: false, failure: "SESSION_NOT_ACTIVE" };
+  }
+  const ids = input.records.map((record) => record.studentId);
+  const onRoll = await tx.studentEnrollment.findMany({
+    where: { tenantId, classArmId, sessionId: activeSession.id, status: "ACTIVE", studentId: { in: ids }, student: { archivedAt: null } },
+    select: { studentId: true },
+  });
+  if (new Set(ids).size !== ids.length || new Set(onRoll.map((row) => row.studentId)).size !== ids.length) {
+    return { ok: false, failure: "INVALID_STUDENTS" };
+  }
+
   const date = new Date(input.date);
 
-  // 3. Upsert each attendance record
+  // 4. Upsert each attendance record
   for (const record of input.records) {
     await tx.attendanceRecord.upsert({
       where: {
@@ -210,7 +228,7 @@ export async function markArmAttendance(
     });
   }
 
-  // 4. Audit Log
+  // 5. Audit Log
   await tx.auditLog.create({
     data: {
       tenantId,
@@ -226,7 +244,7 @@ export async function markArmAttendance(
     },
   });
 
-  // 5. Automated communication trigger for student absences
+  // 6. Automated communication trigger for student absences
   const absentStudentIds = input.records.filter((r) => r.status === AttendanceStatus.ABSENT).map((r) => r.studentId);
 
   if (absentStudentIds.length > 0) {
