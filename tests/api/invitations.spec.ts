@@ -384,7 +384,7 @@ test.describe("POST /invitations/accept — a person with no account", () => {
     expect(weak.json.error.details[0].path).toBe("body.password");
     const noPassword = await accept({ token, name: "Fix Me" });
     expect(noPassword.json.error.details).toEqual([{ path: "body.password", message: "Choose a password." }]);
-    const badName = await accept({ token, name: "Evil‮name", password: FRESH });
+    const badName = await accept({ token, name: "Evil\u202ename", password: FRESH });
     expect(badName.json.error.details).toEqual([{ path: "body.name", message: expect.any(String) }]);
     const noName = await accept({ token, password: FRESH });
     expect(noName.json.error.details[0].path).toBe("body.name");

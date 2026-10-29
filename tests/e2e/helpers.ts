@@ -31,7 +31,7 @@ export async function signInThroughUi(page: Page, user: { email: string; passwor
   await fillCredentials(page, user.email, user.password);
   if (opts.remember) await keepSignedInBox(page).check();
   await signInButton(page).click();
-  await expect(page).toHaveURL(HOME_URL);
+  await expect(page).toHaveURL(HOME_URL, { timeout: 15_000 }); // a bcrypt compare and two server renders: past the default 5 s on a cold server of a busy machine
 }
 
 /// Resolves once React has hydrated the page: a button that is clickable but not yet hydrated swallows the click (the More sheet "never opens",

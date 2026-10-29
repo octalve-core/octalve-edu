@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { fail } from "@/lib/api/envelope";
-import { FinanceConflict, FinanceNotFound, FinanceRefusal } from "./service";
+import { FinanceConflict, FinanceNotFound, FinanceRefusal, FulfilmentRefusal } from "./service";
 import { DiscountWorkflowMode } from "@prisma/client";
 
 export const createFeeStructureSchema = z.object({
@@ -52,6 +52,8 @@ export const applyDiscountSchema = z.object({
 export function financeFailure(err: unknown, context: string): Response {
   if (err instanceof FinanceConflict) return fail(err.message, 409, "CONFLICT");
   if (err instanceof FinanceRefusal) return fail(err.message, 400, "REFUSED");
+  // a payment the gateway does not confirm (unknown reference, still pending, not successful, amount differs): the message is written for the webhook's log, so it is not shown
+  if (err instanceof FulfilmentRefusal) return fail("The payment could not be confirmed.", 400, "REFUSED");
   // a unique-index race on a supplied receipt number
   if ((err as { code?: string } | null)?.code === "P2002") return fail("That receipt number is already used.", 409, "CONFLICT");
   const name = (err as { name?: string; code?: string } | null)?.name;

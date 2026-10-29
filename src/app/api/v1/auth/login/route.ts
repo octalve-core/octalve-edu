@@ -1,3 +1,4 @@
+import { readJsonBody } from "@/lib/api/validate";
 import { after, type NextRequest, type NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
@@ -59,12 +60,9 @@ async function handleLogin(req: NextRequest): Promise<NextResponse> {
     return fail(RATE_LIMITED_MESSAGE, 429, "RATE_LIMITED");
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return fail("Invalid JSON body", 400, "INVALID_BODY");
-  }
+  const read = await readJsonBody(req);
+  if (!read.ok) return read.response;
+  const body = read.json;
 
   const parsed = loginSchema.safeParse(body);
   if (!parsed.success) {

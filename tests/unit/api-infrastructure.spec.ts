@@ -13,7 +13,9 @@ import {
   parseCursorPagination,
   parseOffsetPagination,
 } from "@/lib/api/pagination";
-import { MAX_BODY_BYTES, validate } from "@/lib/api/validate";
+import { fail } from "@/lib/api/envelope";
+import { NUL_MESSAGE } from "@/lib/api/no-nul";
+import { MAX_BODY_BYTES, readJsonBody, validate } from "@/lib/api/validate";
 
 // Pagination and validation helpers (plan §0.5.3, A): strict on purpose — a malformed parameter is a 400 that names
 // the field, never silently clamped or "first value wins".
@@ -197,6 +199,27 @@ test.describe("validate()", () => {
     expect(res.json.error.details).toEqual([{ path: "query.q", message: expect.any(String) }]);
   });
 
+  test("a NUL character anywhere in the body (a value, a key, nested) is 400 VALIDATION before the schema is asked, and the handler never runs", async () => {
+    const { handler, calls } = route();
+    const nul = String.fromCharCode(0);
+    // each of these would pass the schema (a string of 3 characters; keys the schema does not name are stripped): only the scan refuses them
+    const refused = [{ name: `a${nul}b` }, { name: "ok", [`x${nul}`]: 1 }, { name: "ok", extra: { deep: [`${nul}`] } }];
+    for (const body of refused) {
+      const res = await run(handler, request({ body: JSON.stringify(body) }));
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      expect(res.json.error).toEqual({
+        code: "VALIDATION",
+        message: "Some of the fields are not valid.",
+        details: [{ path: "body", message: NUL_MESSAGE }],
+      });
+    }
+    expect(calls).toHaveLength(0);
+    // the six characters of an escape are text, not a NUL: they reach the schema like any other text
+    const literalEscape = ["\\", "u0000"].join("");
+    expect((await run(handler, request({ body: JSON.stringify({ name: literalEscape }) }))).status).toBe(200);
+    expect(calls).toHaveLength(1);
+  });
+
   test("details are capped at 20, so a hostile payload cannot make a huge response", async () => {
     const wide = validate({ body: z.array(z.string().max(1)) }, async () => Response.json({}));
     const res = await run(wide as never, request({ body: JSON.stringify(Array.from({ length: 500 }, () => "too long")) }));
@@ -235,6 +258,74 @@ test.describe("validate()", () => {
     expect(await run(handler, request({ body: big }))).toMatchObject({ status: 413 });
   });
 
+  // A body with no declared length (a chunked upload) can only be measured by reading it, so it is read no further than the cap.
+  const CHUNK = 64 * 1024;
+  const streamedRequest = (stream: ReadableStream<Uint8Array>) =>
+    new NextRequest("http://localhost/api/x", { method: "POST", body: stream, duplex: "half" as const } as ConstructorParameters<
+      typeof NextRequest
+    >[1]);
+  /// `total` bytes in chunks of `chunk`; `state.pulled` is how many the consumer has taken. With `stall` the stream never ends after the last chunk.
+  function streamOf(total: number, chunk = CHUNK, stall = false) {
+    let sent = 0;
+    const state = { pulled: 0 };
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent >= total) {
+          if (!stall) controller.close();
+          return;
+        }
+        const n = Math.min(chunk, total - sent);
+        sent += n;
+        state.pulled = sent;
+        controller.enqueue(new Uint8Array(n).fill(0x78));
+      },
+    });
+    return { stream, state };
+  }
+  const streamBytes = (bytes: Uint8Array, chunk: number) =>
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (let at = 0; at < bytes.length; at += chunk) controller.enqueue(bytes.subarray(at, at + chunk));
+        controller.close();
+      },
+    });
+
+  test("a body streamed past the cap is refused once the cap is passed: the rest of it is never read", async () => {
+    const { stream, state } = streamOf(MAX_BODY_BYTES * 20);
+    const { handler, calls } = route();
+    const res = await run(handler, streamedRequest(stream));
+    expect(res).toMatchObject({ status: 413, json: { error: { code: "PAYLOAD_TOO_LARGE" } } });
+    expect(calls).toHaveLength(0);
+    expect(state.pulled, "bytes taken from a stream of 20 MiB").toBeLessThanOrEqual(MAX_BODY_BYTES + 8 * CHUNK);
+  });
+
+  test("a body that stalls after passing the cap is still refused: the end of it is not waited for", async () => {
+    const { stream } = streamOf(MAX_BODY_BYTES + 3 * CHUNK, CHUNK, true);
+    const { handler } = route();
+    const outcome = await Promise.race([
+      run(handler, streamedRequest(stream)),
+      new Promise<"still waiting">((resolve) => setTimeout(() => resolve("still waiting"), 5_000)),
+    ]);
+    expect(outcome).toMatchObject({ status: 413 });
+  });
+
+  test("a streamed body is read whole up to the cap: exactly the cap is accepted, one byte more is not, and characters split across chunks decode intact", async () => {
+    const echo = validate({ body: z.object({ pad: z.string() }) }, async (_r, _a: unknown, _c: unknown, input) =>
+      Response.json({ n: input.body.pad.length }),
+    );
+    const exact = Buffer.from(JSON.stringify({ pad: "x".repeat(MAX_BODY_BYTES - 10) }));
+    expect(exact.byteLength).toBe(MAX_BODY_BYTES);
+    expect((await run(echo as never, streamedRequest(streamBytes(exact, 50_000)))).json).toEqual({ n: MAX_BODY_BYTES - 10 });
+    const over = Buffer.from(JSON.stringify({ pad: "x".repeat(MAX_BODY_BYTES - 9) }));
+    expect(over.byteLength).toBe(MAX_BODY_BYTES + 1);
+    expect(await run(echo as never, streamedRequest(streamBytes(over, 50_000)))).toMatchObject({ status: 413 });
+    // two, three and four bytes per character, one byte per chunk: every character is split across chunks
+    const text = "é€😀 ok";
+    expect((await run(echo as never, streamedRequest(streamBytes(Buffer.from(JSON.stringify({ pad: text })), 1)))).json).toEqual({
+      n: text.length,
+    });
+  });
+
   test("a route with only a query schema never reads the body; one with only a body never reads the query", async () => {
     const onlyQuery = validate({ query: querySchema }, async (_r, _a: unknown, _c: unknown, input) => Response.json(input));
     expect((await run(onlyQuery as never, request({ query: "q=a" }))).json).toEqual({ query: { q: "a" } });
@@ -242,5 +333,87 @@ test.describe("validate()", () => {
     expect((await run(onlyBody as never, request({ body: JSON.stringify({ name: "n" }), query: "q=whatever&evil=1" }))).json).toEqual({
       body: { name: "n" },
     });
+  });
+});
+
+// The reader of a route that reads its own body (sign-in, passwords, invitations, ...): what validate() does with a body, without a schema.
+test.describe("fail() and the connection", () => {
+  test("a 413 closes the connection after it (the rest of the body may still be on its way); no other status does", () => {
+    expect(fail("Too big.", 413, "PAYLOAD_TOO_LARGE").headers.get("connection")).toBe("close");
+    for (const status of [400, 401, 403, 404, 409, 422, 429, 500])
+      expect(fail("No.", status).headers.get("connection"), String(status)).toBeNull();
+  });
+});
+
+test.describe("readJsonBody()", () => {
+  const NULCHAR = String.fromCharCode(0);
+  const refusal = async (read: Awaited<ReturnType<typeof readJsonBody>>) => {
+    expect(read.ok).toBe(false);
+    if (read.ok) throw new Error("unreachable");
+    return { status: read.response.status, json: await read.response.json() };
+  };
+
+  test("a JSON body is returned parsed, whatever its shape (the route checks the shape)", async () => {
+    for (const value of [{ a: 1 }, [1, 2], "text", 7, true, null]) {
+      expect(await readJsonBody(request({ body: JSON.stringify(value) }))).toEqual({ ok: true, json: value });
+    }
+  });
+
+  test("a body that is not JSON, and an empty one, are 400 INVALID_BODY, the same answer validate() gives", async () => {
+    for (const body of ["{nope", "", "undefined", "<xml/>"]) {
+      expect(await refusal(await readJsonBody(request({ body })))).toEqual({
+        status: 400,
+        json: { data: null, meta: {}, error: { code: "INVALID_BODY", message: "Invalid JSON body" } },
+      });
+    }
+  });
+
+  test("a NUL character in a value, in a key or deep inside is 400 VALIDATION with the one message; its six-character escape is text and passes", async () => {
+    for (const value of [{ a: `x${NULCHAR}` }, { [`k${NULCHAR}`]: 1 }, { a: [{ b: { c: [`${NULCHAR}`] } }] }, `${NULCHAR}`]) {
+      expect(await refusal(await readJsonBody(request({ body: JSON.stringify(value) })))).toMatchObject({
+        status: 400,
+        json: { error: { code: "VALIDATION", details: [{ path: "body", message: NUL_MESSAGE }] } },
+      });
+    }
+    const literalEscape = ["\\", "u0000"].join("");
+    expect(await readJsonBody(request({ body: JSON.stringify({ a: literalEscape }) }))).toEqual({ ok: true, json: { a: literalEscape } });
+  });
+
+  test("a body past the cap is 413 PAYLOAD_TOO_LARGE, by its declared length and by its actual length; a streamed one is not read past the cap", async () => {
+    const big = JSON.stringify({ pad: "x".repeat(MAX_BODY_BYTES) });
+    expect(await refusal(await readJsonBody(request({ body: big })))).toMatchObject({
+      status: 413,
+      json: { error: { code: "PAYLOAD_TOO_LARGE" } },
+    });
+    const chunk = 64 * 1024;
+    let pulled = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += chunk;
+        controller.enqueue(new Uint8Array(chunk).fill(0x78));
+      },
+    });
+    const streamed = new NextRequest("http://localhost/api/x", {
+      method: "POST",
+      body: stream,
+      duplex: "half" as const,
+    } as ConstructorParameters<typeof NextRequest>[1]);
+    expect(await refusal(await readJsonBody(streamed))).toMatchObject({ status: 413 });
+    expect(pulled, "bytes taken from a stream that never ends").toBeLessThanOrEqual(MAX_BODY_BYTES + 8 * chunk);
+  });
+
+  test("a smaller cap can be asked for; it is the caller's, not a global", async () => {
+    const body = JSON.stringify({ pad: "x".repeat(100) });
+    expect(await readJsonBody(request({ body }), 50)).toMatchObject({ ok: false });
+    expect(await readJsonBody(request({ body }), 1000)).toMatchObject({ ok: true });
+  });
+
+  test("a body a million levels deep cannot overflow the stack: it is a 4xx or a value, never a thrown error", async () => {
+    const depth = 1_000_000;
+    const nested = "[".repeat(depth) + "]".repeat(depth);
+    const outcome = await readJsonBody(request({ body: nested }), nested.length + 1).catch(
+      (error: unknown) => `threw: ${String(error).slice(0, 60)}`,
+    );
+    expect(typeof outcome).toBe("object"); // either parsed (then holdsNul walked it iteratively) or refused as INVALID_BODY by JSON.parse; never a thrown RangeError
   });
 });

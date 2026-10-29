@@ -306,7 +306,14 @@ test.describe("changeMember — permissions (Phase 1.0)", () => {
     const actions = (await db.auditLog.findMany({ where: { tenantId: a.id, targetId: target.id }, orderBy: { action: "asc" } })).map(
       (row) => row.action,
     );
-    expect(actions).toEqual(["MEMBER_CAMPUS_CHANGED", "MEMBER_PERMISSIONS_CHANGED", "MEMBER_ROLE_CHANGED"]);
+    // granting CAN_APPROVE_RESULTS also gives the person the default approver scope (GENERAL, ADR 0018), with its own audit row, in the same transaction
+    expect(actions).toEqual([
+      "MEMBER_CAMPUS_CHANGED",
+      "MEMBER_PERMISSIONS_CHANGED",
+      "MEMBER_ROLE_CHANGED",
+      "RESULT_APPROVAL_SCOPE_CHANGED",
+    ]);
+    expect(await db.resultApprovalScope.count({ where: { tenantId: a.id, userId: target.id, kind: "GENERAL" } })).toBe(1);
   });
 
   test("permissions are never read from, or written to, another school's membership of the same person", async () => {

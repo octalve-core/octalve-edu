@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { Permission, type Role } from "@prisma/client";
 import { fail, noStore } from "@/lib/api/envelope";
+import { holdsNul, NUL_MESSAGE } from "@/lib/api/no-nul";
 import { isAuthorized } from "@/lib/auth/authorize";
 import { validateCSRF } from "@/lib/auth/csrf";
 import { getSessionFromRequest, type ResolvedSession } from "@/lib/auth/session";
@@ -135,6 +136,15 @@ export function withAuth(
         if (!recorded) return noStore(fail(NO_ACCESS, 403, "FORBIDDEN"));
       }
       auth = { ...session, tenant: { ...tenant, run: (fn) => forTenant(tenant.tenantId).transaction(fn) } };
+    }
+
+    // A NUL character in the address (a path segment, or a key or value of the query string) names nothing the database can hold, so it is refused for every route, whatever
+    // the route does with the value: a 404 for a path segment, a 400 for the query string. After the checks above (someone who may not be here is told so first), before the
+    // handler. The body is checked by validate(). lib/api/no-nul.ts
+    const pathParams = await (routeContext as { params?: Promise<unknown> } | undefined)?.params;
+    if (holdsNul(pathParams)) return noStore(fail("Not found.", 404, "NOT_FOUND"));
+    if (holdsNul([...req.nextUrl.searchParams])) {
+      return noStore(fail("Some of the query parameters are not valid.", 400, "VALIDATION", [{ path: "query", message: NUL_MESSAGE }]));
     }
 
     const response = await handler(req, auth as never, routeContext as never);

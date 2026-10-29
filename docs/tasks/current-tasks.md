@@ -31,6 +31,13 @@
 | 18 | [TASK-0011-Followups](0011-audited-support-access.md) | Audited Support Access Enhancements (Named Grantee & Admin Notice) | [x] Completed | 2026-10-18 05:40:00 UTC | 2026-10-18 06:15:00 UTC | [PR #24](https://github.com/octalve-core/octalve-edu/pull/24) |
 | 19 | Release Staging | Release v1.0.1 Staging: Promote `dev` ➔ `master` | [x] Completed | 2026-10-18 06:33:00 UTC | 2026-10-18 06:33:30 UTC | [PR #25](https://github.com/octalve-core/octalve-edu/pull/25) |
 | 20 | Release Production | Release v1.0.1 Production: Promote `master` ➔ `prod` (Tagged `v1.0.1`) | [x] Completed | 2026-10-18 06:33:40 UTC | 2026-10-18 06:34:00 UTC | [PR #26](https://github.com/octalve-core/octalve-edu/pull/26) |
+| 21 | [TASK-0017](0017-review-fixes-access-atomicity-and-request-bodies.md) | Review fixes: who may read and write what, writes that are all or nothing, request bodies | [x] Completed (merged into `dev`; full suite on the merged `dev`: 2159 passed, 23 skipped, 2 failed, the two failures repaired in task 0019) | before 2026-10-20 17:37:44 UTC | 2026-10-20 19:57:42 UTC | PRs [#36](https://github.com/octalve-core/octalve-edu/pull/36) to [#43](https://github.com/octalve-core/octalve-edu/pull/43) |
+| 22 | [TASK-0018](0018-teacher-assignments-for-results-and-certificate-verification.md) | Teacher assignments for results; certificates: verification by token, numbers per school, access by role and campus | [x] Completed (merged into `dev`; the certificate migration is for the maintainer to run on the hosted database BEFORE the code is deployed there) | 2026-10-20 20:31:57 UTC | 2026-10-20 21:39:38 UTC | PRs [#45](https://github.com/octalve-core/octalve-edu/pull/45), [#46](https://github.com/octalve-core/octalve-edu/pull/46) |
+| 23 | [TASK-0019](0019-a-request-that-cannot-be-valid-is-a-4xx.md) | A request that cannot be valid is a 4xx (NUL character, broken percent-encoding) and two tests that failed only under load | [x] Completed (merged into `dev`) | 2026-10-20 23:45:54 UTC | 2026-10-21 00:28:14 UTC | PRs #47, #48 and #49 |
+| 24 | [TASK-0020](0020-results-approver-scopes.md) | Results are approved by assignment: generally, per section or per class (ADR 0018) | [ ] In progress (ADR merged as PR #51 and accepted by the maintainer on 2026-10-23; slice 1 merged as PR #54; slices 2 to 4 not started; the migration `20261030090000_results_approval_scopes` is for the maintainer to run BEFORE the code is deployed) | 2026-10-21 01:12:08 UTC | — | PRs #51 (ADR), #54 (slice 1) |
+| 25 | [TASK-0021](0021-proxy-api-matcher-and-shared-body-reader.md) | The proxy must not make Next wait for an API request body; one shared reader for a request body | [ ] In progress (module A merged as PR #56; module B, the reader, merged as PR #57; module C, AlEemaan, not started) | 2026-10-21 UTC | — | `claude/shared-body-reader` |
+| 26 | [TASK-0022](0022-invoice-numbers-under-concurrency.md) | Invoice numbers are unique under concurrency (ISS-0030) | [x] Completed: merged into `dev` as PR #58 (`be0ae1a`; branch `claude/fix-invoice-numbers`) | 2026-10-21 | — | `claude/fix-invoice-numbers` |
+| 27 | [TASK-0023](0023-payment-status-who-may-confirm.md) | Who may confirm which payment reference (ISS-0029) | [x] Completed: merged into `dev` as PR #60 (`108849e`; branch `claude/fix-payment-status-access`) | 2026-10-22 | — | `claude/fix-payment-status-access` |
 ---
 
 ## Detailed Milestone Checklist
@@ -226,3 +233,92 @@
 
 
 
+
+### UI fixes found by the AlEemaan browser run, applied here (branch `claude/ui-fixes-hydration-nav`)
+- **Status:** [x] Committed locally, PR into `dev` pending.
+- [x] React hydration error #418 on signed-in full loads: `ServiceWorkerRegister` read `navigator.onLine` while rendering; it now starts online and reads it in an effect.
+- [x] Finance, Higher-ed, Certificates and Custom-domain screens used design tokens this app does not define (`text-foreground`, `bg-primary`, `border-border`...), so they rendered largely unstyled; mapped to the real tokens (`text-fg`, `bg-brand-strong`, `border-line`...).
+- [x] Lint was failing on `dev` with 3 errors: the support-grants route read the platform administrator with the raw client (now `findPlatformAdminByEmail` in `lib/support/grants.ts`), and an unescaped apostrophe.
+- [x] Stale tests repaired: academics sections list (the LMS section exists), people-students (the `gender` field).
+- [ ] Known failing on `dev` itself (verified by stashing): `shell.spec.ts` "More: who you are..." on a phone (the Users tab is not found while the More sheet is open) and `academics.spec.ts` "staff may LOOK" (an `Open` button is present). Not caused by this branch; not fixed.
+- Correction: the Coursework page IS reachable (Academics > "LMS & Assignments"); an earlier note saying it was unreachable was wrong, so no menu item was added.
+- Full suite on this branch: 2069 passed, 13 failed, of which 4 were nav-test failures from a menu item that was then removed, 4 sign-out/cookie tests that passed again when run alone (load), 2 stale tests fixed above and 3 pre-existing (above).
+
+---
+
+### TASK-0017: Review fixes - who may read and write what, writes that are all or nothing, request bodies
+- **Started:** before `2026-10-20 17:37:44 UTC` (the first commit of the series; the start was not timestamped)
+- **Ended:** `2026-10-20 19:57:42 UTC` (PR #43 merged)
+- **Status:** [x] Completed: merged into `dev` as PRs #36 to #43 on 2026-10-20, in order, each after its Vercel check passed and with `base.ref` checked to be `dev` (merge commits `b13d725`, `6eb6fd4`, `25ae546`, `3206971`, `abe0d57`, `fb76827`, `87a4cb9`, `d12d22d`). Detail, rules and numbers: [the task file](0017-review-fixes-access-atomicity-and-request-bodies.md).
+- [x] #36 `claude/fix-bounded-body-read`: `validate()` reads a request body no further than the cap
+- [x] #37 `claude/fix-timetable-write-checks` (two commits): a refused batch changes nothing; one lesson's start and end are checked together
+- [x] #38 `claude/fix-lms-whose-work`: work is handed in for the signed-in student's own record, reads follow the viewer, marked work is final for the student
+- [x] #39 `claude/fix-results-draft-only`: a result is edited only while DRAFT, a refused request writes nothing, recording and listing follow the caller's campus
+- [x] #40 `claude/fix-attendance-roll`: a roll names only the students on that arm's roll
+- [x] #41 `claude/fix-report-card-scope`: staff read a report card within their campus and, for a teacher, their own arms
+- [x] #42 `claude/chore-source-hygiene`: no invisible or direction-changing character typed into a source file, with a guard test
+- [x] #43 `claude/fix-names-need-a-visible-character` (on top of #42): a name needs a visible character
+- [x] Verification: typecheck, lint and prettier clean on each branch and on the merge of the six fixes; unit 382 on `dev` before, 385 on the merge of the six, 389 on the merged `dev`; API 705, integration 614, e2e (3 specs) 15 on one build of the first five; the last two changes 148 + 40 API tests; every new test failed on the unfixed build first
+- [x] One full suite on the merged `dev` (PRs #36 to #44, all projects, 2.1 hours): 2159 passed, 23 skipped, 2 failed; the two failures (the email-change timing check and the account-menu e2e test) are repaired in task 0019. A first attempt, built from the eight branches, had ended before any test ran: the web servers did not start within 60 s at a load average of 48, which is not a test failure.
+- [ ] NOT run: the API and integration projects on each branch alone.
+- [ ] After the promotion to `prod`: record the issues these fixed in `docs/issues/README.md` (the maintainer decides the wording while the repository is public)
+
+### TASK-0018: Teacher assignments for results, and certificates (verification by token, numbers per school, access by role and campus)
+- **Started:** `2026-10-20 20:31:57 UTC` (the first commit of the series)
+- **Ended:** `2026-10-20 21:39:38 UTC` (PR #46 merged)
+- **Status:** [x] Completed: merged into `dev` as PRs #45 and #46 on 2026-10-20, each after its Vercel check passed and with `base.ref` checked to be `dev` (merge commits `443a565`, `a17baa3`). **#46 ships a migration that the maintainer runs on the hosted database before the code is deployed there.** Detail, rules and numbers: [the task file](0018-teacher-assignments-for-results-and-certificate-verification.md).
+- [x] #45 `claude/fix-results-assigned-subject-arm` (two commits): a teacher records a subject only for the students of an arm they are assigned it in (403 otherwise, nothing saved); a teacher's results list is the students of the arms they are assigned to (an approver keeps the campus-ruled list)
+- [x] #46 `claude/fix-certificates-verify-and-access` (two commits, a migration): the public verification takes a 32-character token instead of the number; numbers are unique within a school and taken under a lock; issuing refuses an unknown student or period before writing; a student lists their own certificates, a campus member their campus's and the school-wide ones', a campus administrator issues and revokes for their own campus's students only
+- [x] Verification: every new test failed on an unfixed build first (35 of 139 API and integration tests, 4 of 22 unit tests, every one for the intended reason); results 125 passed and certificates 93 passed on the branches' builds; unit 389 and 390; the migration was rehearsed over existing rows and the build before it was run against the migrated database; the unit project on `dev` after #45 to #49 (tip `cf32c30`): 396 passed.
+- [ ] The maintainer runs `pnpm db:migrate:deploy` on the hosted database before the certificate code is deployed there
+- [ ] NOT run: mobile e2e, https project, the e2e specs, a full suite with both branches merged, the migration on the hosted database
+- [ ] After the promotion to `prod`: record what these fixed in `docs/issues/README.md` (the maintainer decides the wording while the repository is public)
+
+### TASK-0019: A request that cannot be valid is a 4xx (NUL character, broken percent-encoding) and two tests that failed only under load
+- **Started:** `2026-10-20 23:45:54 UTC` (the first commit of the three branches)
+- **Ended:** `2026-10-21 00:28:14 UTC` (the last pull request merged)
+- **Status:** [x] Completed: merged into `dev` as PRs #47, #48 and #49, each after its Vercel check passed and with `base.ref` checked to be `dev`. Detail, rules and numbers: [the task file](0019-a-request-that-cannot-be-valid-is-a-4xx.md).
+- [x] #47 `claude/fix-malformed-path-is-400`: a path with broken percent-encoding (`%ff`, a lone `%`, `%ED%A0%80`) is a 400 from the proxy, pages and API (it was a bare 500 before any route ran); the proxy's matcher now covers `/api/:path*`
+- [x] #49 `claude/fix-nul-in-input`: a NUL character in a path segment (404), the query string (400) or a JSON body (400) is refused before the handler by `withAuth` and `validate()` (it was a 500 on 15 route-and-method pairs for a path segment, on lists and searches for the query string, and on five create routes for the body); the same branch makes four route-and-method pairs that answered 500 for an id this school does not have answer 404 (LMS assignments and materials) or 400 (the payment status)
+- [x] #48 `claude/fix-two-load-sensitive-tests` (two commits): the email-change timing check (lower quartile of 12 samples, 250 ms, its own 240 s budget; a 400 ms wait in the route is refused, a 60 ms one is not reliably seen) and the account-menu e2e test (waits for the page the person ends up on; sign-in 15 s)
+- [x] Verification: every new test failed on an unfixed build first (NUL: 15 of 21 API tests, the rest controls; proxy: 8 of 10); on the branches' builds NUL 67 passed in the four spec files (the first version), then 168 passed in the 14 neighbouring spec files after the unknown-id fixes and 1791 of 1794 in the whole unit, integration and api projects on the first version's build; the unit project on `dev` after #49: 396 passed, proxy 52 passed, the whole shell spec 55 passed in 3 repetitions at load 20 to 27
+- [x] The NUL scan of the query string and the JSON body is ported to AlEemaan (roji-tech/AlEemaan PR #79, merge commit `deb072f`, 2026-10-21 01:41 UTC; it already had the path rule and the malformed-path rule)
+- [ ] The 16 routes that read their own body are not behind the body scan: one shared reader with the scan is the next batch
+- [ ] NOT run: the e2e and https projects on the NUL and proxy branches, a full suite with all three merged
+- [ ] After the promotion to `prod`: record what these fixed in `docs/issues/README.md` (the maintainer decides the wording while the repository is public)
+
+### TASK-0020: Results are approved by assignment: generally, per section or per class (ADR 0018)
+- **Started:** `2026-10-21 01:12:08 UTC` (the first commit of the ADR)
+- **Status:** [ ] In progress. [ADR 0018](../adr/0018-results-are-approved-by-assignment-generally-per-section-or-per-class.md) is merged as PR #51 (merge commit `b6729c8`, 2026-10-21 01:15:31 UTC) and was accepted by the maintainer on 2026-10-23 ("yes to all three" details; only a person accepts an ADR). Detail, slices and numbers: [the task file](0020-results-approver-scopes.md).
+- [x] The maintainer's decision (2026-10-21): approvers are assigned General (their whole campus), per section (primary, JSS, SSS) or per class (JSS 2 ...) in the school's settings, and see and act on only what is assigned to them; Octalve first, AlEemaan after.
+- [x] #51 `claude/results-approver-scopes`: the ADR.
+- [x] Slice 1 MERGED as PR #54 (`4dd25a1`, 2026-10-21 08:12 UTC; branch `claude/results-approver-scope-rules`): `Section`, `ResultApprovalScope`, migration `20261030090000_results_approval_scopes` (backfills a General scope for every current holder of `CAN_APPROVE_RESULTS`), `src/lib/results/approver-scope.ts`, the transitions and the list follow the scope, members get a General scope with the permission; failing-first by mutation 12 of 21 fail, 9 controls pass; the whole setup, unit, integration and api run 1832 passed, 3 failed of 1835 (two pass alone, one is a failure on `dev` since #47: the proxy makes Next wait for the end of an API request body)
+- [x] Slice 2a: the school setting `unsectionedClassApproval` (decided 2026-10-23) with its migration `20261031090000_unsectioned_class_approval`, the rule that reads it and the settings route that carries it; failing first by mutation, 194 specs pass
+- [x] Slice 2b: sections and approvers API (five routes under `/settings`; `ADMIN` only, audited, fresh re-authentication); failing first by mutation (2 of 13 fail, 11 controls pass); 201 specs pass on the branch
+- [x] Slice 3: the settings screen: a Results approval tab (sections, which class is in which, where each approver approves; every write through the step-up dialog) and the `unsectionedClassApproval` select in Configuration; failing first by mutation (the campus rules removed: 5 of 20 new tests fail, 15 controls pass); unit 7 and e2e 12 (desktop and phone, both themes, axe) pass
+- [ ] Slice 4: AlEemaan
+- [x] The maintainer: yes to the three details; the ADR is accepted (2026-10-23)
+- [ ] The maintainer: run the migration on the hosted database before the code is deployed there
+
+### TASK-0021: The proxy must not make Next wait for an API request body; one shared reader for a request body
+- **Status:** [ ] In progress. [The task file](0021-proxy-api-matcher-and-shared-body-reader.md) has the cause, the plan and what is left.
+- [x] Module A, the proxy fix: merged as PR #56 (`ae724c9`, 2026-10-21 19:54 UTC)
+- [x] Module B, the shared reader: written, failing first (14 of 52 failed on the old routes), verified (whole setup, unit, integration and api projects: 1929 passed, 0 failed); merged as PR #57 (`cfef611`, 2026-10-21 22:14 UTC)
+- [x] Follow-up: every 413 closes the connection after it (`Connection: close`); the reset of the next request on a reused connection (found in AlEemaan) cannot happen; failing first on a build without it (both new tests failed), 140 specs pass; merged as PR #59 (`1c38f68`)
+- [ ] Module C, AlEemaan: its matcher is fixed in its task 0036; port the reader (its routes answer 500 for a body that is not JSON)
+
+### TASK-0022: Invoice numbers are unique under concurrency (ISS-0030)
+- **Status:** [x] Completed: merged into `dev` as PR #58 (`be0ae1a`), branch `claude/fix-invoice-numbers`. [The task file](0022-invoice-numbers-under-concurrency.md) has the plan and what is left.
+- [x] A bill run takes the school's invoice-number lock first and takes the next free number; `tests/integration/invoice-numbers.spec.ts` (3 tests)
+- [x] Failing first on the unfixed service (3 of 3 failed); on the branch the 3 tests, the lifecycle walk and the finance API specs (38) pass; build, tsc, eslint, prettier and the catalogs clean
+- [ ] Not run: the whole setup, unit, integration and api projects; e2e and https; a full suite on the merged `dev`
+
+### TASK-0023: Who may confirm which payment reference (ISS-0029)
+- **Status:** [x] Completed: merged into `dev` as PR #60 (`108849e`), branch `claude/fix-payment-status-access`. [The task file](0023-payment-status-who-may-confirm.md) has the plan and what is left.
+- [x] `confirmPaymentForRequester`: only a member who may see the payment's invoice can confirm it; unknown, another school's and not theirs are the one refusal; the gateway is not asked for them; the route uses it
+- [x] Failing first on a build of `dev` (the foreign-member test and the other-school test failed; the own-guardian and pending controls passed)
+- [x] Verified on the branch (payment-status, finance, campus-admin-finance and idor-audit specs: 42 passed); PR #60 merged. Not run: the other projects on the branch; the full suite on the merged `dev` is in progress
+
+## TASK-0024: the question bank (parity with AlEemaan's task 0032)
+
+[Task file](0024-question-bank.md). Slice A (schema, migration, pure parts, database tests) is merged (PR #68). Slice B (reviewers and switches) is merged (PR #69). Slice C (the questions and their review: service and API) is merged (PR #70). Slice D (pictures) is merged (PR #71). Slice E (the screens: Browse, My questions, Review queue, a navigation entry for staff) is merged (PR #72). All five slices are on `dev` (2026-10-26); what remains is the walkthrough, the hosted migration and image store, and the slice that reads `bank.parents.view`.

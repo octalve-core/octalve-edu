@@ -82,9 +82,9 @@ export function CustomDomainSettings({ schoolCode: _schoolCode, initialDomains =
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-foreground">Custom Domains & White-Labeling</h3>
-        <p className="text-sm text-muted-foreground">
-          Map your school's branded domain (e.g. portal.myschool.edu) to provide a seamless white-label portal experience.
+        <h3 className="text-lg font-semibold text-fg">Custom Domains & White-Labeling</h3>
+        <p className="text-sm text-fg-muted">
+          Map your school&apos;s branded domain (e.g. portal.myschool.edu) to provide a seamless white-label portal experience.
         </p>
       </div>
 
@@ -95,13 +95,13 @@ export function CustomDomainSettings({ schoolCode: _schoolCode, initialDomains =
             value={inputDomain}
             onChange={(e) => setInputDomain(e.target.value)}
             placeholder="portal.yourschool.edu"
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full rounded-md border border-line-strong bg-field px-3 py-2 text-sm shadow-sm placeholder:text-fg-muted focus:outline-none focus:ring-2 focus:ring-ring"
           />
-          {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
+          {error && <p className="mt-1 text-xs text-danger-fg">{error}</p>}
         </div>
         <button
           type="submit"
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition"
+          className="rounded-md bg-brand-strong px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-strong-hover transition"
         >
           Add Custom Domain
         </button>
@@ -109,10 +109,10 @@ export function CustomDomainSettings({ schoolCode: _schoolCode, initialDomains =
 
       <div className="space-y-4">
         {domains.map((dom) => (
-          <div key={dom.id} className="rounded-lg border border-border bg-card p-5 shadow-sm space-y-4">
+          <div key={dom.id} className="rounded-lg border border-line bg-surface p-5 shadow-sm space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-3">
-                <span className="font-semibold text-foreground">{dom.domain}</span>
+                <span className="font-semibold text-fg">{dom.domain}</span>
                 <span
                   className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                     dom.status === DomainStatus.ACTIVE
@@ -123,7 +123,7 @@ export function CustomDomainSettings({ schoolCode: _schoolCode, initialDomains =
                   {dom.status === DomainStatus.ACTIVE ? "Active & Verified" : "Pending Verification"}
                 </span>
                 {dom.sslActive && (
-                  <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 rounded bg-surface-2 px-2 py-0.5 text-xs font-medium text-fg-muted">
                     <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
                     SSL Active
                   </span>
@@ -134,14 +134,14 @@ export function CustomDomainSettings({ schoolCode: _schoolCode, initialDomains =
                   <button
                     onClick={() => handleVerify(dom.id)}
                     disabled={isVerifying === dom.id}
-                    className="rounded border border-primary px-3 py-1 text-xs font-medium text-primary hover:bg-primary/10 transition disabled:opacity-50"
+                    className="rounded border border-brand-fg px-3 py-1 text-xs font-medium text-brand-fg hover:bg-brand-tint transition disabled:opacity-50"
                   >
                     {isVerifying === dom.id ? "Checking DNS..." : "Verify DNS"}
                   </button>
                 )}
                 <button
                   onClick={() => handleDelete(dom.id)}
-                  className="rounded px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 transition"
+                  className="rounded px-2.5 py-1 text-xs font-medium text-danger-fg hover:bg-danger-bg transition"
                 >
                   Remove
                 </button>
@@ -149,17 +149,17 @@ export function CustomDomainSettings({ schoolCode: _schoolCode, initialDomains =
             </div>
 
             {dom.status !== DomainStatus.ACTIVE && (
-              <div className="rounded-md bg-muted/60 p-4 text-xs space-y-3">
-                <p className="font-semibold text-foreground">Configure the following DNS records with your registrar:</p>
+              <div className="rounded-md bg-surface-2 p-4 text-xs space-y-3">
+                <p className="font-semibold text-fg">Configure the following DNS records with your registrar:</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {dom.dnsInstructions.map((dns, idx) => (
-                    <div key={idx} className="rounded border border-border bg-background p-3 space-y-1">
-                      <div className="flex justify-between text-muted-foreground font-mono">
+                    <div key={idx} className="rounded border border-line bg-field p-3 space-y-1">
+                      <div className="flex justify-between text-fg-muted font-mono">
                         <span>Type: {dns.type}</span>
                         <span>Host: {dns.host}</span>
                       </div>
-                      <div className="font-mono text-foreground font-semibold break-all">{dns.value}</div>
-                      <p className="text-[11px] text-muted-foreground">{dns.instructions}</p>
+                      <div className="font-mono text-fg font-semibold break-all">{dns.value}</div>
+                      <p className="text-[11px] text-fg-muted">{dns.instructions}</p>
                     </div>
                   ))}
                 </div>

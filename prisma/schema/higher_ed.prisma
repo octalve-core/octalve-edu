@@ -85,7 +85,9 @@ model Certificate {
   periodId         String?
   period           AcademicPeriod?   @relation(fields: [tenantId, periodId], references: [tenantId, id], onDelete: SetNull)
   title            String            // e.g. "Certificate in Advanced Full-Stack Web Development"
-  certificateNo    String            @unique // e.g. "OCT-VOC-2026-0042"
+  certificateNo    String            // e.g. "OCT-VOC-2026-00042": unique within the school, two schools may issue the same one
+  /// 32 hex characters from the database's random source: the public link (`/api/v1/verify-certificate/[token]`). The number is not a way in.
+  verificationToken String           @unique @default(dbgenerated("replace((gen_random_uuid())::text, '-'::text, ''::text)"))
   issueDate        DateTime          @default(now())
   verificationHash String            // SHA-256 fingerprint for tamper-proofing
   metadata         Json?             // skills mastered, grade, honors, issuer remarks
@@ -93,6 +95,7 @@ model Certificate {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @default(now()) @updatedAt
 
+  @@unique([tenantId, certificateNo])
   @@index([tenantId])
   @@index([studentId])
   @@index([verificationHash])

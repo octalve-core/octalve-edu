@@ -3,11 +3,10 @@ import { Role } from "@prisma/client";
 import { fail, ok } from "@/lib/api/envelope";
 import { validate } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { prisma } from "@/lib/db";
 import { stepUpProofSchema } from "@/lib/school-settings/http";
 import { verifyStepUpProof } from "@/lib/school-settings/service";
 import { SUPPORT_AREAS, SUPPORT_GRANT_DEFAULT_HOURS, SUPPORT_GRANT_MAX_HOURS } from "@/lib/support/areas";
-import { createGrant, listGrants } from "@/lib/support/grants";
+import { createGrant, findPlatformAdminByEmail, listGrants } from "@/lib/support/grants";
 
 // /api/v1/schools/[code]/support-grants                                                       (task 0011 slice A, ADR 0017)
 //   GET   the school's grants, newest first (live, expired, revoked)
@@ -45,15 +44,8 @@ export const POST = withAuth(
 
     let granteeUserId: string | null = null;
     if (input.granteeEmail) {
-      const email = input.granteeEmail.toLowerCase();
-      const grantee = await prisma.user.findUnique({
-        where: { email },
-        select: { id: true, isPlatformAdmin: true },
-      });
-      if (!grantee || !grantee.isPlatformAdmin) {
-        return fail("That email does not belong to a platform administrator.", 400, "INVALID_GRANTEE");
-      }
-      granteeUserId = grantee.id;
+      granteeUserId = await findPlatformAdminByEmail(input.granteeEmail);
+      if (!granteeUserId) return fail("That email does not belong to a platform administrator.", 400, "INVALID_GRANTEE");
     }
 
     const grant = await createGrant(auth.tenant, auth.userId, {

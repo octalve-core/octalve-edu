@@ -1,15 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BillingCycle, DiscountWorkflowMode, FeeCostBearer, RolloverMode } from "@prisma/client";
+import { BillingCycle, DiscountWorkflowMode, FeeCostBearer, RolloverMode, UnsectionedClassApproval } from "@prisma/client";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/SelectField";
+import { Switch } from "@/components/ui/Switch";
 import { AlertTriangleIcon, BuildingIcon, CalendarIcon, CheckIcon, ShieldCheckIcon, SlidersIcon } from "@/components/ui/icons";
 import { useApi } from "@/components/academics/useApi";
 import { sendJson } from "@/components/auth/postJson";
 import { computeSettingsDeltas, type UpdatableSettings } from "@/lib/school-settings/rules";
 import type { SchoolSettingsDetail } from "@/lib/school-settings/service";
+import { ResultsApprovalPanel } from "./ResultsApprovalPanel";
 import { SettingsAuditLog } from "./SettingsAuditLog";
 import { StepUpModal } from "./StepUpModal";
 
@@ -19,7 +21,7 @@ interface SchoolSettingsPanelProps {
 
 export function SchoolSettingsPanel({ schoolCode }: SchoolSettingsPanelProps) {
   const { reply, loading, error, reload } = useApi(`/api/v1/schools/${schoolCode}/settings`);
-  const [activeTab, setActiveTab] = useState<"settings" | "audit">("settings");
+  const [activeTab, setActiveTab] = useState<"settings" | "approval" | "audit">("settings");
 
   // Staged modifications
   const [staged, setStaged] = useState<UpdatableSettings>({});
@@ -126,6 +128,7 @@ export function SchoolSettingsPanel({ schoolCode }: SchoolSettingsPanelProps) {
         <div className="flex gap-2">
           <button
             type="button"
+            aria-current={activeTab === "settings" ? "true" : undefined}
             onClick={() => setActiveTab("settings")}
             className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
               activeTab === "settings" ? "bg-brand-tint text-brand-fg" : "text-fg-muted hover:bg-surface-2 hover:text-fg"
@@ -136,6 +139,18 @@ export function SchoolSettingsPanel({ schoolCode }: SchoolSettingsPanelProps) {
           </button>
           <button
             type="button"
+            aria-current={activeTab === "approval" ? "true" : undefined}
+            onClick={() => setActiveTab("approval")}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+              activeTab === "approval" ? "bg-brand-tint text-brand-fg" : "text-fg-muted hover:bg-surface-2 hover:text-fg"
+            }`}
+          >
+            <CheckIcon className="h-4 w-4" />
+            Results approval
+          </button>
+          <button
+            type="button"
+            aria-current={activeTab === "audit" ? "true" : undefined}
             onClick={() => setActiveTab("audit")}
             className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
               activeTab === "audit" ? "bg-brand-tint text-brand-fg" : "text-fg-muted hover:bg-surface-2 hover:text-fg"
@@ -147,8 +162,8 @@ export function SchoolSettingsPanel({ schoolCode }: SchoolSettingsPanelProps) {
         </div>
 
         {hasChanges && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-600 dark:text-amber-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-warn-line bg-warn-bg px-3 py-1 text-xs font-medium text-warn-fg">
+            <span className="h-1.5 w-1.5 rounded-full bg-warn-icon" />
             {pendingDeltas.length} unsaved {pendingDeltas.length === 1 ? "change" : "changes"}
           </span>
         )}
@@ -158,6 +173,8 @@ export function SchoolSettingsPanel({ schoolCode }: SchoolSettingsPanelProps) {
 
       {activeTab === "audit" ? (
         <SettingsAuditLog auditLog={auditLog} />
+      ) : activeTab === "approval" ? (
+        <ResultsApprovalPanel schoolCode={schoolCode} hasMfa={hasMfa} />
       ) : (
         <div className="grid gap-6 md:grid-cols-2">
           {/* Section 1: Academic & Grading Controls */}
@@ -183,23 +200,24 @@ export function SchoolSettingsPanel({ schoolCode }: SchoolSettingsPanelProps) {
                     When enabled, scores must transition from DRAFT &rarr; SUBMITTED &rarr; APPROVED before publishing to parents.
                   </p>
                 </div>
-                <button
-                  type="button"
+                <Switch
                   id="result-approval-toggle"
-                  role="switch"
-                  aria-checked={effectiveSettings.resultApprovalRequired}
-                  onClick={() => handleToggle("resultApprovalRequired")}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
-                    effectiveSettings.resultApprovalRequired ? "bg-brand" : "bg-line"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-surface shadow-sm transition-transform ${
-                      effectiveSettings.resultApprovalRequired ? "translate-x-5" : "translate-x-0.5"
-                    } mt-0.5`}
-                  />
-                </button>
+                  checked={effectiveSettings.resultApprovalRequired}
+                  onChange={() => handleToggle("resultApprovalRequired")}
+                />
               </div>
+
+              {/* Results of a class that has no section (ADR 0018) */}
+              <SelectField
+                label="Results of a class with no section"
+                value={effectiveSettings.unsectionedClassApproval}
+                onChange={(e) => handleSelect("unsectionedClassApproval", e.target.value)}
+                options={[
+                  { value: UnsectionedClassApproval.GENERAL_OR_CLASS_ONLY, label: "Only a General approver, or one given that class" },
+                  { value: UnsectionedClassApproval.ANY_SECTION_APPROVER, label: "Also any approver of a section on the same campus" },
+                ]}
+                hint="Who may approve the results of a class that is in no section. A General approver, or someone given that class by name, always may. The second choice lets more people approve, so saving it carries the security warning."
+              />
 
               {/* Rollover Mode */}
               <SelectField
@@ -223,22 +241,11 @@ export function SchoolSettingsPanel({ schoolCode }: SchoolSettingsPanelProps) {
                     Automatically balance and stream enrolled students into class arms based on seat capacity.
                   </p>
                 </div>
-                <button
-                  type="button"
+                <Switch
                   id="class-auto-assign-toggle"
-                  role="switch"
-                  aria-checked={effectiveSettings.classAutoAssignment}
-                  onClick={() => handleToggle("classAutoAssignment")}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
-                    effectiveSettings.classAutoAssignment ? "bg-brand" : "bg-line"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-surface shadow-sm transition-transform ${
-                      effectiveSettings.classAutoAssignment ? "translate-x-5" : "translate-x-0.5"
-                    } mt-0.5`}
-                  />
-                </button>
+                  checked={effectiveSettings.classAutoAssignment}
+                  onChange={() => handleToggle("classAutoAssignment")}
+                />
               </div>
             </div>
           </div>
@@ -302,22 +309,11 @@ export function SchoolSettingsPanel({ schoolCode }: SchoolSettingsPanelProps) {
                     Send automated payment notifications via email and WhatsApp links when invoices approach due date.
                   </p>
                 </div>
-                <button
-                  type="button"
+                <Switch
                   id="fee-reminder-toggle"
-                  role="switch"
-                  aria-checked={effectiveSettings.feeReminderEnabled}
-                  onClick={() => handleToggle("feeReminderEnabled")}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
-                    effectiveSettings.feeReminderEnabled ? "bg-brand" : "bg-line"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-surface shadow-sm transition-transform ${
-                      effectiveSettings.feeReminderEnabled ? "translate-x-5" : "translate-x-0.5"
-                    } mt-0.5`}
-                  />
-                </button>
+                  checked={effectiveSettings.feeReminderEnabled}
+                  onChange={() => handleToggle("feeReminderEnabled")}
+                />
               </div>
             </div>
           </div>
@@ -345,22 +341,11 @@ export function SchoolSettingsPanel({ schoolCode }: SchoolSettingsPanelProps) {
                     Requires two-factor authentication (TOTP or recovery codes) before teachers can enter scores or mark attendance.
                   </p>
                 </div>
-                <button
-                  type="button"
+                <Switch
                   id="mfa-teaching-toggle"
-                  role="switch"
-                  aria-checked={effectiveSettings.mfaRequiredForTeaching}
-                  onClick={() => handleToggle("mfaRequiredForTeaching")}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
-                    effectiveSettings.mfaRequiredForTeaching ? "bg-brand" : "bg-line"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-surface shadow-sm transition-transform ${
-                      effectiveSettings.mfaRequiredForTeaching ? "translate-x-5" : "translate-x-0.5"
-                    } mt-0.5`}
-                  />
-                </button>
+                  checked={effectiveSettings.mfaRequiredForTeaching}
+                  onChange={() => handleToggle("mfaRequiredForTeaching")}
+                />
               </div>
 
               {/* Multi-Campus */}
@@ -373,22 +358,11 @@ export function SchoolSettingsPanel({ schoolCode }: SchoolSettingsPanelProps) {
                     Enable branch-level campus division within this single institution, allowing campus-specific filtering.
                   </p>
                 </div>
-                <button
-                  type="button"
+                <Switch
                   id="multi-campus-toggle"
-                  role="switch"
-                  aria-checked={effectiveSettings.multiCampusEnabled}
-                  onClick={() => handleToggle("multiCampusEnabled")}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${
-                    effectiveSettings.multiCampusEnabled ? "bg-brand" : "bg-line"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-surface shadow-sm transition-transform ${
-                      effectiveSettings.multiCampusEnabled ? "translate-x-5" : "translate-x-0.5"
-                    } mt-0.5`}
-                  />
-                </button>
+                  checked={effectiveSettings.multiCampusEnabled}
+                  onChange={() => handleToggle("multiCampusEnabled")}
+                />
               </div>
             </div>
           </div>

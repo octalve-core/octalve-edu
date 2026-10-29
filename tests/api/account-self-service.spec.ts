@@ -87,8 +87,8 @@ test.describe("PATCH /account/profile", () => {
       ["", /enter your name/i],
       ["   ", /enter your name/i],
       ["a".repeat(101), /at most 100/],
-      ["Amina\u0000Yusuf", /can't be used/],
-      ["Amina‮Yusuf", /can't be used/],
+      [`Amina${String.fromCharCode(0)}Yusuf`, /not valid/], // a NUL is refused by the shared body reader (readJsonBody), before the profile rule: its words are the central ones
+      ["Amina\u202eYusuf", /can't be used/],
     ];
     for (const [name, message] of cases) {
       const res = await patch(person, { name });
@@ -347,6 +347,7 @@ test.describe("POST /email-change/request", () => {
   });
 
   test("the response time doesn't depend on whether the address is taken (the work runs after the response)", async () => {
+    test.setTimeout(240_000); // 24 samples, each a sign-in and a request that both cost a bcrypt compare: 1.6 minutes measured on a machine running other test suites, and over 2 when busier
     const taken = await createUser();
     const time = async (newEmail: string) => {
       const person = await signedIn(); // a fresh person each time: no per-account limit is ever involved
@@ -356,12 +357,19 @@ test.describe("POST /email-change/request", () => {
     };
     const free: number[] = [];
     const takenTimes: number[] = [];
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 12; i++) {
       free.push(await time(uniqueEmail("free")));
       takenTimes.push(await time(taken.email));
     }
-    const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
-    expect(Math.abs(median(free) - median(takenTimes))).toBeLessThan(40); // ms
+    // What this can see, measured (2026-10-21, a machine running other test suites, load average 20 to 33): every sample contains a bcrypt compare at cost 12 and took 1.6 to 2.9 s, so two
+    // kinds of sample from IDENTICAL code differ by tens of milliseconds and sometimes by over a hundred: 61 ms between medians (46 between lower quartiles) in a control run, 76 ms between
+    // medians in the full-suite run of the merged dev, and 178 ms between lower quartiles in the worst of six runs that also carried a 60 ms leak. The old 40 ms tolerance on a difference of
+    // medians was inside that noise: it failed at random, and could not have caught a leak that small anyway. It now compares the LOWER quartile (other work on a busy machine only ever ADDS
+    // time, so the fast samples show what the route itself costs) with a tolerance of 250 ms, about twice the largest noise seen. That catches a gross difference: a wait of 400 ms in the route
+    // for a taken address was refused in 4 of 6 runs (differences of 264 to 435 ms; 190 ms and one below 250 were not refused), a wait of 60 ms in none of 6. A lookup of a few milliseconds
+    // before the answer is far below what an HTTP timing measurement can show; the guard against that is the after() call in the route and its review.
+    const lowerQuartile = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 4)];
+    expect(Math.abs(lowerQuartile(free) - lowerQuartile(takenTimes))).toBeLessThan(250); // ms
   });
 
   test("a wrong password is refused, nothing is sent and nothing is stored — a stolen session alone isn't enough", async () => {

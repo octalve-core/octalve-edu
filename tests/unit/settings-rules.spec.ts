@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { BillingCycle, DiscountWorkflowMode, FeeCostBearer, RolloverMode, type SchoolSettings } from "@prisma/client";
+import {
+  BillingCycle,
+  DiscountWorkflowMode,
+  FeeCostBearer,
+  RolloverMode,
+  UnsectionedClassApproval,
+  type SchoolSettings,
+} from "@prisma/client";
 import { computeSettingsDeltas, isControlWeakened, stringifySettingValue, validateSettingsPayload } from "@/lib/school-settings/rules";
 
 test.describe("SchoolSettings Pure Rules", () => {
@@ -14,6 +21,7 @@ test.describe("SchoolSettings Pure Rules", () => {
     feeCostBearer: FeeCostBearer.SCHOOL_ABSORBS,
     multiCampusEnabled: false,
     mfaRequiredForTeaching: true,
+    unsectionedClassApproval: UnsectionedClassApproval.GENERAL_OR_CLASS_ONLY,
     updatedAt: new Date("2026-10-10T12:00:00Z"),
   };
 
@@ -79,6 +87,29 @@ test.describe("SchoolSettings Pure Rules", () => {
       expect(res.errors).toContain('Field "rolloverMode" must be one of: AUTOMATIC, ADMIN_CONFIRMED.');
       expect(res.errors).toContain('Field "billingCycle" must be one of: PER_TERM, PER_SESSION.');
     }
+  });
+
+  test("unsectionedClassApproval accepts the two values and nothing else", () => {
+    for (const value of ["GENERAL_OR_CLASS_ONLY", "ANY_SECTION_APPROVER"]) {
+      const res = validateSettingsPayload({ unsectionedClassApproval: value });
+      expect(res.ok, value).toBe(true);
+      if (res.ok) expect(res.data).toEqual({ unsectionedClassApproval: value });
+    }
+    for (const value of ["EVERYONE", "any_section_approver", true, null, 1]) {
+      const res = validateSettingsPayload({ unsectionedClassApproval: value });
+      expect(res.ok, String(value)).toBe(false);
+      if (!res.ok)
+        expect(res.errors).toContain('Field "unsectionedClassApproval" must be one of: GENERAL_OR_CLASS_ONLY, ANY_SECTION_APPROVER.');
+    }
+  });
+
+  test("unsectionedClassApproval: only widening who may approve is flagged, and it is a delta only when it changes", () => {
+    expect(isControlWeakened("unsectionedClassApproval", "GENERAL_OR_CLASS_ONLY", "ANY_SECTION_APPROVER")).toBe(true);
+    expect(isControlWeakened("unsectionedClassApproval", "ANY_SECTION_APPROVER", "GENERAL_OR_CLASS_ONLY")).toBe(false);
+    expect(computeSettingsDeltas(baseSettings, { unsectionedClassApproval: UnsectionedClassApproval.GENERAL_OR_CLASS_ONLY })).toEqual([]);
+    expect(computeSettingsDeltas(baseSettings, { unsectionedClassApproval: UnsectionedClassApproval.ANY_SECTION_APPROVER })).toEqual([
+      { field: "unsectionedClassApproval", fromValue: "GENERAL_OR_CLASS_ONLY", toValue: "ANY_SECTION_APPROVER", isWeakeningSecurity: true },
+    ]);
   });
 
   test("computeSettingsDeltas computes exact diffs and ignores unchanged fields", () => {

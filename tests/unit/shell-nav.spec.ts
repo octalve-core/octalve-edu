@@ -14,15 +14,16 @@ test.describe("navFor", () => {
     expect(navFor(null)).toMatchObject([{ label: "Your schools", href: "/dashboard" }]);
   });
 
-  test("an ADMIN of a school: Overview, Academics, People, Communication, Users, and Settings (now active)", () => {
+  test("an ADMIN of a school: Overview, Academics, People, Communication, Users, Question bank and Settings", () => {
     const items = navFor(admin);
-    expect(items.map((i) => i.label)).toEqual(["Overview", "Academics", "People", "Communication", "Users", "Settings"]);
+    expect(items.map((i) => i.label)).toEqual(["Overview", "Academics", "People", "Communication", "Users", "Question bank", "Settings"]);
     expect(items[0].href).toBe("/schools/riverside");
     expect(items[1].href).toBe("/schools/riverside/academics");
     expect(items[2].href).toBe("/schools/riverside/people");
     expect(items[3].href).toBe("/schools/riverside/communication");
     expect(items[4].href).toBe("/schools/riverside/users");
-    expect(items[5].href).toBe("/schools/riverside/settings");
+    expect(items[5].href).toBe("/schools/riverside/question-bank");
+    expect(items[6].href).toBe("/schools/riverside/settings");
     expect(items.filter((i) => i.href === null)).toEqual([]);
   });
 
@@ -34,6 +35,7 @@ test.describe("navFor", () => {
       "People",
       "Communication",
       "Users",
+      "Question bank",
       "Settings",
       "Platform",
     ]);
@@ -42,29 +44,30 @@ test.describe("navFor", () => {
     expect(navFor(null).map((i) => i.label)).not.toContain("Platform");
   });
 
-  test("a CAMPUS_ADMIN sees Overview, Academics, People, Communication and Users - never the school's Settings", () => {
+  test("a CAMPUS_ADMIN sees Overview, Academics, People, Communication, Users and Question bank - never the school's Settings", () => {
     const items = navFor({ ...admin, role: "CAMPUS_ADMIN" });
-    expect(items.map((i) => i.label)).toEqual(["Overview", "Academics", "People", "Communication", "Users"]);
+    expect(items.map((i) => i.label)).toEqual(["Overview", "Academics", "People", "Communication", "Users", "Question bank"]);
     expect(items.map((i) => i.href)).toEqual([
       "/schools/riverside",
       "/schools/riverside/academics",
       "/schools/riverside/people",
       "/schools/riverside/communication",
       "/schools/riverside/users",
+      "/schools/riverside/question-bank",
     ]);
   });
 
-  test("staff see Overview, Academics and People (to look at, never to change); students and parents see Overview only — decided by the role IN THAT SCHOOL", () => {
+  test("staff see Overview, Academics, People (to look at, never to change) and the Question bank (to write in); students and parents see Overview only — decided by the role IN THAT SCHOOL", () => {
     for (const role of ["TEACHING_STAFF", "NON_TEACHING_STAFF"] as const) {
       const items = navFor({ ...admin, role });
       expect(
         items.map((i) => i.label),
         role,
-      ).toEqual(["Overview", "Academics", "People"]);
+      ).toEqual(["Overview", "Academics", "People", "Question bank"]);
       expect(
         items.map((i) => i.href),
         role,
-      ).toEqual(["/schools/riverside", "/schools/riverside/academics", "/schools/riverside/people"]);
+      ).toEqual(["/schools/riverside", "/schools/riverside/academics", "/schools/riverside/people", "/schools/riverside/question-bank"]);
     }
     for (const role of ["STUDENT", "PARENT"] as const) {
       expect(
@@ -73,7 +76,7 @@ test.describe("navFor", () => {
       ).toEqual(["Overview"]);
     }
     // The same person is an admin in one school and a teacher in another: each school's nav follows its own role.
-    expect(navFor(teacher).map((i) => i.label)).toEqual(["Overview", "Academics", "People"]);
+    expect(navFor(teacher).map((i) => i.label)).toEqual(["Overview", "Academics", "People", "Question bank"]);
     expect(navFor(admin).map((i) => i.label)).toContain("Users");
     expect(navFor(teacher).map((i) => i.label)).not.toContain("Users"); // the Users page stays the administrators'
   });
@@ -137,6 +140,7 @@ test.describe("pageLabel and isActive", () => {
     expect(pageLabel("/schools/riverside/communication/broadcast")).toBe("Communication");
     expect(pageLabel("/schools/riverside/users")).toBe("Users");
     expect(pageLabel("/schools/riverside/users/")).toBe("Users");
+    expect(pageLabel("/schools/riverside/question-bank")).toBe("Question bank");
     expect(pageLabel("/schools/riverside/academics")).toBe("Academics");
     expect(pageLabel("/schools/riverside/people")).toBe("People");
     expect(pageLabel("/schools/riverside/people/students/abc123")).toBe("People"); // a person's own page is still People

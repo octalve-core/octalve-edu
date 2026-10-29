@@ -81,8 +81,8 @@ export function FeeStructuresPanel({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-foreground">Fee Schedules</h2>
-          <p className="text-sm text-muted-foreground">Configure line-item fees per term and class for automated student invoicing.</p>
+          <h2 className="text-xl font-bold tracking-tight text-fg">Fee Schedules</h2>
+          <p className="text-sm text-fg-muted">Configure line-item fees per term and class for automated student invoicing.</p>
         </div>
 
         {canManageFinance && (
@@ -99,7 +99,7 @@ export function FeeStructuresPanel({
             key={p.id}
             type="button"
             className={`min-h-11 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              selectedPeriod === p.id ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"
+              selectedPeriod === p.id ? "bg-brand-strong text-white shadow-sm" : "bg-surface-2 text-fg-muted hover:bg-surface-2"
             }`}
             onClick={() => setSelectedPeriod(p.id)}
           >
@@ -109,39 +109,39 @@ export function FeeStructuresPanel({
       </div>
 
       {/* Fee Items Table / Cards */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+      <div className="rounded-xl border border-line bg-surface overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-muted/50 border-b border-border text-muted-foreground font-semibold">
+            <thead className="bg-surface-2 border-b border-line text-fg-muted font-semibold">
               <tr>
                 <th className="px-4 py-3">Fee Item Name</th>
                 <th className="px-4 py-3">Class Applicability</th>
                 <th className="px-4 py-3 text-right">Amount (₦)</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-line">
               {filteredFees.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={3} className="px-4 py-8 text-center text-fg-muted">
                     No fee structures defined for this period. Click &ldquo;+ Add Fee Schedule&rdquo; to create one.
                   </td>
                 </tr>
               ) : (
                 filteredFees.map((fee) => (
-                  <tr key={fee.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-4 font-medium text-foreground">{fee.name}</td>
-                    <td className="px-4 py-4 text-muted-foreground">
+                  <tr key={fee.id} className="hover:bg-surface-2 transition-colors">
+                    <td className="px-4 py-4 font-medium text-fg">{fee.name}</td>
+                    <td className="px-4 py-4 text-fg-muted">
                       {fee.classGroup?.name ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-brand-tint text-brand-fg">
                           {fee.classGroup.name} only
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-surface-2 text-fg-muted">
                           All Classes
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-4 text-right font-semibold text-foreground">{formatNaira(fee.amount)}</td>
+                    <td className="px-4 py-4 text-right font-semibold text-fg">{formatNaira(fee.amount)}</td>
                   </tr>
                 ))
               )}
@@ -153,7 +153,7 @@ export function FeeStructuresPanel({
       {/* Create Dialog */}
       <Dialog open={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Create Fee Schedule">
         <form onSubmit={handleCreate} className="space-y-4 py-2">
-          {error && <div className="p-3 text-sm rounded bg-destructive/15 text-destructive border border-destructive/20">{error}</div>}
+          {error && <div className="p-3 text-sm rounded bg-danger-bg text-danger-fg border border-danger-line">{error}</div>}
 
           <TextField
             label="Fee Item Name"
@@ -175,9 +175,9 @@ export function FeeStructuresPanel({
           />
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground">Target Class (Optional)</label>
+            <label className="text-sm font-medium text-fg">Target Class (Optional)</label>
             <select
-              className="w-full min-h-11 rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full min-h-11 rounded-lg border border-line-strong bg-field px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
               value={classGroupId}
               onChange={(e) => setClassGroupId(e.target.value)}
             >

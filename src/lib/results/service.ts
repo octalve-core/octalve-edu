@@ -1,7 +1,9 @@
 import { Decimal } from "@prisma/client/runtime/library";
-import { ResultStatus, Permission } from "@prisma/client";
+import { ResultStatus, Permission, type Prisma } from "@prisma/client";
 import type { Tx } from "@/lib/tenant/for-tenant";
 import { gradeFor } from "@/lib/academics/scoring";
+import { assignedArmIds } from "@/lib/attendance/access";
+import { approverScope, inScopeResultIds, NO_SCOPE } from "./approver-scope";
 import { canTransitionResult, validateComponentScores, generateVerificationToken, calculateVerificationHash } from "./rules";
 import { calculateCompetitionRanks, evaluatePromotion } from "./ranking";
 import type { RecordResultsInput, TransitionStatusInput, ResultFailure } from "./http";
@@ -9,14 +11,41 @@ import { triggerResultsPublishedAlerts } from "@/lib/communication/event-trigger
 
 export type ServiceResult<T> = { ok: true; data: T } | { ok: false; failure: ResultFailure; message?: string };
 
+/// What a member anchored to a campus works with: that campus's students and the school-wide ones (the rule `transitionResultStatuses` has always
+/// applied). `undefined` (no restriction) for an ADMIN and for a member of no campus.
+function campusOf(role: string, campusId: string | null): Prisma.StudentRecordWhereInput | undefined {
+  return role === "ADMIN" || campusId === null ? undefined : { OR: [{ campusId: null }, { campusId }] };
+}
+
+const NOT_EDITABLE =
+  "Results that have left DRAFT cannot be changed here. Send them back to DRAFT first (an administrator unlocks a LOCKED result, with a reason).";
+
+const NOT_ASSIGNED = "You are not assigned to teach this subject to every student in this request.";
+
+const OUT_OF_SCOPE = "This result is outside the classes you approve results for.";
+
+/// The arms this person is assigned to teach `subjectId` in: a subject assignment, for exactly this subject, on their (live) staff record. A timetable
+/// slot does not count here: it says when a class meets, not who answers for its marks.
+async function armsTaught(tx: Tx, tenantId: string, userId: string, subjectId: string): Promise<string[]> {
+  const rows = await tx.staffSubjectAssignment.findMany({
+    where: { tenantId, subjectId, staffRecord: { userId, archivedAt: null } },
+    select: { classArmId: true },
+  });
+  return rows.map((row) => row.classArmId);
+}
+
 /**
- * Records or updates score entries for students in a given subject and period.
+ * Records or updates score entries for students in a given subject and period. A result is edited only while it is DRAFT (PRD 5): once it has been
+ * submitted, a change goes back through the lifecycle, with its reason and its audit row. A teacher records only for the students of an arm they are
+ * assigned to teach the subject in. The whole request is accepted or none of it is.
  */
 export async function recordStudentResults(
   tx: Tx,
   tenantId: string,
   actorUserId: string,
   input: RecordResultsInput,
+  /// Who is recording: the role in this school and the campus the membership is anchored to (null = the whole school).
+  caller: { role: string; campusId: string | null },
 ): Promise<ServiceResult<{ count: number; saved: string[] }>> {
   // Validate period and subject exist
   const [period, subject] = await Promise.all([
@@ -34,7 +63,39 @@ export async function recordStudentResults(
     include: { bands: true },
   });
 
-  const savedIds: string[] = [];
+  // Every refusal is decided before the first write: `forTenant().transaction` commits when this function RETURNS and rolls back only when it THROWS,
+  // so a refusal returned after a write would keep that write (ADR 0002).
+  const studentIds = input.results.map((entry) => entry.studentId);
+  const known = await tx.studentRecord.count({ where: { tenantId, id: { in: studentIds }, ...campusOf(caller.role, caller.campusId) } });
+  if (known !== studentIds.length) {
+    return { ok: false, failure: "NOT_FOUND", message: "A student in this request was not found." };
+  }
+
+  // A teacher records a subject only for the students on the roll of an arm they are assigned to teach it in (an ACTIVE enrolment in this period's
+  // session); one student outside that refuses the whole request. An ADMIN is not held to it.
+  if (caller.role === "TEACHING_STAFF") {
+    const arms = await armsTaught(tx, tenantId, actorUserId, input.subjectId);
+    const rolled =
+      arms.length === 0
+        ? []
+        : await tx.studentEnrollment.findMany({
+            where: { tenantId, sessionId: period.sessionId, status: "ACTIVE", studentId: { in: studentIds }, classArmId: { in: arms } },
+            select: { studentId: true },
+          });
+    const covered = new Set(rolled.map((row) => row.studentId));
+    if (studentIds.some((id) => !covered.has(id))) {
+      return { ok: false, failure: "NOT_ASSIGNED", message: NOT_ASSIGNED };
+    }
+  }
+
+  const entries: Array<{
+    studentId: string;
+    finalScore: number;
+    maxScore: number;
+    components: (typeof input.results)[number]["components"];
+    gradeLetter: string | null;
+    gradeRemark: string | null;
+  }> = [];
 
   for (const entry of input.results) {
     let finalScore = entry.score ?? 0;
@@ -67,27 +128,32 @@ export async function recordStudentResults(
       }
     }
 
-    // Check if result already exists
-    const existing = await tx.result.findUnique({
-      where: {
-        tenantId_studentId_subjectId_periodId: {
-          tenantId,
-          studentId: entry.studentId,
-          subjectId: input.subjectId,
-          periodId: input.periodId,
-        },
-      },
-    });
+    entries.push({ studentId: entry.studentId, finalScore, maxScore, components: entry.components, gradeLetter, gradeRemark });
+  }
 
-    if (existing && existing.status === ResultStatus.LOCKED) {
-      return {
-        ok: false,
-        failure: "INVALID_TRANSITION",
-        message: "Cannot edit LOCKED results directly. An administrator must unlock them first.",
-      };
-    }
+  // The rows are locked while they are read: a request moving one of them out of DRAFT waits for this one to finish, and one that has already done so
+  // is seen here, so "still DRAFT" holds until this request commits. (In id order, so two overlapping requests cannot wait on each other.)
+  const held = await tx.$queryRaw<{ id: string; studentId: string; status: ResultStatus; score: Prisma.Decimal }[]>`
+    SELECT id, "studentId", status, score FROM "Result"
+    WHERE "tenantId" = ${tenantId} AND "subjectId" = ${input.subjectId} AND "periodId" = ${input.periodId} AND "studentId" = ANY(${studentIds}::text[])
+    ORDER BY id
+    FOR UPDATE`;
+  if (held.some((row) => row.status !== ResultStatus.DRAFT)) {
+    return { ok: false, failure: "NOT_EDITABLE", message: NOT_EDITABLE };
+  }
+  const existing = new Map(held.map((row) => [row.studentId, row]));
 
-    const verificationToken = existing?.verificationToken ?? generateVerificationToken();
+  const savedIds: string[] = [];
+
+  for (const entry of entries) {
+    const before = existing.get(entry.studentId);
+    const content = {
+      score: new Decimal(entry.finalScore),
+      maxScore: new Decimal(entry.maxScore),
+      componentScores: entry.components ? JSON.parse(JSON.stringify(entry.components)) : undefined,
+      gradeLetter: entry.gradeLetter,
+      gradeRemark: entry.gradeRemark,
+    };
 
     const upserted = await tx.result.upsert({
       where: {
@@ -98,41 +164,30 @@ export async function recordStudentResults(
           periodId: input.periodId,
         },
       },
-      update: {
-        score: new Decimal(finalScore),
-        maxScore: new Decimal(maxScore),
-        componentScores: entry.components ? JSON.parse(JSON.stringify(entry.components)) : undefined,
-        gradeLetter,
-        gradeRemark,
-        updatedAt: new Date(),
-      },
+      update: { ...content, updatedAt: new Date() },
       create: {
         tenantId,
         studentId: entry.studentId,
         subjectId: input.subjectId,
         periodId: input.periodId,
-        score: new Decimal(finalScore),
-        maxScore: new Decimal(maxScore),
+        ...content,
         status: ResultStatus.DRAFT,
-        componentScores: entry.components ? JSON.parse(JSON.stringify(entry.components)) : undefined,
-        gradeLetter,
-        gradeRemark,
         enteredByStaffId: actorUserId,
-        verificationToken,
+        verificationToken: generateVerificationToken(),
       },
     });
 
     // Record audit row if updated
-    if (existing && Number(existing.score) !== finalScore) {
+    if (before && Number(before.score) !== entry.finalScore) {
       await tx.resultAudit.create({
         data: {
           tenantId,
           resultId: upserted.id,
           actorUserId,
-          fromStatus: existing.status,
-          toStatus: existing.status,
-          fromScore: existing.score,
-          toScore: new Decimal(finalScore),
+          fromStatus: before.status,
+          toStatus: before.status,
+          fromScore: before.score,
+          toScore: new Decimal(entry.finalScore),
           reason: "Score update",
         },
       });
@@ -159,14 +214,15 @@ export async function transitionResultStatuses(
   campusId: string | null = null,
 ): Promise<ServiceResult<{ updatedCount: number; toStatus: ResultStatus }>> {
   const isAdmin = actorRole === "ADMIN";
-  const hasApprovePermission = permissions.includes("CAN_APPROVE_RESULTS") || isAdmin;
+  const holdsApprove = permissions.includes("CAN_APPROVE_RESULTS");
 
   const requested = [...new Set(input.resultIds)];
+  const visible = campusOf(actorRole, campusId);
   const results = await tx.result.findMany({
     where: {
       tenantId,
       id: { in: requested },
-      ...(isAdmin || campusId === null ? {} : { student: { OR: [{ campusId: null }, { campusId }] } }),
+      ...(visible ? { student: visible } : {}),
     },
     include: {
       student: true,
@@ -181,17 +237,35 @@ export async function transitionResultStatuses(
     return { ok: false, failure: "NOT_FOUND", message: "No matching results found." };
   }
 
+  // Where this person approves (ADR 0018): an approver acts only on the results their scope covers; an ADMIN is held to no scope. The scope matters only to the
+  // transitions that need approval authority, so the author's own submit (DRAFT to SUBMITTED) is not touched by it.
+  const scoped = holdsApprove && !isAdmin;
+  const covered = scoped
+    ? await inScopeResultIds(
+        tx,
+        tenantId,
+        await approverScope(tx, tenantId, actorUserId),
+        results.map((res) => ({ id: res.id, studentId: res.studentId, sessionId: res.period.sessionId })),
+      )
+    : new Set<string>();
+
   // Pre-validate transitions for all target records
   for (const res of results) {
     const check = canTransitionResult(res.status, input.toStatus, {
       isAdmin,
-      hasApprovePermission,
+      hasApprovePermission: scoped ? covered.has(res.id) : holdsApprove,
       isAuthor: res.enteredByStaffId === actorUserId,
       reason: input.reason,
     });
 
     if (!check.allowed) {
-      return { ok: false, failure: check.code, message: check.error };
+      // An approver whose scope does not reach this result is told that, not that they lack the permission they hold.
+      const outOfScope = check.code === "UNAUTHORIZED" && scoped && !covered.has(res.id);
+      return {
+        ok: false,
+        failure: check.code,
+        message: outOfScope && /requires CAN_APPROVE_RESULTS/.test(check.error) ? OUT_OF_SCOPE : check.error,
+      };
     }
   }
 
@@ -260,7 +334,9 @@ export async function transitionResultStatuses(
 }
 
 /**
- * Queries results with optional filters.
+ * Queries results with optional filters. A teacher sees the results of the students on the roll of the arms they are assigned to (the rule the student's
+ * attendance history and report card apply), plus - when they hold CAN_APPROVE_RESULTS - those of the classes their approver scope covers (ADR 0018). An approver
+ * with a GENERAL scope is held to the campus rule alone.
  */
 export async function queryResults(
   tx: Tx,
@@ -271,14 +347,37 @@ export async function queryResults(
     classArmId?: string;
     status?: ResultStatus;
   },
+  /// Who is asking: the role in this school, the campus the membership is anchored to (null = the whole school), who they are and what they may do here.
+  caller: { role: string; campusId: string | null; userId: string; permissions: readonly (Permission | string)[] },
 ) {
+  let enrolled: Prisma.StudentEnrollmentWhereInput | undefined = filter.classArmId
+    ? { classArmId: filter.classArmId, status: "ACTIVE" }
+    : undefined;
+  // A teacher works with the arms they are assigned to, plus - when they hold CAN_APPROVE_RESULTS - the arms of their approver scope (ADR 0018); a GENERAL approver
+  // is held to the campus rule alone.
+  const scope =
+    caller.role === "TEACHING_STAFF" && caller.permissions.includes("CAN_APPROVE_RESULTS")
+      ? await approverScope(tx, tenantId, caller.userId)
+      : NO_SCOPE;
+  if (caller.role === "TEACHING_STAFF" && !scope.general) {
+    // On the roll, in the active session, of such an arm; a teacher with none (or a school with no active session) sees none.
+    const arms = new Set([...(await assignedArmIds(tx, tenantId, caller.userId)), ...scope.armIds]);
+    const active = await tx.academicSession.findFirst({ where: { tenantId, status: "ACTIVE", archivedAt: null }, select: { id: true } });
+    const mine = filter.classArmId ? [...arms].filter((id) => id === filter.classArmId) : [...arms];
+    if (!active || mine.length === 0) return [];
+    enrolled = { sessionId: active.id, status: "ACTIVE", classArmId: { in: mine } };
+  }
+  const student: Prisma.StudentRecordWhereInput = {
+    ...campusOf(caller.role, caller.campusId),
+    ...(enrolled ? { enrollments: { some: enrolled } } : {}),
+  };
   return tx.result.findMany({
     where: {
       tenantId,
       periodId: filter.periodId,
       subjectId: filter.subjectId,
       status: filter.status,
-      student: filter.classArmId ? { enrollments: { some: { classArmId: filter.classArmId, status: "ACTIVE" } } } : undefined,
+      student: Object.keys(student).length > 0 ? student : undefined,
     },
     include: {
       student: { select: { id: true, firstName: true, lastName: true, admissionNo: true } },

@@ -3,6 +3,7 @@ import { ok, fail } from "@/lib/api/envelope";
 import { validate } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { isPlausibleId } from "@/lib/academics/http";
+import { studentAccess } from "@/lib/attendance/access";
 import { resultFailure } from "@/lib/results/http";
 import { getStudentReportCard } from "@/lib/results/service";
 
@@ -20,6 +21,11 @@ export const GET = withAuth(
     if (!isPlausibleId(id)) {
       return fail("No such student.", 404, "NOT_FOUND");
     }
+
+    // Staff read only the students their campus and (for a teacher) their arms allow; anything else is the 404 an unknown id gets (ISS-0013), the rule the student's
+    // attendance history applies. A student and a parent are judged by getStudentReportCard.
+    const noAccess = await studentAccess(auth, id);
+    if (noAccess) return noAccess;
 
     const role = auth.tenant.role;
 
