@@ -1,15 +1,9 @@
 import type { Tx } from "@/lib/tenant/for-tenant";
-import {
-  BankQuestionType,
-  FormKind,
-  FormStatus,
-  FormAudienceKind,
-  FormResponseStatus,
-  FormMarkingMethod,
-  FormMarkingStatus,
-} from "@prisma/client";
+import { BankQuestionType, FormKind, FormStatus, FormAudienceKind, FormResponseStatus, FormMarkingStatus } from "@prisma/client";
 import {
   isFormOpen,
+  isFormForPupilCampus,
+  isWithinTimeLimit,
   scrubFormQuestionsForPupil,
   isPupilAudienceEligible,
   validatePracticeSetInput,
@@ -17,6 +11,7 @@ import {
 } from "./practice-sets";
 import { resolveMarkingMethod, evaluateSubmissionWithMarking } from "./manual-marking";
 import { campusFilter, reachForm } from "./access";
+import { lockAttempt } from "./manual-marking-service";
 
 export class FormsServiceError extends Error {
   constructor(
@@ -385,8 +380,35 @@ export async function closePracticeSet(
   });
 }
 
+/// Where the pupil stands now: the class group they are in and the campus they belong to, which a set's audience and campus are matched against.
+async function pupilStandingOf(tx: Tx, tenantId: string, studentId: string) {
+  const [enrollment, student] = await Promise.all([
+    tx.studentEnrollment.findFirst({
+      where: { studentId, tenantId, status: "ACTIVE" },
+      orderBy: { enrolledAt: "desc" },
+      include: { classArm: { select: { classGroupId: true } } },
+    }),
+    tx.studentRecord.findFirst({ where: { id: studentId, tenantId }, select: { campusId: true } }),
+  ]);
+  return { classGroupId: enrollment?.classArm?.classGroupId ?? null, campusId: student?.campusId ?? null };
+}
+
+/// Serialises the starts of one pupil on one set, so two starts at the same moment find one open attempt, not none each.
+async function lockPupilStart(tx: Tx, formId: string, studentId: string) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`practice-start:${formId}:${studentId}`}::text))`;
+}
+
+/// What a pupil is told when a set is not open (`reason` is what `isFormOpen` gave).
+function notOpenError(reason?: string) {
+  return new FormsServiceError(
+    reason === "NOT_YET_OPEN" ? "This practice set is not open yet." : "This practice set is closed.",
+    403,
+    reason,
+  );
+}
+
 /**
- * Lists available open practice sets for a pupil.
+ * Lists available open practice sets for a pupil: the sets of their campus and the whole school's, for their class.
  */
 export async function listAvailablePracticeSetsForPupil(
   tx: Tx,
@@ -395,19 +417,15 @@ export async function listAvailablePracticeSetsForPupil(
     tenantId: string;
   },
 ) {
-  const enrollment = await tx.studentEnrollment.findFirst({
-    where: { studentId: params.studentId, tenantId: params.tenantId, status: "ACTIVE" },
-    orderBy: { enrolledAt: "desc" },
-    include: { classArm: { select: { classGroupId: true } } },
-  });
-
-  const pupilClassGroupId = enrollment?.classArm?.classGroupId ?? null;
+  const pupil = await pupilStandingOf(tx, params.tenantId, params.studentId);
+  const pupilClassGroupId = pupil.classGroupId;
 
   const forms = await tx.form.findMany({
     where: {
       tenantId: params.tenantId,
       kind: FormKind.PRACTICE_SET,
       status: FormStatus.PUBLISHED,
+      OR: pupil.campusId ? [{ campusId: pupil.campusId }, { campusId: null }] : [{ campusId: null }],
     },
     orderBy: { createdAt: "desc" },
     include: {
@@ -458,13 +476,8 @@ export async function getPracticeSetForPupil(
     tenantId: string;
   },
 ) {
-  const enrollment = await tx.studentEnrollment.findFirst({
-    where: { studentId: params.studentId, tenantId: params.tenantId, status: "ACTIVE" },
-    orderBy: { enrolledAt: "desc" },
-    include: { classArm: { select: { classGroupId: true } } },
-  });
-
-  const pupilClassGroupId = enrollment?.classArm?.classGroupId ?? null;
+  const pupil = await pupilStandingOf(tx, params.tenantId, params.studentId);
+  const pupilClassGroupId = pupil.classGroupId;
 
   const form = await tx.form.findFirst({
     where: {
@@ -483,18 +496,13 @@ export async function getPracticeSetForPupil(
     },
   });
 
-  if (!form) {
+  // A set of another campus is "not found" to this pupil, as a form of another campus is to staff.
+  if (!form || !isFormForPupilCampus(form.campusId, pupil.campusId)) {
     throw new FormsServiceError("Practice set not found.", 404, "NOT_FOUND");
   }
 
   const openCheck = isFormOpen(form);
-  if (!openCheck.isOpen) {
-    throw new FormsServiceError(
-      openCheck.reason === "NOT_YET_OPEN" ? "This practice set is not open yet." : "This practice set is closed.",
-      403,
-      openCheck.reason,
-    );
-  }
+  if (!openCheck.isOpen) throw notOpenError(openCheck.reason);
 
   const audience = form.audiences[0];
   if (audience && !isPupilAudienceEligible(audience, pupilClassGroupId)) {
@@ -515,7 +523,9 @@ export async function getPracticeSetForPupil(
 }
 
 /**
- * Starts a new practice set response session for a pupil.
+ * Starts a response session (an attempt) on a practice set for a pupil, or resumes the one they have open. Only a pupil the set is for may start it (its campus and its audience). The
+ * check for an open attempt and the opening of a new one are made under a lock for this pupil and this set, so two starts at the same moment are one attempt. An attempt left open
+ * past the set's time limit can no longer be submitted, so it is closed off (ABANDONED) and a fresh one is opened instead of resuming a dead one.
  */
 export async function startPracticeSetForPupil(
   tx: Tx,
@@ -525,33 +535,53 @@ export async function startPracticeSetForPupil(
     tenantId: string;
   },
 ) {
+  const pupil = await pupilStandingOf(tx, params.tenantId, params.studentId);
+
+  await lockPupilStart(tx, params.formId, params.studentId);
+
   const form = await tx.form.findFirst({
     where: { id: params.formId, tenantId: params.tenantId, kind: FormKind.PRACTICE_SET },
     include: { audiences: true },
   });
 
-  if (!form) {
+  if (!form || !isFormForPupilCampus(form.campusId, pupil.campusId)) {
     throw new FormsServiceError("Practice set not found.", 404, "NOT_FOUND");
   }
 
-  const openCheck = isFormOpen(form);
+  const now = new Date();
+  const openCheck = isFormOpen(form, now);
   if (!openCheck.isOpen) {
     throw new FormsServiceError("This practice set is not currently open.", 403, openCheck.reason);
   }
 
-  const existing = await tx.formResponse.findFirst({
+  const audience = form.audiences[0];
+  if (audience && !isPupilAudienceEligible(audience, pupil.classGroupId)) {
+    throw new FormsServiceError("You are not eligible for this practice set.", 403, "FORBIDDEN");
+  }
+
+  const open = await tx.formResponse.findMany({
     where: {
       tenantId: params.tenantId,
       formId: form.id,
       studentId: params.studentId,
       status: FormResponseStatus.IN_PROGRESS,
     },
+    orderBy: { startedAt: "desc" },
   });
+  const inTime = open.filter((r) => isWithinTimeLimit(r.startedAt, form.maxDurationMinutes, now));
+  const expired = open.filter((r) => !inTime.includes(r));
 
-  if (existing) {
+  if (expired.length > 0) {
+    await tx.formResponse.updateMany({
+      where: { tenantId: params.tenantId, id: { in: expired.map((r) => r.id) } },
+      data: { status: FormResponseStatus.ABANDONED },
+    });
+  }
+
+  if (inTime[0]) {
     return {
-      responseId: existing.id,
-      startedAt: existing.startedAt,
+      responseId: inTime[0].id,
+      startedAt: inTime[0].startedAt,
       isResume: true,
     };
   }
@@ -564,7 +594,7 @@ export async function startPracticeSetForPupil(
       studentId: params.studentId,
       respondentId: params.studentId,
       status: FormResponseStatus.IN_PROGRESS,
-      startedAt: new Date(),
+      startedAt: now,
     },
   });
 
@@ -576,7 +606,9 @@ export async function startPracticeSetForPupil(
 }
 
 /**
- * Submits pupil answers, evaluates accuracy, and reveals explanations.
+ * Submits pupil answers, evaluates accuracy, and reveals explanations. An attempt is submitted once: the attempt is read under its lock, inside the transaction, so two submissions at
+ * the same moment cannot both find it open. The set must be a practice set that is open now (published, inside its opening and closing times; a teacher who closes a set closes it for an
+ * attempt in flight too) and the attempt must be inside the set's time limit; a refusal writes nothing.
  */
 export async function submitPracticeSetForPupil(
   tx: Tx,
@@ -588,14 +620,12 @@ export async function submitPracticeSetForPupil(
     answers: Array<{ formQuestionId: string; value: unknown }>;
   },
 ) {
-  const [form, response, questions] = await Promise.all([
-    tx.form.findFirst({ where: { id: params.formId, tenantId: params.tenantId } }),
+  await lockAttempt(tx, params.responseId);
+
+  const [form, response] = await Promise.all([
+    tx.form.findFirst({ where: { id: params.formId, tenantId: params.tenantId, kind: FormKind.PRACTICE_SET } }),
     tx.formResponse.findFirst({
       where: { id: params.responseId, formId: params.formId, studentId: params.studentId, tenantId: params.tenantId },
-    }),
-    tx.formQuestion.findMany({
-      where: { formId: params.formId, tenantId: params.tenantId },
-      orderBy: { sortOrder: "asc" },
     }),
   ]);
 
@@ -607,9 +637,22 @@ export async function submitPracticeSetForPupil(
     throw new FormsServiceError("This practice set has already been completed.", 400, "ALREADY_COMPLETED");
   }
 
+  const completedAt = new Date();
+
+  const openCheck = isFormOpen(form, completedAt);
+  if (!openCheck.isOpen) throw notOpenError(openCheck.reason);
+
+  if (!isWithinTimeLimit(response.startedAt, form.maxDurationMinutes, completedAt)) {
+    throw new FormsServiceError("The time for this practice set is up.", 403, "TIME_UP");
+  }
+
+  const questions = await tx.formQuestion.findMany({
+    where: { formId: params.formId, tenantId: params.tenantId },
+    orderBy: { sortOrder: "asc" },
+  });
+
   // Evaluate answers taking manual marking into account
   const evaluation = evaluateSubmissionWithMarking(questions, params.answers);
-  const completedAt = new Date();
 
   // Write answer records
   await tx.formAnswer.createMany({
