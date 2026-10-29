@@ -6,6 +6,7 @@ import {
   UnsectionedClassApproval,
   type SchoolSettings,
 } from "@prisma/client";
+import { isSchoolTimeZone } from "./school-day";
 
 export const ALLOWED_SETTING_FIELDS = [
   "resultApprovalRequired",
@@ -18,6 +19,7 @@ export const ALLOWED_SETTING_FIELDS = [
   "multiCampusEnabled",
   "mfaRequiredForTeaching",
   "unsectionedClassApproval",
+  "timeZone",
 ] as const;
 
 export type UpdatableSettingField = (typeof ALLOWED_SETTING_FIELDS)[number];
@@ -33,6 +35,7 @@ export interface UpdatableSettings {
   multiCampusEnabled?: boolean;
   mfaRequiredForTeaching?: boolean;
   unsectionedClassApproval?: UnsectionedClassApproval;
+  timeZone?: string;
 }
 
 export interface SettingsDelta {
@@ -167,6 +170,14 @@ export function validateSettingsPayload(payload: unknown):
           errors.push(`Field "${key}" must be one of: ${Object.values(UnsectionedClassApproval).join(", ")}.`);
         } else {
           clean[settingKey] = val as UnsectionedClassApproval;
+        }
+        break;
+
+      case "timeZone":
+        if (!isSchoolTimeZone(val)) {
+          errors.push(`Field "${key}" must be the name of a time zone, such as "Africa/Lagos" or "UTC".`);
+        } else {
+          clean[settingKey] = val;
         }
         break;
 

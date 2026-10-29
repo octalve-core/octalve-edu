@@ -43,6 +43,9 @@ model SchoolSettings {
   mfaRequiredForTeaching Boolean              @default(true)
   /// ADR 0018: who may approve the results of a class group that has no section.
   unsectionedClassApproval UnsectionedClassApproval @default(GENERAL_OR_CLASS_ONLY)
+  /// The school's own time zone (an IANA name): where its day starts, for the limits counted in days (the practice cap, the reports one person may make). "UTC" until the
+  /// administrator chooses; the application checks the name, the database only its length. See src/lib/school-settings/school-day.ts.
+  timeZone String @default("UTC")
 
   updatedAt DateTime @default(now()) @updatedAt
 

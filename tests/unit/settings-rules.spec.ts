@@ -22,6 +22,7 @@ test.describe("SchoolSettings Pure Rules", () => {
     multiCampusEnabled: false,
     mfaRequiredForTeaching: true,
     unsectionedClassApproval: UnsectionedClassApproval.GENERAL_OR_CLASS_ONLY,
+    timeZone: "UTC",
     updatedAt: new Date("2026-10-10T12:00:00Z"),
   };
 
@@ -110,6 +111,28 @@ test.describe("SchoolSettings Pure Rules", () => {
     expect(computeSettingsDeltas(baseSettings, { unsectionedClassApproval: UnsectionedClassApproval.ANY_SECTION_APPROVER })).toEqual([
       { field: "unsectionedClassApproval", fromValue: "GENERAL_OR_CLASS_ONLY", toValue: "ANY_SECTION_APPROVER", isWeakeningSecurity: true },
     ]);
+  });
+
+  test("timeZone accepts the name of a time zone and nothing else", () => {
+    for (const value of ["UTC", "Africa/Lagos", "Pacific/Kiritimati", "America/Argentina/Buenos_Aires"]) {
+      const res = validateSettingsPayload({ timeZone: value });
+      expect(res.ok, value).toBe(true);
+      if (res.ok) expect(res.data).toEqual({ timeZone: value });
+    }
+    for (const value of ["Mars/Olympus_Mons", "", " Africa/Lagos", "+01:00", "Lagos time", "x".repeat(65), true, null, 1, ["UTC"]]) {
+      const res = validateSettingsPayload({ timeZone: value });
+      expect(res.ok, JSON.stringify(value)).toBe(false);
+      if (!res.ok) expect(res.errors).toContain('Field "timeZone" must be the name of a time zone, such as "Africa/Lagos" or "UTC".');
+    }
+  });
+
+  test("timeZone is a delta only when it changes, and moving the day is not a weakened control", () => {
+    expect(computeSettingsDeltas(baseSettings, { timeZone: "UTC" })).toEqual([]);
+    expect(computeSettingsDeltas(baseSettings, { timeZone: "Africa/Lagos" })).toEqual([
+      { field: "timeZone", fromValue: "UTC", toValue: "Africa/Lagos", isWeakeningSecurity: false },
+    ]);
+    expect(isControlWeakened("timeZone", "Africa/Lagos", "UTC")).toBe(false);
+    expect(isControlWeakened("timeZone", "UTC", "Pacific/Kiritimati")).toBe(false);
   });
 
   test("computeSettingsDeltas computes exact diffs and ignores unchanged fields", () => {
