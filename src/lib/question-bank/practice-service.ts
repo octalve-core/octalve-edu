@@ -2,6 +2,8 @@ import { Prisma, PracticeFeedbackMode, Role } from "@prisma/client";
 import type { Tx } from "@/lib/tenant/for-tenant";
 import { normalizeLabel } from "@/lib/question-bank/labels";
 import { effectiveSettingsIn } from "@/lib/question-bank/settings-service";
+import { readSchoolTimeZone } from "@/lib/school-settings/read";
+import { startOfSchoolDay } from "@/lib/school-settings/school-day";
 import {
   scrubQuestionForPupil,
   evaluatePracticeAnswer,
@@ -20,13 +22,6 @@ export class PracticeError extends Error {
     super(message);
     this.name = "PracticeError";
   }
-}
-
-/**
- * Returns beginning of today in UTC.
- */
-function getStartOfTodayUtc(now = new Date()): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
 }
 
 /**
@@ -79,15 +74,15 @@ export async function getStudentClassGroup(tx: Tx, tenantId: string, studentId: 
 }
 
 /**
- * Counts the questions a student has used of today's allowance (UTC day): the ones already answered, plus the ones still to answer in sets opened today and not yet finished.
+ * Counts the questions a student has used of today's allowance (the school's day, from midnight in its own time zone; UTC until the school chooses one): the ones already answered, plus the ones still to answer in sets opened today and not yet finished.
  * A set is drawn when it is opened, so counting only the answers lets a pupil open any number of sets before answering one and draw far more than the cap.
  */
 async function countTodayAttempts(tx: Tx, tenantId: string, studentId: string, now = new Date()): Promise<number> {
-  const todayUtc = getStartOfTodayUtc(now);
+  const dayStart = startOfSchoolDay(now, await readSchoolTimeZone(tx, tenantId));
   const [answered, open] = await Promise.all([
-    tx.practiceAttempt.count({ where: { tenantId, studentId, answeredAt: { gte: todayUtc } } }),
+    tx.practiceAttempt.count({ where: { tenantId, studentId, answeredAt: { gte: dayStart } } }),
     tx.practiceSession.findMany({
-      where: { tenantId, studentId, finishedAt: null, startedAt: { gte: todayUtc } },
+      where: { tenantId, studentId, finishedAt: null, startedAt: { gte: dayStart } },
       select: { size: true, _count: { select: { attempts: true } } },
     }),
   ]);
