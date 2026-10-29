@@ -11,7 +11,18 @@ import { TextField } from "@/components/ui/TextField";
 import { sendForm, sendJson } from "@/components/auth/postJson";
 import { say } from "@/components/question-bank/say";
 import { useBankApi } from "@/components/question-bank/BankApi";
-import { MAX_OPTIONS, MIN_OPTIONS, TYPE_LABEL, blankForm, bodyOf, formOf, imageUrl, type ApiItem, type FormState, type ItemType } from "@/components/question-bank/model";
+import {
+  MAX_OPTIONS,
+  MIN_OPTIONS,
+  TYPE_LABEL,
+  blankForm,
+  bodyOf,
+  formOf,
+  imageUrl,
+  type ApiItem,
+  type FormState,
+  type ItemType,
+} from "@/components/question-bank/model";
 import { TagInput } from "@/components/question-bank/TagInput";
 
 // Writing or correcting a question. A new question is saved as a draft only its writer sees; pictures are added to a SAVED question (each needs a description, or to be marked
@@ -40,17 +51,41 @@ export function QuestionForm({
 }) {
   return (
     <Dialog open={open} onClose={onClose} title={item ? "Edit the question" : "Write a question"} wide>
-      {open && <FormBody key={item?.id ?? "new"} item={item} writeCampuses={writeCampuses} wholeSchool={wholeSchool} onClose={onClose} onSaved={onSaved} />}
+      {open && (
+        <FormBody
+          key={item?.id ?? "new"}
+          item={item}
+          writeCampuses={writeCampuses}
+          wholeSchool={wholeSchool}
+          onClose={onClose}
+          onSaved={onSaved}
+        />
+      )}
     </Dialog>
   );
 }
 
-function FormBody({ item, writeCampuses, wholeSchool, onClose, onSaved }: { item: ApiItem | null; writeCampuses: { id: string; name: string }[]; wholeSchool: boolean; onClose: () => void; onSaved: (item: ApiItem, message: string) => void }) {
+function FormBody({
+  item,
+  writeCampuses,
+  wholeSchool,
+  onClose,
+  onSaved,
+}: {
+  item: ApiItem | null;
+  writeCampuses: { id: string; name: string }[];
+  wholeSchool: boolean;
+  onClose: () => void;
+  onSaved: (item: ApiItem, message: string) => void;
+}) {
   const api = useBankApi();
   const [saved, setSaved] = useState<ApiItem | null>(item);
   const [form, setForm] = useState<FormState>(item ? formOf(item) : blankForm());
   // "" is the whole school. A person tied to one campus is not asked: the server writes for their own campus.
-  const places = [...(wholeSchool ? [{ value: "", label: "The whole school" }] : []), ...writeCampuses.map((c) => ({ value: c.id, label: c.name }))];
+  const places = [
+    ...(wholeSchool ? [{ value: "", label: "The whole school" }] : []),
+    ...writeCampuses.map((c) => ({ value: c.id, label: c.name })),
+  ];
   const [campusId, setCampusId] = useState(places[0]?.value ?? "");
   const [problems, setProblems] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
@@ -64,7 +99,10 @@ function FormBody({ item, writeCampuses, wholeSchool, onClose, onSaved }: { item
     const body = bodyOf(form);
     const reply = saved
       ? await sendJson(itemUrl(api, saved.id), "PATCH", body)
-      : await sendJson(`${api}/items`, "POST", { ...(places.length > 1 || (wholeSchool && places.length === 1) ? { campusId: campusId || null } : {}), ...body });
+      : await sendJson(`${api}/items`, "POST", {
+          ...(places.length > 1 || (wholeSchool && places.length === 1) ? { campusId: campusId || null } : {}),
+          ...body,
+        });
     setPending(false);
     if (!reply.ok) {
       const details = (reply.details ?? []).map((d) => d.message);
@@ -115,14 +153,23 @@ function FormBody({ item, writeCampuses, wholeSchool, onClose, onSaved }: { item
                       name="correct"
                       aria-label={`Option ${index + 1} is correct`}
                       checked={multi ? form.multi.includes(index) : form.single === index}
-                      onChange={(e) => (multi ? set("multi", e.target.checked ? [...form.multi, index] : form.multi.filter((i) => i !== index)) : set("single", index))}
+                      onChange={(e) =>
+                        multi
+                          ? set("multi", e.target.checked ? [...form.multi, index] : form.multi.filter((i) => i !== index))
+                          : set("single", index)
+                      }
                     />
                   </label>
                   <div className="min-w-0 flex-1">
                     <TextField
                       label={`Option ${index + 1}`}
                       value={text}
-                      onChange={(e) => set("options", form.options.map((o, i) => (i === index ? e.target.value : o)))}
+                      onChange={(e) =>
+                        set(
+                          "options",
+                          form.options.map((o, i) => (i === index ? e.target.value : o)),
+                        )
+                      }
                       maxLength={520}
                     />
                   </div>
@@ -130,8 +177,14 @@ function FormBody({ item, writeCampuses, wholeSchool, onClose, onSaved }: { item
                     <Button
                       variant="ghost"
                       onClick={() => {
-                        set("options", form.options.filter((_, i) => i !== index));
-                        set("multi", form.multi.filter((i) => i !== index).map((i) => (i > index ? i - 1 : i)));
+                        set(
+                          "options",
+                          form.options.filter((_, i) => i !== index),
+                        );
+                        set(
+                          "multi",
+                          form.multi.filter((i) => i !== index).map((i) => (i > index ? i - 1 : i)),
+                        );
                         set("single", form.single === index ? 0 : form.single > index ? form.single - 1 : form.single);
                       }}
                     >
@@ -174,12 +227,25 @@ function FormBody({ item, writeCampuses, wholeSchool, onClose, onSaved }: { item
                     <TextField
                       label={`Accepted answer ${index + 1}`}
                       value={text}
-                      onChange={(e) => set("accepted", form.accepted.map((a, i) => (i === index ? e.target.value : a)))}
+                      onChange={(e) =>
+                        set(
+                          "accepted",
+                          form.accepted.map((a, i) => (i === index ? e.target.value : a)),
+                        )
+                      }
                       maxLength={520}
                     />
                   </div>
                   {form.accepted.length > 1 && (
-                    <Button variant="ghost" onClick={() => set("accepted", form.accepted.filter((_, i) => i !== index))}>
+                    <Button
+                      variant="ghost"
+                      onClick={() =>
+                        set(
+                          "accepted",
+                          form.accepted.filter((_, i) => i !== index),
+                        )
+                      }
+                    >
                       Remove<span className="sr-only"> answer {index + 1}</span>
                     </Button>
                   )}
@@ -194,7 +260,14 @@ function FormBody({ item, writeCampuses, wholeSchool, onClose, onSaved }: { item
           </fieldset>
         )}
 
-        <TextAreaField label="Explanation (optional)" rows={3} value={form.explanation} onChange={(e) => set("explanation", e.target.value)} maxLength={2100} hint="Shown to pupils after they answer." />
+        <TextAreaField
+          label="Explanation (optional)"
+          rows={3}
+          value={form.explanation}
+          onChange={(e) => set("explanation", e.target.value)}
+          maxLength={2100}
+          hint="Shown to pupils after they answer."
+        />
         <div className="grid gap-4 sm:grid-cols-3">
           <TextField label="Points" inputMode="numeric" value={form.points} onChange={(e) => set("points", e.target.value)} maxLength={3} />
           <SelectField
@@ -205,8 +278,19 @@ function FormBody({ item, writeCampuses, wholeSchool, onClose, onSaved }: { item
           />
           <TextField label="Topic (optional)" value={form.topic} onChange={(e) => set("topic", e.target.value)} maxLength={130} />
         </div>
-        <TextField label="Subject" value={form.subject} onChange={(e) => set("subject", e.target.value)} maxLength={90} hint="For example Mathematics. A reviewer can change it." />
-        <TagInput label="Classes" tags={form.classTags} onChange={(tags) => set("classTags", tags)} hint="For example JSS 1. Type one and press Enter." />
+        <TextField
+          label="Subject"
+          value={form.subject}
+          onChange={(e) => set("subject", e.target.value)}
+          maxLength={90}
+          hint="For example Mathematics. A reviewer can change it."
+        />
+        <TagInput
+          label="Classes"
+          tags={form.classTags}
+          onChange={(tags) => set("classTags", tags)}
+          hint="For example JSS 1. Type one and press Enter."
+        />
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button variant="ghost" onClick={onClose} disabled={pending}>
@@ -218,7 +302,15 @@ function FormBody({ item, writeCampuses, wholeSchool, onClose, onSaved }: { item
         </div>
       </form>
 
-      {saved && <Pictures item={saved} onChanged={(next, message) => { setSaved(next); onSaved(next, message); }} />}
+      {saved && (
+        <Pictures
+          item={saved}
+          onChanged={(next, message) => {
+            setSaved(next);
+            onSaved(next, message);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -236,7 +328,8 @@ function Pictures({ item, onChanged }: { item: ApiItem; onChanged: (item: ApiIte
     event.preventDefault();
     if (pending) return;
     if (!file) return setError("Choose a picture.");
-    if (!decorative && alt.trim() === "") return setError("Describe the picture for someone who cannot see it, or say it is only decoration.");
+    if (!decorative && alt.trim() === "")
+      return setError("Describe the picture for someone who cannot see it, or say it is only decoration.");
     setError(null);
     setPending(true);
     const data = new FormData();
@@ -278,7 +371,13 @@ function Pictures({ item, onChanged }: { item: ApiItem; onChanged: (item: ApiIte
           {item.images.map((image, index) => (
             <li key={image.id} className="space-y-2 rounded-xl border border-line bg-surface-2 p-2">
               {/* eslint-disable-next-line @next/next/no-img-element -- our own route, same origin, private */}
-              <img src={imageUrl(api, item.id, image.id)} alt={image.decorative ? "" : image.alt} width={image.width} height={image.height} className="mx-auto h-auto max-h-40 w-auto max-w-full" />
+              <img
+                src={imageUrl(api, item.id, image.id)}
+                alt={image.decorative ? "" : image.alt}
+                width={image.width}
+                height={image.height}
+                className="mx-auto h-auto max-h-40 w-auto max-w-full"
+              />
               <p className="text-xs text-fg-2">{image.decorative ? "Decoration only" : image.alt}</p>
               <Button variant="secondary" onClick={() => remove(image.id)} disabled={pending}>
                 Remove<span className="sr-only"> picture {index + 1}</span>
@@ -300,10 +399,23 @@ function Pictures({ item, onChanged }: { item: ApiItem; onChanged: (item: ApiIte
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             className="block w-full text-sm text-fg file:mr-3 file:min-h-11 file:rounded-xl file:border file:border-line-strong file:bg-surface file:px-4 file:text-sm file:font-semibold file:text-fg"
           />
-          <p className="mt-1.5 text-xs text-fg-muted">A JPEG, PNG or WebP picture under 8 MB. It is resized, and anything hidden in it (such as where it was taken) is removed.</p>
+          <p className="mt-1.5 text-xs text-fg-muted">
+            A JPEG, PNG or WebP picture under 8 MB. It is resized, and anything hidden in it (such as where it was taken) is removed.
+          </p>
         </div>
-        <TextField label="Describe the picture" value={alt} onChange={(e) => setAlt(e.target.value)} disabled={decorative} maxLength={320} hint="For someone who cannot see it." />
-        <CheckboxField label="It is only decoration (no description needed)" checked={decorative} onChange={(e) => setDecorative(e.target.checked)} />
+        <TextField
+          label="Describe the picture"
+          value={alt}
+          onChange={(e) => setAlt(e.target.value)}
+          disabled={decorative}
+          maxLength={320}
+          hint="For someone who cannot see it."
+        />
+        <CheckboxField
+          label="It is only decoration (no description needed)"
+          checked={decorative}
+          onChange={(e) => setDecorative(e.target.checked)}
+        />
         <Button type="submit" variant="secondary" loading={pending}>
           {pending ? "Adding…" : "Add picture"}
         </Button>

@@ -1,6 +1,15 @@
 import type { Prisma } from "@prisma/client";
 import type { Tx } from "@/lib/tenant/for-tenant";
-import { maySeeOverlap, maySetVisibility, mayDecide, mayEditAsSubmitter, maySubmit, mayMakeGeneral, type BankItemFacts, type BankViewer } from "@/lib/question-bank/rules";
+import {
+  maySeeOverlap,
+  maySetVisibility,
+  mayDecide,
+  mayEditAsSubmitter,
+  maySubmit,
+  mayMakeGeneral,
+  type BankItemFacts,
+  type BankViewer,
+} from "@/lib/question-bank/rules";
 import { overlapScore, OVERLAP_THRESHOLD } from "@/lib/question-bank/overlap";
 
 // What the question bank item services share (task 0024 slice C): the failure shape, the row each service selects, the view a staff member gets back, and the silent
@@ -103,7 +112,11 @@ async function latestReason(db: Pick<Tx, "questionBankReview">, row: ItemRow): P
   return review?.reason ?? null;
 }
 
-export async function viewOf(db: Pick<Tx, "questionBankReview" | "questionOverlapFlag">, viewer: BankViewer, row: ItemRow): Promise<ItemView> {
+export async function viewOf(
+  db: Pick<Tx, "questionBankReview" | "questionOverlapFlag">,
+  viewer: BankViewer,
+  row: ItemRow,
+): Promise<ItemView> {
   const facts = factsOf(row);
   const view: ItemView = {
     id: row.id,
@@ -161,7 +174,9 @@ export async function lockItem(tx: Tx, tenantId: string, id: string): Promise<It
 /// The words the question is compared by: its prompt and each option (an option is `{ text }` in the bank and a plain string in a quiz).
 const inputOf = (row: { prompt: string; options: unknown }) => ({
   prompt: row.prompt,
-  options: Array.isArray(row.options) ? row.options.map((option: unknown) => (typeof option === "string" ? option : String((option as { text?: unknown })?.text ?? ""))) : [],
+  options: Array.isArray(row.options)
+    ? row.options.map((option: unknown) => (typeof option === "string" ? option : String((option as { text?: unknown })?.text ?? "")))
+    : [],
 });
 
 const CANDIDATES = 500;

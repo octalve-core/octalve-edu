@@ -2,7 +2,19 @@ import "../support/env";
 import { test, expect } from "@playwright/test";
 import sharp from "sharp";
 import { SAAS_URL } from "../support/env";
-import { DEFAULT_PASSWORD, Role, addMembership, createTenant, createUser, db, enableMfa, removeCreatedTenants, seedInstance, type TestTenant, type TestUser } from "../support/db";
+import {
+  DEFAULT_PASSWORD,
+  Role,
+  addMembership,
+  createTenant,
+  createUser,
+  db,
+  enableMfa,
+  removeCreatedTenants,
+  seedInstance,
+  type TestTenant,
+  type TestUser,
+} from "../support/db";
 import { api as rawApi, cookieHeader } from "../support/http";
 import { createSession } from "@/lib/auth/session";
 import { forTenant, type Tx } from "@/lib/tenant/for-tenant";
@@ -57,8 +69,19 @@ test.beforeEach(async () => {
   await db.$executeRawUnsafe(
     `TRUNCATE "QuestionBankAudit", "QuestionBankReview", "QuestionBankItemVersion", "QuestionOverlapFlag", "QuestionBankImage", "QuestionBankClassTag", "QuestionBankItem", "QuestionBankReviewer", "QuestionBankSetting" RESTART IDENTITY CASCADE`,
   );
-  await db.questionBankReviewer.create({ data: { tenantId: a.id, userId: users.reviewer.id, assignedById: users.admin.id, scope: "GENERAL", campusId: north.id } });
-  await db.questionBankReviewer.create({ data: { tenantId: a.id, userId: users.exam.id, assignedById: users.admin.id, scope: "GENERAL", campusId: north.id, isExamApprover: true } });
+  await db.questionBankReviewer.create({
+    data: { tenantId: a.id, userId: users.reviewer.id, assignedById: users.admin.id, scope: "GENERAL", campusId: north.id },
+  });
+  await db.questionBankReviewer.create({
+    data: {
+      tenantId: a.id,
+      userId: users.exam.id,
+      assignedById: users.admin.id,
+      scope: "GENERAL",
+      campusId: north.id,
+      isExamApprover: true,
+    },
+  });
 });
 test.afterAll(async () => {
   await removeCreatedTenants();
@@ -81,20 +104,38 @@ const create = async (who: Who) => {
   expect(res.status, res.text).toBe(201);
   return res.json.data.item as { id: string };
 };
-const decide = (who: Who, id: string, action: string, payload: unknown = {}) => api(`${ITEMS}/${id}/${action}`, { method: "POST", cookie: ck[who], body: payload });
+const decide = (who: Who, id: string, action: string, payload: unknown = {}) =>
+  api(`${ITEMS}/${id}/${action}`, { method: "POST", cookie: ck[who], body: payload });
 // pictures
-const GPS = { IFD0: { Copyright: "SECRET-COPYRIGHT-MARK", Software: "SECRET-SOFTWARE-MARK" }, IFD3: { GPSLatitudeRef: "N", GPSLatitude: "51/1 30/1 0/1", GPSLongitudeRef: "W", GPSLongitude: "0/1 7/1 0/1" } };
-const jpegWithGps = () => sharp({ create: { width: 64, height: 48, channels: 3, background: "#3366aa" } }).jpeg().withExif(GPS).toBuffer();
-const png = (colour = "#aa3333") => sharp({ create: { width: 40, height: 30, channels: 3, background: colour } }).png().toBuffer();
+const GPS = {
+  IFD0: { Copyright: "SECRET-COPYRIGHT-MARK", Software: "SECRET-SOFTWARE-MARK" },
+  IFD3: { GPSLatitudeRef: "N", GPSLatitude: "51/1 30/1 0/1", GPSLongitudeRef: "W", GPSLongitude: "0/1 7/1 0/1" },
+};
+const jpegWithGps = () =>
+  sharp({ create: { width: 64, height: 48, channels: 3, background: "#3366aa" } })
+    .jpeg()
+    .withExif(GPS)
+    .toBuffer();
+const png = (colour = "#aa3333") =>
+  sharp({ create: { width: 40, height: 30, channels: 3, background: colour } })
+    .png()
+    .toBuffer();
 
-const form = (file: Uint8Array | null, fields: Record<string, string> = { alt: "A blue rectangle" }, name = "picture.jpg", type = "image/jpeg") => {
+const form = (
+  file: Uint8Array | null,
+  fields: Record<string, string> = { alt: "A blue rectangle" },
+  name = "picture.jpg",
+  type = "image/jpeg",
+) => {
   const data = new FormData();
   if (file) data.append("file", new Blob([file as BlobPart], { type }), name);
   for (const [key, value] of Object.entries(fields)) data.append(key, value);
   return data;
 };
-const upload = (who: Who | undefined, id: string, data: FormData, url = ITEMS) => api(`${url}/${id}/images`, { method: "POST", cookie: who ? ck[who] : undefined, form: data });
-const serve = (who: Who | undefined, id: string, imageId: string, url = ITEMS) => api(`${url}/${id}/images/${imageId}`, { cookie: who ? ck[who] : undefined });
+const upload = (who: Who | undefined, id: string, data: FormData, url = ITEMS) =>
+  api(`${url}/${id}/images`, { method: "POST", cookie: who ? ck[who] : undefined, form: data });
+const serve = (who: Who | undefined, id: string, imageId: string, url = ITEMS) =>
+  api(`${url}/${id}/images/${imageId}`, { cookie: who ? ck[who] : undefined });
 const stored = (id: string) => db.questionBankItem.findUniqueOrThrow({ where: { id }, include: { images: true } });
 
 test.describe("adding and serving a picture", () => {
@@ -104,14 +145,21 @@ test.describe("adding and serving a picture", () => {
     expect(res.status, res.text).toBe(201);
     const imageId = res.json.data.imageId as string;
     expect(res.json.data.item).toMatchObject({ version: 2, status: "DRAFT" });
-    expect(res.json.data.item.images).toEqual([expect.objectContaining({ id: imageId, alt: "A blue rectangle", decorative: false, contentType: "image/jpeg", sortOrder: 0 })]);
+    expect(res.json.data.item.images).toEqual([
+      expect.objectContaining({ id: imageId, alt: "A blue rectangle", decorative: false, contentType: "image/jpeg", sortOrder: 0 }),
+    ]);
     expect(JSON.stringify(res.json)).not.toMatch(/storageKey|octalve\/|question-bank\/img_/); // nothing says where the file lives
 
     const row = await db.questionBankImage.findUniqueOrThrow({ where: { id: imageId } });
     expect(row).toMatchObject({ tenantId: a.id, itemId: item.id, store: "memory", contentType: "image/jpeg", width: 64, height: 48 });
     expect(row.storageKey).toBe(`octalve/${a.id}/question-bank/${imageId}`); // the school is in the key
     expect(await db.questionBankItemVersion.count({ where: { itemId: item.id, version: 2 } })).toBe(1);
-    expect((await db.questionBankAudit.findMany({ where: { action: "IMAGE_ADDED" } }))[0]).toMatchObject({ tenantId: a.id, itemId: item.id, actorUserId: users.writer.id, campusId: north.id });
+    expect((await db.questionBankAudit.findMany({ where: { action: "IMAGE_ADDED" } }))[0]).toMatchObject({
+      tenantId: a.id,
+      itemId: item.id,
+      actorUserId: users.writer.id,
+      campusId: north.id,
+    });
 
     const got = await serve("writer", item.id, imageId);
     expect(got.status).toBe(200);
@@ -134,7 +182,15 @@ test.describe("adding and serving a picture", () => {
     const ok = await upload("writer", item.id, form(file, { decorative: "true" }));
     expect(ok.status, ok.text).toBe(201);
     expect(ok.json.data.item.images[0]).toMatchObject({ decorative: true, alt: "" });
-    const refused: Record<string, string>[] = [{}, { alt: "   " }, { alt: "x".repeat(301) }, { alt: "ok", decorative: "true" }, { alt: "ok", decorative: "yes" }, { alt: "bad\u0000text" }, { alt: "hidden‮text" }];
+    const refused: Record<string, string>[] = [
+      {},
+      { alt: "   " },
+      { alt: "x".repeat(301) },
+      { alt: "ok", decorative: "true" },
+      { alt: "ok", decorative: "yes" },
+      { alt: "bad\u0000text" },
+      { alt: "hidden\u202etext" },
+    ];
     for (const fields of refused) {
       const res = await upload("writer", item.id, form(file, fields));
       expect(res.status, JSON.stringify(fields)).toBe(400);
@@ -176,7 +232,12 @@ test.describe("adding and serving a picture", () => {
     expect(big.json.error.code).toBe("IMAGE_REJECTED");
     const json = await api(`${ITEMS}/${item.id}/images`, { method: "POST", cookie: ck.writer, body: { alt: "x" } });
     expect(json.status).toBe(415);
-    const broken = await api(`${ITEMS}/${item.id}/images`, { method: "POST", cookie: ck.writer, rawBody: "garbage", headers: { "content-type": "multipart/form-data; boundary=xyz" } });
+    const broken = await api(`${ITEMS}/${item.id}/images`, {
+      method: "POST",
+      cookie: ck.writer,
+      rawBody: "garbage",
+      headers: { "content-type": "multipart/form-data; boundary=xyz" },
+    });
     expect(broken.status).toBe(400);
     const file = await png();
     expect((await upload("writer", item.id, form(file, { alt: "x", caption: "no" }))).status).toBe(400);
@@ -201,7 +262,9 @@ test.describe("adding and serving a picture", () => {
     expect(fourth.json.error.code).toBe("IMAGE_LIMIT");
     expect((await stored(item.id)).images.map((image) => image.sortOrder).sort()).toEqual([0, 1, 2]);
 
-    await db.questionBankSetting.create({ data: { tenantId: a.id, campusId: null, key: "bank.images.max", value: 4, updatedById: users.admin.id } });
+    await db.questionBankSetting.create({
+      data: { tenantId: a.id, campusId: null, key: "bank.images.max", value: 4, updatedById: users.admin.id },
+    });
     const racing = await create("writer");
     const results = await Promise.all([1, 2, 3, 4, 5].map(() => upload("writer", racing.id, form(file))));
     expect(results.filter((r) => r.status === 201).length).toBe(4);
@@ -211,8 +274,12 @@ test.describe("adding and serving a picture", () => {
 
   test("the limits come from the school's settings: a larger picture is drawn again smaller", async () => {
     const item = await create("writer");
-    await db.questionBankSetting.create({ data: { tenantId: a.id, campusId: null, key: "bank.images.maxLongSide", value: 400, updatedById: users.admin.id } });
-    const wide = await sharp({ create: { width: 1200, height: 600, channels: 3, background: "#118833" } }).png().toBuffer();
+    await db.questionBankSetting.create({
+      data: { tenantId: a.id, campusId: null, key: "bank.images.maxLongSide", value: 400, updatedById: users.admin.id },
+    });
+    const wide = await sharp({ create: { width: 1200, height: 600, channels: 3, background: "#118833" } })
+      .png()
+      .toBuffer();
     const res = await upload("writer", item.id, form(wide));
     expect(res.status, res.text).toBe(201);
     const row = (await stored(item.id)).images[0];
@@ -292,15 +359,23 @@ test.describe("who may add, serve and remove", () => {
   test("the question bank switched off for staff closes the pictures too; a person whose membership ended a moment ago changes nothing", async () => {
     const item = await create("writer");
     const file = await png();
-    const off = await db.questionBankSetting.create({ data: { tenantId: a.id, campusId: north.id, key: "bank.access.staff", value: false, updatedById: users.admin.id } });
+    const off = await db.questionBankSetting.create({
+      data: { tenantId: a.id, campusId: north.id, key: "bank.access.staff", value: false, updatedById: users.admin.id },
+    });
     const refused = await upload("writer", item.id, form(file));
     expect(refused.status).toBe(403);
     expect(refused.json.error.code).toBe("BANK_OFF");
     await db.questionBankSetting.delete({ where: { id: off.id } });
 
-    await db.tenantMembership.update({ where: { userId_tenantId: { userId: users.writer.id, tenantId: a.id } }, data: { deactivatedAt: new Date() } });
+    await db.tenantMembership.update({
+      where: { userId_tenantId: { userId: users.writer.id, tenantId: a.id } },
+      data: { deactivatedAt: new Date() },
+    });
     expect((await upload("writer", item.id, form(file))).status).toBeGreaterThanOrEqual(401);
-    await db.tenantMembership.update({ where: { userId_tenantId: { userId: users.writer.id, tenantId: a.id } }, data: { deactivatedAt: null } });
+    await db.tenantMembership.update({
+      where: { userId_tenantId: { userId: users.writer.id, tenantId: a.id } },
+      data: { deactivatedAt: null },
+    });
     expect((await stored(item.id)).images.length).toBe(0);
   });
 });
@@ -315,7 +390,10 @@ test.describe("another school", () => {
     expect((await upload("teacherB", item.id, form(await png()), bItems)).status).toBe(404);
     expect((await api(`${bItems}/${item.id}/images/${imageId}`, { method: "DELETE", cookie: ck.teacherB })).status).toBe(404);
     // through A's address: B's teacher is not a member of A
-    for (const status of [(await serve("teacherB", item.id, imageId)).status, (await upload("teacherB", item.id, form(await png()))).status]) {
+    for (const status of [
+      (await serve("teacherB", item.id, imageId)).status,
+      (await upload("teacherB", item.id, form(await png()))).status,
+    ]) {
       expect([403, 404]).toContain(status);
     }
     expect((await stored(item.id)).images.length).toBe(1);
@@ -328,10 +406,19 @@ test.describe("another school", () => {
     const grant = await api(`/api/v1/schools/${a.code}/support-grants`, {
       method: "POST",
       cookie: ck.admin,
-      body: { areas: ["settings", "academics", "people", "attendance", "results"], hours: 2, reason: "Ticket 3: checking the question pictures", stepUp: { type: "password", value: DEFAULT_PASSWORD } },
+      body: {
+        areas: ["settings", "academics", "people", "attendance", "results"],
+        hours: 2,
+        reason: "Ticket 3: checking the question pictures",
+        stepUp: { type: "password", value: DEFAULT_PASSWORD },
+      },
     });
     expect(grant.status, grant.text).toBe(201);
-    const opened = await api("/api/v1/platform/support/open", { method: "POST", cookie: ck.platform, body: { code: a.code, password: DEFAULT_PASSWORD } });
+    const opened = await api("/api/v1/platform/support/open", {
+      method: "POST",
+      cookie: ck.platform,
+      body: { code: a.code, password: DEFAULT_PASSWORD },
+    });
     expect(opened.status, opened.text).toBe(200);
     for (const [path, method] of [
       [`${ITEMS}/${item.id}/images/${imageId}`, "GET"],
@@ -355,7 +442,11 @@ test.describe("removing a picture", () => {
     expect(res.json.data.item.version).toBe(4);
     expect((await serve("writer", item.id, first)).status).toBe(404);
     expect((await serve("writer", item.id, second)).status).toBe(200);
-    expect((await db.questionBankAudit.findMany({ where: { action: "IMAGE_REMOVED" } }))[0]).toMatchObject({ tenantId: a.id, itemId: item.id, actorUserId: users.writer.id });
+    expect((await db.questionBankAudit.findMany({ where: { action: "IMAGE_REMOVED" } }))[0]).toMatchObject({
+      tenantId: a.id,
+      itemId: item.id,
+      actorUserId: users.writer.id,
+    });
     expect((await api(`${ITEMS}/${item.id}/images/${first}`, { method: "DELETE", cookie: ck.writer })).status).toBe(404);
     // the freed place can be used again, in the next order
     const again = await upload("writer", item.id, form(await png("#222222")));

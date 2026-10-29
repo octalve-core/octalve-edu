@@ -274,7 +274,7 @@ test.describe("changing people", () => {
 
     await edit.click();
     const group = dialog(page).getByRole("group", { name: "Extra permissions" });
-    await expect(group.getByRole("checkbox")).toHaveCount(4);
+    await expect(group.getByRole("checkbox")).toHaveCount(5); // approve results, manage fees, publish, manage people, see form results
     await expect(group.getByRole("checkbox", { checked: true })).toHaveCount(0);
     await expect(group).toContainText("Administrators can do all of these already.");
     await group.getByLabel("Manage fees and payments").check();

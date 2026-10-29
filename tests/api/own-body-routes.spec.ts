@@ -12,6 +12,10 @@ import { NUL_MESSAGE } from "@/lib/api/no-nul";
 // value is 400 VALIDATION (PostgreSQL cannot store one). The routes are found by reading the route files, so a route that adopts the reader later is held to the rule without
 // a line here (tests/unit/route-body-guard.spec.ts fails on a route that reads its body any other way). The first-run wizard, which only exists on the solo server, is in
 // setup.spec.ts; the payment webhook, which needs the raw text for its signature, and the student restore route, whose body is optional, are at the end of this file.
+//
+// A route under schools/[code] is called the way its own guard lets someone in: the real school code, a made-up value for every other [segment] (the reader runs before any
+// lookup, so the value is never looked up), and the person its kind needs - a school administrator for the staff routes, a pupil for the portal routes, nobody for a survey's
+// public link (the link is its credential). Without that every one of them is refused at the door (403) and the reader is never reached.
 
 const NUL = String.fromCharCode(0);
 const MIB = 1024 * 1024;
@@ -42,6 +46,7 @@ const routes = ownBodyRoutes();
 
 let school: TestTenant;
 let cookie: string;
+let pupilCookie: string;
 
 test.beforeAll(async () => {
   await seedInstance();
@@ -51,13 +56,22 @@ test.beforeAll(async () => {
   const login = await loginAs(admin, { baseUrl: SAAS_URL });
   expect(login.status).toBe(200);
   cookie = cookieHeader(login.token!);
+  const pupil = await createUser({ name: "Pupil Pat" });
+  await addMembership(pupil.id, school.id, Role.STUDENT);
+  const pupilLogin = await loginAs(pupil, { baseUrl: SAAS_URL });
+  expect(pupilLogin.status).toBe(200);
+  pupilCookie = cookieHeader(pupilLogin.token!);
 });
 test.afterAll(async () => {
   await removeCreatedTenants();
 });
 
-const send = (route: OwnBodyRoute, opts: { body?: unknown; rawBody?: string }) =>
-  api(`/api/v1/${route.rel}`, { method: route.method, baseUrl: SAAS_URL, cookie, ...opts });
+const send = (route: OwnBodyRoute, opts: { body?: unknown; rawBody?: string }) => {
+  const tenant = route.rel.startsWith("schools/[code]/");
+  const url = tenant ? route.rel.replace("[code]", school.code).replace(/\[[^\]]+\]/g, "x") : route.rel;
+  const who = !tenant ? cookie : route.rel.includes("/portal/") ? pupilCookie : route.rel.includes("/forms/public/") ? undefined : cookie;
+  return api(`/api/v1/${url}`, { method: route.method, baseUrl: SAAS_URL, cookie: who, ...opts });
+};
 
 test.describe("every route that reads its own body", () => {
   test("the sweep finds the routes (so it cannot pass by looking at none)", () => {

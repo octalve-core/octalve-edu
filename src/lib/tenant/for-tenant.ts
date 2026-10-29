@@ -49,6 +49,14 @@ export async function setVerificationContext(tx: Tx, token: string): Promise<voi
   await tx.$queryRaw`SELECT set_config('app.verification_token', ${token}::text, true)`;
 }
 
+/// Sets the *share* context for a public survey link: the share token of the questionnaire the caller holds a link to. The policy on `Form` lets this context read exactly the one
+/// PUBLISHED questionnaire whose token matches and nothing else, and nothing is writable through it: the code then sets the TENANT context from the row it found (`setTenantContext`
+/// with a `trustedTenantId` — the token named the school) before it reads the questions or writes an answer.
+export async function setShareContext(tx: Tx, token: string): Promise<void> {
+  if (!/^[0-9a-f]{32}$/.test(token)) throw new Error("setShareContext: not a valid share token");
+  await tx.$queryRaw`SELECT set_config('app.share_token', ${token}::text, true)`;
+}
+
 export function forTenant(tenantId: VerifiedTenantId) {
   return {
     /// Runs `fn` in one transaction with the tenant context set. Rolls back if `fn` throws.
@@ -88,6 +96,17 @@ export function forVerification(token: string) {
     transaction<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
       return prisma.$transaction(async (tx) => {
         await setVerificationContext(tx, token);
+        return fn(tx);
+      }, TRANSACTION_OPTIONS);
+    },
+  };
+}
+
+export function forShareToken(token: string) {
+  return {
+    transaction<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
+      return prisma.$transaction(async (tx) => {
+        await setShareContext(tx, token);
         return fn(tx);
       }, TRANSACTION_OPTIONS);
     },

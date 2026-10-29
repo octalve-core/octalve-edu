@@ -130,18 +130,22 @@ model Quiz {
   timeLimitMinutes Int?
   passingScore     Float?
   status           QuizStatus   @default(DRAFT)
+  isExamTemplate   Boolean      @default(false)
+  examWindowStart  DateTime?
+  examWindowEnd    DateTime?
   createdById      String?
   archivedAt       DateTime?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @default(now()) @updatedAt
 
-  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  campus     Campus?        @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
-  subject    Subject        @relation(fields: [tenantId, subjectId], references: [tenantId, id], onDelete: NoAction)
-  classGroup ClassGroup?    @relation(fields: [tenantId, classGroupId], references: [tenantId, id], onDelete: NoAction)
-  creator    StaffRecord?   @relation(fields: [tenantId, createdById], references: [tenantId, id], onDelete: NoAction)
-  questions  QuizQuestion[]
-  attempts   QuizAttempt[]
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus            Campus?            @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  subject           Subject            @relation(fields: [tenantId, subjectId], references: [tenantId, id], onDelete: NoAction)
+  classGroup        ClassGroup?        @relation(fields: [tenantId, classGroupId], references: [tenantId, id], onDelete: NoAction)
+  creator           StaffRecord?       @relation(fields: [tenantId, createdById], references: [tenantId, id], onDelete: NoAction)
+  questions         QuizQuestion[]
+  attempts          QuizAttempt[]
+  questionBankItems QuestionBankItem[]
 
   @@unique([tenantId, id])
   @@index([tenantId, subjectId])
@@ -149,23 +153,28 @@ model Quiz {
 }
 
 model QuizQuestion {
-  id            String       @id @default(cuid())
-  tenantId      String
-  quizId        String
-  prompt        String
-  questionType  QuestionType @default(MULTIPLE_CHOICE)
-  options       Json         @default("[]")
-  correctAnswer String
-  points        Int          @default(1)
-  sortOrder     Int          @default(0)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @default(now()) @updatedAt
+  id                String            @id @default(cuid())
+  tenantId          String
+  quizId            String
+  prompt            String
+  questionType      QuestionType      @default(MULTIPLE_CHOICE)
+  options           Json              @default("[]")
+  correctAnswer     String
+  points            Int               @default(1)
+  sortOrder         Int               @default(0)
+  sourceItemId      String?
+  sourceVersion     Int?
+  exposedToPractice Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @default(now()) @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  quiz   Quiz   @relation(fields: [tenantId, quizId], references: [tenantId, id], onDelete: Cascade)
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  quiz       Quiz              @relation(fields: [tenantId, quizId], references: [tenantId, id], onDelete: Cascade)
+  sourceItem QuestionBankItem? @relation(fields: [tenantId, sourceItemId], references: [tenantId, id], onDelete: SetNull)
 
   @@unique([tenantId, id])
   @@index([tenantId, quizId])
+  @@index([tenantId, sourceItemId])
 }
 
 model QuizAttempt {

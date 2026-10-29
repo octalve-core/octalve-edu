@@ -70,32 +70,39 @@ model QuestionBankItem {
   subjectKey    String?
   visibility    BankVisibility   @default(TEACHERS_ONLY)
   /// For TEACHERS_ONLY_UNTIL: the date from which pupils may see it (the "until an assessment closes" form arrives with slice 3).
-  visibleFrom   DateTime?
-  status        BankItemStatus   @default(DRAFT)
+  visibleFrom        DateTime?
+  visibleAfterQuizId String?
+  status             BankItemStatus   @default(DRAFT)
   /// A fix creates a new version; old versions are kept.
-  version       Int              @default(1)
-  submittedById String
-  approvedById  String?
-  approvedAt    DateTime?
-  retiredReason String?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @default(now()) @updatedAt
+  version            Int              @default(1)
+  submittedById      String
+  approvedById       String?
+  approvedAt         DateTime?
+  retiredReason      String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @default(now()) @updatedAt
 
-  tenant      Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  campus      Campus?                   @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
-  submittedBy TenantMembership          @relation("BankItemSubmitter", fields: [submittedById, tenantId], references: [userId, tenantId], onDelete: NoAction)
-  approvedBy  TenantMembership?         @relation("BankItemApprover", fields: [approvedById, tenantId], references: [userId, tenantId], onDelete: NoAction)
-  images      QuestionBankImage[]
-  classTags   QuestionBankClassTag[]
-  reviews     QuestionBankReview[]
-  versions    QuestionBankItemVersion[]
-  flags       QuestionOverlapFlag[]     @relation("FlagItem")
-  similarTo   QuestionOverlapFlag[]     @relation("FlagSimilarTo")
+  tenant           Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus           Campus?                   @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  submittedBy      TenantMembership          @relation("BankItemSubmitter", fields: [submittedById, tenantId], references: [userId, tenantId], onDelete: NoAction)
+  approvedBy       TenantMembership?         @relation("BankItemApprover", fields: [approvedById, tenantId], references: [userId, tenantId], onDelete: NoAction)
+  visibleAfterQuiz Quiz?                     @relation(fields: [tenantId, visibleAfterQuizId], references: [tenantId, id], onDelete: SetNull)
+  images           QuestionBankImage[]
+  classTags        QuestionBankClassTag[]
+  reviews          QuestionBankReview[]
+  versions         QuestionBankItemVersion[]
+  flags            QuestionOverlapFlag[]     @relation("FlagItem")
+  similarTo        QuestionOverlapFlag[]     @relation("FlagSimilarTo")
+  copiedQuestions  QuizQuestion[]
+  practiceAttempts PracticeAttempt[]
+  reports          QuestionReport[]
+  formQuestions    FormQuestion[]
 
   @@unique([tenantId, id])
   @@index([tenantId, campusId, status])
   @@index([tenantId, status, visibility])
   @@index([tenantId, bank, subjectKey])
+  @@index([tenantId, visibleAfterQuizId])
 }
 
 /// At most 4 per item (a trigger; the school's setting, 3 or 4, is enforced by the service). Alt text is required unless the image is marked decorative (a check).
@@ -267,3 +274,137 @@ model QuestionBankSetting {
 
   @@index([tenantId, campusId])
 }
+
+enum PracticeFeedbackMode {
+  EACH
+  END
+}
+
+model PracticeSession {
+  id           String               @id @default(cuid())
+  tenantId     String
+  campusId     String?
+  studentId    String
+  classGroupId String?
+  subjectLabel String
+  subjectKey   String
+  topic        String?
+  size         Int
+  feedbackMode PracticeFeedbackMode @default(EACH)
+  itemIds      Json                 @default("[]")
+  startedAt    DateTime             @default(now())
+  finishedAt   DateTime?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @default(now()) @updatedAt
+
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus     Campus?           @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  student    StudentRecord     @relation(fields: [tenantId, studentId], references: [tenantId, id], onDelete: Cascade)
+  classGroup ClassGroup?       @relation(fields: [tenantId, classGroupId], references: [tenantId, id], onDelete: SetNull)
+  attempts   PracticeAttempt[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, studentId, startedAt])
+  @@index([tenantId, subjectKey])
+}
+
+model PracticeAttempt {
+  id         String    @id @default(cuid())
+  tenantId   String
+  sessionId  String
+  studentId  String
+  bankItemId String
+  version    Int
+  answer     Json
+  correct    Boolean
+  answeredAt DateTime  @default(now())
+  archivedAt DateTime?
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  session  PracticeSession  @relation(fields: [tenantId, sessionId], references: [tenantId, id], onDelete: Cascade)
+  student  StudentRecord    @relation(fields: [tenantId, studentId], references: [tenantId, id], onDelete: Cascade)
+  bankItem QuestionBankItem @relation(fields: [tenantId, bankItemId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, studentId, answeredAt])
+  @@index([tenantId, sessionId])
+  @@index([tenantId, bankItemId])
+}
+
+enum QuestionReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+enum QuestionReportOutcome {
+  FIXED
+  NOT_AN_ERROR
+  NEEDS_DISCUSSION
+}
+
+model QuestionReport {
+  id                String                 @id @default(cuid())
+  tenantId          String
+  campusId          String?
+  bankItemId        String
+  reporterUserId    String
+  reporterRole      String
+  reporterStudentId String?
+  reason            String
+  status            QuestionReportStatus   @default(OPEN)
+  resolvedById      String?
+  resolvedAt        DateTime?
+  outcome           QuestionReportOutcome?
+  explanation       String?
+  regradeImpact     Json?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @default(now()) @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus          Campus?          @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  bankItem        QuestionBankItem @relation(fields: [tenantId, bankItemId], references: [tenantId, id], onDelete: Cascade)
+  reporter        User             @relation("QuestionReportsFiled", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  reporterStudent StudentRecord?   @relation(fields: [tenantId, reporterStudentId], references: [tenantId, id], onDelete: SetNull)
+  resolvedBy      User?            @relation("QuestionReportsResolved", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, bankItemId, status])
+  @@index([tenantId, reporterUserId])
+}
+
+enum PrintTargetKind {
+  QUESTION_BANK_ITEM
+  FORM
+  QUIZ
+  PRACTICE_SESSION
+  FORM_RESPONSE
+}
+
+model QuestionBankPrintLog {
+  id                 String          @id @default(cuid())
+  tenantId           String
+  campusId           String?
+  targetKind         PrintTargetKind
+  targetId           String
+  title              String
+  watermark          String
+  pageCount          Int             @default(1)
+  reason             String?
+  recipientStudentId String?
+  printedById        String
+  ipAddress          String?
+  userAgent          String?
+  printedAt          DateTime        @default(now())
+
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus           Campus?        @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  printedBy        User           @relation("UserPrintLogs", fields: [printedById], references: [id], onDelete: Restrict)
+  recipientStudent StudentRecord? @relation("PrintLogRecipient", fields: [tenantId, recipientStudentId], references: [tenantId, id], onDelete: SetNull)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, targetKind, targetId])
+  @@index([tenantId, printedById])
+  @@index([tenantId, printedAt])
+}
+

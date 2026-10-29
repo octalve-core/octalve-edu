@@ -20,6 +20,8 @@ the files of `src/app/` that wrap every page (root layout, web manifest, icons, 
 | --- | --- | --- |
 | `/` | `page.tsx` | Router that never renders UI (`force-dynamic`), open to anyone: a signed-in visitor (`getSession()`) goes to `/dashboard`; otherwise, with `DEPLOYMENT_MODE=solo` and first-run set-up known to be incomplete, to `/setup`; otherwise to `/login`. An unknown set-up state (database error) does not redirect to `/setup`. |
 | `/offline` | `offline/page.tsx` | Static page anyone can open (no data, no session check): says the person is offline, that the Quick Tools dock still works and that payments logged offline sync when the connection returns, with a `Try Reconnecting` link to `/`. `public/sw.js` serves it as the fallback for a failed navigation, if it has it cached. |
+| `/video-guide` | `video-guide/page.tsx` | In-app video guide and product walkthrough player: HTML5 video player with WebVTT subtitles, interactive chapter seeking sidebar, and downloads for full video and captioned PDF. |
+
 
 ## App-level files (`src/app/`)
 

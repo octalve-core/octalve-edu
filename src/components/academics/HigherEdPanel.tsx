@@ -132,9 +132,7 @@ export function HigherEdPanel({ schoolCode: _schoolCode, initialDepartments = []
           <button
             onClick={() => setActiveTab("registrations")}
             className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-              activeTab === "registrations"
-                ? "bg-brand-strong text-white shadow-sm"
-                : "bg-surface-2 text-fg-muted hover:bg-surface-2"
+              activeTab === "registrations" ? "bg-brand-strong text-white shadow-sm" : "bg-surface-2 text-fg-muted hover:bg-surface-2"
             }`}
           >
             Registrations & GPA
@@ -152,9 +150,7 @@ export function HigherEdPanel({ schoolCode: _schoolCode, initialDepartments = []
                   key={lvl}
                   onClick={() => setSelectedLevel(lvl)}
                   className={`rounded px-3 py-1 text-xs font-semibold transition ${
-                    selectedLevel === lvl
-                      ? "bg-brand-strong text-white"
-                      : "border border-line bg-surface text-fg hover:bg-accent"
+                    selectedLevel === lvl ? "bg-brand-strong text-white" : "border border-line bg-surface text-fg hover:bg-accent"
                   }`}
                 >
                   {lvl}L
@@ -168,9 +164,7 @@ export function HigherEdPanel({ schoolCode: _schoolCode, initialDepartments = []
                   key={sem}
                   onClick={() => setSelectedSemester(sem)}
                   className={`rounded px-3 py-1 text-xs font-semibold transition ${
-                    selectedSemester === sem
-                      ? "bg-brand-strong text-white"
-                      : "border border-line bg-surface text-fg hover:bg-accent"
+                    selectedSemester === sem ? "bg-brand-strong text-white" : "border border-line bg-surface text-fg hover:bg-accent"
                   }`}
                 >
                   Semester {sem}

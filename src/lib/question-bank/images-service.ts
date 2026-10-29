@@ -5,7 +5,19 @@ import { effectiveSettingsIn } from "@/lib/question-bank/settings-service";
 import { loadViewer } from "@/lib/question-bank/viewer";
 import { mayDecide, mayEditAsSubmitter, staffMaySee, type BankViewer } from "@/lib/question-bank/rules";
 import { ImageRejectedError, processQuestionImage } from "@/lib/question-bank/images";
-import { ITEM_SELECT, NOT_FOUND, factsOf, fail, lockItem, snapshotOf, viewOf, type Fail, type ItemRow, type ItemView, type Tx } from "@/lib/question-bank/items-common";
+import {
+  ITEM_SELECT,
+  NOT_FOUND,
+  factsOf,
+  fail,
+  lockItem,
+  snapshotOf,
+  viewOf,
+  type Fail,
+  type ItemRow,
+  type ItemView,
+  type Tx,
+} from "@/lib/question-bank/items-common";
 import { ACCESS_OFF, bankOpenFor } from "@/lib/question-bank/items-service";
 import { getImageStore, StorageError, StorageNotConfiguredError, STORE_NAMES, type ImageStore, type StoreName } from "@/lib/storage";
 
@@ -47,14 +59,20 @@ async function recordEdit(tx: Tx, tenantId: string, userId: string, before: Item
   const version = before.version + 1;
   await tx.questionBankItem.update({ where: { id: before.id }, data: { version } });
   const after = await tx.questionBankItem.findFirstOrThrow({ where: { id: before.id, tenantId }, select: ITEM_SELECT });
-  await tx.questionBankItemVersion.create({ data: { tenantId, itemId: after.id, version, snapshot: snapshotOf(after), actorUserId: userId } });
-  if (asReviewer) await tx.questionBankReview.create({ data: { tenantId, itemId: after.id, version, reviewerId: userId, outcome: "EDITED" } });
+  await tx.questionBankItemVersion.create({
+    data: { tenantId, itemId: after.id, version, snapshot: snapshotOf(after), actorUserId: userId },
+  });
+  if (asReviewer)
+    await tx.questionBankReview.create({ data: { tenantId, itemId: after.id, version, reviewerId: userId, outcome: "EDITED" } });
   return after;
 }
 
 export type ImageResult = { ok: true; item: ItemView; imageId: string } | Fail;
 
-export async function addImage(tenant: TenantCtx, input: { userId: string; itemId: string; bytes: Uint8Array; alt: string; decorative: boolean }): Promise<ImageResult> {
+export async function addImage(
+  tenant: TenantCtx,
+  input: { userId: string; itemId: string; bytes: Uint8Array; alt: string; decorative: boolean },
+): Promise<ImageResult> {
   const { tenantId } = tenant;
   // 1. Who is asking, and may they. Nothing is decoded for a person who may not.
   const early = await tenant.run(async (tx) => {
@@ -65,7 +83,8 @@ export async function addImage(tenant: TenantCtx, input: { userId: string; itemI
     if (!verdict.ok) return verdict;
     if (!(await bankOpenFor(tx, tenantId, viewer, row.campusId))) return fail(403, "BANK_OFF", ACCESS_OFF);
     const settings = await effectiveSettingsIn(tx, tenantId, row.campusId);
-    if (row.images.length >= settings["bank.images.max"]) return fail(409, "IMAGE_LIMIT", `A question can have at most ${settings["bank.images.max"]} pictures.`);
+    if (row.images.length >= settings["bank.images.max"])
+      return fail(409, "IMAGE_LIMIT", `A question can have at most ${settings["bank.images.max"]} pictures.`);
     return { ok: true, limits: { maxBytes: settings["bank.images.maxBytes"], maxLongSide: settings["bank.images.maxLongSide"] } } as const;
   });
   if (!early.ok) return early;
@@ -87,7 +106,8 @@ export async function addImage(tenant: TenantCtx, input: { userId: string; itemI
   try {
     await store.put(key, processed.bytes, processed.contentType);
   } catch (error) {
-    if (error instanceof StorageError || error instanceof StorageNotConfiguredError) return fail(502, "STORAGE_FAILED", "The picture could not be saved. Try again in a moment.");
+    if (error instanceof StorageError || error instanceof StorageNotConfiguredError)
+      return fail(502, "STORAGE_FAILED", "The picture could not be saved. Try again in a moment.");
     throw error;
   }
 
@@ -101,7 +121,8 @@ export async function addImage(tenant: TenantCtx, input: { userId: string; itemI
       if (!verdict.ok) return verdict;
       if (!(await bankOpenFor(tx, tenantId, viewer, before.campusId))) return fail(403, "BANK_OFF", ACCESS_OFF);
       const settings = await effectiveSettingsIn(tx, tenantId, before.campusId);
-      if (before.images.length >= settings["bank.images.max"]) return fail(409, "IMAGE_LIMIT", `A question can have at most ${settings["bank.images.max"]} pictures.`);
+      if (before.images.length >= settings["bank.images.max"])
+        return fail(409, "IMAGE_LIMIT", `A question can have at most ${settings["bank.images.max"]} pictures.`);
 
       const sortOrder = before.images.reduce((highest, image) => Math.max(highest, image.sortOrder), -1) + 1;
       await tx.questionBankImage.create({
@@ -129,7 +150,14 @@ export async function addImage(tenant: TenantCtx, input: { userId: string; itemI
         entity: "ITEM",
         action: "IMAGE_ADDED",
         oldValue: { version: before.version, images: before.images.length },
-        newValue: { version: after.version, images: after.images.length, imageId, decorative: input.decorative, bytes: processed.bytes.byteLength, store: store.name },
+        newValue: {
+          version: after.version,
+          images: after.images.length,
+          imageId,
+          decorative: input.decorative,
+          bytes: processed.bytes.byteLength,
+          store: store.name,
+        },
       });
       return { ok: true, item: await viewOf(tx, viewer, after), imageId };
     });
@@ -141,7 +169,10 @@ export async function addImage(tenant: TenantCtx, input: { userId: string; itemI
   return result;
 }
 
-export async function removeImage(tenant: TenantCtx, input: { userId: string; itemId: string; imageId: string }): Promise<{ ok: true; item: ItemView } | Fail> {
+export async function removeImage(
+  tenant: TenantCtx,
+  input: { userId: string; itemId: string; imageId: string },
+): Promise<{ ok: true; item: ItemView } | Fail> {
   const { tenantId } = tenant;
   const done = await tenant.run(async (tx) => {
     const before = await lockItem(tx, tenantId, input.itemId);
@@ -150,7 +181,10 @@ export async function removeImage(tenant: TenantCtx, input: { userId: string; it
     const verdict = judge(viewer, before);
     if (!verdict.ok) return verdict;
     if (!(await bankOpenFor(tx, tenantId, viewer, before.campusId))) return fail(403, "BANK_OFF", ACCESS_OFF);
-    const image = await tx.questionBankImage.findFirst({ where: { id: input.imageId, itemId: before.id, tenantId }, select: { id: true, storageKey: true, store: true } });
+    const image = await tx.questionBankImage.findFirst({
+      where: { id: input.imageId, itemId: before.id, tenantId },
+      select: { id: true, storageKey: true, store: true },
+    });
     if (!image) return NOT_FOUND;
 
     await tx.questionBankImage.delete({ where: { id: image.id } });
@@ -172,11 +206,18 @@ export async function removeImage(tenant: TenantCtx, input: { userId: string; it
   const which = (STORE_NAMES as readonly string[]).includes(done.file.store) ? (done.file.store as StoreName) : undefined;
   const store = which ? storeOrNull(which) : null;
   if (store) {
-    await store
-      .remove(done.file.key)
-      .catch((error) => console.error("question bank: a removed picture's file was left in the store", { imageId: input.imageId, store: done.file.store, error: String(error?.name ?? error) }));
+    await store.remove(done.file.key).catch((error) =>
+      console.error("question bank: a removed picture's file was left in the store", {
+        imageId: input.imageId,
+        store: done.file.store,
+        error: String(error?.name ?? error),
+      }),
+    );
   } else {
-    console.error("question bank: a removed picture's file was left in the store (store not configured)", { imageId: input.imageId, store: done.file.store });
+    console.error("question bank: a removed picture's file was left in the store (store not configured)", {
+      imageId: input.imageId,
+      store: done.file.store,
+    });
   }
   return { ok: true, item: done.item };
 }
@@ -211,7 +252,8 @@ export async function readImage(tenant: TenantCtx, input: { userId: string; item
     if (!stored) return NOT_FOUND;
     return { ok: true, bytes: stored.bytes, contentType: found.contentType };
   } catch (error) {
-    if (error instanceof StorageError || error instanceof StorageNotConfiguredError) return fail(502, "STORAGE_FAILED", "The picture could not be loaded. Try again in a moment.");
+    if (error instanceof StorageError || error instanceof StorageNotConfiguredError)
+      return fail(502, "STORAGE_FAILED", "The picture could not be loaded. Try again in a moment.");
     throw error;
   }
 }

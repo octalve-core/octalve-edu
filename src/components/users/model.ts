@@ -4,9 +4,10 @@ import { ROLE_LABELS } from "@/lib/roles";
 // What the Users page gets from the members/invitations API (plan §0.5.4), and the small display rules around it.
 
 export type RoleName = keyof typeof ROLE_LABELS;
-export type PermissionName = "CAN_APPROVE_RESULTS" | "CAN_MANAGE_FINANCE" | "CAN_PUBLISH_CONTENT" | "CAN_MANAGE_USERS";
+export type PermissionName =
+  "CAN_APPROVE_RESULTS" | "CAN_MANAGE_FINANCE" | "CAN_PUBLISH_CONTENT" | "CAN_MANAGE_USERS" | "CAN_VIEW_FORM_RESULTS";
 
-/// The four extra capabilities (plan §1.7), in the order the API returns them, with a plain-language name and what each one lets a person do.
+/// The five extra capabilities (plan §1.7), in the order the API returns them, with a plain-language name and what each one lets a person do.
 /// Nobody should ever see "CAN_MANAGE_FINANCE".
 export const PERMISSION_OPTIONS: { value: PermissionName; label: string; help: string }[] = [
   { value: "CAN_APPROVE_RESULTS", label: "Approve results", help: "Review and approve teachers' submitted results." },
@@ -16,6 +17,11 @@ export const PERMISSION_OPTIONS: { value: PermissionName; label: string; help: s
     value: "CAN_MANAGE_USERS",
     label: "Manage people",
     help: "Reserved for managing people; it does not let anyone change roles or permissions.",
+  },
+  {
+    value: "CAN_VIEW_FORM_RESULTS",
+    label: "See form results",
+    help: "Read the results, answers and roll calls of forms in their campus. They cannot change, mark or print them.",
   },
 ];
 export const permissionLabel = (permission: PermissionName) => PERMISSION_OPTIONS.find((option) => option.value === permission)!.label;

@@ -68,7 +68,9 @@ export function ReviewersPanel({ schoolCode, hasMfa, actorRole, ownCampusId, cam
       () => {
         void (async () => {
           const replies = await Promise.all(
-            STAFF_ROLES.map((role) => getJson(`${base}/members?role=${role}&limit=${PEOPLE_PER_ROLE}${text ? `&q=${encodeURIComponent(text)}` : ""}`)),
+            STAFF_ROLES.map((role) =>
+              getJson(`${base}/members?role=${role}&limit=${PEOPLE_PER_ROLE}${text ? `&q=${encodeURIComponent(text)}` : ""}`),
+            ),
           );
           if (!current) return;
           const bad = replies.find((r) => !r.ok);
@@ -115,7 +117,12 @@ export function ReviewersPanel({ schoolCode, hasMfa, actorRole, ownCampusId, cam
     const name = person ? who(person) : "They";
     const campusId = where === ALL ? null : where;
     ask({
-      change: { field: "Question bank reviewer", fromValue: "not a reviewer", toValue: `${name}: ${covers === "SUBJECT" ? subject.trim() : "every subject"}${examApprover ? ", exam approver" : ""} (${campusName(campusId)})`, isWeakeningSecurity: false },
+      change: {
+        field: "Question bank reviewer",
+        fromValue: "not a reviewer",
+        toValue: `${name}: ${covers === "SUBJECT" ? subject.trim() : "every subject"}${examApprover ? ", exam approver" : ""} (${campusName(campusId)})`,
+        isWeakeningSecurity: false,
+      },
       send: (stepUp) =>
         sendJson(`${base}/question-bank/reviewers`, "POST", {
           campusId,
@@ -137,7 +144,12 @@ export function ReviewersPanel({ schoolCode, hasMfa, actorRole, ownCampusId, cam
   function remove(reviewer: Reviewer) {
     setDone(null);
     ask({
-      change: { field: "Question bank reviewer", fromValue: `${who(reviewer)}: ${reviewer.scope === "SUBJECT" ? reviewer.subjectLabel : "every subject"} (${campusName(reviewer.campusId)})`, toValue: "removed", isWeakeningSecurity: false },
+      change: {
+        field: "Question bank reviewer",
+        fromValue: `${who(reviewer)}: ${reviewer.scope === "SUBJECT" ? reviewer.subjectLabel : "every subject"} (${campusName(reviewer.campusId)})`,
+        toValue: "removed",
+        isWeakeningSecurity: false,
+      },
       send: (stepUp) => sendJson(`${base}/question-bank/reviewers/${encodeURIComponent(reviewer.id)}`, "DELETE", { stepUp }),
       done: `${who(reviewer)} is no longer a reviewer here.`,
     });
@@ -150,8 +162,9 @@ export function ReviewersPanel({ schoolCode, hasMfa, actorRole, ownCampusId, cam
     <div className="space-y-6">
       <Alert variant="info">
         <p>
-          <strong>What a reviewer does.</strong> A reviewer approves, edits or rejects the questions teachers submit. One who covers every subject reviews them all; one who covers a
-          subject reviews that subject. An exam approver also sees overlap warnings and decides when pupils may see a question. Each change asks you to confirm who you are.
+          <strong>What a reviewer does.</strong> A reviewer approves, edits or rejects the questions teachers submit. One who covers every
+          subject reviews them all; one who covers a subject reviews that subject. An exam approver also sees overlap warnings and decides
+          when pupils may see a question. Each change asks you to confirm who you are.
         </p>
       </Alert>
       {isAdmin && campuses.length > 0 && (
@@ -222,7 +235,11 @@ export function ReviewersPanel({ schoolCode, hasMfa, actorRole, ownCampusId, cam
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             maxLength={64}
-            hint={capped ? `Showing the first ${PEOPLE_PER_ROLE} of each kind of staff. Type part of a name or an address to narrow the list.` : "Type part of a name or an address to narrow the list."}
+            hint={
+              capped
+                ? `Showing the first ${PEOPLE_PER_ROLE} of each kind of staff. Type part of a name or an address to narrow the list.`
+                : "Type part of a name or an address to narrow the list."
+            }
           />
           <SelectField
             label="Person"
@@ -231,7 +248,10 @@ export function ReviewersPanel({ schoolCode, hasMfa, actorRole, ownCampusId, cam
             hint="Active staff only: administrators, teachers and other staff."
             error={problem === "Choose a person." ? problem : null}
             options={[
-              { value: "", label: people.length === 0 ? (search.trim() ? "Nobody matches" : "No staff to choose from") : "Choose a person" },
+              {
+                value: "",
+                label: people.length === 0 ? (search.trim() ? "Nobody matches" : "No staff to choose from") : "Choose a person",
+              },
               ...people.map((p) => ({ value: p.userId, label: p.email ? `${who(p)} (${p.email})` : who(p) })),
             ]}
           />
@@ -263,7 +283,15 @@ export function ReviewersPanel({ schoolCode, hasMfa, actorRole, ownCampusId, cam
         </form>
       </section>
 
-      <StepUpModal open={pending !== null} onClose={() => setPending(null)} onConfirm={confirm} hasMfa={hasMfa} deltas={pending ? [pending.change] : []} saving={saving} error={saveError} />
+      <StepUpModal
+        open={pending !== null}
+        onClose={() => setPending(null)}
+        onConfirm={confirm}
+        hasMfa={hasMfa}
+        deltas={pending ? [pending.change] : []}
+        saving={saving}
+        error={saveError}
+      />
     </div>
   );
 }

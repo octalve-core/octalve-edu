@@ -1,7 +1,14 @@
 import "../support/env";
 import crypto from "node:crypto";
 import { test, expect } from "@playwright/test";
-import { MAX_TRACKED_IDENTIFIERS, checkRateLimit, getClientIp, refundAttempt, reserveAttempt } from "@/lib/auth/rate-limit";
+import {
+  MAX_TRACKED_IDENTIFIERS,
+  auditClientInfo,
+  checkRateLimit,
+  getClientIp,
+  refundAttempt,
+  reserveAttempt,
+} from "@/lib/auth/rate-limit";
 
 const WINDOW_MS = 5 * 60 * 1000;
 const key = (label: string) => `test:${label}:${crypto.randomUUID()}`;
@@ -178,6 +185,52 @@ test.describe("getClientIp — only ever trusts what the proxy sets", () => {
   test("the configured header name is case-insensitive", async () => {
     await withEnv({ CLIENT_IP_HEADER: "X-Client-IP" }, () => {
       expect(getClientIp(req({ "x-client-ip": "203.0.113.50" }))).toBe("203.0.113.50");
+    });
+  });
+});
+
+test.describe("auditClientInfo — what an audit record keeps about the caller", () => {
+  const req = (headers: Record<string, string>) => ({ headers: new Headers(headers) });
+  const withHeader = async (name: string | undefined, fn: () => void) => {
+    const saved = process.env.CLIENT_IP_HEADER;
+    if (name === undefined) delete process.env.CLIENT_IP_HEADER;
+    else process.env.CLIENT_IP_HEADER = name;
+    try {
+      fn();
+    } finally {
+      if (saved === undefined) delete process.env.CLIENT_IP_HEADER;
+      else process.env.CLIENT_IP_HEADER = saved;
+    }
+  };
+
+  test("keeps the address the proxy set and ignores the browser's own forwarded-for list", async () => {
+    await withHeader(undefined, () => {
+      const info = auditClientInfo(
+        req({ "x-real-ip": "203.0.113.7", "x-forwarded-for": "6.6.6.6, 1.2.3.4", "user-agent": "Firefox/130.0" }),
+      );
+      expect(info).toEqual({ ipAddress: "203.0.113.7", userAgent: "Firefox/130.0" });
+    });
+  });
+
+  test("no trusted address means no address, not the made-up one and not the word 'unproxied'", async () => {
+    await withHeader(undefined, () => {
+      expect(auditClientInfo(req({ "x-forwarded-for": "6.6.6.6" })).ipAddress).toBeUndefined();
+      expect(auditClientInfo(req({})).ipAddress).toBeUndefined();
+    });
+  });
+
+  test("in x-forwarded-for mode it takes the entry the trusted proxy appended, from the right", async () => {
+    await withHeader("x-forwarded-for", () => {
+      expect(auditClientInfo(req({ "x-forwarded-for": "6.6.6.6, 198.51.100.9" })).ipAddress).toBe("198.51.100.9");
+    });
+  });
+
+  test("the user agent is trimmed and cut to 256 characters; an empty one is nothing", async () => {
+    await withHeader(undefined, () => {
+      expect(auditClientInfo(req({ "x-real-ip": "203.0.113.7", "user-agent": "  Firefox/130.0  " })).userAgent).toBe("Firefox/130.0");
+      expect(auditClientInfo(req({ "x-real-ip": "203.0.113.7", "user-agent": "a".repeat(5000) })).userAgent).toHaveLength(256);
+      expect(auditClientInfo(req({ "x-real-ip": "203.0.113.7", "user-agent": "   " })).userAgent).toBeUndefined();
+      expect(auditClientInfo(req({ "x-real-ip": "203.0.113.7" })).userAgent).toBeUndefined();
     });
   });
 });
