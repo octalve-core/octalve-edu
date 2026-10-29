@@ -4,11 +4,15 @@ import { writeBankAudit } from "@/lib/question-bank/audit";
 import { effectiveSettingsIn } from "@/lib/question-bank/settings-service";
 import { loadViewer } from "@/lib/question-bank/viewer";
 import { staffMaySee, reviewPower } from "@/lib/question-bank/rules";
+import { copyFromBankItem, type BankItemToCopy } from "./assessments";
+import { MAX_REGRADE_ATTEMPTS, groupChanges, planAttemptRegrade, type AttemptChange } from "./regrade";
 import {
   sanitizeReportReason,
   maskReporterForReviewer,
   pupilCellsAtMinimum,
   reportCell,
+  reportLimitReached,
+  startOfUtcDay,
   computeRegradeImpact,
   validateReportOutcome,
   type RegradeImpactSummary,
@@ -27,14 +31,30 @@ export class ReportServiceError extends Error {
 
 const ALREADY_REPORTED = "You have already reported this question; your report is waiting for a reviewer.";
 
-/// Serialises the reports of one person on one question, so two sent at the same moment are one: the check for an open report and the filing of a new one are made together, inside the
-/// transaction, with this lock held until it ends.
-async function lockReporter(tx: Tx, reporter: string, itemId: string) {
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`report:${reporter}:${itemId}`}::text))`;
+/// Serialises the reports of one person, so two sent at the same moment are one and cannot slip past the limits: the checks (one open report per question, how many in all) and the filing
+/// of a new report are made together, inside the transaction, with this lock held until it ends.
+async function lockReporter(tx: Tx, reporter: string) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`report:${reporter}`}::text))`;
+}
+
+/// Refuses a report from a person who has too many waiting or has made too many today (429 `REPORT_LIMIT`). `who` is the filter that picks out their reports.
+async function enforceReportLimits(tx: Tx, role: "PUPIL" | "TEACHER", who: Prisma.QuestionReportWhereInput) {
+  const [openCount, todayCount] = await Promise.all([
+    tx.questionReport.count({ where: { ...who, status: QuestionReportStatus.OPEN } }),
+    tx.questionReport.count({ where: { ...who, createdAt: { gte: startOfUtcDay() } } }),
+  ]);
+  const reached = reportLimitReached(role, openCount, todayCount);
+  if (reached === "OPEN") {
+    throw new ReportServiceError("You have too many reports waiting for a reviewer. Wait until some are answered.", 429, "REPORT_LIMIT");
+  }
+  if (reached === "DAY") {
+    throw new ReportServiceError("You have made the most reports allowed in a day. Try again tomorrow.", 429, "REPORT_LIMIT");
+  }
 }
 
 /**
- * Submits a question issue report as a teacher. A person has one open report on a question: another is refused (`ALREADY_REPORTED`) until a reviewer has resolved the first.
+ * Submits a question issue report as a teacher. A person has one open report on a question: another is refused (`ALREADY_REPORTED`) until a reviewer has resolved the first. A teacher may have
+ * 20 reports waiting and make 50 a day (`REPORT_LIMIT`, 429).
  */
 export async function reportQuestionAsTeacher(
   tx: Tx,
@@ -84,7 +104,7 @@ export async function reportQuestionAsTeacher(
     : null;
   const sectionName = campus?.name ?? "General";
 
-  await lockReporter(tx, `user:${params.userId}`, item.id);
+  await lockReporter(tx, `user:${params.userId}`);
   const open = await tx.questionReport.findFirst({
     where: {
       tenantId: params.tenantId,
@@ -96,6 +116,7 @@ export async function reportQuestionAsTeacher(
     select: { id: true },
   });
   if (open) throw new ReportServiceError(ALREADY_REPORTED, 400, "ALREADY_REPORTED");
+  await enforceReportLimits(tx, "TEACHER", { tenantId: params.tenantId, reporterUserId: params.userId, reporterRole: "TEACHER" });
 
   const created = await tx.questionReport.create({
     data: {
@@ -128,7 +149,7 @@ export async function reportQuestionAsTeacher(
 }
 
 /**
- * Submits a question issue report as a pupil from practice. One open report on a question per pupil (`ALREADY_REPORTED`).
+ * Submits a question issue report as a pupil from practice. One open report on a question per pupil (`ALREADY_REPORTED`); at most 10 waiting and 20 a day (`REPORT_LIMIT`, 429).
  */
 export async function reportQuestionAsPupil(
   tx: Tx,
@@ -181,12 +202,13 @@ export async function reportQuestionAsPupil(
 
   const sectionName = student?.campus?.name ?? "General";
 
-  await lockReporter(tx, `pupil:${params.studentId}`, item.id);
+  await lockReporter(tx, `pupil:${params.studentId}`);
   const open = await tx.questionReport.findFirst({
     where: { tenantId: params.tenantId, bankItemId: item.id, reporterStudentId: params.studentId, status: QuestionReportStatus.OPEN },
     select: { id: true },
   });
   if (open) throw new ReportServiceError(ALREADY_REPORTED, 400, "ALREADY_REPORTED");
+  await enforceReportLimits(tx, "PUPIL", { tenantId: params.tenantId, reporterStudentId: params.studentId });
 
   const created = await tx.questionReport.create({
     data: {
@@ -354,9 +376,134 @@ export async function listReportsForReviewer(
   }));
 }
 
+export interface CorrectionSummary {
+  copiesCorrected: number;
+  attemptsChecked: number;
+  attemptsChanged: number;
+  attemptsUnreadable: number;
+  skippedArchived: number;
+}
+
+/// How many changed attempts the audit row lists one by one (the counts always cover all of them).
+const AUDITED_CHANGES = 200;
+
 /**
- * Resolves a question report with an outcome, reason, and optional assessment re-grade offer. A report is resolved once: the report is claimed with a conditional update (it must still be
- * open), so reviewers resolving it at the same moment cannot each succeed, write an audit row and apply a re-grade.
+ * Puts the corrected question into the assessments that copied it, and scores the attempts already made again. An exception to "past papers are immutable", so it is narrow:
+ *   - only the copies in the CAMPUS the report came from (a school-wide question may be copied in other campuses; their teachers are not changed under them); a school-wide report, made with
+ *     no campus, reaches the whole school's copies;
+ *   - only copies that are behind the question's version, and not in archived quizzes (past papers), which are counted and left as they were;
+ *   - a copy takes the corrected prompt, type, options and key; its points are the quiz's own and stay, and so does its place in the quiz;
+ *   - the finished attempts of the affected quizzes are scored again with the rule a quiz is graded by (`planAttemptRegrade`); attempts whose stored answers cannot be read are left alone;
+ *   - more than `MAX_REGRADE_ATTEMPTS` attempts are refused before anything is written (`TOO_MANY_ATTEMPTS`): the correction is all or nothing, and runs in the request's transaction;
+ *   - what was done is written to the audit trail with the scores before and after.
+ */
+async function applyCorrection(
+  tx: Tx,
+  p: { tenantId: string; reportId: string; campusId: string | null; itemId: string; actorUserId: string },
+): Promise<CorrectionSummary> {
+  const item = await tx.questionBankItem.findFirstOrThrow({ where: { tenantId: p.tenantId, id: p.itemId } });
+  const inCampus = p.campusId ? { campusId: p.campusId } : {};
+
+  const behind = { tenantId: p.tenantId, sourceItemId: item.id, OR: [{ sourceVersion: null }, { sourceVersion: { lt: item.version } }] };
+  const [skippedArchived, copies] = await Promise.all([
+    tx.quizQuestion.count({ where: { ...behind, quiz: { ...inCampus, archivedAt: { not: null } } } }),
+    tx.quizQuestion.findMany({ where: { ...behind, quiz: { ...inCampus, archivedAt: null } }, select: { id: true, quizId: true } }),
+  ]);
+  if (copies.length === 0) {
+    const none: CorrectionSummary = { copiesCorrected: 0, attemptsChecked: 0, attemptsChanged: 0, attemptsUnreadable: 0, skippedArchived };
+    await auditCorrection(tx, p, item.version, none, []);
+    return none;
+  }
+
+  const quizIds = [...new Set(copies.map((c) => c.quizId))];
+  const finished = { tenantId: p.tenantId, quizId: { in: quizIds }, completedAt: { not: null } };
+  const attemptCount = await tx.quizAttempt.count({ where: finished });
+  if (attemptCount > MAX_REGRADE_ATTEMPTS) {
+    throw new ReportServiceError(
+      `This correction would score ${attemptCount} attempts again; the most one correction does is ${MAX_REGRADE_ATTEMPTS}. Nothing was changed.`,
+      400,
+      "TOO_MANY_ATTEMPTS",
+    );
+  }
+
+  const corrected = copyFromBankItem(item as unknown as BankItemToCopy);
+  await tx.quizQuestion.updateMany({
+    where: { tenantId: p.tenantId, id: { in: copies.map((c) => c.id) } },
+    data: {
+      prompt: corrected.prompt,
+      questionType: corrected.questionType,
+      options: corrected.options,
+      correctAnswer: corrected.correctAnswer,
+      sourceVersion: corrected.sourceVersion,
+    },
+  });
+
+  // The quizzes are read after the copies are corrected, so the attempts are scored against the questions as they now are.
+  const [quizzes, attempts] = await Promise.all([
+    tx.quiz.findMany({
+      where: { tenantId: p.tenantId, id: { in: quizIds } },
+      select: { id: true, passingScore: true, questions: { select: { id: true, questionType: true, correctAnswer: true, points: true } } },
+    }),
+    tx.quizAttempt.findMany({ where: finished, select: { id: true, quizId: true, answers: true, score: true, isPassed: true } }),
+  ]);
+  const changes: AttemptChange[] = [];
+  let unreadable = 0;
+  for (const quiz of quizzes) {
+    const plan = planAttemptRegrade(
+      quiz.questions,
+      quiz.passingScore,
+      attempts.filter((a) => a.quizId === quiz.id),
+    );
+    changes.push(...plan.changes);
+    unreadable += plan.unreadable;
+  }
+  for (const group of groupChanges(changes)) {
+    await tx.quizAttempt.updateMany({
+      where: { tenantId: p.tenantId, id: { in: group.attemptIds } },
+      data: { score: group.score, isPassed: group.isPassed },
+    });
+  }
+
+  const summary: CorrectionSummary = {
+    copiesCorrected: copies.length,
+    attemptsChecked: attempts.length,
+    attemptsChanged: changes.length,
+    attemptsUnreadable: unreadable,
+    skippedArchived,
+  };
+  await auditCorrection(tx, p, item.version, summary, changes);
+  return summary;
+}
+
+async function auditCorrection(
+  tx: Tx,
+  p: { tenantId: string; reportId: string; campusId: string | null; itemId: string; actorUserId: string },
+  itemVersion: number,
+  summary: CorrectionSummary,
+  changes: AttemptChange[],
+) {
+  await writeBankAudit(tx, {
+    tenantId: p.tenantId,
+    entity: "ITEM",
+    action: "REGRADE_APPLIED",
+    campusId: p.campusId,
+    itemId: p.itemId,
+    ref: p.reportId,
+    actorUserId: p.actorUserId,
+    newValue: {
+      itemVersion,
+      ...summary,
+      changes: changes.slice(0, AUDITED_CHANGES),
+      changesTruncated: changes.length > AUDITED_CHANGES,
+    } as unknown as Prisma.InputJsonValue,
+  });
+}
+
+/**
+ * Resolves a question report with an outcome, reason, and optional correction of the assessments that copied the question. A report is resolved once: the report is claimed with a
+ * conditional update (it must still be open), so reviewers resolving it at the same moment cannot each succeed, write an audit row and apply a re-grade.
+ *
+ * `applyRegrade` is the explicit exception to "past papers are immutable" (see `applyCorrection`): only for a report resolved as FIXED and a question that is APPROVED; all or nothing.
  */
 export async function resolveQuestionReport(
   tx: Tx,
@@ -374,11 +521,19 @@ export async function resolveQuestionReport(
     throw new ReportServiceError(validated.message, 400, "VALIDATION");
   }
 
+  if (params.applyRegrade && validated.outcome !== QuestionReportOutcome.FIXED) {
+    throw new ReportServiceError(
+      "A correction can only be applied to assessments when the report is resolved as fixed.",
+      400,
+      "VALIDATION",
+    );
+  }
+
   const [viewer, report] = await Promise.all([
     loadViewer(tx, params.tenantId, params.userId),
     tx.questionReport.findFirst({
       where: { tenantId: params.tenantId, id: params.reportId },
-      include: { bankItem: { select: { id: true, campusId: true, subjectKey: true } } },
+      include: { bankItem: { select: { id: true, campusId: true, subjectKey: true, status: true } } },
     }),
   ]);
 
@@ -395,7 +550,11 @@ export async function resolveQuestionReport(
     throw new ReportServiceError("You are not authorized to resolve reports for this question.", 403, "FORBIDDEN");
   }
 
-  let regradeCount = 0;
+  if (params.applyRegrade && report.bankItem.status !== "APPROVED") {
+    throw new ReportServiceError("Approve the corrected question before applying it to assessments.", 400, "ITEM_NOT_APPROVED");
+  }
+
+  let regrade: CorrectionSummary | null = null;
 
   const claimed = await tx.questionReport.updateMany({
     where: { tenantId: params.tenantId, id: report.id, status: QuestionReportStatus.OPEN },
@@ -411,13 +570,15 @@ export async function resolveQuestionReport(
     throw new ReportServiceError("This report has already been resolved or dismissed.", 400, "ALREADY_RESOLVED");
   }
 
-  // If FIXED and applyRegrade requested, update linked quiz questions
-  if (params.applyRegrade && validated.outcome === QuestionReportOutcome.FIXED) {
-    const updatedQuestions = await tx.quizQuestion.updateMany({
-      where: { tenantId: params.tenantId, sourceItemId: report.bankItemId },
-      data: { exposedToPractice: true },
+  // FIXED with the correction asked for: the copies are corrected and the attempts scored again, in this same transaction
+  if (params.applyRegrade) {
+    regrade = await applyCorrection(tx, {
+      tenantId: params.tenantId,
+      reportId: report.id,
+      campusId: report.campusId,
+      itemId: report.bankItemId,
+      actorUserId: params.userId,
     });
-    regradeCount = updatedQuestions.count;
   }
 
   const updated = await tx.questionReport.findFirstOrThrow({ where: { tenantId: params.tenantId, id: report.id } });
@@ -445,7 +606,8 @@ export async function resolveQuestionReport(
     status: updated.status,
     outcome: updated.outcome,
     outcomeReason: updated.explanation,
-    regradeCount,
+    regradeCount: (regrade as CorrectionSummary | null)?.copiesCorrected ?? 0,
+    regrade: regrade as CorrectionSummary | null,
   };
 }
 

@@ -61,6 +61,25 @@ export function maskReporterForReviewer(params: {
   return `${roleLabel} in ${sectionLabel}`;
 }
 
+/// How many reports one person may have, so that one account cannot bury the reviewers' queue: waiting for a reviewer at once, and made in one UTC day.
+export const REPORT_LIMITS = {
+  PUPIL: { open: 10, perDay: 20 },
+  TEACHER: { open: 20, perDay: 50 },
+} as const;
+
+/// Which limit a person has reached, if any (the waiting limit is named first). `openCount` is their reports still waiting for a reviewer; `todayCount` all they made since midnight UTC.
+export function reportLimitReached(role: "PUPIL" | "TEACHER", openCount: number, todayCount: number): "OPEN" | "DAY" | null {
+  const limit = REPORT_LIMITS[role];
+  if (openCount >= limit.open) return "OPEN";
+  if (todayCount >= limit.perDay) return "DAY";
+  return null;
+}
+
+/// Midnight UTC of the day `now` falls in (the day also resets at 00:00 UTC for the daily practice cap).
+export function startOfUtcDay(now: Date = new Date()): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
 /// One question and one place (here a campus): the group of pupils a reviewer could narrow a pupil's report down to.
 export function reportCell(itemId: string, section: string): string {
   return `${itemId}|${section}`; // an item id is letters and digits, so the first bar always ends it
