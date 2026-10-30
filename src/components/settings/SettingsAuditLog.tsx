@@ -13,6 +13,8 @@ const FIELD_LABELS: Record<string, string> = {
   feeCostBearer: "Transaction Cost Bearer",
   multiCampusEnabled: "Multi-Campus Architecture",
   mfaRequiredForTeaching: "MFA Mandatory for Teaching Staff",
+  unsectionedClassApproval: "Results of a Class with No Section",
+  timeZone: "School Time Zone",
 };
 
 interface SettingsAuditLogProps {

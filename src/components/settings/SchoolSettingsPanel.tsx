@@ -15,6 +15,25 @@ import { ResultsApprovalPanel } from "./ResultsApprovalPanel";
 import { SettingsAuditLog } from "./SettingsAuditLog";
 import { StepUpModal } from "./StepUpModal";
 
+/// The names the browser knows, with UTC first (what a school is on until it chooses). The server checks whatever is sent; this is only the list to choose from.
+const TIME_ZONES: string[] = (() => {
+  try {
+    return ["UTC", ...Intl.supportedValuesOf("timeZone").filter((zone) => zone !== "UTC")];
+  } catch {
+    return [
+      "UTC",
+      "Africa/Lagos",
+      "Africa/Accra",
+      "Africa/Nairobi",
+      "Africa/Cairo",
+      "Asia/Dubai",
+      "Asia/Karachi",
+      "Asia/Kolkata",
+      "Europe/London",
+    ];
+  }
+})();
+
 interface SchoolSettingsPanelProps {
   schoolCode: string;
 }
@@ -229,6 +248,20 @@ export function SchoolSettingsPanel({ schoolCode }: SchoolSettingsPanelProps) {
                   { value: RolloverMode.AUTOMATIC, label: "Automatic (Session close triggers student advancement)" },
                 ]}
                 hint="Governs whether promotion/graduation runs automatically on session closure or requires explicit review."
+              />
+
+              {/* The school's own day (the daily practice cap and the daily report limit start at midnight here) */}
+              <SelectField
+                label="School time zone"
+                value={effectiveSettings.timeZone}
+                onChange={(e) => handleSelect("timeZone", e.target.value)}
+                options={(TIME_ZONES.includes(effectiveSettings.timeZone) ? TIME_ZONES : [effectiveSettings.timeZone, ...TIME_ZONES]).map(
+                  (zone) => ({
+                    value: zone,
+                    label: zone,
+                  }),
+                )}
+                hint="Where the school's day starts. A pupil's daily practice allowance and the number of reports one person may make in a day start again at midnight in this time zone. Until it is chosen, the day is the UTC day."
               />
 
               {/* Class Auto-Assignment */}

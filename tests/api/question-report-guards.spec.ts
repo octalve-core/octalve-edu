@@ -247,7 +247,7 @@ test.describe("resolving a report", () => {
 });
 
 // A person's reports are limited, so that one account cannot bury the queue: a pupil may have 10 reports waiting for a reviewer and 20 a day, a teacher 20 waiting and 50 a day. The day is
-// the UTC day, as for the daily practice cap.
+// the school's day (its own time zone, UTC until it chooses one; tests/api/school-time-zone.spec.ts), as for the daily practice cap.
 const newItem = (prompt: string) => approvedItem(t.id, north, teacher.user.id, { prompt, subjectLabel: "Civics", subjectKey: "civics" });
 
 test.describe("how many reports one person may make", () => {

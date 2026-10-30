@@ -2,6 +2,8 @@ import { Prisma, QuestionReportOutcome, QuestionReportStatus } from "@prisma/cli
 import type { Tx } from "@/lib/tenant/for-tenant";
 import { writeBankAudit } from "@/lib/question-bank/audit";
 import { effectiveSettingsIn } from "@/lib/question-bank/settings-service";
+import { readSchoolTimeZone } from "@/lib/school-settings/read";
+import { startOfSchoolDay } from "@/lib/school-settings/school-day";
 import { loadViewer } from "@/lib/question-bank/viewer";
 import { staffMaySee, reviewPower } from "@/lib/question-bank/rules";
 import { copyFromBankItem, type BankItemToCopy } from "./assessments";
@@ -12,7 +14,6 @@ import {
   pupilCellsAtMinimum,
   reportCell,
   reportLimitReached,
-  startOfUtcDay,
   computeRegradeImpact,
   validateReportOutcome,
   type RegradeImpactSummary,
@@ -37,11 +38,12 @@ async function lockReporter(tx: Tx, reporter: string) {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`report:${reporter}`}::text))`;
 }
 
-/// Refuses a report from a person who has too many waiting or has made too many today (429 `REPORT_LIMIT`). `who` is the filter that picks out their reports.
-async function enforceReportLimits(tx: Tx, role: "PUPIL" | "TEACHER", who: Prisma.QuestionReportWhereInput) {
+/// Refuses a report from a person who has too many waiting or has made too many today, today being the school's day (429 `REPORT_LIMIT`). `who` is the filter that picks out their reports.
+async function enforceReportLimits(tx: Tx, tenantId: string, role: "PUPIL" | "TEACHER", who: Prisma.QuestionReportWhereInput) {
+  const dayStart = startOfSchoolDay(new Date(), await readSchoolTimeZone(tx, tenantId));
   const [openCount, todayCount] = await Promise.all([
     tx.questionReport.count({ where: { ...who, status: QuestionReportStatus.OPEN } }),
-    tx.questionReport.count({ where: { ...who, createdAt: { gte: startOfUtcDay() } } }),
+    tx.questionReport.count({ where: { ...who, createdAt: { gte: dayStart } } }),
   ]);
   const reached = reportLimitReached(role, openCount, todayCount);
   if (reached === "OPEN") {
@@ -116,7 +118,11 @@ export async function reportQuestionAsTeacher(
     select: { id: true },
   });
   if (open) throw new ReportServiceError(ALREADY_REPORTED, 400, "ALREADY_REPORTED");
-  await enforceReportLimits(tx, "TEACHER", { tenantId: params.tenantId, reporterUserId: params.userId, reporterRole: "TEACHER" });
+  await enforceReportLimits(tx, params.tenantId, "TEACHER", {
+    tenantId: params.tenantId,
+    reporterUserId: params.userId,
+    reporterRole: "TEACHER",
+  });
 
   const created = await tx.questionReport.create({
     data: {
@@ -208,7 +214,7 @@ export async function reportQuestionAsPupil(
     select: { id: true },
   });
   if (open) throw new ReportServiceError(ALREADY_REPORTED, 400, "ALREADY_REPORTED");
-  await enforceReportLimits(tx, "PUPIL", { tenantId: params.tenantId, reporterStudentId: params.studentId });
+  await enforceReportLimits(tx, params.tenantId, "PUPIL", { tenantId: params.tenantId, reporterStudentId: params.studentId });
 
   const created = await tx.questionReport.create({
     data: {
