@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { BillingCycle, DiscountWorkflowMode, FeeCostBearer, RolloverMode, UnsectionedClassApproval } from "@prisma/client";
+import { isSchoolTimeZone } from "./school-day";
 
 export const stepUpProofSchema = z.object({
   type: z.enum(["totp", "recovery", "password"]),
@@ -19,6 +20,10 @@ export const updateSettingsSchema = z.object({
       multiCampusEnabled: z.boolean().optional(),
       mfaRequiredForTeaching: z.boolean().optional(),
       unsectionedClassApproval: z.nativeEnum(UnsectionedClassApproval).optional(),
+      timeZone: z
+        .string()
+        .refine(isSchoolTimeZone, { message: 'Must be the name of a time zone, such as "Africa/Lagos" or "UTC".' })
+        .optional(),
     })
     .refine((obj) => Object.keys(obj).length > 0, {
       message: "At least one setting must be provided to update.",
