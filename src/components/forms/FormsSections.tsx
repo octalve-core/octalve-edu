@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { FormsApiProvider } from "@/components/forms/FormsApi";
+import { ForYouPanel } from "@/components/forms/ForYouPanel";
 import { FormsList } from "@/components/forms/FormsList";
 import { MarkingQueue } from "@/components/forms/MarkingQueue";
 import { SectionTabs } from "@/components/forms/SectionTabs";
@@ -15,15 +16,13 @@ const SECTIONS = [
   { id: "questionnaires", label: "Questionnaires" },
   { id: "paper", label: "Paper work" },
   { id: "marking", label: "Marking" },
+  { id: "foryou", label: "For you" },
 ] as const;
 type SectionId = (typeof SECTIONS)[number]["id"];
 
-export function FormsSections({ schoolCode }: { schoolCode: string }) {
-  return (
-    <FormsApiProvider schoolCode={schoolCode}>
-      <Sections />
-    </FormsApiProvider>
-  );
+/// `canWrite`: whoever writes and marks forms (administrators and teachers) gets every section; the rest of the staff has only the questionnaires addressed to them. The API decides anyway.
+export function FormsSections({ schoolCode, canWrite }: { schoolCode: string; canWrite: boolean }) {
+  return <FormsApiProvider schoolCode={schoolCode}>{canWrite ? <Sections /> : <ForYouPanel />}</FormsApiProvider>;
 }
 
 function Sections() {
@@ -35,6 +34,7 @@ function Sections() {
       {active === "questionnaires" && <FormsList key="questionnaires" kind="QUESTIONNAIRE" classGroups={classGroups} />}
       {active === "paper" && <FormsList key="paper" kind="PAPER_WORK" classGroups={classGroups} />}
       {active === "marking" && <MarkingQueue key="marking" />}
+      {active === "foryou" && <ForYouPanel key="foryou" />}
     </SectionTabs>
   );
 }

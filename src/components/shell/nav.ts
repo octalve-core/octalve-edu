@@ -62,8 +62,8 @@ export function navFor(school: ShellSchool | null, platform = false): NavItem[] 
       // Staff write and browse questions here; whether they may review is decided on the page.
       { label: "Question bank", href: `/schools/${school.code}/question-bank`, icon: FileTextIcon },
     );
-    // Teachers write and mark forms; non-teaching staff do not (the API refuses them), so the entry is not drawn for them.
-    if (school.role === "TEACHING_STAFF") items.push({ label: "Forms", href: `/schools/${school.code}/forms`, icon: BookOpenIcon });
+    // Teachers write and mark forms; non-teaching staff only answer the questionnaires addressed to them. Both reach the page; what each may do is decided there and by the API.
+    items.push({ label: "Forms", href: `/schools/${school.code}/forms`, icon: BookOpenIcon });
   } else if (school.role === "STUDENT") {
     // A pupil's own work: the practice sets, questionnaires and paper work set for them, and the question practice they do for themselves.
     items.push({ label: "My work", href: `/schools/${school.code}/learn`, icon: BookOpenIcon });

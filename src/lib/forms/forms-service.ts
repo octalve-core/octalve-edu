@@ -562,6 +562,15 @@ export async function startPracticeSetForPupil(
     throw new FormsServiceError("You are not eligible for this practice set.", 403, "FORBIDDEN");
   }
 
+  // A practice set is answered once: a pupil who has finished it sees their result, they do not start it again (the screen offers "See result", and the API agrees).
+  const finished = await tx.formResponse.findFirst({
+    where: { tenantId: params.tenantId, formId: form.id, studentId: params.studentId, status: FormResponseStatus.COMPLETED },
+    select: { id: true },
+  });
+  if (finished) {
+    throw new FormsServiceError("You have already finished this practice set.", 400, "ALREADY_COMPLETED");
+  }
+
   const open = await tx.formResponse.findMany({
     where: {
       tenantId: params.tenantId,

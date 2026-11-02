@@ -39,7 +39,9 @@ export function PublicLinkBox({
       ) : (
         <p className="text-fg-muted">The link works once the questionnaire is published.</p>
       )}
-      <p className="text-xs text-fg-muted">A public link cannot tell who is answering and cannot stop one person answering twice.</p>
+      <p className="text-xs text-fg-muted">
+        A public link cannot tell who is answering. Each browser is asked to answer once, but anyone can clear that and answer again.
+      </p>
     </div>
   );
 }

@@ -172,8 +172,8 @@ function Body({
           </label>
           {publicLink && (
             <p className="text-xs text-fg-muted">
-              A public link cannot tell who is answering and cannot stop one person answering twice. Do not ask about pupils. It is
-              rate-limited and checked for spam.
+              A public link cannot tell who is answering. Each browser is asked to answer once, but anyone can clear that and answer again.
+              Do not ask about pupils. It is rate-limited and checked for spam.
             </p>
           )}
           <CheckboxField label="Anonymous" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} />

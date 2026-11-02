@@ -4,6 +4,7 @@ import { useRef, useState, type KeyboardEvent } from "react";
 import { BankApiProvider } from "@/components/question-bank/BankApi";
 import { PrintLogPanel } from "@/components/question-bank/PrintLogPanel";
 import { QuestionsPanel } from "@/components/question-bank/QuestionsPanel";
+import { MyReportsPanel } from "@/components/question-bank/MyReportsPanel";
 import { ReportsPanel } from "@/components/question-bank/ReportsPanel";
 import { ReviewersPanel } from "@/components/question-bank/ReviewersPanel";
 import { SettingsPanel } from "@/components/question-bank/SettingsPanel";
@@ -30,6 +31,7 @@ export function QuestionBankSections({ isAdmin, canReview, writeCampuses, wholeS
   const sections = [
     { id: "browse", label: "Browse" },
     { id: "mine", label: "My questions" },
+    { id: "myreports", label: "My reports" },
     ...(canReview
       ? [
           { id: "queue", label: "Review queue" },
@@ -101,6 +103,7 @@ export function QuestionBankSections({ isAdmin, canReview, writeCampuses, wholeS
             <QuestionsPanel key={active} view={active} writeCampuses={writeCampuses} wholeSchool={wholeSchool} />
           )}
           {active === "reports" && <ReportsPanel writeCampuses={writeCampuses} wholeSchool={wholeSchool} />}
+          {active === "myreports" && <MyReportsPanel />}
           {active === "prints" && <PrintLogPanel />}
           {active === "reviewers" && <ReviewersPanel {...props} />}
           {active === "settings" && <SettingsPanel {...props} />}

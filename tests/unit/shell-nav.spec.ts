@@ -69,19 +69,25 @@ test.describe("navFor", () => {
     ]);
   });
 
-  test("staff see Overview, Academics, People (to look at, never to change) and the Question bank (to write in); a teacher also gets Forms; a pupil gets My work; a parent My children — decided by the role IN THAT SCHOOL", () => {
-    const nonTeaching = navFor({ ...admin, role: "NON_TEACHING_STAFF" });
-    expect(nonTeaching.map((i) => i.label)).toEqual(["Overview", "Academics", "People", "Question bank"]);
-    expect(nonTeaching.map((i) => i.href)).toEqual([
-      "/schools/riverside",
-      "/schools/riverside/academics",
-      "/schools/riverside/people",
-      "/schools/riverside/question-bank",
-    ]);
-    // Teachers write and mark forms; non-teaching staff do not, so the entry is not drawn for them.
-    const teaching = navFor({ ...admin, role: "TEACHING_STAFF" });
-    expect(teaching.map((i) => i.label)).toEqual(["Overview", "Academics", "People", "Question bank", "Forms"]);
-    expect(teaching.at(-1)?.href).toBe("/schools/riverside/forms");
+  test("staff see Overview, Academics, People (to look at, never to change) and the Question bank (to write in); staff also get Forms; a pupil gets My work; a parent My children — decided by the role IN THAT SCHOOL", () => {
+    // Teachers write and mark forms; non-teaching staff only answer the questionnaires addressed to them, and both reach the same page.
+    for (const role of ["TEACHING_STAFF", "NON_TEACHING_STAFF"] as const) {
+      const items = navFor({ ...admin, role });
+      expect(
+        items.map((i) => i.label),
+        role,
+      ).toEqual(["Overview", "Academics", "People", "Question bank", "Forms"]);
+      expect(
+        items.map((i) => i.href),
+        role,
+      ).toEqual([
+        "/schools/riverside",
+        "/schools/riverside/academics",
+        "/schools/riverside/people",
+        "/schools/riverside/question-bank",
+        "/schools/riverside/forms",
+      ]);
+    }
     // A pupil's own work is one page.
     expect(navFor({ ...admin, role: "STUDENT" }).map((i) => [i.label, i.href])).toEqual([
       ["Overview", "/schools/riverside"],

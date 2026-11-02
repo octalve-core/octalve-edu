@@ -10,6 +10,7 @@ import { downloadBlob, getForPdf } from "@/components/question-bank/pdf";
 import { useFormsApi } from "@/components/forms/FormsApi";
 import { plural, type Notice } from "@/components/forms/model";
 import { PracticeAnswerItem } from "@/components/learn/PracticeAnswers";
+import type { StartedSession } from "@/components/learn/PracticeSession";
 import { ReportQuestionDialog } from "@/components/learn/ReportQuestionDialog";
 import { REPORT_SENT, practiceBase, printAddress, when, type PracticedAnswer } from "@/components/learn/practiceModel";
 
@@ -38,7 +39,16 @@ type Summary = {
 type History = { mode: "FULL"; sessions: Session[] } | { mode: "SUMMARY"; summary: Summary };
 
 // `pupilId` is set only when a guardian looks at one of their children; a pupil's own history names nobody.
-export function PracticeHistory({ pupilId, canAct }: { pupilId?: string; canAct: boolean }) {
+export function PracticeHistory({
+  pupilId,
+  canAct,
+  onResume,
+}: {
+  pupilId?: string;
+  canAct: boolean;
+  /** Carry on with a session left open: given the questions still to answer, the owner shows them. Without it the history only offers to finish the session. */
+  onResume?: (started: StartedSession) => void;
+}) {
   const { api } = useFormsApi();
   const base = practiceBase(api);
   const [archivedView, setArchivedView] = useState(false);
@@ -88,6 +98,17 @@ export function PracticeHistory({ pupilId, canAct }: { pupilId?: string; canAct:
     act(sessionId, async () => {
       const reply = await sendJson(`${base}/sessions/${encodeURIComponent(sessionId)}/finish`, "POST", {});
       return { ok: reply.ok, message: say(reply, "The session couldn't be finished.") };
+    });
+  const carryOn = (sessionId: string) =>
+    act(sessionId, async () => {
+      const reply = await getJson(`${base}/sessions/${encodeURIComponent(sessionId)}`);
+      if (!reply.ok) return { ok: false, message: say(reply, "The session couldn't be opened.") };
+      const started = reply.data as unknown as StartedSession;
+      if (started.questions.length === 0) {
+        return { ok: false, message: "No question is left to answer in this session. Finish it to see how you did." };
+      }
+      onResume?.(started);
+      return { ok: true, message: "" };
     });
   const download = (sessionId: string) =>
     act(sessionId, async () => {
@@ -213,9 +234,16 @@ export function PracticeHistory({ pupilId, canAct }: { pupilId?: string; canAct:
                   </Button>
                 )}
                 {canAct && !finished && (
-                  <Button variant="secondary" loading={busy === s.id} onClick={() => finishIt(s.id)}>
-                    Finish it
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {onResume && (
+                      <Button loading={busy === s.id} onClick={() => carryOn(s.id)}>
+                        Continue<span className="sr-only"> this session</span>
+                      </Button>
+                    )}
+                    <Button variant="secondary" loading={busy === s.id} onClick={() => finishIt(s.id)}>
+                      Finish it
+                    </Button>
+                  </div>
                 )}
               </li>
             );
