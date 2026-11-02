@@ -20,6 +20,8 @@ import {
   type HistoryEntry,
 } from "@/components/question-bank/model";
 import { ApproveDialog, ReasonDialog } from "@/components/question-bank/DecisionDialogs";
+import { PrintDialog } from "@/components/question-bank/PrintDialog";
+import { ReportProblemDialog } from "@/components/question-bank/ReportProblemDialog";
 
 // One question, as staff see it: the words, the answer key (staff set the exam, so they see it), the pictures, what was decided and why, and only the buttons the server's `can`
 // flags allow. Presentation only: the server decides, and a button it would refuse is simply not drawn.
@@ -65,6 +67,10 @@ function DetailBody({
   const [pending, setPending] = useState(false);
   const [deciding, setDeciding] = useState<"approve" | "reject" | "retire" | null>(null);
   const [version, setVersion] = useState(0);
+  const [reporting, setReporting] = useState(false);
+  const [reported, setReported] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const [printed, setPrinted] = useState(false);
 
   useEffect(() => {
     let current = true;
@@ -117,11 +123,16 @@ function DetailBody({
   const { item, history } = loaded;
   const key = answerKey(item);
   const similar = item.overlap ?? [];
+  // A report goes to the reviewers of an approved question someone else wrote; any question the person can open can be printed (display only: the API decides, and says why not,
+  // for example for a secret exam question near the exam).
+  const mayReport = item.status === "APPROVED" && !item.mine;
 
   return (
     <div className="space-y-5">
       <div aria-live="polite" className="empty:hidden">
         {error && <Alert variant="error">{error}</Alert>}
+        {reported && <Alert variant="success">Your report went to the reviewers.</Alert>}
+        {printed && <Alert variant="success">The PDF was downloaded and the print is in the print log.</Alert>}
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -274,6 +285,14 @@ function DetailBody({
         <Button variant="ghost" onClick={onClose}>
           Close
         </Button>
+        <Button variant="secondary" onClick={() => setPrinting(true)}>
+          Print
+        </Button>
+        {mayReport && (
+          <Button variant="secondary" onClick={() => setReporting(true)}>
+            Report a problem
+          </Button>
+        )}
         {item.can.retire && (
           <Button variant="danger" onClick={() => setDeciding("retire")}>
             Retire
@@ -297,6 +316,26 @@ function DetailBody({
         {item.can.approve && <Button onClick={() => setDeciding("approve")}>Approve</Button>}
       </div>
 
+      <PrintDialog
+        open={printing}
+        onClose={() => setPrinting(false)}
+        onPrinted={() => {
+          setPrinting(false);
+          setPrinted(true);
+        }}
+        targetKind="QUESTION_BANK_ITEM"
+        targetId={item.id}
+        noun="question"
+      />
+      <ReportProblemDialog
+        item={item}
+        open={reporting}
+        onClose={() => setReporting(false)}
+        onSent={() => {
+          setReporting(false);
+          setReported(true);
+        }}
+      />
       <ApproveDialog
         item={deciding === "approve" ? item : null}
         onClose={() => setDeciding(null)}

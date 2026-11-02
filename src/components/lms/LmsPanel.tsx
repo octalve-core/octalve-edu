@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
+import { QuizQuestionsDialog } from "@/components/lms/QuizQuestionsDialog";
 import { BookOpenIcon, CheckCircle2Icon, FileTextIcon } from "@/components/ui/icons";
 
 interface SubjectOption {
@@ -79,6 +80,7 @@ export function LmsPanel({
 
   // Assignment Modal
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
+  const [viewingQuiz, setViewingQuiz] = useState<string | null>(null);
   const [assignmentTitle, setAssignmentTitle] = useState("");
   const [assignmentSubjectId, setAssignmentSubjectId] = useState(subjects[0]?.id ?? "");
   const [assignmentClassGroupId, setAssignmentClassGroupId] = useState("");
@@ -381,6 +383,13 @@ export function LmsPanel({
                         <span>{quiz._count.questions} questions</span>
                         <span>{quiz.timeLimitMinutes ? `${quiz.timeLimitMinutes} mins` : "Untimed"}</span>
                       </div>
+                      {canManage && (
+                        <div className="mt-3 flex justify-end">
+                          <Button variant="secondary" onClick={() => setViewingQuiz(quiz.id)} aria-label={`Questions of ${quiz.title}`}>
+                            Questions
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -389,6 +398,8 @@ export function LmsPanel({
           )}
         </>
       )}
+
+      {canManage && <QuizQuestionsDialog schoolCode={schoolCode} quizId={viewingQuiz} onClose={() => setViewingQuiz(null)} />}
 
       {/* Submissions Grading Drawer */}
       {selectedAssignment && (
