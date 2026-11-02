@@ -5,8 +5,9 @@ import { MfaUnavailableError } from "@/lib/auth/mfa/secret-box";
 import { effectiveSettingsIn } from "@/lib/question-bank/settings-service";
 import { BankQuestionType, FormKind, FormStatus, FormAudienceKind, FormResponseStatus, Prisma } from "@prisma/client";
 import { campusFilter, reachForm } from "./access";
-import { FormsServiceError } from "./forms-service";
+import { FormsServiceError, pupilStandingOf } from "./forms-service";
 import { participationCode, recordedAt } from "./participation";
+import { isFormForPupilCampus } from "./practice-sets";
 import {
   validateQuestionnaireInput,
   isQuestionnaireOpen,
@@ -445,19 +446,16 @@ export async function listAvailableQuestionnairesForPupil(
     tenantId: string;
   },
 ) {
-  const enrollment = await tx.studentEnrollment.findFirst({
-    where: { studentId: params.studentId, tenantId: params.tenantId, status: "ACTIVE" },
-    orderBy: { enrolledAt: "desc" },
-    include: { classArm: { select: { classGroupId: true } } },
-  });
-
-  const pupilClassGroupId = enrollment?.classArm?.classGroupId ?? null;
+  // The pupil's class and campus: a questionnaire of another campus is not theirs to see, as with practice sets.
+  const pupil = await pupilStandingOf(tx, params.tenantId, params.studentId);
+  const pupilClassGroupId = pupil.classGroupId;
 
   const forms = await tx.form.findMany({
     where: {
       tenantId: params.tenantId,
       kind: FormKind.QUESTIONNAIRE,
       status: FormStatus.PUBLISHED,
+      OR: pupil.campusId ? [{ campusId: pupil.campusId }, { campusId: null }] : [{ campusId: null }],
     },
     orderBy: { createdAt: "desc" },
     include: {
@@ -508,6 +506,16 @@ export async function getQuestionnaireForMember(
     },
   });
 
+  // A pupil is read by their own class and campus (the route names the pupil, not their class): a questionnaire of another campus is "not found", and one for a class is opened by that class.
+  let classGroupId = params.classGroupId;
+  if (params.memberRole === "STUDENT") {
+    const pupil = await pupilStandingOf(tx, params.tenantId, params.memberId);
+    classGroupId = pupil.classGroupId;
+    if (form && !isFormForPupilCampus(form.campusId, pupil.campusId)) {
+      throw new FormsServiceError("Questionnaire not found.", 404, "NOT_FOUND");
+    }
+  }
+
   if (!form) {
     throw new FormsServiceError("Questionnaire not found.", 404, "NOT_FOUND");
   }
@@ -522,7 +530,7 @@ export async function getQuestionnaireForMember(
   }
 
   const audience = form.audiences[0];
-  if (audience && !isMemberEligibleForQuestionnaire(audience, params.memberRole, params.classGroupId)) {
+  if (audience && !isMemberEligibleForQuestionnaire(audience, params.memberRole, classGroupId)) {
     throw new FormsServiceError("You are not eligible for this questionnaire.", 403, "FORBIDDEN");
   }
 
@@ -572,13 +580,12 @@ export async function submitQuestionnaireForMember(
   }
 
   let classGroupId = params.classGroupId;
-  if (!classGroupId && params.memberRole === "STUDENT") {
-    const enrollment = await tx.studentEnrollment.findFirst({
-      where: { studentId: params.memberId, tenantId: params.tenantId, status: "ACTIVE" },
-      orderBy: { enrolledAt: "desc" },
-      include: { classArm: { select: { classGroupId: true } } },
-    });
-    classGroupId = enrollment?.classArm?.classGroupId ?? null;
+  if (params.memberRole === "STUDENT") {
+    const pupil = await pupilStandingOf(tx, params.tenantId, params.memberId);
+    if (!isFormForPupilCampus(form.campusId, pupil.campusId)) {
+      throw new FormsServiceError("Questionnaire not found.", 404, "NOT_FOUND");
+    }
+    classGroupId = classGroupId ?? pupil.classGroupId;
   }
 
   const audience = form.audiences[0];

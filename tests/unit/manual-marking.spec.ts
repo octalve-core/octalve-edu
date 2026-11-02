@@ -216,6 +216,10 @@ test.describe("Forms Manual Marking - Pure Domain Logic (Task 0032 Slice 9)", ()
       expect(pendingAns.score).toBeNull();
       expect(pendingAns.correctAnswer).toBeNull();
       expect(pendingAns.explanation).toBeNull();
+      // ... and the question that travels with the answer carries no key and no explanation either
+      expect(pendingAns.formQuestion?.correctAnswer).toBeNull();
+      expect(pendingAns.formQuestion?.explanation).toBeNull();
+      expect(JSON.stringify(pendingAns)).not.toContain("Secret");
 
       // Marked question reveals teacher feedback and awarded score
       const markedAns = sanitized.answers[1];

@@ -330,5 +330,5 @@
 - [x] O6 built (tsc, eslint, Prettier on the new files and the catalog check clean)
 - [x] O7 built: a Video guide link in the profile menu, a configurable address for the video and its policy, `NEXT_DIST_DIR`
 - [x] O1 staff forms and O2 form page / marking / roll call built (four routes added: questionnaire detail and update, questionnaire close, paper-work close, practice-set responses)
-- [ ] O3 the pupil's forms, O4 the pupil's practice, O5 the public page
+- [x] O3 the pupil's forms (My work), O4 the pupil's practice and a guardian's page (My children), O5 the public questionnaire page built; five service fixes and one new route on the way (see task 0025)
 - [ ] Tests, slice by slice, then PRs into `dev`

@@ -6,13 +6,22 @@ import type { Reply } from "@/components/auth/postJson";
 export type PdfReply = { ok: true; blob: Blob; name: string } | { ok: false; reply: Reply };
 
 export async function postForPdf(path: string, body: unknown): Promise<PdfReply> {
+  return fetchPdf(path, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+/// The same for a print route that is read with GET (a pupil's own result).
+export async function getForPdf(path: string): Promise<PdfReply> {
+  return fetchPdf(path, { method: "GET", credentials: "same-origin" });
+}
+
+async function fetchPdf(path: string, init: RequestInit): Promise<PdfReply> {
   try {
-    const res = await fetch(path, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const res = await fetch(path, init);
     if (res.ok && (res.headers.get("content-type") ?? "").includes("application/pdf")) {
       const named = /filename="?([^";]+)"?/.exec(res.headers.get("content-disposition") ?? "")?.[1];
       let name = "document.pdf";

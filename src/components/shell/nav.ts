@@ -64,6 +64,12 @@ export function navFor(school: ShellSchool | null, platform = false): NavItem[] 
     );
     // Teachers write and mark forms; non-teaching staff do not (the API refuses them), so the entry is not drawn for them.
     if (school.role === "TEACHING_STAFF") items.push({ label: "Forms", href: `/schools/${school.code}/forms`, icon: BookOpenIcon });
+  } else if (school.role === "STUDENT") {
+    // A pupil's own work: the practice sets, questionnaires and paper work set for them, and the question practice they do for themselves.
+    items.push({ label: "My work", href: `/schools/${school.code}/learn`, icon: BookOpenIcon });
+  } else if (school.role === "PARENT") {
+    // A guardian looks at how their children's practice is going, as far as the school lets them.
+    items.push({ label: "My children", href: `/schools/${school.code}/children`, icon: GraduationCapIcon });
   }
   return [...items, ...platformItem];
 }
@@ -92,6 +98,9 @@ const SCHOOL_PAGES: Record<string, string> = {
   people: "People",
   communication: "Communication",
   "question-bank": "Question bank",
+  forms: "Forms",
+  learn: "My work",
+  children: "My children",
   settings: "Settings",
   support: "Support access",
 };
@@ -104,6 +113,8 @@ export function pageLabel(pathname: string): string | null {
   if (match) return SCHOOL_PAGES[match[1] ?? ""] ?? null;
   // A person's own page under People (a student or a member of staff) is still "People" in the breadcrumb.
   if (/^\/schools\/[^/]+\/people\/(?:students|staff)\/[^/]+\/?$/.test(pathname)) return "People";
+  // A form's own page is still "Forms" in the breadcrumb.
+  if (/^\/schools\/[^/]+\/forms\/[^/]+\/?$/.test(pathname)) return "Forms";
   // Sub-pages under Communication are still "Communication" in the breadcrumb.
   if (/^\/schools\/[^/]+\/communication(?:\/.*)?$/.test(pathname)) return "Communication";
   return null;

@@ -381,7 +381,8 @@ export async function closePracticeSet(
 }
 
 /// Where the pupil stands now: the class group they are in and the campus they belong to, which a set's audience and campus are matched against.
-async function pupilStandingOf(tx: Tx, tenantId: string, studentId: string) {
+/// Where a pupil stands: their class group and their campus, the two facts every pupil-facing form rule asks (also used by the questionnaires).
+export async function pupilStandingOf(tx: Tx, tenantId: string, studentId: string) {
   const [enrollment, student] = await Promise.all([
     tx.studentEnrollment.findFirst({
       where: { studentId, tenantId, status: "ACTIVE" },
@@ -433,6 +434,8 @@ export async function listAvailablePracticeSetsForPupil(
       _count: { select: { questions: true } },
       responses: {
         where: { studentId: params.studentId },
+        // Newest first: the list shows the pupil's latest attempt, not whichever the database returns first.
+        orderBy: { createdAt: "desc" },
         select: { id: true, status: true, score: true, maxScore: true, submittedAt: true },
       },
     },

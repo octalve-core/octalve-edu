@@ -474,6 +474,9 @@ export async function finishPracticeSession(
       id: att.id,
       bankItemId: att.bankItemId,
       prompt: q?.prompt ?? "",
+      // The kind and the options travel with the answer so the screen can say it in the option's words, not its id.
+      type: q?.type ?? null,
+      options: Array.isArray(q?.options) ? q.options : [],
       answer: att.answer,
       correct: att.correct,
       correctAnswer: q?.correctAnswer ?? null,
@@ -580,6 +583,8 @@ export async function getPracticeHistory(
         id: a.id,
         bankItemId: a.bankItemId,
         prompt: a.bankItem.prompt,
+        type: a.bankItem.type,
+        options: Array.isArray(a.bankItem.options) ? a.bankItem.options : [],
         answer: a.answer,
         correct: a.correct,
         correctAnswer: a.bankItem.correctAnswer,
