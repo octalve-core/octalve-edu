@@ -1,6 +1,7 @@
 import type { ComponentType, SVGProps } from "react";
 import type { Role } from "@prisma/client";
 import {
+  BookOpenIcon,
   BuildingIcon,
   CalendarIcon,
   FileTextIcon,
@@ -40,6 +41,7 @@ export function navFor(school: ShellSchool | null, platform = false): NavItem[] 
       { label: "Communication", href: `/schools/${school.code}/communication`, icon: MailIcon },
       { label: "Users", href: `/schools/${school.code}/users`, icon: UsersIcon },
       { label: "Question bank", href: `/schools/${school.code}/question-bank`, icon: FileTextIcon },
+      { label: "Forms", href: `/schools/${school.code}/forms`, icon: BookOpenIcon },
       { label: "Settings", href: `/schools/${school.code}/settings`, icon: SlidersIcon },
     );
   } else if (school.role === "CAMPUS_ADMIN") {
@@ -50,6 +52,7 @@ export function navFor(school: ShellSchool | null, platform = false): NavItem[] 
       { label: "Communication", href: `/schools/${school.code}/communication`, icon: MailIcon },
       { label: "Users", href: `/schools/${school.code}/users`, icon: UsersIcon },
       { label: "Question bank", href: `/schools/${school.code}/question-bank`, icon: FileTextIcon },
+      { label: "Forms", href: `/schools/${school.code}/forms`, icon: BookOpenIcon },
     );
   } else if (school.role === "TEACHING_STAFF" || school.role === "NON_TEACHING_STAFF") {
     // Staff may look at the school year and at the school's people (read-only; plan 1.2, decisions P2 and P9) — they change none of it.
@@ -59,6 +62,8 @@ export function navFor(school: ShellSchool | null, platform = false): NavItem[] 
       // Staff write and browse questions here; whether they may review is decided on the page.
       { label: "Question bank", href: `/schools/${school.code}/question-bank`, icon: FileTextIcon },
     );
+    // Teachers write and mark forms; non-teaching staff do not (the API refuses them), so the entry is not drawn for them.
+    if (school.role === "TEACHING_STAFF") items.push({ label: "Forms", href: `/schools/${school.code}/forms`, icon: BookOpenIcon });
   }
   return [...items, ...platformItem];
 }
