@@ -328,5 +328,6 @@
 [Task file](0025-forms-screens.md). The APIs of the Forms module and the question bank's reports, printing and offer-back are on `dev`; the screens were not. Slice O6 (reports, print, print log and offer-back from an LMS quiz card) is built on branch `claude/forms-screens-octalve` and not yet tested (the maintainer asked on 2026-11-02 for all the implementation first, then each slice tested in turn). O1 to O5 and O7 are planned.
 
 - [x] O6 built (tsc, eslint, Prettier on the new files and the catalog check clean)
-- [ ] O1 staff forms, O2 form page / marking / roll call, O3 the pupil's forms, O4 the pupil's practice, O5 the public page, O7 video guide link and `NEXT_DIST_DIR`
+- [x] O7 built: a Video guide link in the profile menu, a configurable address for the video and its policy, `NEXT_DIST_DIR`
+- [ ] O1 staff forms, O2 form page / marking / roll call, O3 the pupil's forms, O4 the pupil's practice, O5 the public page
 - [ ] Tests, slice by slice, then PRs into `dev`

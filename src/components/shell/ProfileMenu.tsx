@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSignOut } from "@/components/auth/useSignOut";
-import { ChevronDownIcon, LogOutIcon, SlidersIcon, UserIcon } from "@/components/ui/icons";
+import { ChevronDownIcon, LogOutIcon, MonitorIcon, SlidersIcon, UserIcon } from "@/components/ui/icons";
 import { ROLE_LABELS } from "@/lib/roles";
 import { useShell } from "./ShellProvider";
 import { SoonTag } from "./SoonTag";
@@ -59,6 +59,10 @@ export function ProfileMenu({ name, email }: { name: string | null; email: strin
           <Link href="/account" className={`${ITEM} ${FOCUS_RING}`}>
             <UserIcon className="h-4 w-4" />
             Profile
+          </Link>
+          <Link href="/video-guide" className={`${ITEM} ${FOCUS_RING}`}>
+            <MonitorIcon className="h-4 w-4" />
+            Video guide
           </Link>
           {home?.role === "ADMIN" && (
             <span className={`${ITEM} text-fg-muted hover:bg-transparent hover:text-fg-muted`}>

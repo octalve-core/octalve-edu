@@ -1,7 +1,7 @@
 # 0025: The Forms and question-bank screens (the APIs are on `dev`; the screens were not)
 
 - **Period / Focus:** requested 2026-11-02 (the maintainer: "implement every item ... for both AlEemaan and Octalve")
-- **Status:** In progress (plan written 2026-11-02; slice O6 built, O1 to O5 and O7 not)
+- **Status:** In progress (plan written 2026-11-02; slices O6 and O7 built, O1 to O5 not)
 - **Priority:** High (Octalve's walkthrough waits for it)
 - **Assignee:** next AI / maintainer
 - **Target Branch / PR:** one branch per sitting, off `dev`; the PRs are cut slice by slice when each slice is tested
@@ -30,7 +30,7 @@ Every route of the Forms module and the question bank's reports, printing and of
 ### Slice O5: The public questionnaire page
 - [ ] `/q/[code]/[token]`, signed out, noindex and no-referrer
 ### Slice O7: Small things
-- [ ] A link to `/video-guide` from the profile menu; a configurable address for the video; `distDir` from `NEXT_DIST_DIR`
+- [x] A "Video guide" link in the profile menu; the video guide page reads its files from `NEXT_PUBLIC_VIDEO_GUIDE_BASE_URL` (a path on this site or an https address; anything else is the default) and the page's policy allows that one host for `/video-guide` only; `distDir` from `NEXT_DIST_DIR` (`/.next-*/` is git-ignored). Unit tests in `tests/unit/video-guide-media-base.spec.ts`. The harness's offline exception is AlEemaan's; Octalve's walkthrough harness is not built yet.
 
 ## 4. Definition of done (every slice)
 The e2e specs for the slice (desktop and phone, axe in both themes), then tsc, eslint, build, tests in that order; the component and page catalogs (`verify_catalogs.py`) updated; this file, HANDOVER and `current-tasks.md` updated; PR into `dev` with `base.ref` verified and the exact "Vercel" check green before the guarded merge. The maintainer asked on 2026-11-02 for all the implementation first and then each slice tested in turn, so the specs are written in the test phase.
