@@ -325,11 +325,12 @@
 
 ## TASK-0025: the Forms and question-bank screens (parity with AlEemaan's task 0041)
 
-[Task file](0025-forms-screens.md). The APIs of the Forms module and the question bank's reports, printing and offer-back were on `dev`; the screens were not. **All eight slices (O1 to O8) are built and tested (2026-11-03, lane 3; results in section 5 of the task file); the PR into `dev` is pending.** The maintainer asked on 2026-11-02 for all the implementation first, then each slice tested in turn.
+[Task file](0025-forms-screens.md). The APIs of the Forms module and the question bank's reports, printing and offer-back were on `dev`; the screens were not. **All eight slices (O1 to O8) are built and tested (2026-11-03, lane 3; results in section 5 of the task file) and merged into `dev` as PR #86 (`8115519`).** The maintainer asked on 2026-11-02 for all the implementation first, then each slice tested in turn.
 
 - [x] O6 reports, print, print log and offer-back from an LMS quiz card: built and tested
 - [x] O7 a Video guide link in the profile menu, a configurable address for the video and its policy, `NEXT_DIST_DIR`: built and tested
 - [x] O1 staff forms and O2 form page / marking / roll call: built and tested (four routes added: questionnaire detail and update, questionnaire close, paper-work close, practice-set responses)
 - [x] O3 the pupil's forms (My work), O4 the pupil's practice and a guardian's page (My children), O5 the public questionnaire page: built and tested (service changes and one new route on the way, see the task file)
 - [x] O8 the five things the screens showed were missing (staff reporter's outcomes, one answer per practice set, carrying on a practice session, one answer per browser on a public link, "For you" for staff and guardians): built and tested
-- [ ] PR into `dev`, guarded merge; then Octalve's walkthrough (its own run, after AlEemaan's)
+- [x] PR #86 into `dev`, guarded merge (2026-11-03)
+- [ ] Octalve's walkthrough (its own run, after AlEemaan's)

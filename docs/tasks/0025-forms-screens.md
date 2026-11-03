@@ -1,10 +1,10 @@
 # 0025: The Forms and question-bank screens (the APIs are on `dev`; the screens were not)
 
 - **Period / Focus:** requested 2026-11-02 (the maintainer: "implement every item ... for both AlEemaan and Octalve")
-- **Status:** Built and tested (plan 2026-11-02; all eight slices built 2026-11-02; tested 2026-11-03, section 5); PR into `dev` pending
+- **Status:** Built and tested (plan 2026-11-02; all eight slices built 2026-11-02; tested 2026-11-03, section 5); merged into `dev` as PR #86 (merge commit `8115519`, 2026-11-03)
 - **Priority:** High (Octalve's walkthrough waits for it)
 - **Assignee:** next AI / maintainer
-- **Target Branch / PR:** branch `claude/forms-screens-octalve`, off `dev`; one PR holding the eight slices as separate commits (the specs of several slices share files: the Forms and My work specs cover O1 to O5 and O8 together)
+- **Target Branch / PR:** branch `claude/forms-screens-octalve`, off `dev`; PR #86, one PR holding the eight slices as separate commits (the specs of several slices share files: the Forms and My work specs cover O1 to O5 and O8 together)
 
 > **How to tick:** change `[ ]` to `[x]`.
 
