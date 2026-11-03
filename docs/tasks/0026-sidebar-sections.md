@@ -1,7 +1,7 @@
 # 0026: The sidebar in sections, collapsible to icons, with the person pinned at the foot
 
 - **Period / Focus:** requested 2026-11-03 by the maintainer, for both repos; this is the port of AlEemaan's task 0042 (its design document is the source: `docs/tasks/0042-sidebar-sections.md` there)
-- **Status:** Built 2026-11-03; test results in section 7
+- **Status:** Built and tested 2026-11-03 (results in section 7); merged into `dev` as PR #88 (merge commit `e5549fc`, 2026-11-03)
 - **Priority:** High (Octalve's walkthrough, when it is run, films the sidebar)
 - **Assignee:** next AI / maintainer
 - **Target Branch / PR:** one branch (`claude/sidebar-sections`) and one PR off `dev`

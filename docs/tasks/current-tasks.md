@@ -337,7 +337,7 @@
 
 ## TASK-0026: the sidebar in sections, collapsible to icons, with the person pinned at the foot (parity with AlEemaan's task 0042)
 
-[Task file](0026-sidebar-sections.md). Requested by the maintainer on 2026-11-03 for both repos. Built 2026-11-03 (tests: section 7 of the task file; PR pending).
+[Task file](0026-sidebar-sections.md). Requested by the maintainer on 2026-11-03 for both repos. Built and tested 2026-11-03 (section 7 of the task file) and merged into `dev` as PR #88 (`e5549fc`).
 
 - [x] Sections that fold (Administration, Learning; Platform as a plain link last), remembered in a cookie; the section of the current page opens on arrival
 - [x] The whole sidebar folds to a rail of icons with a round arrow on its edge; it opens over the page while an icon is hovered or focused (hovering the arrow does nothing); the school switcher keeps its height in the rail
