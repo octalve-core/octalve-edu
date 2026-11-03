@@ -186,7 +186,7 @@ function Body({
       {kind === "QUESTIONNAIRE" && !publicLink && (
         <fieldset className="space-y-1">
           <legend className="text-sm font-semibold text-fg">Roles</legend>
-          <p className="text-xs text-fg-muted">Leave all unticked for everyone in the branch.</p>
+          <p className="text-xs text-fg-muted">Leave all unticked to address every role.</p>
           <div className="grid gap-x-6 sm:grid-cols-2">
             {ROLE_CHOICES.map((r) => (
               <CheckboxField
@@ -205,7 +205,7 @@ function Body({
           <legend className="text-sm font-semibold text-fg">{kind === "QUESTIONNAIRE" ? "Pupils of these classes" : "Classes"}</legend>
           <p className="text-xs text-fg-muted">{kind === "PAPER_WORK" ? "Choose at least one." : "Leave all unticked for every class."}</p>
           {classGroups.length === 0 ? (
-            <p className="text-sm text-fg-muted">This branch has no classes yet.</p>
+            <p className="text-sm text-fg-muted">There are no classes yet.</p>
           ) : (
             <div className="grid gap-x-6 sm:grid-cols-2">
               {classGroups.map((g) => (
@@ -262,7 +262,7 @@ function Body({
           Cancel
         </Button>
         <Button type="submit" loading={pending}>
-          {kind === "PAPER_WORK" ? "Create paper work" : "Save as draft"}
+          {kind === "PAPER_WORK" ? "Create paper work" : kind === "PRACTICE_SET" ? "Create practice set" : "Save as draft"}
         </Button>
       </div>
     </form>

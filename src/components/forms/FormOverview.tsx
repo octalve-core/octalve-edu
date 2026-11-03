@@ -132,7 +132,7 @@ export function FormOverview({
                   ? "Anyone with the link"
                   : roles.length > 0
                     ? `Members: ${roles.map((r) => r.toLowerCase().replace(/_/g, " ")).join(", ")}`
-                    : "Everyone in the branch"}
+                    : "Everyone"}
               </Row>
               <Row label="Anonymous">
                 {summary.isAnonymous ? "Yes: nobody can see who gave which answer" : "No: you can see who answered"}

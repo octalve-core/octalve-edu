@@ -29,5 +29,5 @@ export const GET = withAuth(
       throw err;
     }
   },
-  { tenant: true, roles: PORTAL_STUDENT_ROLES },
+  { tenant: true, roles: PORTAL_STUDENT_ROLES, area: "academics" },
 );

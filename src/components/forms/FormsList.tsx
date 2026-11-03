@@ -13,7 +13,7 @@ import { PublicLinkBox } from "@/components/forms/PublicLinkBox";
 import { StatusBadge } from "@/components/forms/StatusBadge";
 import { KIND_NOUN, classGroupIdsOf, plural, windowText, type FormKindKey, type ListedForm } from "@/components/forms/model";
 
-// The forms of one kind in one branch, with the two things a teacher does to each one here: publish a draft and close a published one. Presentation only - the API decides who may.
+// The forms of one kind in the person's campus, with the two things a teacher does to each one here: publish a draft and close a published one. Presentation only - the API decides who may.
 
 type Notice = { variant: "success" | "error"; text: string } | null;
 type ClassGroup = { id: string; name: string };
@@ -46,7 +46,7 @@ export function FormsList({ kind, classGroups }: { kind: FormKindKey; classGroup
 
   useEffect(() => {
     const controller = new AbortController();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- load when the branch changes
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load when the school or the status changes
     void load(controller.signal);
     return () => controller.abort();
   }, [load]);

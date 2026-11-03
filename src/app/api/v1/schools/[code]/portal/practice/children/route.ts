@@ -10,5 +10,5 @@ export const GET = withAuth(
     const children = await auth.tenant.run(async (tx) => listChildrenForGuardian(tx, auth.tenant.tenantId, auth.userId));
     return ok({ children });
   },
-  { tenant: true, roles: [Role.PARENT] },
+  { tenant: true, roles: [Role.PARENT], area: "academics" },
 );

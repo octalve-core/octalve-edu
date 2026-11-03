@@ -11,7 +11,7 @@ import { useFormsApi } from "@/components/forms/FormsApi";
 import type { Notice } from "@/components/forms/model";
 import { MarkingDialog } from "@/components/forms/MarkingDialog";
 
-// The practice-set attempts a teacher marks: across the branch's forms (the Marking section of the Forms page) or for one form (its Marking tab). Presentation only: the marking
+// The practice-set attempts a teacher marks: across the campus's forms (the Marking section of the Forms page) or for one form (its Marking tab). Presentation only: the marking
 // APIs say which forms a person may read and who may mark.
 
 type MarkingStatus = "NOT_REQUIRED" | "PENDING" | "PARTIALLY_MARKED" | "MARKED";
@@ -91,7 +91,7 @@ export function MarkingQueue({ formId }: { formId?: string }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- load the queue when the branch, the form or the filter changes
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load the queue when the form or the filter changes
     void load(controller.signal);
     return () => controller.abort();
   }, [load]);
@@ -167,8 +167,12 @@ export function MarkingQueue({ formId }: { formId?: string }) {
 }
 
 function FormLink({ id, title }: { id: string; title: string }) {
+  const { schoolCode } = useFormsApi();
   return (
-    <Link href={`/forms/${id}`} className="font-medium text-fg underline-offset-2 hover:underline">
+    <Link
+      href={`/schools/${encodeURIComponent(schoolCode)}/forms/${encodeURIComponent(id)}`}
+      className="font-medium text-fg underline-offset-2 hover:underline"
+    >
       {title}
     </Link>
   );
