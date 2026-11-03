@@ -1,36 +1,26 @@
 import type { ReactNode } from "react";
 import { SessionRevalidator } from "@/components/auth/SessionRevalidator";
-import { GraduationCapIcon } from "@/components/ui/icons";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { brand } from "@/lib/brand";
 import type { SupportBannerData } from "@/lib/support/session";
+import { BrandMark } from "./BrandMark";
 import { Breadcrumb } from "./Breadcrumb";
 import { MobileNav } from "./MobileNav";
 import { ProfileMenu } from "./ProfileMenu";
 import { SchoolSwitcher } from "./SchoolSwitcher";
 import { ShellProvider } from "./ShellProvider";
+import { SidebarFrame, SidebarProvider } from "./SidebarFrame";
 import { SidebarNav } from "./SidebarNav";
 import { SupportBanner } from "./SupportBanner";
 import { SidebarPerson } from "./SidebarPerson";
 import { QuickToolsTrigger } from "@/components/tools/QuickToolsTrigger";
-import type { ShellSchool } from "./nav";
+import type { SectionId, ShellSchool } from "./nav";
 
 export type ShellUser = { name: string | null; email: string | null };
 
-function BrandMark({ size }: { size: "sm" | "md" }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`flex shrink-0 items-center justify-center rounded-xl bg-brand text-white ${size === "md" ? "h-10 w-10" : "h-9 w-9"}`}
-    >
-      <GraduationCapIcon className="h-5 w-5" />
-    </span>
-  );
-}
-
 /// The signed-in app's frame, from the design artifact ("same shell, one brand tweak" — ported from AlEemaan's):
-///  - `lg` and up: a 248 px sidebar (brand, school, navigation, the signed-in person) and a 60 px top bar (breadcrumb,
-///    theme toggle, account menu);
+///  - `lg` and up: a 248 px sidebar (brand, school, navigation in foldable sections, the signed-in person pinned at its
+///    foot) that the person can fold to a 64 px rail of icons, and a 60 px top bar (breadcrumb, theme toggle, account menu);
 ///  - below `lg`: a compact top bar and a floating bottom tab bar with a "More" sheet — the page reserves room for it,
 ///    so it never covers content.
 /// Unlike AlEemaan's, this shell is **school-aware**: the navigation follows the school the path is in (see
@@ -41,6 +31,8 @@ export function AppShell({
   schools,
   platform = false,
   support = null,
+  sidebarCollapsed = false,
+  foldedSections = [],
   children,
 }: {
   user: ShellUser;
@@ -49,11 +41,14 @@ export function AppShell({
   platform?: boolean;
   /// A support view is open on this sign-in (ADR 0017): the banner is drawn above the page.
   support?: SupportBannerData | null;
+  /// The remembered choices (cookies, read by the layout) so the first paint has the right width and the right folded sections.
+  sidebarCollapsed?: boolean;
+  foldedSections?: readonly SectionId[];
   children: ReactNode;
 }) {
   return (
     <ShellProvider schools={schools} platform={platform}>
-      <div className="min-h-screen bg-canvas text-fg-2">
+      <SidebarProvider initialCollapsed={sidebarCollapsed} initialFolded={foldedSections}>
         <SessionRevalidator />
         <a
           href="#main"
@@ -62,19 +57,11 @@ export function AppShell({
           Skip to content
         </a>
 
-        <div className="fixed inset-y-0 left-0 z-20 hidden w-62 flex-col border-r border-line bg-surface lg:flex">
-          <div className="flex h-15 shrink-0 items-center gap-3 px-5">
-            <BrandMark size="md" />
-            <span className="text-lg font-bold tracking-tight text-fg">{brand.name}</span>
-          </div>
-          <SchoolSwitcher />
-          <div className="flex-1 overflow-y-auto px-3 py-2">
-            <SidebarNav />
-          </div>
-          <SidebarPerson name={user.name} email={user.email} />
-        </div>
+        <SidebarFrame top={<SchoolSwitcher />} foot={<SidebarPerson name={user.name} email={user.email} />}>
+          <SidebarNav />
+        </SidebarFrame>
 
-        <div className="lg:pl-62">
+        <div className="transition-[padding] duration-200 motion-reduce:transition-none lg:pl-62 lg:group-data-[sidebar=collapsed]/shell:pl-16">
           {support && <SupportBanner name={support.name} areas={support.areas} endsAt={support.endsAt} />}
           <header className="sticky top-0 z-20 flex h-15 items-center justify-between gap-4 border-b border-line bg-canvas px-4 sm:px-6">
             <div className="flex items-center gap-2.5 lg:hidden">
@@ -100,7 +87,7 @@ export function AppShell({
 
         <MobileNav name={user.name} email={user.email} />
         <QuickToolsTrigger />
-      </div>
+      </SidebarProvider>
     </ShellProvider>
   );
 }

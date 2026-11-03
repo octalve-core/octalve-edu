@@ -9,7 +9,7 @@ import { GraduationCapIcon, LogOutIcon, MoreIcon, UserIcon, XIcon } from "@/comp
 import { ROLE_LABELS } from "@/lib/roles";
 import { useShell } from "./ShellProvider";
 import { SoonTag } from "./SoonTag";
-import { FOCUS_RING, initialsOf, isActive, navFor } from "./nav";
+import { FOCUS_RING, groupNav, initialsOf, isActive, navFor } from "./nav";
 
 const TAB =
   "flex min-h-14 w-full flex-col items-center justify-center gap-1 rounded-xl px-2 text-xs font-medium text-fg-muted transition-colors hover:text-fg aria-[current=page]:bg-brand-tint aria-[current=page]:font-semibold aria-[current=page]:text-brand-fg";
@@ -17,7 +17,8 @@ const SHEET_ROW =
   "flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium text-fg-2 transition-colors hover:bg-surface-2 hover:text-fg";
 
 /// Phone navigation (below `lg`): a floating bottom tab bar in place of a hamburger drawer, and a "More" sheet for
-/// everything that doesn't fit — switching school, pages that aren't built yet, Profile, and Sign out. The sheet is a
+/// everything that doesn't fit — switching school, the pages that don't fit the bar (under the same section headings as
+/// the desktop sidebar; a section of one has no heading), pages that aren't built yet, Profile, and Sign out. The sheet is a
 /// native modal `<dialog>`, so the focus trap, Escape, an inert page behind it and focus returning to "More" come from
 /// the platform rather than hand-rolled code.
 export function MobileNav({ name, email }: { name: string | null; email: string | null }) {
@@ -37,6 +38,7 @@ export function MobileNav({ name, email }: { name: string | null; email: string 
   const barTabs = tabs.length > 5 ? tabs.slice(0, MAX_PHONE_BAR_TABS) : tabs;
   const overflowTabs = tabs.length > 5 ? tabs.slice(MAX_PHONE_BAR_TABS) : [];
   const isMoreActive = overflowTabs.some((item) => isActive(pathname, item));
+  const moreGroups = groupNav(overflowTabs);
 
   // Any navigation closes the sheet (closing an already-closed dialog is a no-op).
   useEffect(() => {
@@ -140,16 +142,28 @@ export function MobileNav({ name, email }: { name: string | null; email: string 
           )}
 
           <ul className="mt-3 border-t border-line pt-2">
-            {overflowTabs.map((item) => (
-              <li key={item.label}>
-                <Link
-                  href={item.href!}
-                  aria-current={isActive(pathname, item) ? "page" : undefined}
-                  className={`${SHEET_ROW} aria-[current=page]:bg-brand-tint aria-[current=page]:text-brand-fg ${FOCUS_RING}`}
-                >
-                  <item.icon className="h-5 w-5" />
-                  {item.label}
-                </Link>
+            {moreGroups.map((group, index) => (
+              <li
+                key={group.section?.id ?? group.items[0].label}
+                className={!group.section && index > 0 ? "mt-1 border-t border-line pt-1" : undefined}
+              >
+                {group.section && (
+                  <h3 className="px-3 pt-3 pb-1 text-[11px] font-semibold tracking-wider text-fg-muted uppercase">{group.section.label}</h3>
+                )}
+                <ul>
+                  {group.items.map((item) => (
+                    <li key={item.label}>
+                      <Link
+                        href={item.href!}
+                        aria-current={isActive(pathname, item) ? "page" : undefined}
+                        className={`${SHEET_ROW} aria-[current=page]:bg-brand-tint aria-[current=page]:text-brand-fg ${FOCUS_RING}`}
+                      >
+                        <item.icon className="h-5 w-5" />
+                        {item.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
               </li>
             ))}
             {soon.map(({ label, icon: Icon }) => (
