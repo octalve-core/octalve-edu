@@ -152,6 +152,7 @@ Small shared modules: brand words, the database client, the dev-tools gate, role
 | `relative-time.ts` | `relativeTime(iso, now, locale)`: "3 days ago" style text from `Intl.RelativeTimeFormat` (units year down to minute; under a minute it says "just now"; an unparseable date gives an empty string). Pure, the clock is a parameter; used by `SessionsPanel`. |
 | `roles.ts` | `ROLE_LABELS`: display names for the six `Role` values (`ADMIN` is "Administrator", `CAMPUS_ADMIN` "Campus administrator", then teaching staff, non-teaching staff, student, parent). The enum values are identifiers and must not be shown to people. |
 | `theme.ts` | `THEME_COOKIE` (`theme`), type `Theme` (`dark` or `light`), `parseTheme` (anything but `light` is `dark`) and `THEME_MAX_AGE_SECONDS` (one year). The theme is a plain cookie so the server renders the right one on the first paint, with no inline script. |
+| `shell-prefs.ts` | The sidebar's two remembered choices, as cookies read on the server like the theme: `SIDEBAR_COOKIE` (`sidebar`: `"collapsed"` or anything else = expanded), `SIDEBAR_SECTIONS_COOKIE` (`sidebar-sections`: the folded section ids, comma-separated), `SHELL_PREFS_MAX_AGE_SECONDS` (one year), `parseSidebarCollapsed`, `serializeSidebarCollapsed`, `parseFoldedSections(value, known)` (only known ids, once each, in the order of `known`) and `serializeFoldedSections`. Not secrets and not authentication; a hand-edited value can only select a state that exists. |
 
 ## `src/` (top-level files)
 
