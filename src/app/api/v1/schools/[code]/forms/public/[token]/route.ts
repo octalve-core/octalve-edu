@@ -3,6 +3,7 @@ import { fail, noStore, ok } from "@/lib/api/envelope";
 import { getClientIp, reserveAttempt } from "@/lib/auth/rate-limit";
 import { getPublicQuestionnaireByToken } from "@/lib/forms/questionnaires-service";
 import { FormsServiceError } from "@/lib/forms/forms-service";
+import { answeredHere } from "@/lib/forms/public-answered";
 
 /// Reads from one address in a window (the window is in lib/auth/rate-limit.ts): a link is opened a few times by a person, never hundreds of times.
 const READ_LIMIT = 120;
@@ -16,7 +17,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ code: strin
   const { code, token } = await ctx.params;
   try {
     const questionnaire = await getPublicQuestionnaireByToken(code, token);
-    return noStore(ok(questionnaire));
+    // `answeredHere` lets the page say so instead of offering the form again (this browser only: see public-answered.ts)
+    return noStore(ok({ ...questionnaire, answeredHere: answeredHere(req, token) }));
   } catch (err) {
     if (err instanceof FormsServiceError) {
       return noStore(fail(err.message, err.statusCode, err.code));

@@ -176,3 +176,42 @@ export function bodyOf(form: FormState): Record<string, unknown> {
   if (form.type === "SINGLE") return { type: "SINGLE", ...common, options, correct: Math.max(position(form.single), 0) };
   return { type: "MULTI", ...common, options, correct: form.multi.map(position).filter((i) => i >= 0) };
 }
+
+// Reports on questions, as `GET .../question-bank/reports` answers them to a reviewer: the reporter is already masked to a role and a campus.
+export type ReportStatus = "OPEN" | "RESOLVED" | "DISMISSED";
+export type ReportOutcome = "FIXED" | "NOT_AN_ERROR" | "NEEDS_DISCUSSION";
+export type ApiReport = {
+  id: string;
+  itemId: string;
+  item: {
+    id: string;
+    prompt: string;
+    type: ItemType;
+    subjectLabel: string | null;
+    topic: string | null;
+    version: number;
+    status: ItemStatus;
+  };
+  reason: string;
+  status: ReportStatus;
+  outcome: ReportOutcome | null;
+  outcomeReason: string | null;
+  reporter: string;
+  createdAt: string;
+  resolvedAt: string | null;
+  regradeImpact: { affectedQuizzesCount: number; totalAttemptsCount: number; offerMessage: string } | null;
+};
+/// What a correction did (the server's counts), when a reviewer asked for the assessments that copied the question to be corrected.
+export type CorrectionSummary = {
+  copiesCorrected: number;
+  attemptsChecked: number;
+  attemptsChanged: number;
+  attemptsUnreadable: number;
+  skippedArchived: number;
+};
+export const REPORT_STATUS_LABEL: Record<ReportStatus, string> = { OPEN: "Waiting", RESOLVED: "Resolved", DISMISSED: "Dismissed" };
+export const REPORT_OUTCOME_LABEL: Record<ReportOutcome, string> = {
+  FIXED: "Fixed",
+  NOT_AN_ERROR: "Not an error",
+  NEEDS_DISCUSSION: "Needs discussion",
+};

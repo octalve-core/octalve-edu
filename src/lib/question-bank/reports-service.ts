@@ -654,3 +654,44 @@ export async function getPupilReportHistory(
     resolvedAt: r.resolvedAt,
   }));
 }
+
+/**
+ * Returns the reports a member of staff filed themselves, newest first, with where each stands and (once a reviewer has answered) the outcome and the reason. A person reads only their own:
+ * the filter is the signed-in person's id, never a parameter, and a pupil's reports (which carry a pupil record) are not part of it.
+ */
+export async function getStaffReportHistory(
+  tx: Tx,
+  params: {
+    tenantId: string;
+    userId: string;
+  },
+) {
+  const reports = await tx.questionReport.findMany({
+    where: { tenantId: params.tenantId, reporterUserId: params.userId, reporterStudentId: null },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+    include: {
+      bankItem: {
+        select: {
+          prompt: true,
+          subjectLabel: true,
+          topic: true,
+        },
+      },
+    },
+  });
+
+  return reports.map((r) => ({
+    id: r.id,
+    bankItemId: r.bankItemId,
+    questionPrompt: r.bankItem.prompt,
+    subjectLabel: r.bankItem.subjectLabel,
+    topic: r.bankItem.topic,
+    reason: r.reason,
+    status: r.status,
+    outcome: r.outcome,
+    outcomeReason: r.explanation,
+    createdAt: r.createdAt,
+    resolvedAt: r.resolvedAt,
+  }));
+}

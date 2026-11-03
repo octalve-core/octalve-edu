@@ -16,9 +16,11 @@ export type CspOptions = {
   /// APP_URL is https. `upgrade-insecure-requests` on a plain-HTTP (LAN) install would make the
   /// browser rewrite every sub-request to https and break the whole app, so it is https-only.
   https?: boolean;
+  /// The one other host the video guide's files may be loaded from (src/lib/video-guide/media-base.ts), for the `/video-guide` page only; null or absent for every other page.
+  mediaOrigin?: string | null;
 };
 
-export function buildCsp({ nonce, dev = false, https = false }: CspOptions): string {
+export function buildCsp({ nonce, dev = false, https = false, mediaOrigin = null }: CspOptions): string {
   const directives = [
     "default-src 'self'",
     // 'strict-dynamic': the nonced bootstrap may load Next's chunks without a host allow-list.
@@ -27,7 +29,9 @@ export function buildCsp({ nonce, dev = false, https = false }: CspOptions): str
     `style-src 'self' 'nonce-${nonce}'`,
     "img-src 'self' data: blob:",
     "font-src 'self'",
-    `connect-src 'self'${dev ? " ws: wss:" : ""}`,
+    // The chapters list is fetched and the video and its captions are loaded from the other host, on the video guide page only.
+    `connect-src 'self'${mediaOrigin ? ` ${mediaOrigin}` : ""}${dev ? " ws: wss:" : ""}`,
+    ...(mediaOrigin ? [`media-src 'self' ${mediaOrigin}`] : []),
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

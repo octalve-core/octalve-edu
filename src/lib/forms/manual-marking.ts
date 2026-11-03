@@ -274,6 +274,8 @@ export function sanitizeResponseForPupil<
     if (ans.markingStatus === FormMarkingStatus.PENDING) {
       return {
         ...ans,
+        // The question travels with the answer (its prompt, options and points), so the key and the explanation are blanked there too, not only at the top.
+        formQuestion: ans.formQuestion ? { ...ans.formQuestion, correctAnswer: null, explanation: null } : ans.formQuestion,
         score: null,
         isCorrect: null,
         feedback: null,

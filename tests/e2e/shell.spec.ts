@@ -170,6 +170,15 @@ test.describe("on a desktop: the sidebar and the top bar", () => {
     await expect(page.getByRole("link", { name: "Profile" })).toHaveCount(0); // closed by navigating
   });
 
+  test("the account menu has a Video guide link, and it leads to the video guide page", async ({ page }) => {
+    await signedInAs(page, Role.ADMIN, { name: "Tunde Bello" });
+    await accountMenu(page).click();
+    await expect(page.getByRole("link", { name: "Video guide" })).toHaveAttribute("href", "/video-guide");
+    await page.getByRole("link", { name: "Video guide" }).click();
+    await expect(page).toHaveURL(/\/video-guide$/);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  });
+
   test("Sign out from the account menu ends the session and lands on the sign-in screen", async ({ page }) => {
     await signedInAs(page, Role.ADMIN);
     await accountMenu(page).click();

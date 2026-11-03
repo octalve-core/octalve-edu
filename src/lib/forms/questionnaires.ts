@@ -151,6 +151,25 @@ export function isQuestionnaireOpen(
   return { isOpen: true };
 }
 
+/// The role a member answers a questionnaire as: a campus administrator is an administrator for this purpose (the audience choices name "Administrators").
+export const answersAs = (role: string): string => (role === "CAMPUS_ADMIN" ? "ADMIN" : role);
+
+/**
+ * Whether a member of staff (or a guardian) is addressed by a questionnaire. Narrower than the pupils' rule on purpose: a questionnaire that names roles is for those roles, and one that
+ * names no role is for everybody in the school only when it names no class either (a questionnaire written for a class is for that class's pupils, not for staff). A public
+ * questionnaire is answered through its link, so it is not listed for anyone here.
+ */
+export function isMemberEligibleAsStaff(
+  audience: { kind: FormAudienceKind; roles?: unknown; classGroupIds?: unknown },
+  role: string,
+): boolean {
+  if (audience.kind === FormAudienceKind.PUBLIC) return false;
+  const roles = Array.isArray(audience.roles) ? (audience.roles as string[]) : [];
+  if (roles.length > 0) return roles.includes(role);
+  const classes = Array.isArray(audience.classGroupIds) ? (audience.classGroupIds as string[]) : [];
+  return classes.length === 0;
+}
+
 /**
  * Checks whether a user/member is eligible to access and respond to the questionnaire.
  */

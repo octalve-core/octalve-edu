@@ -325,6 +325,92 @@ export async function startPracticeSession(
 }
 
 /**
+ * Opens a session the pupil started and did not finish, to carry on with: the questions not yet answered, in the order they were drawn, without keys. Only the pupil's own session (any other is
+ * "not found"), and one that is not finished. The switch that stops an answer stops this (practice closed), and a question the school has withdrawn since (no longer approved, no longer for
+ * practice, no longer for the pupil's class) is not offered again; the pupil can finish the session, which gives what is left back to today's allowance.
+ */
+export async function getPracticeSessionToResume(
+  tx: Tx,
+  params: {
+    tenantId: string;
+    campusId?: string | null;
+    studentId: string;
+    role: Role;
+    sessionId: string;
+    now?: Date;
+  },
+) {
+  const now = params.now ?? new Date();
+  if (params.role !== Role.STUDENT && params.role !== Role.ADMIN) {
+    throw new PracticeError("Your sign-in does not include student practice.", 403, "PORTAL_ACCESS");
+  }
+
+  const settings = await effectiveSettingsIn(tx, params.tenantId, params.campusId ?? null);
+  if (!settings["bank.access.pupils"]) {
+    throw new PracticeError("Practice is currently closed.", 403, "PRACTICE_CLOSED");
+  }
+
+  const session = await tx.practiceSession.findFirst({
+    where: { tenantId: params.tenantId, id: params.sessionId },
+    include: { attempts: { select: { bankItemId: true } } },
+  });
+  if (!session || session.studentId !== params.studentId) {
+    throw new PracticeError("Practice session not found", 404, "NOT_FOUND");
+  }
+  if (session.finishedAt) {
+    throw new PracticeError("This practice session has already been completed.", 400, "SESSION_FINISHED");
+  }
+
+  const answered = new Set(session.attempts.map((a) => a.bankItemId));
+  const remainingIds = (session.itemIds as string[]).filter((id) => !answered.has(id));
+
+  const { classKey } = await getStudentClassGroup(tx, params.tenantId, params.studentId);
+  const where: Prisma.QuestionBankItemWhereInput = {
+    tenantId: params.tenantId,
+    id: { in: remainingIds },
+    bank: "ASSESSMENT",
+    status: "APPROVED",
+    OR: params.campusId ? [{ campusId: params.campusId }, { campusId: null }] : [{ campusId: null }],
+    AND: [{ OR: [{ visibility: "PRACTICE" }, { visibility: "TEACHERS_ONLY_UNTIL", visibleFrom: { lte: now } }] }, classFilter(classKey)],
+  };
+  const items = await tx.questionBankItem.findMany({
+    where,
+    select: {
+      id: true,
+      bank: true,
+      status: true,
+      type: true,
+      prompt: true,
+      explanation: true,
+      points: true,
+      difficulty: true,
+      topic: true,
+      options: true,
+      correctAnswer: true,
+      subjectLabel: true,
+      subjectKey: true,
+      visibility: true,
+      visibleFrom: true,
+    },
+  });
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const questions = remainingIds.flatMap((id) => (byId.has(id) ? [scrubQuestionForPupil(byId.get(id)!)] : []));
+
+  return {
+    session: {
+      id: session.id,
+      size: session.size,
+      feedbackMode: session.feedbackMode,
+      startedAt: session.startedAt,
+      subjectLabel: session.subjectLabel,
+      topic: session.topic,
+    },
+    answeredCount: answered.size,
+    questions,
+  };
+}
+
+/**
  * Submits an answer for a question in a practice session.
  */
 export async function submitPracticeAnswer(
@@ -474,6 +560,9 @@ export async function finishPracticeSession(
       id: att.id,
       bankItemId: att.bankItemId,
       prompt: q?.prompt ?? "",
+      // The kind and the options travel with the answer so the screen can say it in the option's words, not its id.
+      type: q?.type ?? null,
+      options: Array.isArray(q?.options) ? q.options : [],
       answer: att.answer,
       correct: att.correct,
       correctAnswer: q?.correctAnswer ?? null,
@@ -580,6 +669,8 @@ export async function getPracticeHistory(
         id: a.id,
         bankItemId: a.bankItemId,
         prompt: a.bankItem.prompt,
+        type: a.bankItem.type,
+        options: Array.isArray(a.bankItem.options) ? a.bankItem.options : [],
         answer: a.answer,
         correct: a.correct,
         correctAnswer: a.bankItem.correctAnswer,

@@ -1,6 +1,7 @@
 import type { ComponentType, SVGProps } from "react";
 import type { Role } from "@prisma/client";
 import {
+  BookOpenIcon,
   BuildingIcon,
   CalendarIcon,
   FileTextIcon,
@@ -40,6 +41,7 @@ export function navFor(school: ShellSchool | null, platform = false): NavItem[] 
       { label: "Communication", href: `/schools/${school.code}/communication`, icon: MailIcon },
       { label: "Users", href: `/schools/${school.code}/users`, icon: UsersIcon },
       { label: "Question bank", href: `/schools/${school.code}/question-bank`, icon: FileTextIcon },
+      { label: "Forms", href: `/schools/${school.code}/forms`, icon: BookOpenIcon },
       { label: "Settings", href: `/schools/${school.code}/settings`, icon: SlidersIcon },
     );
   } else if (school.role === "CAMPUS_ADMIN") {
@@ -50,6 +52,7 @@ export function navFor(school: ShellSchool | null, platform = false): NavItem[] 
       { label: "Communication", href: `/schools/${school.code}/communication`, icon: MailIcon },
       { label: "Users", href: `/schools/${school.code}/users`, icon: UsersIcon },
       { label: "Question bank", href: `/schools/${school.code}/question-bank`, icon: FileTextIcon },
+      { label: "Forms", href: `/schools/${school.code}/forms`, icon: BookOpenIcon },
     );
   } else if (school.role === "TEACHING_STAFF" || school.role === "NON_TEACHING_STAFF") {
     // Staff may look at the school year and at the school's people (read-only; plan 1.2, decisions P2 and P9) — they change none of it.
@@ -59,6 +62,14 @@ export function navFor(school: ShellSchool | null, platform = false): NavItem[] 
       // Staff write and browse questions here; whether they may review is decided on the page.
       { label: "Question bank", href: `/schools/${school.code}/question-bank`, icon: FileTextIcon },
     );
+    // Teachers write and mark forms; non-teaching staff only answer the questionnaires addressed to them. Both reach the page; what each may do is decided there and by the API.
+    items.push({ label: "Forms", href: `/schools/${school.code}/forms`, icon: BookOpenIcon });
+  } else if (school.role === "STUDENT") {
+    // A pupil's own work: the practice sets, questionnaires and paper work set for them, and the question practice they do for themselves.
+    items.push({ label: "My work", href: `/schools/${school.code}/learn`, icon: BookOpenIcon });
+  } else if (school.role === "PARENT") {
+    // A guardian looks at how their children's practice is going, as far as the school lets them.
+    items.push({ label: "My children", href: `/schools/${school.code}/children`, icon: GraduationCapIcon });
   }
   return [...items, ...platformItem];
 }
@@ -87,6 +98,9 @@ const SCHOOL_PAGES: Record<string, string> = {
   people: "People",
   communication: "Communication",
   "question-bank": "Question bank",
+  forms: "Forms",
+  learn: "My work",
+  children: "My children",
   settings: "Settings",
   support: "Support access",
 };
@@ -99,6 +113,8 @@ export function pageLabel(pathname: string): string | null {
   if (match) return SCHOOL_PAGES[match[1] ?? ""] ?? null;
   // A person's own page under People (a student or a member of staff) is still "People" in the breadcrumb.
   if (/^\/schools\/[^/]+\/people\/(?:students|staff)\/[^/]+\/?$/.test(pathname)) return "People";
+  // A form's own page is still "Forms" in the breadcrumb.
+  if (/^\/schools\/[^/]+\/forms\/[^/]+\/?$/.test(pathname)) return "Forms";
   // Sub-pages under Communication are still "Communication" in the breadcrumb.
   if (/^\/schools\/[^/]+\/communication(?:\/.*)?$/.test(pathname)) return "Communication";
   return null;
