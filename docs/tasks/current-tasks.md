@@ -344,3 +344,26 @@
 - [x] The person stays pinned at the foot; the phone More sheet has the same headings
 - [x] Unit and e2e tests (both themes, open, rail and peek); component and function catalogs
 - [ ] Octalve's walkthrough must include the shell rows (its own run, after AlEemaan's)
+
+## TASK-0027: Programs, learning that is not a normal class (parity with AlEemaan's task 0043)
+
+[Task file](0027-programs.md). Requested by the maintainer on 2026-11-03 for AlEemaan; the Octalve port is designed (docs only, 2026-11-04) and waits for AlEemaan's slices P1 and P2 to be merged into its `dev`.
+
+- [ ] P0 The generic tenant-and-campus settings table (shared with 0028 and 0029)
+- [ ] P1 Structure - [ ] P2 People - [ ] P3 Staff and attendance - [ ] P3b Assessments - [ ] P4 Fees - [ ] P5 Completion and certificates
+- [ ] Settle the overlap with Phase 5 (vocational cohorts, higher-ed credit units) before P1
+
+## TASK-0028: Standing, suspension, expulsion and termination on the school's own records (parity with AlEemaan's task 0045)
+
+[Task file](0028-standing.md). Requested by the maintainer on 2026-11-03 for AlEemaan; designed here 2026-11-04 (docs only).
+
+- [ ] S1 Pupils (migration, rules, service, routes, the Students page) - [ ] S2 Staff and the sign-in lift - [ ] S3 The campus switch and its Settings tab
+- [ ] Tests, including RLS and the append-only trigger
+
+## TASK-0029: Part payment "if allowed" (parity with AlEemaan's task 0046)
+
+[Task file](0029-part-payment.md). Requested by the maintainer on 2026-11-03 for AlEemaan; designed here 2026-11-04 (docs only). Only an `ADMIN` sets the rule (ADR 0016: a campus administrator does not configure fees).
+
+- [ ] F1 Column, rule, settings, enforcement in both payment paths - [ ] F2 Finance screens
+- [ ] Check `recordManualPayment` and `initializePayment` for the double-take race AlEemaan found, and fix it first if present
+
