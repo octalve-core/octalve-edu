@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isMalformedPath } from "@/lib/api/malformed-path";
 import { buildCsp, generateNonce } from "@/lib/security/csp";
+import { videoGuideMedia } from "@/lib/video-guide/media-base";
 
 // Per-request nonce-based CSP (domain-implementation-plan.md §0.5.B). Next 16 calls this file `proxy`
 // (it was `middleware`). The nonce goes on the REQUEST headers — Next reads the policy from there and
@@ -25,6 +26,8 @@ export function proxy(request: NextRequest) {
     nonce,
     dev: process.env.NODE_ENV === "development",
     https: (process.env.APP_URL ?? "").startsWith("https://"),
+    // The video is kept out of git and may be hosted elsewhere: that host is allowed on the video guide page and nowhere else.
+    mediaOrigin: request.nextUrl.pathname === "/video-guide" ? videoGuideMedia(process.env.NEXT_PUBLIC_VIDEO_GUIDE_BASE_URL).origin : null,
   });
   const header = process.env.CSP_REPORT_ONLY === "true" ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy";
 

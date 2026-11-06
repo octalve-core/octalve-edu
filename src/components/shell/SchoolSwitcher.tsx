@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDownIcon, GraduationCapIcon } from "@/components/ui/icons";
+import { BuildingIcon, ChevronDownIcon, GraduationCapIcon } from "@/components/ui/icons";
 import { ROLE_LABELS } from "@/lib/roles";
 import { useShell } from "./ShellProvider";
+import { useSidebar } from "./SidebarFrame";
 import { useDisclosure } from "./useDisclosure";
 import { FOCUS_RING } from "./nav";
 
@@ -12,18 +13,34 @@ const LABEL = "text-[11px] font-semibold tracking-wider text-fg-muted uppercase"
 /// Under the brand in the sidebar: which school you are in, and — with two or more — a way to change. One school is
 /// plain text (nothing to switch to); none draws nothing. The entries are links to `/schools/<code>` for the person's
 /// OWN schools; opening one runs the same membership check as any other visit, so this grants nothing.
+/// In the icon rail it is a building icon of the same height (so the navigation below does not move when the rail opens); the
+/// switcher itself shows once the sidebar is open.
 export function SchoolSwitcher() {
   const { schools, school, home } = useShell();
+  const { open: sidebarOpen } = useSidebar();
   const { open, toggle, panelId, buttonRef, rootProps } = useDisclosure();
   const current = school ?? home;
 
   if (schools.length === 0) return null;
 
+  if (!sidebarOpen) {
+    return (
+      <div className="px-3 pb-3">
+        <div className="flex min-h-12 items-center justify-center text-fg-muted">
+          <BuildingIcon className="h-5 w-5" />
+          <span className="sr-only">School: {current?.name ?? "none chosen"}</span>
+        </div>
+      </div>
+    );
+  }
+
   if (schools.length === 1) {
     return (
-      <div className="px-5 pb-3">
-        <p className={LABEL}>School</p>
-        <p className="mt-1 truncate text-sm font-semibold text-fg">{schools[0].name}</p>
+      <div className="px-3 pb-3">
+        <div className="flex min-h-12 flex-col justify-center px-2">
+          <p className={LABEL}>School</p>
+          <p className="mt-1 truncate text-sm font-semibold text-fg">{schools[0].name}</p>
+        </div>
       </div>
     );
   }

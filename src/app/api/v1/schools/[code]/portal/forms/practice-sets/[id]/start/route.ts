@@ -19,7 +19,8 @@ export const POST = withAuth(
           tenantId: auth.tenant.tenantId,
         });
       });
-      return ok(result, {}, result.isResume ? 200 : 201);
+      // `serverTime` lets the screen count the pupil's time left against the school's clock, not the device's.
+      return ok({ ...result, serverTime: new Date().toISOString() }, {}, result.isResume ? 200 : 201);
     } catch (err) {
       if (err instanceof FormsServiceError) {
         return fail(err.message, err.statusCode, err.code);

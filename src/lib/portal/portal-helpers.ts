@@ -38,3 +38,18 @@ export async function getStudentForViewer(tx: Tx, params: { tenantId: string; us
   }
   return null;
 }
+
+/// The pupils a guardian may look at: those their APPROVED links name (a pending or revoked link, a link of an archived guardian and an archived pupil name nobody). The same rule
+/// as `getStudentForViewer` for a guardian, so what is listed here is exactly what the history route will open.
+export async function listChildrenForGuardian(tx: Tx, tenantId: string, userId: string) {
+  const rows = await tx.studentRecord.findMany({
+    where: { tenantId, archivedAt: null, guardians: { some: { status: "APPROVED", guardian: { userId, archivedAt: null } } } },
+    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    select: { id: true, firstName: true, middleName: true, lastName: true, admissionNo: true },
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    name: [r.firstName, r.middleName, r.lastName].filter(Boolean).join(" "),
+    admissionNo: r.admissionNo,
+  }));
+}

@@ -12,6 +12,10 @@ export const BANK_STAFF_ROLES = [Role.ADMIN, Role.CAMPUS_ADMIN, Role.TEACHING_ST
 /// the non-teaching staff reaches the question bank to review what is written (`BANK_STAFF_ROLES`) and reads the list of forms, and does no more with a form.
 export const FORM_STAFF_ROLES = [Role.ADMIN, Role.CAMPUS_ADMIN, Role.TEACHING_STAFF];
 
+/// Who is addressed by questionnaires written for members of the school and answers them ("For you"): the four staff roles and guardians. Pupils answer through the portal routes. Whether
+/// a questionnaire is for a given person is decided by its audience (`isMemberEligibleAsStaff`), not by this list.
+export const FOR_YOU_ROLES = [...BANK_STAFF_ROLES, Role.PARENT];
+
 /// A failure as a response. A validation failure carries its field problems.
 export function failure(result: Fail | (Fail & { details?: { path: string; message: string }[] })) {
   const details = "details" in result ? result.details : undefined;

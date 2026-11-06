@@ -5,12 +5,15 @@ import { MfaUnavailableError } from "@/lib/auth/mfa/secret-box";
 import { effectiveSettingsIn } from "@/lib/question-bank/settings-service";
 import { BankQuestionType, FormKind, FormStatus, FormAudienceKind, FormResponseStatus, Prisma } from "@prisma/client";
 import { campusFilter, reachForm } from "./access";
-import { FormsServiceError } from "./forms-service";
+import { FormsServiceError, pupilStandingOf } from "./forms-service";
 import { participationCode, recordedAt } from "./participation";
+import { isFormForPupilCampus } from "./practice-sets";
 import {
   validateQuestionnaireInput,
   isQuestionnaireOpen,
   isMemberEligibleForQuestionnaire,
+  isMemberEligibleAsStaff,
+  answersAs,
   formatQuestionnaireQuestionsForRespondent,
   validateAndNormalizeAnswers,
   aggregateQuestionnaireAnalytics,
@@ -435,6 +438,22 @@ export async function getQuestionnaireAnalytics(
   return withholdSmallSample({ ...analytics, totalResponses: responses }, settings["bank.smallSummary.min"]);
 }
 
+/// Whether a member may answer, by who they are: a pupil by their class, anyone else (staff, a guardian) by the roles the audience names.
+function mayAnswer(
+  audience: { kind: FormAudienceKind; roles?: unknown; classGroupIds?: unknown } | undefined,
+  role: string,
+  classGroupId: string | null | undefined,
+): boolean {
+  if (!audience) return true;
+  return role === "STUDENT"
+    ? isMemberEligibleForQuestionnaire(audience, "STUDENT", classGroupId)
+    : isMemberEligibleAsStaff(audience, answersAs(role));
+}
+
+/// A member who is not a pupil reaches the questionnaires of their own campus and the whole school's; a person bound to no campus (the school's administrator) reaches all.
+const reachesCampus = (formCampusId: string | null, campusId: string | null | undefined) =>
+  !campusId || formCampusId === null || formCampusId === campusId;
+
 /**
  * Lists available questionnaires for a pupil.
  */
@@ -445,19 +464,16 @@ export async function listAvailableQuestionnairesForPupil(
     tenantId: string;
   },
 ) {
-  const enrollment = await tx.studentEnrollment.findFirst({
-    where: { studentId: params.studentId, tenantId: params.tenantId, status: "ACTIVE" },
-    orderBy: { enrolledAt: "desc" },
-    include: { classArm: { select: { classGroupId: true } } },
-  });
-
-  const pupilClassGroupId = enrollment?.classArm?.classGroupId ?? null;
+  // The pupil's class and campus: a questionnaire of another campus is not theirs to see, as with practice sets.
+  const pupil = await pupilStandingOf(tx, params.tenantId, params.studentId);
+  const pupilClassGroupId = pupil.classGroupId;
 
   const forms = await tx.form.findMany({
     where: {
       tenantId: params.tenantId,
       kind: FormKind.QUESTIONNAIRE,
       status: FormStatus.PUBLISHED,
+      OR: pupil.campusId ? [{ campusId: pupil.campusId }, { campusId: null }] : [{ campusId: null }],
     },
     orderBy: { createdAt: "desc" },
     include: {
@@ -488,6 +504,43 @@ export async function listAvailableQuestionnairesForPupil(
 }
 
 /**
+ * Lists the questionnaires addressed to a member who is not a pupil (staff, a guardian): open now, of their campus or the whole school's, naming their role, with whether they answered.
+ */
+export async function listAvailableQuestionnairesForMember(
+  tx: Tx,
+  params: { tenantId: string; userId: string; role: string; campusId?: string | null },
+) {
+  const forms = await tx.form.findMany({
+    where: {
+      tenantId: params.tenantId,
+      kind: FormKind.QUESTIONNAIRE,
+      status: FormStatus.PUBLISHED,
+      ...campusFilter(params.campusId),
+    },
+    orderBy: { createdAt: "desc" },
+    include: { audiences: true, _count: { select: { questions: true } } },
+  });
+
+  const now = new Date();
+  const open = forms.filter((f) => {
+    if (!isQuestionnaireOpen(f, now).isOpen) return false;
+    const audience = f.audiences[0];
+    return audience !== undefined && mayAnswer(audience, params.role, null);
+  });
+  const answered = await submittedFormIds(tx, params.tenantId, open, params.userId);
+  return open.map((f) => ({
+    id: f.id,
+    title: f.title,
+    instructions: f.instructions,
+    isAnonymous: f.isAnonymous,
+    questionCount: f._count.questions,
+    opensAt: f.opensAt,
+    closesAt: f.closesAt,
+    hasSubmitted: answered.has(f.id),
+  }));
+}
+
+/**
  * Retrieves a questionnaire for a respondent.
  */
 export async function getQuestionnaireForMember(
@@ -497,6 +550,8 @@ export async function getQuestionnaireForMember(
     memberId: string;
     memberRole?: string | null;
     classGroupId?: string | null;
+    /** The campus of a member who is not a pupil (a pupil's own is read from their record). */
+    campusId?: string | null;
     tenantId: string;
   },
 ) {
@@ -507,6 +562,18 @@ export async function getQuestionnaireForMember(
       questions: { orderBy: { sortOrder: "asc" } },
     },
   });
+
+  // A pupil is read by their own class and campus (the route names the pupil, not their class): a questionnaire of another campus is "not found", and one for a class is opened by that class.
+  let classGroupId = params.classGroupId;
+  if (params.memberRole === "STUDENT") {
+    const pupil = await pupilStandingOf(tx, params.tenantId, params.memberId);
+    classGroupId = pupil.classGroupId;
+    if (form && !isFormForPupilCampus(form.campusId, pupil.campusId)) {
+      throw new FormsServiceError("Questionnaire not found.", 404, "NOT_FOUND");
+    }
+  } else if (form && !reachesCampus(form.campusId, params.campusId)) {
+    throw new FormsServiceError("Questionnaire not found.", 404, "NOT_FOUND");
+  }
 
   if (!form) {
     throw new FormsServiceError("Questionnaire not found.", 404, "NOT_FOUND");
@@ -521,8 +588,7 @@ export async function getQuestionnaireForMember(
     );
   }
 
-  const audience = form.audiences[0];
-  if (audience && !isMemberEligibleForQuestionnaire(audience, params.memberRole, params.classGroupId)) {
+  if (!mayAnswer(form.audiences[0], params.memberRole ?? "", classGroupId)) {
     throw new FormsServiceError("You are not eligible for this questionnaire.", 403, "FORBIDDEN");
   }
 
@@ -550,6 +616,8 @@ export async function submitQuestionnaireForMember(
     isStudent?: boolean;
     memberRole?: string | null;
     classGroupId?: string | null;
+    /** The campus of a member who is not a pupil (a pupil's own is read from their record). */
+    campusId?: string | null;
     tenantId: string;
     answers: Array<{ formQuestionId: string; value: unknown }>;
   },
@@ -572,17 +640,17 @@ export async function submitQuestionnaireForMember(
   }
 
   let classGroupId = params.classGroupId;
-  if (!classGroupId && params.memberRole === "STUDENT") {
-    const enrollment = await tx.studentEnrollment.findFirst({
-      where: { studentId: params.memberId, tenantId: params.tenantId, status: "ACTIVE" },
-      orderBy: { enrolledAt: "desc" },
-      include: { classArm: { select: { classGroupId: true } } },
-    });
-    classGroupId = enrollment?.classArm?.classGroupId ?? null;
+  if (params.memberRole === "STUDENT") {
+    const pupil = await pupilStandingOf(tx, params.tenantId, params.memberId);
+    if (!isFormForPupilCampus(form.campusId, pupil.campusId)) {
+      throw new FormsServiceError("Questionnaire not found.", 404, "NOT_FOUND");
+    }
+    classGroupId = classGroupId ?? pupil.classGroupId;
+  } else if (!reachesCampus(form.campusId, params.campusId)) {
+    throw new FormsServiceError("Questionnaire not found.", 404, "NOT_FOUND");
   }
 
-  const audience = form.audiences[0];
-  if (audience && !isMemberEligibleForQuestionnaire(audience, params.memberRole, classGroupId)) {
+  if (!mayAnswer(form.audiences[0], params.memberRole ?? "", classGroupId)) {
     throw new FormsServiceError("You are not eligible for this questionnaire.", 403, "FORBIDDEN");
   }
 

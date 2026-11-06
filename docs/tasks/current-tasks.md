@@ -322,3 +322,48 @@
 ## TASK-0024: the question bank (parity with AlEemaan's task 0032)
 
 [Task file](0024-question-bank.md). Slice A (schema, migration, pure parts, database tests) is merged (PR #68). Slice B (reviewers and switches) is merged (PR #69). Slice C (the questions and their review: service and API) is merged (PR #70). Slice D (pictures) is merged (PR #71). Slice E (the screens: Browse, My questions, Review queue, a navigation entry for staff) is merged (PR #72). All five slices are on `dev` (2026-10-26); what remains is the walkthrough, the hosted migration and image store, and the slice that reads `bank.parents.view`.
+
+## TASK-0025: the Forms and question-bank screens (parity with AlEemaan's task 0041)
+
+[Task file](0025-forms-screens.md). The APIs of the Forms module and the question bank's reports, printing and offer-back were on `dev`; the screens were not. **All eight slices (O1 to O8) are built and tested (2026-11-03, lane 3; results in section 5 of the task file) and merged into `dev` as PR #86 (`8115519`).** The maintainer asked on 2026-11-02 for all the implementation first, then each slice tested in turn.
+
+- [x] O6 reports, print, print log and offer-back from an LMS quiz card: built and tested
+- [x] O7 a Video guide link in the profile menu, a configurable address for the video and its policy, `NEXT_DIST_DIR`: built and tested
+- [x] O1 staff forms and O2 form page / marking / roll call: built and tested (four routes added: questionnaire detail and update, questionnaire close, paper-work close, practice-set responses)
+- [x] O3 the pupil's forms (My work), O4 the pupil's practice and a guardian's page (My children), O5 the public questionnaire page: built and tested (service changes and one new route on the way, see the task file)
+- [x] O8 the five things the screens showed were missing (staff reporter's outcomes, one answer per practice set, carrying on a practice session, one answer per browser on a public link, "For you" for staff and guardians): built and tested
+- [x] PR #86 into `dev`, guarded merge (2026-11-03)
+- [ ] Octalve's walkthrough (its own run, after AlEemaan's)
+
+## TASK-0026: the sidebar in sections, collapsible to icons, with the person pinned at the foot (parity with AlEemaan's task 0042)
+
+[Task file](0026-sidebar-sections.md). Requested by the maintainer on 2026-11-03 for both repos. Built and tested 2026-11-03 (section 7 of the task file) and merged into `dev` as PR #88 (`e5549fc`).
+
+- [x] Sections that fold (Administration, Learning; Platform as a plain link last), remembered in a cookie; the section of the current page opens on arrival
+- [x] The whole sidebar folds to a rail of icons with a round arrow on its edge; it opens over the page while an icon is hovered or focused (hovering the arrow does nothing); the school switcher keeps its height in the rail
+- [x] The person stays pinned at the foot; the phone More sheet has the same headings
+- [x] Unit and e2e tests (both themes, open, rail and peek); component and function catalogs
+- [ ] Octalve's walkthrough must include the shell rows (its own run, after AlEemaan's)
+
+## TASK-0027: Programs, learning that is not a normal class (parity with AlEemaan's task 0043)
+
+[Task file](0027-programs.md). Requested by the maintainer on 2026-11-03 for AlEemaan; the Octalve port is designed (docs only, 2026-11-04) and waits for AlEemaan's slices P1 and P2 to be merged into its `dev`.
+
+- [ ] P0 The generic tenant-and-campus settings table (shared with 0028 and 0029)
+- [ ] P1 Structure - [ ] P2 People - [ ] P3 Staff and attendance - [ ] P3b Assessments - [ ] P4 Fees - [ ] P5 Completion and certificates
+- [ ] Settle the overlap with Phase 5 (vocational cohorts, higher-ed credit units) before P1
+
+## TASK-0028: Standing, suspension, expulsion and termination on the school's own records (parity with AlEemaan's task 0045)
+
+[Task file](0028-standing.md). Requested by the maintainer on 2026-11-03 for AlEemaan; designed here 2026-11-04 (docs only).
+
+- [ ] S1 Pupils (migration, rules, service, routes, the Students page) - [ ] S2 Staff and the sign-in lift - [ ] S3 The campus switch and its Settings tab
+- [ ] Tests, including RLS and the append-only trigger
+
+## TASK-0029: Part payment "if allowed" (parity with AlEemaan's task 0046)
+
+[Task file](0029-part-payment.md). Requested by the maintainer on 2026-11-03 for AlEemaan; designed here 2026-11-04 (docs only). Only an `ADMIN` sets the rule (ADR 0016: a campus administrator does not configure fees).
+
+- [ ] F1 Column, rule, settings, enforcement in both payment paths - [ ] F2 Finance screens
+- [ ] Check `recordManualPayment` and `initializePayment` for the double-take race AlEemaan found, and fix it first if present
+

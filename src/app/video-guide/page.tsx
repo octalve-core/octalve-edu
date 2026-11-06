@@ -2,6 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { videoGuideMedia } from "@/lib/video-guide/media-base";
+
+// Read at build time (NEXT_PUBLIC_): the folder the files are served from, on this site by default.
+const MEDIA = videoGuideMedia(process.env.NEXT_PUBLIC_VIDEO_GUIDE_BASE_URL);
 
 interface Chapter {
   id: string;
@@ -21,7 +25,7 @@ export default function VideoGuidePage() {
   const [hasVideo, setHasVideo] = useState<boolean>(true);
 
   useEffect(() => {
-    fetch("/media/video-guide/chapters.json")
+    fetch(`${MEDIA.base}/chapters.json`)
       .then((res) => (res.ok ? res.json() : []))
       .then((data: Chapter[]) => {
         setChapters(data);
@@ -72,7 +76,7 @@ export default function VideoGuidePage() {
 
           <div className="flex items-center gap-3">
             <a
-              href="/media/video-guide/walkthrough.pdf"
+              href={`${MEDIA.base}/walkthrough.pdf`}
               download
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line bg-surface hover:bg-surface-2 text-xs font-medium text-fg shadow-sm transition-all"
             >
@@ -86,7 +90,7 @@ export default function VideoGuidePage() {
               <span>Download PDF</span>
             </a>
             <a
-              href="/media/video-guide/walkthrough.webm"
+              href={`${MEDIA.base}/walkthrough.webm`}
               download
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand hover:bg-brand/90 text-white text-xs font-semibold shadow-sm transition-all"
             >
@@ -110,14 +114,15 @@ export default function VideoGuidePage() {
                   ref={videoRef}
                   controls
                   playsInline
+                  crossOrigin={MEDIA.origin ? "anonymous" : undefined}
                   className="w-full h-full object-contain bg-black"
                   onTimeUpdate={handleTimeUpdate}
                   onPlay={() => setIsPlaying(true)}
                   onPause={() => setIsPlaying(false)}
                   onError={() => setHasVideo(false)}
                 >
-                  <source src="/media/video-guide/walkthrough.webm" type="video/webm" />
-                  <track kind="subtitles" src="/media/video-guide/walkthrough.vtt" srcLang="en" label="Captions" default />
+                  <source src={`${MEDIA.base}/walkthrough.webm`} type="video/webm" />
+                  <track kind="subtitles" src={`${MEDIA.base}/walkthrough.vtt`} srcLang="en" label="Captions" default />
                   Your browser does not support the video tag.
                 </video>
               ) : (
@@ -233,7 +238,7 @@ export default function VideoGuidePage() {
                     <p className="text-[11px] text-fg-muted">1 page per step with screenshots</p>
                   </div>
                 </div>
-                <a href="/media/video-guide/walkthrough.pdf" download className="text-xs font-medium text-brand hover:underline">
+                <a href={`${MEDIA.base}/walkthrough.pdf`} download className="text-xs font-medium text-brand hover:underline">
                   Download
                 </a>
               </div>
@@ -254,7 +259,7 @@ export default function VideoGuidePage() {
                     <p className="text-[11px] text-fg-muted">Timestamped step captions</p>
                   </div>
                 </div>
-                <a href="/media/video-guide/walkthrough.vtt" download className="text-xs font-medium text-brand hover:underline">
+                <a href={`${MEDIA.base}/walkthrough.vtt`} download className="text-xs font-medium text-brand hover:underline">
                   Download
                 </a>
               </div>
