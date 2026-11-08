@@ -349,7 +349,7 @@
 
 [Task file](0027-programs.md). Requested by the maintainer on 2026-11-03 for AlEemaan; the Octalve port is designed (docs only, 2026-11-04) and waits for AlEemaan's slices P1 and P2 to be merged into its `dev`.
 
-- [ ] P0 The generic tenant-and-campus settings table (shared with 0028 and 0029)
+- [x] P0 The generic tenant-and-campus settings table (`TenantSetting`, built 2026-11-08 on `claude/octalve-parity` with the part-payment slice; shared with 0028 and 0029)
 - [ ] P1 Structure - [ ] P2 People - [ ] P3 Staff and attendance - [ ] P3b Assessments - [ ] P4 Fees - [ ] P5 Completion and certificates
 - [ ] Settle the overlap with Phase 5 (vocational cohorts, higher-ed credit units) before P1
 
@@ -357,13 +357,13 @@
 
 [Task file](0028-standing.md). Requested by the maintainer on 2026-11-03 for AlEemaan; designed here 2026-11-04 (docs only).
 
-- [ ] S1 Pupils (migration, rules, service, routes, the Students page) - [ ] S2 Staff and the sign-in lift - [ ] S3 The campus switch and its Settings tab
-- [ ] Tests, including RLS and the append-only trigger
+- [x] S1 Pupils (migration, rules, service, route; built 2026-11-08 on `claude/octalve-parity`, needs the migration `20261115090000_standing`; the Students page is not built) - [x] S2 Staff and the sign-in lift (service, routes, lift) - [~] S3 The campus switch (API built; the Settings tab is not)
+- [x] Tests written (unit, API, integration for the checks, the append-only history and RLS); NOT RUN yet
 
 ## TASK-0029: Part payment "if allowed" (parity with AlEemaan's task 0046)
 
 [Task file](0029-part-payment.md). Requested by the maintainer on 2026-11-03 for AlEemaan; designed here 2026-11-04 (docs only). Only an `ADMIN` sets the rule (ADR 0016: a campus administrator does not configure fees).
 
-- [ ] F1 Column, rule, settings, enforcement in both payment paths - [ ] F2 Finance screens
-- [ ] Check `recordManualPayment` and `initializePayment` for the double-take race AlEemaan found, and fix it first if present
+- [x] F1 Column, rule, settings, enforcement in both payment paths (built 2026-11-08 on `claude/octalve-parity`; needs the migration `20261114090000_tenant_settings_part_payment`) - [ ] F2 Finance screens: **blocked, Octalve has no mounted Finance page** (the finance components exist but no page imports them); the invoice API already returns the sentence and the flag a screen needs
+- [x] Checked `recordManualPayment` and `initializePayment` for the double-take race AlEemaan found: it was there (no row lock; the manual path did not even refuse more than the balance up front). Fixed with `SELECT ... FOR UPDATE` and a test
 

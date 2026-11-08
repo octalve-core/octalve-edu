@@ -29,7 +29,7 @@ Different, on purpose:
 - **Programs may have assessments** (AlEemaan's 0043 section 8.11, slice P3b): ported with the same slice.
 
 ## 4. Work breakdown
-- [ ] P0 The generic tenant-and-campus settings table, its RLS and audit, and the switch helper (shared with 0028 and 0029)
+- [x] P0 The generic tenant-and-campus settings table, its RLS and audit (`TenantSetting`, migration `20261114090000_tenant_settings_part_payment`, built 2026-11-08 with task 0029; the switch helper for `programs.enabled` comes with P1)
 - [ ] P1 Structure (programs, campuses, level names, groups, program admins, the audit, the `programs.enabled` switch, the Programs page, the sidebar entry)
 - [ ] P2 People (`ProgramParticipant`, the state of a place read from the school's own records, standing for standalone people, the People tab; AlEemaan's 0043 section 9)
 - [ ] P3 Staff and attendance - [ ] P3b Assessments - [ ] P4 Fees - [ ] P5 Completion and certificates (each as in AlEemaan's 0043)
