@@ -41,7 +41,8 @@ function shuffle<T>(array: T[]): T[] {
  */
 export async function resolveStudentForUser(tx: Tx, tenantId: string, userId: string) {
   const student = await tx.studentRecord.findFirst({
-    where: { tenantId, userId, archivedAt: null },
+    // An expelled pupil has no record to the portal (task 0028).
+    where: { tenantId, userId, archivedAt: null, standing: { not: "EXPELLED" } },
     include: {
       campus: { select: { id: true, name: true } },
     },

@@ -107,6 +107,20 @@ elsewhere(
   "POST v1/schools/[code]/members/[userId]/deactivate/route.ts",
   "POST v1/schools/[code]/members/[userId]/reactivate/route.ts",
 );
+elsewhere(
+  "lib/settings/ceiling-switch.ts `set`: a campus administrator changes their own campus's value only (any other campus is 404) and only to turn it off; the school's value is the school administrator's, with a fresh proof. `view` lists only the caller's own campus for anyone who is not the school's administrator",
+  "PATCH v1/schools/[code]/settings/standing/route.ts",
+  "GET v1/schools/[code]/settings/standing/route.ts",
+);
+elsewhere(
+  "lib/finance/part-payment-service.ts `policyView`: lists only the caller's own campus for anyone who is not the school's administrator (the rule is read-only for a campus administrator; the PATCH is the school administrator's, checked in the handler)",
+  "GET v1/schools/[code]/settings/part-payment/route.ts",
+);
+elsewhere(
+  "lib/standing/staff-service.ts: outOfReach (a campus administrator reaches the members of their own campus only; a person with no campus is the school's) and mayAct (never an administrator, never themselves)",
+  "GET v1/schools/[code]/members/[userId]/standing/route.ts",
+  "POST v1/schools/[code]/members/[userId]/standing/route.ts",
+);
 const INVITES =
   "lib/invitations/service.ts: createInvitation / campusActorInvitationRefusal (own campus, never administrator-level, lists are the campus's)";
 elsewhere(
