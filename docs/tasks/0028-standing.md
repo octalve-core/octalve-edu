@@ -1,7 +1,7 @@
 # 0028: Standing - suspension, expulsion and termination on the school's own records (the Octalve Edu port of AlEemaan's task 0045)
 
 - **Period / Focus:** design written 2026-11-04 (docs only); requested by the maintainer on 2026-11-03 for AlEemaan. The source is AlEemaan's `docs/tasks/0045-standing-suspension-expulsion-termination.md` (built and tested on its branch `claude/programs-p1`).
-- **Status:** Design only. Nothing is built here.
+- **Status:** S1 (the migration, the rules, the pupil service and route), S2 (the staff service, the routes, the sign-in lift) and the API of S3 (the switch) built 2026-11-08 on `claude/octalve-parity`, not yet tested or merged. No screen is built (the Students page, the Users page, the portal notice and the Settings tab): section 5. Waiting for the migration `20261115090000_standing` on the hosted databases.
 - **Priority:** High (programs slice P2 reads it)
 - **Assignee:** next AI / maintainer
 - **Target Branch / PR:** one branch and one PR off `dev`
@@ -24,10 +24,28 @@ Different, on purpose:
 7. **The settings store** for the switch is the generic table that task 0027 adds (P0).
 
 ## 3. Work breakdown
-- [ ] S1 Migration (enums, `EXPELLED` on `EnrollmentStatus`, `standing` and `standingUntil` on students, staff records and memberships with the checks, `StandingEvent` with RLS, composite keys and the trigger); the pure rules; the pupil service and routes; the Students page
-- [ ] S2 The staff service (suspend, lift, terminate, reinstate), the sign-in lift, routes; the Users page and the staff list; Reactivate and Restore refuse a suspended or terminated person
-- [ ] S3 The campus switch and its Settings tab; walkthrough rows; docs
+- [x] S1 Migration (enums, `EXPELLED` on `EnrollmentStatus`, `standing` and `standingUntil` on students, staff records and memberships with the checks, `StandingEvent` with RLS, composite keys and the trigger); the pure rules; the pupil service and routes; the Students page
+- [x] S2 The staff service (suspend, lift, terminate, reinstate), the sign-in lift, routes; the Users page and the staff list; Reactivate and Restore refuse a suspended or terminated person
+- [~] S3 The campus switch (the API is built; the Settings tab is not); walkthrough rows; docs
 - [ ] Tests: unit (rules), API (who may, every effect, the history, the guards, campus isolation), integration (the checks, the trigger, RLS), browser (both themes, phone), the route-role-guard source test
 
 ## 4. Not in this task
 Messages to guardians about a suspension, an appeal process, reporting by period; the same exclusions as AlEemaan's 0045.
+
+## 5. Build record (2026-11-08)
+**What exists.** The migration `20261115090000_standing` (additive: three enums, `EnrollmentStatus.EXPELLED`, `standing` and `standingUntil` on `StudentRecord`, `StaffRecord` and `TenantMembership` with the checks, and `StandingEvent` with row-level security and no UPDATE, DELETE or TRUNCATE for the runtime role). `src/lib/standing/` (rules, common, validation, the pupil and staff services, the sign-in lift), `src/lib/settings/ceiling-switch.ts` (the generic switch over `TenantSetting`, also for `programs.enabled` later), and four routes: `people/students/[id]/standing`, `people/staff/[id]/standing`, `members/[userId]/standing`, `settings/standing`.
+
+**Decisions made while building.**
+- No scope. A person has one membership per school, so a suspension or termination is of the membership (and the staff record that names it); the AlEemaan "SCHOOL" scope does not exist here.
+- The history is append-only by `REVOKE UPDATE, DELETE, TRUNCATE ... FROM app_user` (the way `NotificationAuditLog` does it), not a trigger, so the owner role can still delete a school's rows when the school itself is removed.
+- A suspension of staff deactivates the membership, as in AlEemaan. Deactivating here does not delete sessions (authority is read from the membership at every request), so neither does this.
+- The lift at sign-in is in `completeSignIn`, the one place a person becomes signed in; it reads the person's own membership rows through the user context and lifts each in that school's context.
+- The portal: a suspended pupil can read but not take a quiz, practise or hand in work (six write routes use `getStudentForWork`, which answers 403 `SUSPENDED`; a suspension applies through its last day and then ends by itself). An expelled pupil has no record to the portal at all (`resolveStudentForUser` and the guardian helpers leave an expelled pupil out), so every portal route answers as it does for anyone without one and never says why. **Deviation from the AlEemaan design:** the expelled pupil can still sign in (Octalve pupils are real users with a membership); they just find nothing. Refusing the sign-in itself is a decision for the maintainer. What is owed stays payable through the invoices, which this does not touch.
+- Only the school's administrator expels, terminates and reinstates; a campus administrator suspends and lifts the pupils and staff of their own campus while `standing.campusAdminMaySuspend` allows it (the school's value AND the campus's; a campus can only turn it off), never an administrator, never themselves, and the school's last administrator is protected.
+- A suspension's end date that is not a day ("2026-13-01") used to answer 500 (an invalid Date cannot be turned back into text); it is refused with 400 like "2026-02-30" (found by the API test).
+- The five new GET routes (the three standings, the standing setting and the part-payment rule) are OUT of the platform support view's reach (`route-area-guard`): a disciplinary record and fee configuration are not grantable areas. A campus administrator's read of the two settings is narrowed to their own campus in the service (`route-role-guard`, `CAMPUS_CHECKED_ELSEWHERE`).
+- Attendance rolls, invoice generation and result sheets already select pupils by an ACTIVE enrolment (read on 2026-11-08), so expelling drops the pupil from them with no change there. Octalve has no promotion rollover module to check.
+
+**Tested (2026-11-08, test lane 4; order tsc, lint, build, tests).** tsc clean, lint 0 errors (6 old warnings in files this work does not touch), production build OK. Unit project 837/837, integration project 691/691, the whole API project 1,383 passed / 2 failed, the browser specs for the Forms screens and sign-in 79 passed / 2 skipped (desktop and phone). The 2 API failures (`nul-in-input` on `portal/practice/children`, and the route table of `question-bank-parity-gates`, which lacks 10 Forms routes that exist) are NOT from this work: they fail the same way on a clean build of the base commit 455f3a0 (lane 5). Failing-first: the new API specs were copied onto that unfixed base build and all 49 fail there (the code is not there), then pass here. NOT run: the full browser suite and the HTTPS project (no screen was built; the portal and sign-in specs were run), a hosted database.
+
+**Not built.** The screens: a Standing control on the Students page and the Users page, the portal notice, and the "Discipline" tab of Settings. The program roles that standing pauses (task 0027, slice P2) wait for programs.

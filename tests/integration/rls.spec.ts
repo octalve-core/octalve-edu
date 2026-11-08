@@ -154,8 +154,10 @@ test.describe("who is running", () => {
     expect(byTable["ResultAudit"]).toEqual(["INSERT", "SELECT"]);
     expect(byTable["SettingsChangeAudit"]).toEqual(["INSERT", "SELECT"]);
     expect(byTable["NotificationAuditLog"]).toEqual(["INSERT", "SELECT"]);
+    expect(byTable["StandingEvent"]).toEqual(["INSERT", "SELECT"]); // a standing history is append-only
+    const APPEND_ONLY = new Set(["AuditLog", "ResultAudit", "SettingsChangeAudit", "NotificationAuditLog", "StandingEvent"]);
     for (const [table, verbs] of Object.entries(byTable)) {
-      if (table === "AuditLog" || table === "ResultAudit" || table === "SettingsChangeAudit" || table === "NotificationAuditLog") continue;
+      if (APPEND_ONLY.has(table)) continue;
       expect(verbs, table).toEqual(["DELETE", "INSERT", "SELECT", "UPDATE"]);
     }
     expect(Object.keys(byTable).length).toBeGreaterThan(10); // and every table is covered, not an empty list
@@ -1391,12 +1393,14 @@ test.describe("catalog guard", () => {
       "SettingsChangeAudit",
       "StaffRecord",
       "StaffSubjectAssignment",
+      "StandingEvent",
       "StudentEnrollment",
       "StudentRecord",
       "Subject",
       "SubjectOffering",
       "SupportGrant",
       "TenantMembership",
+      "TenantSetting",
       "TenantStats",
       "TimetableSlot",
     ]); // update this list WITH the migration

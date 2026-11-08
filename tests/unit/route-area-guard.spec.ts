@@ -35,6 +35,15 @@ const OUT_OF_REACH: Record<string, string> = {
     "not a grantable area: the question bank is the school's own teaching material and its review, which a support view must not read",
   "question-bank/settings/route.ts":
     "not a grantable area: the question bank is the school's own teaching material and its review, which a support view must not read",
+  "people/students/[id]/standing/route.ts":
+    "not a grantable area: a pupil's standing and its history (suspension, expulsion, the reasons) is a disciplinary record, which a support view must not read",
+  "people/staff/[id]/standing/route.ts":
+    "not a grantable area: a staff member's standing and its history (suspension, expulsion, the reasons) is a disciplinary record, which a support view must not read",
+  "members/[userId]/standing/route.ts":
+    "not a grantable area: a user's standing and its history (suspension, expulsion, the reasons) is a disciplinary record, which a support view must not read",
+  "settings/standing/route.ts":
+    "not a grantable area: who may suspend where is the school's own disciplinary policy, which a support view must not read",
+  "settings/part-payment/route.ts": "finance is not a grantable area (ADR 0017): the part-payment rule is fee configuration",
   "question-bank/items/[id]/images/[imageId]/route.ts":
     "not a grantable area: a question's picture is part of the school's own teaching material, which a support view must not read",
 };

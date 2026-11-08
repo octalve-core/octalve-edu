@@ -5,6 +5,7 @@ import { forUser } from "@/lib/tenant/for-tenant";
 import { auditPersonEvent } from "@/lib/auth/audit";
 import { describeUserAgent } from "@/lib/auth/user-agent";
 import { ok } from "@/lib/api/envelope";
+import { liftEndedSuspensions } from "@/lib/standing/sign-in";
 import { SESSION_COOKIE_NAME, createSession, deleteSessionByToken, setSessionCookie } from "@/lib/auth/session";
 
 /// The ONE place a person becomes signed in. Used by sign-in step 1 (no second factor on the account) and
@@ -23,6 +24,9 @@ export async function completeSignIn(
 ): Promise<NextResponse> {
   const presentedToken = req.cookies.get(SESSION_COOKIE_NAME)?.value;
   if (presentedToken) await deleteSessionByToken(presentedToken);
+
+  // A suspension whose end date has passed is lifted here, at the one moment a person becomes signed in (task 0028, section 4.5): there is no background job.
+  await liftEndedSuspensions(user.id);
 
   // Read through the user context: a person's own memberships are visible before any tenant is known (§0.5.2).
   // An administrator of any kind - school, campus, or platform - is an account worth stealing: their sessions get the shorter absolute cap.

@@ -1,6 +1,6 @@
 import { fail, ok } from "@/lib/api/envelope";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
-import { PORTAL_STUDENT_ROLES, getStudentFromAuth } from "@/lib/portal/portal-helpers";
+import { PORTAL_STUDENT_ROLES, getStudentForWork } from "@/lib/portal/portal-helpers";
 import { finishPracticeSession, PracticeError } from "@/lib/question-bank/practice-service";
 
 export const POST = withAuth(
@@ -8,7 +8,7 @@ export const POST = withAuth(
     const { id: sessionId } = await ctx.params;
     try {
       const summary = await auth.tenant.run(async (tx) => {
-        const student = await getStudentFromAuth(tx, auth.tenant.tenantId, auth.userId);
+        const student = await getStudentForWork(tx, auth.tenant.tenantId, auth.userId);
         if (!student) {
           throw new PracticeError("Student profile not found.", 404, "NOT_FOUND");
         }

@@ -56,6 +56,8 @@ model Invoice {
   status      InvoiceStatus @default(UNPAID)
   dueDate     DateTime?     @db.Date
   lineItems   Json? // Snapshot of fee structures [{ name, amount, feeStructureId }]
+  /// Task 0029: an administrator marked this one invoice "pay in full" (no part payments on it). It only tightens what the school's rule says, never allows what it forbids.
+  payInFull   Boolean       @default(false)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @default(now()) @updatedAt
 

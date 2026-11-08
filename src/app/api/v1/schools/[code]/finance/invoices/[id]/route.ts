@@ -3,6 +3,8 @@ import { Role } from "@prisma/client";
 import { ok } from "@/lib/api/envelope";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { getStudentInvoice } from "@/lib/finance/service";
+import { partPaymentFor } from "@/lib/finance/part-payment-service";
+import { forTenant } from "@/lib/tenant/for-tenant";
 
 // GET /api/v1/schools/[code]/finance/invoices/[id]
 export const GET = withAuth(
@@ -15,7 +17,9 @@ export const GET = withAuth(
         permissions: [...auth.tenant.permissions],
         campusId: auth.tenant.campusId,
       });
-      return ok({ invoice });
+      // What a screen says about paying this invoice in parts (task 0029): the same rule the payment paths enforce.
+      const partPayment = await forTenant(auth.tenant.tenantId).transaction((tx) => partPaymentFor(tx, auth.tenant.tenantId, invoice));
+      return ok({ invoice, partPayment });
     } catch (err: unknown) {
       return financeFailure(err, "INVOICE");
     }
