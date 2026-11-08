@@ -1,0 +1,56 @@
+// --- Standing: suspension, expulsion and termination (task 0028, the Octalve Edu port of AlEemaan's task 0045) ---
+//
+// The state itself lives on the record it is about (StudentRecord, StaffRecord, TenantMembership: `standing` and `standingUntil`). This file holds the shared enums and the history.
+
+enum StandingState {
+  ACTIVE
+  SUSPENDED
+  /// A pupil only (a check constraint in the migration refuses it elsewhere).
+  EXPELLED
+  /// A member of staff only.
+  TERMINATED
+}
+
+enum StandingSubject {
+  STUDENT
+  STAFF
+}
+
+enum StandingEventAction {
+  SUSPENDED
+  EXPELLED
+  TERMINATED
+  LIFTED
+  REINSTATED
+}
+
+/// Append-only history of every change of standing: who decided, why, when, and until when. Tenant-scoped with row-level security. There is no scope (a membership is one row per school,
+/// so a suspension is of the membership). The ids carry no foreign key except the school's, on purpose: the history must outlive anything it points at. The database role the application
+/// runs as can only INSERT and SELECT it (the migration revokes the rest), so "append-only" is the database's rule and not only the code's.
+model StandingEvent {
+  id              String              @id @default(cuid())
+  tenantId        String
+  subject         StandingSubject
+  studentId       String?
+  staffRecordId   String?
+  /// The person's account (the membership is `userId` + `tenantId`), for a member of staff who has one.
+  memberUserId    String?
+  /// The record's campus when it was decided (null: the school).
+  campusId        String?
+  action          StandingEventAction
+  reason          String
+  startsOn        DateTime            @db.Date
+  endsOn          DateTime?           @db.Date
+  /// The account that decided, or "system" for a suspension lifted by the passing of its end date.
+  decidedByUserId String
+  createdAt       DateTime            @default(now())
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  student     StudentRecord? @relation(fields: [tenantId, studentId], references: [tenantId, id], onDelete: NoAction)
+  staffRecord StaffRecord?   @relation(fields: [tenantId, staffRecordId], references: [tenantId, id], onDelete: NoAction)
+
+  @@index([tenantId, studentId, createdAt])
+  @@index([tenantId, staffRecordId, createdAt])
+  @@index([tenantId, memberUserId, createdAt])
+  @@index([tenantId, campusId, createdAt])
+}

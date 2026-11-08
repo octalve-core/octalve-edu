@@ -84,6 +84,8 @@ model Tenant {
   bankOverlapFlags      QuestionOverlapFlag[]
   bankAudits            QuestionBankAudit[]
   bankSettings          QuestionBankSetting[]
+  tenantSettings        TenantSetting[]
+  standingEvents        StandingEvent[]
   practiceSessions      PracticeSession[]
   practiceAttempts      PracticeAttempt[]
   questionReports       QuestionReport[]
@@ -117,6 +119,7 @@ model Campus {
   bankReviewers         QuestionBankReviewer[]
   bankAudits            QuestionBankAudit[]
   bankSettings          QuestionBankSetting[]
+  tenantSettings        TenantSetting[]
   practiceSessions      PracticeSession[]
   questionReports       QuestionReport[]
   questionBankPrintLogs QuestionBankPrintLog[]
@@ -189,11 +192,15 @@ model TenantMembership {
   bankReviewerRows      QuestionBankReviewer[]    @relation("BankReviewerMember")
   bankReviewersAssigned QuestionBankReviewer[]    @relation("BankReviewerAssigner")
   bankSettingsChanged   QuestionBankSetting[]     @relation("BankSettingUpdater")
+  tenantSettingsChanged TenantSetting[]           @relation("TenantSettingUpdater")
 
   /// Set when an administrator deactivates the person IN THIS SCHOOL. The row stays (history, reactivation) but it is no
   /// longer a membership: every reader treats a deactivated one as absent — the resolver, the person's school list, the
   /// sign-in admin check, the audit fan-out.
   deactivatedAt DateTime?
+  /// Task 0028: a suspension of a member of staff deactivates the membership; this says it is a suspension and until when (the next sign-in after that day lifts it).
+  standing      StandingState @default(ACTIVE)
+  standingUntil DateTime?     @db.Date
 
   createdAt DateTime @default(now())
 
