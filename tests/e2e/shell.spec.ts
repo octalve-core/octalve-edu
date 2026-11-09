@@ -242,8 +242,8 @@ test.describe("on a desktop: the sidebar in sections", () => {
     const nav = mainNav(page);
     for (const name of ["Administration", "Learning"]) await expect(sectionButton(page, name)).toHaveAttribute("aria-expanded", "true");
     const pagesOf = (name: string) => nav.locator(`#${"sidebar-section-" + name.toLowerCase()}`).getByRole("link");
-    await expect(pagesOf("Administration")).toHaveText(["Academics", "People", "Communication", "Users", "Settings"]);
-    await expect(pagesOf("Learning")).toHaveText(["Question bank", "Forms"]);
+    await expect(pagesOf("Administration")).toHaveText(["Academics", "People", "Finance", "Communication", "Users", "Settings"]);
+    await expect(pagesOf("Learning")).toHaveText(["Question bank", "Forms", "Programs"]);
     await expect(nav.locator("ul ul").getByRole("link", { name: "Overview" })).toHaveCount(0); // Overview is not inside a section
   });
 
@@ -306,11 +306,11 @@ test.describe("on a desktop: the sidebar in sections", () => {
     expect(await cookieValue(context, "sidebar-sections")).toBe("administration"); // opening it for this page is not a new preference
   });
 
-  test("staff see two sections of two pages; a pupil sees no section at all", async ({ page }) => {
+  test("staff see two sections; a pupil sees no section at all", async ({ page }) => {
     await signedInAs(page, Role.TEACHING_STAFF);
     await expect(sectionButton(page, "Administration")).toBeVisible();
     await expect(sectionButton(page, "Learning")).toBeVisible();
-    await expect(mainNav(page).getByRole("link")).toHaveText(["Overview", "Academics", "People", "Question bank", "Forms"]);
+    await expect(mainNav(page).getByRole("link")).toHaveText(["Overview", "Academics", "People", "Question bank", "Forms", "Programs"]);
   });
 
   test("a pupil's sidebar has no sections: Overview and My work", async ({ page }) => {
@@ -619,8 +619,10 @@ test.describe("on a phone: the tab bar and the More sheet", () => {
     await expect(sheet).toBeVisible();
     await expect(sheet.getByRole("heading", { name: "Tunde Bello" })).toBeVisible();
     await expect(sheet.getByText("Administrator · Alpha School")).toBeVisible();
-    // An administrator has six pages since Communication (c9cf6f2): the bar holds four tabs and the rest live in this sheet (MobileNav), not on the bar.
-    await expect(mainNav(page).getByRole("link", { name: "Communication" })).toBeVisible();
+    // An administrator has eight pages (Finance and Programs came after Communication): the bar holds four tabs and the rest live in this sheet (MobileNav), not on the bar.
+    await expect(mainNav(page).getByRole("link", { name: "Finance" })).toBeVisible();
+    await expect(mainNav(page).getByRole("link", { name: "Communication" })).toHaveCount(0);
+    await expect(sheet.getByRole("link", { name: "Communication" })).toBeVisible();
     await expect(mainNav(page).getByRole("link", { name: "Users" })).toHaveCount(0);
     await expect(sheet.getByRole("link", { name: "Users" })).toBeVisible();
     await expect(mainNav(page).getByRole("link", { name: "Settings" })).toHaveCount(0);
@@ -642,7 +644,7 @@ test.describe("on a phone: the tab bar and the More sheet", () => {
     await expect(sheet.getByRole("heading", { level: 3 })).toHaveText(["Administration", "Learning"]);
     await expect(sheet.getByRole("button", { name: "Administration" })).toHaveCount(0); // a sheet is short-lived: its headings do not fold
     const learning = sheet.getByRole("heading", { name: "Learning" }).locator("xpath=..");
-    await expect(learning.getByRole("link")).toHaveText(["Question bank", "Forms"]);
+    await expect(learning.getByRole("link")).toHaveText(["Question bank", "Forms", "Programs"]);
   });
 
   test("a tap outside the sheet (on the dimmed page) closes it", async ({ page }) => {

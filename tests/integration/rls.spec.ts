@@ -155,7 +155,15 @@ test.describe("who is running", () => {
     expect(byTable["SettingsChangeAudit"]).toEqual(["INSERT", "SELECT"]);
     expect(byTable["NotificationAuditLog"]).toEqual(["INSERT", "SELECT"]);
     expect(byTable["StandingEvent"]).toEqual(["INSERT", "SELECT"]); // a standing history is append-only
-    const APPEND_ONLY = new Set(["AuditLog", "ResultAudit", "SettingsChangeAudit", "NotificationAuditLog", "StandingEvent"]);
+    expect(byTable["ProgramAudit"]).toEqual(["INSERT", "SELECT"]); // so is a program's audit
+    const APPEND_ONLY = new Set([
+      "AuditLog",
+      "ResultAudit",
+      "SettingsChangeAudit",
+      "NotificationAuditLog",
+      "StandingEvent",
+      "ProgramAudit",
+    ]);
     for (const [table, verbs] of Object.entries(byTable)) {
       if (APPEND_ONLY.has(table)) continue;
       expect(verbs, table).toEqual(["DELETE", "INSERT", "SELECT", "UPDATE"]);
@@ -1370,6 +1378,12 @@ test.describe("catalog guard", () => {
       "Payment",
       "PracticeAttempt",
       "PracticeSession",
+      "Program",
+      "ProgramAudit",
+      "ProgramCampus",
+      "ProgramGroup",
+      "ProgramLevelLabel",
+      "ProgramStaff",
       "QuestionBankAudit",
       "QuestionBankClassTag",
       "QuestionBankImage",

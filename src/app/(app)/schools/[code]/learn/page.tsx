@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { forbidden } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { LearnSections } from "@/components/learn/LearnSections";
+import { StandingNotice } from "@/components/standing/StandingNotice";
+import { dayOf, studentStandingNow } from "@/lib/standing/rules";
+import { today } from "@/lib/standing/common";
 import { requireTenantPage } from "@/lib/tenant/page-tenant";
 
 export const metadata: Metadata = { title: "My work" };
@@ -12,14 +15,20 @@ export const dynamic = "force-dynamic";
 // the 403 view too. Display only: the APIs decide who the pupil is, what is open for them and what they may see.
 export default async function LearnPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
-  const { tenant } = await requireTenantPage(code);
+  const { session, tenant } = await requireTenantPage(code);
   if (tenant.role !== "STUDENT") forbidden();
+  // A suspension that applies today is told to the pupil (without its reason); an ended one is not.
+  const record = await tenant.run((tx) =>
+    tx.studentRecord.findFirst({ where: { tenantId: tenant.tenantId, userId: session.userId }, select: { standing: true, standingUntil: true } }),
+  );
+  const suspended = record !== null && studentStandingNow(record, today()) === "SUSPENDED";
   return (
     <div className="space-y-6">
       <PageHeader
         title="My work"
         description="Practice sets, questionnaires and paper work set for you, and questions to practise on your own."
       />
+      {suspended && <StandingNotice until={record.standingUntil ? dayOf(record.standingUntil) : null} />}
       <LearnSections schoolCode={tenant.tenantCode} />
     </div>
   );
