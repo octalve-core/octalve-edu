@@ -21,7 +21,7 @@ import { guardianOf, member, pupil, type Person } from "../support/qbank-world";
 const SAAS = { baseUrl: SAAS_URL };
 const api: typeof rawApi = (path, opts = {}) => rawApi(path, { ...SAAS, ...opts });
 
-type Kind = "teaching" | "staff" | "pupil" | "pupilOrGuardian" | "guardian" | "forYou" | "admins";
+type Kind = "teaching" | "staff" | "pupil" | "pupilOrGuardian" | "family" | "guardian" | "forYou" | "admins";
 const ID = "cl0000000000000000000000x";
 
 /// "METHOD path under /api/v1/schools/[code]" -> the kind of route it is.
@@ -79,6 +79,9 @@ const ROUTES: Record<string, Kind> = {
   "POST portal/practice/reports": "pupil",
   "GET portal/practice/history": "pupilOrGuardian",
   "PATCH portal/practice/history": "pupilOrGuardian",
+  // the progress record: a pupil their own, a guardian their children's
+  "GET portal/progress": "family",
+  "POST portal/progress/seen": "family",
   // the question bank: printing, reports, offers back
   "POST question-bank/print": "teaching",
   "GET question-bank/print-logs": "staff",
@@ -98,6 +101,7 @@ const ALLOWED: Record<Kind, Role[]> = {
   staff: [Role.ADMIN, Role.CAMPUS_ADMIN, Role.TEACHING_STAFF, Role.NON_TEACHING_STAFF],
   pupil: [Role.STUDENT, Role.ADMIN],
   pupilOrGuardian: [Role.STUDENT, Role.PARENT, Role.ADMIN],
+  family: [Role.STUDENT, Role.PARENT], // a pupil and a guardian only: the progress record has no administrator's preview
   guardian: [Role.PARENT], // the pupils a guardian may look at: only a guardian asks (a pupil has their own record, an administrator names any pupil)
   forYou: [Role.ADMIN, Role.CAMPUS_ADMIN, Role.TEACHING_STAFF, Role.NON_TEACHING_STAFF, Role.PARENT],
   admins: [Role.ADMIN, Role.CAMPUS_ADMIN],

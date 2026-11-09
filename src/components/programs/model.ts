@@ -20,7 +20,7 @@ export const STATUS_TONE: Record<ProgramSummary["status"], "ok" | "warn" | "neut
 export const KIND_LABEL: Record<ProgramSummary["kind"], string> = { ONGOING: "Never ends", FIXED_TERM: "For a period" };
 
 export const dayText = (day: string) =>
-  new Date(`${day}T00:00:00Z`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  new Date(`${day}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 export const whenText = (start: string | null, end: string | null) =>
   start && end ? `${dayText(start)} to ${dayText(end)}` : start ? `From ${dayText(start)}, with no end` : "No dates";
 
@@ -41,3 +41,5 @@ export const ACTION_TEXT: Record<string, string> = {
   ADMIN_NAMED: "Program admin named",
   ADMIN_ENDED: "Program admin ended",
 };
+
+export const when = (iso: string): string => new Date(iso).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });

@@ -101,5 +101,11 @@ export const isEditableStatus = (status: ProgramStatusName): boolean => status =
 /// The one switch of slice P1: `programs.enabled`. The school's value is the ceiling and a campus can only narrow it, so a campus takes part only if both are on. A value that was never
 /// stored is "on". (The mechanism is the shared one in lib/settings/ceiling-switch.ts, its pure parts in ceiling-rules.ts.)
 export const PROGRAMS_ENABLED_KEY = "programs.enabled";
+export const PROGRAM_ATTENDANCE_KEY = "programs.attendance.enabled";
+export const PROGRAM_ASSESSMENTS_KEY = "programs.assessments.enabled";
+export const PROGRAM_FEES_KEY = "programs.fees.enabled";
+export const PROGRAM_PROGRESS_KEY = "programs.progress.enabled";
+export const PROGRAM_PROGRESS_STUDENT_KEY = "programs.progress.student.enabled";
+export const PROGRAM_PROGRESS_GUARDIAN_KEY = "programs.progress.guardian.enabled";
 
 export { parseSwitch as parseEnabled, effectiveSwitch as effectiveEnabled } from "@/lib/settings/ceiling-rules";

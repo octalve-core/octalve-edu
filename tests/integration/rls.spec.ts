@@ -156,6 +156,10 @@ test.describe("who is running", () => {
     expect(byTable["NotificationAuditLog"]).toEqual(["INSERT", "SELECT"]);
     expect(byTable["StandingEvent"]).toEqual(["INSERT", "SELECT"]); // a standing history is append-only
     expect(byTable["ProgramAudit"]).toEqual(["INSERT", "SELECT"]); // so is a program's audit
+    expect(byTable["ProgramAttendanceChange"]).toEqual(["INSERT", "SELECT"]); // and the corrections of attendance
+    expect(byTable["ProgramScoreChange"]).toEqual(["INSERT", "SELECT"]); // and what each score replaced
+    expect(byTable["ProgressTemplate"]).toEqual(["INSERT", "SELECT"]); // a template, once made, is never rewritten
+    expect(byTable["ProgressEntryRevision"]).toEqual(["INSERT", "SELECT"]); // nor what an entry said before
     const APPEND_ONLY = new Set([
       "AuditLog",
       "ResultAudit",
@@ -163,6 +167,10 @@ test.describe("who is running", () => {
       "NotificationAuditLog",
       "StandingEvent",
       "ProgramAudit",
+      "ProgramAttendanceChange",
+      "ProgramScoreChange",
+      "ProgressTemplate",
+      "ProgressEntryRevision",
     ]);
     for (const [table, verbs] of Object.entries(byTable)) {
       if (APPEND_ONLY.has(table)) continue;
@@ -1379,11 +1387,33 @@ test.describe("catalog guard", () => {
       "PracticeAttempt",
       "PracticeSession",
       "Program",
+      "ProgramAssessment",
+      "ProgramAssessmentGroup",
+      "ProgramAttendance",
+      "ProgramAttendanceChange",
       "ProgramAudit",
       "ProgramCampus",
+      "ProgramCertificate",
+      "ProgramCounter",
+      "ProgramFeeExemption",
+      "ProgramFeeItem",
       "ProgramGroup",
+      "ProgramInvoice",
+      "ProgramInvoiceDiscount",
       "ProgramLevelLabel",
+      "ProgramParticipant",
+      "ProgramPayment",
+      "ProgramScore",
+      "ProgramScoreChange",
+      "ProgramSession",
       "ProgramStaff",
+      "ProgramStaffGroup",
+      "ProgressEntry",
+      "ProgressEntryRevision",
+      "ProgressLock",
+      "ProgressRecord",
+      "ProgressSeen",
+      "ProgressTemplate",
       "QuestionBankAudit",
       "QuestionBankClassTag",
       "QuestionBankImage",

@@ -4,6 +4,15 @@ import type { Tx } from "@/lib/tenant/for-tenant";
 import { namesOf } from "@/lib/standing/common";
 import { canManage, levelsOf, viewerOf, type ProgramViewer } from "./access";
 import { NOT_FOUND, change, done, refuse, writeAudit, type Result } from "./common";
+import { parseBands, type Band } from "./assessment-rules";
+import { assessmentsStateOf } from "./assessment-service";
+import { mayReadGroup, readsEverything } from "./attendance-rules";
+import { feesStateOf, reachOf as feesReach } from "./fees-service";
+import { accessOf, attendanceStateOf } from "./attendance-service";
+import { guardianViewStateOf, studentViewStateOf } from "./progress-family";
+import { progressStateOf } from "./progress-service";
+import { peopleByGroup } from "./people-service";
+import { settingsOf, type ProgramSettings } from "./program-settings-service";
 import { campusesTakingPart, schoolEnabled } from "./settings-service";
 import { endDateFor, groupPath, isEditableStatus, parseIsoDate, statusAfter, toIsoDate, type StatusAction } from "./rules";
 import type { CreateProgramInput, UpdateProgramInput } from "./validation";
@@ -34,7 +43,7 @@ export async function listPrograms(auth: TenantAuthContext): Promise<{ enabled: 
     // With programs switched off the school's administrator can still read what exists; nobody else is shown anything.
     if (!enabled && !levels.superAdmin) return { enabled, programs: [] };
     const rows = await tx.program.findMany({
-      where: { tenantId, ...(levels.superAdmin ? {} : { id: { in: [...levels.admin, ...levels.campus] } }) },
+      where: { tenantId, ...(levels.superAdmin ? {} : { id: { in: [...levels.admin, ...levels.campus, ...levels.staff] } }) },
       orderBy: [{ name: "asc" }],
       include: {
         campuses: { include: { campus: { select: { id: true, name: true } } } },
@@ -52,7 +61,7 @@ export async function listPrograms(auth: TenantAuthContext): Promise<{ enabled: 
         status: row.status,
         startsOn: dateOrNull(row.startsOn),
         endsOn: dateOrNull(row.endsOn),
-        access: levels.superAdmin ? "SUPER" : levels.admin.has(row.id) ? "ADMIN" : "CAMPUS",
+        access: levels.superAdmin ? "SUPER" : levels.admin.has(row.id) ? "ADMIN" : levels.campus.has(row.id) ? "CAMPUS" : "STAFF",
         campuses: row.campuses.map((link) => link.campus).sort((a, b) => a.name.localeCompare(b.name)),
         groupCount: row._count.groups,
       })),
@@ -71,15 +80,71 @@ export type ProgramDetail = {
   createdAt: string;
   access: ProgramViewer["level"];
   /// What this person may do here, decided on the server (a button is shown from this and every action checks again).
-  can: { editDetails: boolean; editStructure: boolean; administer: boolean; restore: boolean };
+  can: { editDetails: boolean; editStructure: boolean; administer: boolean; restore: boolean; managePeople: boolean };
   /// Programs are switched off for the school: the program is read only.
   switchedOff: boolean;
   /// True when the program runs school-wide (it has no campus of its own list).
   schoolWide: boolean;
   campuses: { id: string; name: string; takingPart: boolean }[];
   levelLabels: string[];
-  groups: { id: string; parentId: string | null; levelIndex: number; name: string; sortOrder: number; archived: boolean; path: string }[];
+  /// `people`: how many open places are in the group and everything inside it, among the people the viewer may see.
+  groups: {
+    id: string;
+    parentId: string | null;
+    levelIndex: number;
+    name: string;
+    sortOrder: number;
+    archived: boolean;
+    path: string;
+    people: number;
+  }[];
   admins: { id: string; userId: string; name: string; email: string | null; campusName: string | null }[];
+  /// The campuses whose people this viewer may add and manage: every campus of the program for the school's administrator and a program admin, their own for a campus administrator.
+  manageCampusIds: string[];
+  /// Everyone who works in the program (slice P3): admins, supervisors, teachers and recorders. `groupIds`: for a teacher or a recorder, the groups they are assigned to (empty for the others).
+  staff: { id: string; userId: string; name: string; email: string | null; campusName: string | null; role: string; groupIds: string[] }[];
+  /// The program's own switches and numbers, for the people who manage it.
+  settings: ProgramSettings | null;
+  /// Assessments (slice P3b): on, and who decided if not; the program's own switch and grade bands.
+  assessments: {
+    on: boolean;
+    offBy: "SCHOOL" | "PROGRAM" | "CAMPUS" | null;
+    campusesOff: { id: string; name: string }[];
+    enabled: boolean;
+    bands: Band[];
+  };
+  /// Progress records (R1 to R4): the switch (school, campus, the program's own), the template, whether this person can see any record, and - for the people who manage the program - the
+  /// settings and what the school's switches say about what pupils and guardians may see.
+  progress: {
+    on: boolean;
+    offBy: "SCHOOL" | "PROGRAM" | "CAMPUS" | null;
+    campusesOff: { id: string; name: string }[];
+    enabled: boolean;
+    template: string | null;
+    reach: boolean;
+    studentViewOffBy: "SCHOOL" | "PROGRAM" | "CAMPUS" | null;
+    guardianViewOffBy: "SCHOOL" | "PROGRAM" | "CAMPUS" | null;
+    canChangeFourEyes: boolean;
+  };
+  /// Fees (slice P4): the same three-level switch, the program's own flag, and whether this person may see the fees at all (the school's administrator, a program admin, a campus administrator).
+  fees: {
+    on: boolean;
+    offBy: "SCHOOL" | "PROGRAM" | "CAMPUS" | null;
+    campusesOff: { id: string; name: string }[];
+    enabled: boolean;
+    reach: boolean;
+  };
+  /// Attendance for this program: on, and who turned it off if not (the tab is shown only while it is on).
+  attendance: {
+    on: boolean;
+    offBy: "SCHOOL" | "PROGRAM" | "CAMPUS" | null;
+    campusesOff: { id: string; name: string }[];
+    enabled: boolean;
+    lowPercent: number;
+    /// The live groups this person may read the roll of, and the ones they may take it for.
+    readGroupIds: string[];
+    markGroupIds: string[];
+  };
   /// The latest entries, for the people who may manage the program.
   audit: { id: string; action: string; targetType: string; actor: string; at: string; reason: string | null }[] | null;
 };
@@ -98,8 +163,11 @@ export async function getProgram(auth: TenantAuthContext, programId: string): Pr
         levelLabels: { orderBy: { levelIndex: "asc" } },
         groups: { orderBy: [{ levelIndex: "asc" }, { sortOrder: "asc" }, { name: "asc" }] },
         staff: {
-          where: { status: ProgramStaffStatus.ACTIVE, role: "ADMIN" },
-          include: { membership: { include: { user: { select: { name: true, email: true } }, campus: { select: { name: true } } } } },
+          where: { status: ProgramStaffStatus.ACTIVE },
+          include: {
+            membership: { include: { user: { select: { name: true, email: true } }, campus: { select: { name: true } } } },
+            groups: { select: { groupId: true } },
+          },
           orderBy: { createdAt: "asc" },
         },
       },
@@ -115,6 +183,15 @@ export async function getProgram(auth: TenantAuthContext, programId: string): Pr
     );
     const editable = manage && !switchedOff && isEditableStatus(program.status);
     const nodes = program.groups.map((group) => ({ id: group.id, parentId: group.parentId, name: group.name }));
+    const headCounts = await peopleByGroup(tx, tenantId, viewer, programId, nodes);
+    const attendanceState = await attendanceStateOf(tx, tenantId, programId, program.attendanceEnabled);
+    const assessmentsState = await assessmentsStateOf(tx, tenantId, programId, program.assessmentsEnabled);
+    const feesState = await feesStateOf(tx, tenantId, programId, program.feesEnabled);
+    const progressState = await progressStateOf(tx, tenantId, programId, program.progressEnabled);
+    const studentView = await studentViewStateOf(tx, tenantId, programId, program.progressStudentView);
+    const guardianView = await guardianViewStateOf(tx, tenantId, programId, program.progressGuardianView);
+    const access = await accessOf(tx, tenantId, auth.userId, programId, viewer);
+    const liveGroupIds = program.groups.filter((group) => group.archivedAt === null).map((group) => group.id);
 
     let audit: ProgramDetail["audit"] = null;
     if (manage) {
@@ -149,7 +226,11 @@ export async function getProgram(auth: TenantAuthContext, programId: string): Pr
         editStructure: editable,
         administer: viewer.level === "SUPER" && !switchedOff && isEditableStatus(program.status),
         restore: viewer.level === "SUPER" && !switchedOff && program.status === ProgramStatus.ARCHIVED,
+        // The school's administrator, a program admin and the administrator of a campus the program runs in (for their own campus's people).
+        managePeople: !switchedOff && isEditableStatus(program.status),
       },
+      manageCampusIds:
+        viewer.level === "STAFF" ? [] : viewer.level === "CAMPUS" ? [viewer.campusId] : program.campuses.map((link) => link.campusId),
       switchedOff,
       schoolWide: program.campuses.length === 0,
       campuses: program.campuses
@@ -164,15 +245,62 @@ export async function getProgram(auth: TenantAuthContext, programId: string): Pr
         sortOrder: group.sortOrder,
         archived: group.archivedAt !== null,
         path: groupPath(nodes, group.id),
+        people: headCounts[group.id] ?? 0,
       })),
       // Who runs the program is shown to everyone who can read it; e-mail addresses only to the people who manage it.
-      admins: program.staff.map((place) => ({
+      admins: program.staff
+        .filter((place) => place.role === "ADMIN")
+        .map((place) => ({
+          id: place.id,
+          userId: place.userId,
+          name: place.membership.user.name ?? place.membership.user.email ?? "Unnamed",
+          email: manage ? place.membership.user.email : null,
+          campusName: place.membership.campus?.name ?? null,
+        })),
+      staff: program.staff.map((place) => ({
         id: place.id,
         userId: place.userId,
         name: place.membership.user.name ?? place.membership.user.email ?? "Unnamed",
         email: manage ? place.membership.user.email : null,
         campusName: place.membership.campus?.name ?? null,
+        role: place.role,
+        groupIds: place.groups.map((row) => row.groupId),
       })),
+      settings: manage ? settingsOf(program) : null,
+      progress: {
+        on: progressState.on,
+        offBy: progressState.offBy,
+        campusesOff: progressState.campusesOff,
+        enabled: program.progressEnabled,
+        template: program.progressTemplate,
+        reach: readsEverything(access) || access.groups.size > 0 || access.campusIds !== null,
+        studentViewOffBy: manage ? studentView.offBy : null,
+        guardianViewOffBy: manage ? guardianView.offBy : null,
+        canChangeFourEyes: viewer.level === "SUPER",
+      },
+      fees: {
+        on: feesState.on,
+        offBy: feesState.offBy,
+        campusesOff: feesState.campusesOff,
+        enabled: program.feesEnabled,
+        reach: feesReach(viewer) !== null,
+      },
+      assessments: {
+        on: assessmentsState.on,
+        offBy: assessmentsState.offBy,
+        campusesOff: assessmentsState.campusesOff,
+        enabled: program.assessmentsEnabled,
+        bands: parseBands(program.gradeBands),
+      },
+      attendance: {
+        on: attendanceState.on,
+        offBy: attendanceState.offBy,
+        campusesOff: attendanceState.campusesOff,
+        enabled: program.attendanceEnabled,
+        lowPercent: program.lowAttendancePercent,
+        readGroupIds: liveGroupIds.filter((id) => mayReadGroup(access, id)),
+        markGroupIds: liveGroupIds.filter((id) => access.markAll || access.groups.has(id)),
+      },
       audit,
     });
   });
@@ -396,6 +524,9 @@ export async function unlinkCampus(auth: TenantAuthContext, programId: string, c
         "LAST_CAMPUS",
         "A program that runs in campuses must keep at least one. It is not made school-wide after it is made.",
       );
+    // A campus cannot leave while any person IS or WAS in the program through it (the person keeps their history with the campus).
+    const people = await tx.programParticipant.count({ where: { tenantId, programId: program.id, campusId } });
+    if (people > 0) return refuse(409, "CAMPUS_HAS_PEOPLE", "People are in this program through that campus. They would lose their place.");
     const serving = await tx.programStaff.count({
       where: { tenantId, programId: program.id, status: ProgramStaffStatus.ACTIVE, membership: { campusId } },
     });

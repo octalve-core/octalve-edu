@@ -147,8 +147,36 @@ export async function removeCreatedTenants(): Promise<void> {
     data: { supportTenantId: null, supportOpenedAt: null },
   });
   await db.auditLog.deleteMany({ where: { tenantId: { in: ids } } });
+  // A program's people, marks, scores and invoices reach the school's records with keys that stop a record from being removed while they point at it (nothing of a program is ever hard-deleted
+  // by the application); a school is removed here, so what points at the records goes first, children before parents.
+  for (const table of PROGRAM_TABLES) await db.$executeRawUnsafe(`DELETE FROM "${table}" WHERE "tenantId" = ANY($1::text[])`, ids);
   await db.tenant.deleteMany({ where: { id: { in: ids } } });
 }
+
+const PROGRAM_TABLES = [
+  "ProgramAttendanceChange",
+  "ProgramAttendance",
+  "ProgramSession",
+  "ProgramScoreChange",
+  "ProgramScore",
+  "ProgramAssessmentGroup",
+  "ProgramAssessment",
+  "ProgramPayment",
+  "ProgramInvoiceDiscount",
+  "ProgramInvoice",
+  "ProgramFeeExemption",
+  "ProgramFeeItem",
+  "ProgramCounter",
+  "ProgressSeen",
+  "ProgressLock",
+  "ProgressEntryRevision",
+  "ProgressEntry",
+  "ProgressRecord",
+  "ProgressTemplate",
+  "ProgramCertificate",
+  "ProgramStaffGroup",
+  "ProgramParticipant",
+];
 
 export type TestMfa = { secret: Buffer; recoveryCodes: string[] };
 

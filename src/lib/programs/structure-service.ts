@@ -1,6 +1,7 @@
 import type { TenantAuthContext } from "@/lib/auth/with-auth";
 import type { Tx } from "@/lib/tenant/for-tenant";
 import { change, done, refuse, writeAudit, type Result } from "./common";
+import { groupAndInner } from "./people-rules";
 import { MAX_LEVELS, MAX_LIVE_GROUPS, cleanName, sameName } from "./rules";
 
 // Programs, slice P1: the program's own level names and its tree of groups (AlEemaan's design note 8.5). Every change takes the program's lock, makes its checks, then writes.
@@ -160,7 +161,19 @@ export async function updateGroup(
       if (group.archivedAt) return done({ id: group.id });
       const inside = await tx.programGroup.count({ where: { tenantId, programId: program.id, parentId: group.id, archivedAt: null } });
       if (inside > 0) return refuse(409, "HAS_GROUPS", "This group has groups inside it. Archive those first.");
-      // (From slice P2 a group with people in it, and from P3 one a teacher is assigned to, is refused here too.)
+      // A group is not archived while anyone has an open place in it or in a group inside it ("move or withdraw them first"). (From slice P3, one a teacher is assigned to is refused too.)
+      const inner = groupAndInner(
+        await tx.programGroup.findMany({ where: { tenantId, programId: program.id }, select: { id: true, parentId: true, name: true } }),
+        group.id,
+      );
+      const people = await tx.programParticipant.count({
+        where: { tenantId, programId: program.id, groupId: { in: inner }, status: "ACTIVE" },
+      });
+      if (people > 0) return refuse(409, "HAS_PEOPLE", "People are still in this group. Move or withdraw them first.");
+      const staff = await tx.programStaffGroup.count({
+        where: { tenantId, programId: program.id, groupId: { in: inner }, place: { status: "ACTIVE" } },
+      });
+      if (staff > 0) return refuse(409, "HAS_STAFF", "A teacher or a recorder is assigned to this group. Remove the assignment first.");
       await tx.programGroup.update({ where: { tenantId_id: { tenantId, id: group.id } }, data: { archivedAt: new Date() } });
       await writeAudit(tx, tenantId, {
         programId: program.id,
