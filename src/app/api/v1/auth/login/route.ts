@@ -9,6 +9,7 @@ import { verifyPassword, PASSWORD_MAX_LENGTH } from "@/lib/auth/password";
 import { completeSignIn } from "@/lib/auth/complete-sign-in";
 import { createChallenge } from "@/lib/auth/mfa/challenge";
 import { hasActiveMfa } from "@/lib/auth/mfa/service";
+import { isExpelledEverywhere } from "@/lib/standing/sign-in";
 import { auditPersonEvent } from "@/lib/auth/audit";
 
 const loginSchema = z.object({
@@ -104,6 +105,12 @@ async function handleLogin(req: NextRequest): Promise<NextResponse> {
     await reserveAttempt(accountKey, LOGIN_ACCOUNT_SOFT_LIMIT);
     // Identical body for "no such user" and "wrong password" — enumeration
     // can't tell them apart from the content or the timing.
+    return fail(INVALID_CREDENTIALS_MESSAGE, 401, "INVALID_CREDENTIALS");
+  }
+
+  // An expelled pupil is refused altogether (task 0028): the same answer, and the same cost to the account's counter, as a wrong password.
+  if (await isExpelledEverywhere(user.id)) {
+    await reserveAttempt(accountKey, LOGIN_ACCOUNT_SOFT_LIMIT);
     return fail(INVALID_CREDENTIALS_MESSAGE, 401, "INVALID_CREDENTIALS");
   }
 

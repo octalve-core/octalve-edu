@@ -93,14 +93,16 @@ The three tabs of the Communication page: write a broadcast, edit notification t
 
 ## `src/components/finance/`
 
-Fee schedule, invoice and payment screens that no page imports (there is no finance page), so none is reachable from the app today.
+The Finance page's screens (task 0029, slice F2): the invoices, the fee structures, one invoice, and the payment rules. Mounted by `/schools/[code]/finance` and `/schools/[code]/finance/invoices/[id]`. They import `lib/finance/format.ts` and never a server module (a source test holds that: the Prisma runtime evaluates code at load, which the page's Content-Security-Policy refuses).
 
 | File | Description |
 | --- | --- |
-| `FeeStructuresPanel.tsx` | Client component, imported by no page; props `schoolCode`, `feeStructures`, `periods`, `classGroups`, `canManageFinance`, `onRefresh`. A table of fee items filtered by period tab, with an "Add Fee Schedule" dialog (name, amount, one class group or all) that posts to `/api/v1/schools/[code]/finance/fee-structures`. The button shows only when `canManageFinance`; the API decides who may really create. |
+| `FeeStructuresPanel.tsx` | Client component, mounted by the Finance page; props `schoolCode`, `feeStructures`, `periods`, `classGroups`, `canManageFinance`, `onRefresh`. A table of fee items filtered by period tab, with an "Add Fee Schedule" dialog (name, amount, one class group or all) that posts to `/api/v1/schools/[code]/finance/fee-structures`. The button shows only when `canManageFinance`; the API decides who may really create. |
 | `InvoiceDetailView.tsx` | Client component, imported by no page: one invoice as a printable statement (fee breakdown, discounts, payment ledger, four totals) with dialogs to pay online (`.../invoices/[id]/pay`, then redirect to `authorizationUrl`), record a manual payment and apply a discount (the last two only when `canManageFinance`). Props `schoolCode`, `invoice`, `canManageFinance`, `onRefresh`, `tenantName`. It disagrees with the API: the simulator opens only for `mock://` or an empty URL (the mock gateway returns `http://`), the manual form sends `reference` (the API reads `receiptNo`, so it is dropped), and the success check reads `data.verified`, which the status route never returns. |
-| `InvoicesDashboard.tsx` | Client component, imported by no page; props `schoolCode`, `invoices`, `periods`, `canManageFinance`, `onRefresh`. KPI cards (invoiced, collected, outstanding, collection rate, computed over the `invoices` it is given and skipping WAIVED), status, period and search filters, and a table whose "View & Pay" links go to `/schools/[code]/finance/invoices/[id]`, a page that does not exist. "Generate Term Invoices" posts `{ periodId, dueDate }` to `/finance/invoices`. |
+| `InvoicesDashboard.tsx` | Client component, mounted by the Finance page; props `schoolCode`, `invoices`, `periods`, `canManageFinance`, `onRefresh`. KPI cards (invoiced, collected, outstanding, collection rate, computed over the `invoices` it is given and skipping WAIVED), status, period and search filters, and a table whose "View & Pay" links go to `/schools/[code]/finance/invoices/[id]`, a page that does not exist. "Generate Term Invoices" posts `{ periodId, dueDate }` to `/finance/invoices`. |
 | `PaystackMockModal.tsx` | Client component, a dialog: the Paystack checkout simulator with "Simulate Success" and "Simulate Decline". It calls `onSuccess` or `onFailure` and closes; it contacts no server itself and never tells the mock gateway the payment completed. Props `isOpen`, `onClose`, `reference`, `amountFormatted`, `onSuccess`, `onFailure`; only `InvoiceDetailView` uses it. |
+| `FinanceSections.tsx` | Client component (props `schoolCode`, `invoices`, `periods`, `feeStructures`, `classGroups`, `canManageFinance`, `canChangeRules`, `hasMfa`): the page's sections behind one ARIA tab list (Invoices, Fee structures, Payment rules); a change calls the finance APIs and refreshes the page. |
+| `PaymentRulesPanel.tsx` | Client component (props `schoolCode`, `hasMfa`, `canManage`): the part-payment rule (task 0029). Reads `GET settings/part-payment`; the school's rule (parts allowed or not, no smallest part, an amount or a percentage) is saved behind the step-up dialog, a campus's tightening without it; a campus administrator and a bursar read only. |
 
 ## `src/components/users/`
 
@@ -208,6 +210,9 @@ The school settings screen (nine switches, step-up before saving, audit history)
 | `ScopeEditor.tsx` | Client component (props `approver`, `sections`, `classGroups`, `campusNames`, `busy`, `onSave`, `onCancel`): where one approver approves. An "Everything (General)" box that, when ticked, clears and disables the rest (the API refuses General with others), then the sections and the classes as checkboxes, limited to what fits the person's campus (`fitsCampus`, the server's own test) so the screen never offers what the server answers 409 for; a section the person holds that has since been archived stays in the list, ticked and marked, so the refusal ("restore it first") is explained. "Review & save" is disabled until the set differs from what the person holds; with nothing ticked it says the person then approves nothing. |
 | `SettingsAuditLog.tsx` | Client component, prop `auditLog` (`AuditEntryWithActor[]`): a table of `SettingsChangeAudit` rows with time, actor name and email, field label (including the time zone and the unsectioned-class setting), previous and new value. Every row is labelled "Step-up Verified" without reading anything; an empty log shows an explanatory message. |
 | `StepUpModal.tsx` | Client component, a dialog (props `open`, `onClose`, `onConfirm`, `hasMfa`, `deltas`, `saving`, `error`; `deltas` are `StepUpChange[]`, an exported shape `{ field, fromValue, toValue, isWeakeningSecurity }` that a school setting's delta fits and so does a line a caller writes itself, as the Results approval tab does). Lists the proposed changes, warns when any delta `isWeakeningSecurity`, and asks for the one proof the API accepts: an authenticator code or a recovery code when `hasMfa`, otherwise the account password. Calls `onConfirm({ type, value })` with `type` totp, recovery or password. The typed proof lives in an inner `StepUpForm` that is mounted only while the dialog is open, so closing it (Cancel, Escape, or a refused attempt that is cancelled) drops what was typed and the next opening starts empty (it used to be kept in state after closing; changed 2026-10-25). |
+| `SwitchSettingPanel.tsx` | Client component (props `schoolCode`, `hasMfa`, `words`): a switch with a ceiling over `settings/<endpoint>` (tasks 0027 and 0028): the school's value behind the step-up dialog, each campus's own turn-off, the words the caller's. |
+| `DisciplineSettingsPanel.tsx` | Client component: `SwitchSettingPanel` for `settings/standing` (may a campus administrator suspend). Mounted on the Settings page. |
+| `ProgramsSettingsPanel.tsx` | Client component: `SwitchSettingPanel` for `settings/programs` (are programs switched on). Mounted on the Settings page. |
 
 ## `src/components/support/`
 
@@ -216,3 +221,22 @@ The school administrator's side of audited support access (ADR 0017).
 | File | Description |
 | --- | --- |
 | `SupportAccessPanel.tsx` | Client component, prop `schoolCode`. Loads `/api/v1/schools/[code]/support-grants` and `.../support-grants/activity`; lists grants (areas, reason, Open, Ended or Withdrawn, grantee) with "Withdraw" for live ones (POST `.../[id]/revoke`, no password), and the log of what support opened and read. "Allow support access" opens a dialog: area checkboxes, whole hours 1 to 24 (default 4), a reason up to 300 characters, an optional platform administrator email and the password. It always sends the step-up proof as `type: "password"`, which the server refuses for an administrator who has two-step verification on. |
+
+## `src/components/standing/`
+
+Standing (task 0028): where a pupil, a member of staff or a user stands, as screens.
+
+| File | Description |
+| --- | --- |
+| `StandingPanel.tsx` | Client component (props `schoolCode`, `path`, `subject` student / staff / member, `name`, `canSuspend`, `canDecide`): the current standing and its history (newest first), and the buttons that fit the role and the state (suspend with an optional last day, lift, expel or terminate, reinstate), each in a dialog that asks for the reason (3 to 500 characters). Mounted on the student and staff pages and in the Users list's Standing dialog; the API decides again. |
+| `StandingNotice.tsx` | Server-safe component (prop `until`): what a suspended pupil is told on their page of work (that they are suspended, until when, and what that means), never the reason. |
+
+## `src/components/programs/`
+
+Programs (task 0027, slice P1): learning that is not a normal class.
+
+| File | Description |
+| --- | --- |
+| `model.ts` | The types the API answers with (type-only imports of `lib/programs/service`), the words for a status, a kind and an audit action, and the date text. |
+| `ProgramsList.tsx` | Client component (props `schoolCode`, `canCreate`, `campuses`): the programs the person has a place in as cards (name, status, kind, dates, campuses, group count), the switched-off banner, and the New program dialog (name, description, kind, start and duration, campuses or none for school-wide, one to four level names). |
+| `ProgramView.tsx` | Client component (props `schoolCode`, `programId`, `schoolCampuses`): one program behind an ARIA tab list: Overview (details, activate, archive, restore, edit details, the campuses it runs in), Structure (the level names and the tree of groups: add, add inside, rename, move up and down, archive, restore), Admins (named and ended by the school's administrator) and History (the audit, for the people who manage it). What each button shows comes from the server's `can`. |

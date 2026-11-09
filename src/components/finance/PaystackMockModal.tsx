@@ -49,7 +49,7 @@ export function PaystackMockModal({ isOpen, onClose, reference, amountFormatted,
           <Button
             type="button"
             variant="primary"
-            className="min-h-11 w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+            className="min-h-11 w-full"
             disabled={isProcessing}
             onClick={() => handleSimulate("success")}
           >

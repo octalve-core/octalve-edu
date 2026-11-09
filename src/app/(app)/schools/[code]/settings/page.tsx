@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { forbidden } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { DisciplineSettingsPanel } from "@/components/settings/DisciplineSettingsPanel";
+import { ProgramsSettingsPanel } from "@/components/settings/ProgramsSettingsPanel";
 import { SchoolSettingsPanel } from "@/components/settings/SchoolSettingsPanel";
+import { hasActiveMfa } from "@/lib/auth/mfa/service";
 import { requireTenantPage } from "@/lib/tenant/page-tenant";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -12,8 +15,9 @@ export const dynamic = "force-dynamic";
 // Requires step-up re-authentication on every write and maintains an immutable audit ledger.
 export default async function SettingsPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
-  const { tenant } = await requireTenantPage(code, "settings");
+  const { session, tenant } = await requireTenantPage(code, "settings");
   if (tenant.role !== "ADMIN") forbidden();
+  const hasMfa = tenant.support ? false : await hasActiveMfa(session.userId);
 
   return (
     <div>
@@ -34,6 +38,9 @@ export default async function SettingsPage({ params }: { params: Promise<{ code:
       <fieldset disabled={Boolean(tenant.support)} className="min-w-0">
         <SchoolSettingsPanel schoolCode={tenant.tenantCode} />
       </fieldset>
+      {/* The discipline switch is not a grantable support area (a disciplinary policy): a support view does not see it. */}
+      {!tenant.support && <DisciplineSettingsPanel schoolCode={tenant.tenantCode} hasMfa={hasMfa} />}
+      {!tenant.support && <ProgramsSettingsPanel schoolCode={tenant.tenantCode} hasMfa={hasMfa} />}
     </div>
   );
 }

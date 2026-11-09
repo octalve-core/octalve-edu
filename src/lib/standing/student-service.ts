@@ -2,7 +2,9 @@ import { EnrollmentStatus, SessionStatus, StandingState } from "@prisma/client";
 import type { TenantAuthContext } from "@/lib/auth/with-auth";
 import { asDate, done, namesOf, refuse, today, writeEvent, type HistoryEntry, type Result } from "./common";
 import { dayOf, effectiveStanding, mayAct, standingAfter, suspensionEndProblem, type StandingAction } from "./rules";
+import { revokeUserSessions } from "@/lib/auth/session";
 import { maySuspendSwitch } from "./settings";
+import { isExpelledEverywhere } from "./sign-in";
 
 // Standing of a pupil (task 0028, section 4.3): suspended (until a date, or until lifted) or expelled. Suspension changes nothing on the enrolment; expulsion sets the pupil's
 // ACTIVE enrolment to EXPELLED, which takes them off every list that selects pupils by ACTIVE enrolment (attendance rolls, invoice generation, result sheets, promotion).
@@ -34,7 +36,9 @@ export async function changeStudentStanding(
     if (problem) return refuse(400, "VALIDATION", problem, [{ path: "body.until", message: problem }]);
   }
 
-  return tenant.run(async (tx): Promise<Result<{ standing: string; until: string | null }>> => {
+  // The pupil's account, when this expels them (their sessions end after the change commits, below).
+  let expelledUserId: string | null = null;
+  const result = await tenant.run(async (tx): Promise<Result<{ standing: string; until: string | null }>> => {
     await tx.$queryRaw`SELECT "id" FROM "StudentRecord" WHERE "tenantId" = ${tenantId} AND "id" = ${studentId} FOR UPDATE`;
     const student = await tx.studentRecord.findFirst({ where: { tenantId, id: studentId } });
     // A pupil of another campus (or a pupil with no campus, to a campus administrator) answers like one that does not exist.
@@ -95,8 +99,12 @@ export async function changeStudentStanding(
         after: { standing: next, until },
       },
     );
+    if (action === "EXPEL") expelledUserId = student.userId;
     return done({ standing: next, until });
   });
+  // An expelled pupil is refused at sign-in (task 0028), so a session they already hold ends too, when no other school or role of theirs is left to use it.
+  if (expelledUserId && result.ok && (await isExpelledEverywhere(expelledUserId))) await revokeUserSessions(expelledUserId);
+  return result;
 }
 
 export async function studentStandingHistory(

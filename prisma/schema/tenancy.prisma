@@ -86,6 +86,7 @@ model Tenant {
   bankSettings          QuestionBankSetting[]
   tenantSettings        TenantSetting[]
   standingEvents        StandingEvent[]
+  programs              Program[]
   practiceSessions      PracticeSession[]
   practiceAttempts      PracticeAttempt[]
   questionReports       QuestionReport[]
@@ -120,6 +121,7 @@ model Campus {
   bankAudits            QuestionBankAudit[]
   bankSettings          QuestionBankSetting[]
   tenantSettings        TenantSetting[]
+  programCampuses       ProgramCampus[]
   practiceSessions      PracticeSession[]
   questionReports       QuestionReport[]
   questionBankPrintLogs QuestionBankPrintLog[]
@@ -203,6 +205,8 @@ model TenantMembership {
   standingUntil DateTime?     @db.Date
 
   createdAt DateTime @default(now())
+
+  programPlaces         ProgramStaff[]          @relation("ProgramPlaces")
 
   @@unique([userId, tenantId])
   @@index([tenantId])

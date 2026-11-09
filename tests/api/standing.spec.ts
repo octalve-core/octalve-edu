@@ -473,11 +473,56 @@ test.describe("the portal", () => {
   test("an expelled pupil has no record to the portal and is never told why; a guardian's view of that child is closed too; reinstating gives it back", async () => {
     const p = await link();
     expect((await post(pupilUrl(p.id), "admin", { action: "expel", reason: "Expelled after the hearing" })).status).toBe(200);
+    // The pupil's session ended with the expulsion (they have no other place to go: sign-in is refused too, see "sign-in" below), so what they held is answered "signed out".
     const res = await options();
-    expect([403, 404]).toContain(res.status);
+    expect([401, 403, 404]).toContain(res.status);
     expect(res.text).not.toMatch(/expel|suspend|standing/i);
-    expect((await startSet()).status).toBe(404);
+    expect([401, 404]).toContain((await startSet()).status);
     expect((await post(pupilUrl(p.id), "admin", { action: "reinstate", reason: "Reinstated on appeal" })).status).toBe(200);
+    cookie.pupilUser = cookieHeader((await loginAs(people.pupilUser, SAAS)).token!);
     expect((await options()).status).toBe(200);
+  });
+});
+
+test.describe("sign-in", () => {
+  /// A pupil with an account of their own, a record in North and a session they already hold.
+  async function expellable() {
+    const user = await createUser({ name: uniq("Expellable ") });
+    await addMembership(user.id, a.id, Role.STUDENT, north);
+    const record = await pupil(north, { userId: user.id });
+    const held = cookieHeader((await loginAs(user, SAAS)).token!);
+    return { user, record, held };
+  }
+  const expel = (id: string) => post(pupilUrl(id), "admin", { action: "expel", reason: "Expelled after the hearing" });
+  const wrongPassword = (email: string) =>
+    api("/api/v1/auth/login", { ...SAAS, method: "POST", body: { email, password: "not-the-password" } });
+
+  test("an expelled pupil cannot sign in, gets the very answer of a wrong password, and the session they held ends; reinstating gives sign-in back", async () => {
+    const { user, record, held } = await expellable();
+    expect((await api("/api/v1/auth/me", { ...SAAS, cookie: held })).status).toBe(200);
+    expect((await expel(record.id)).status).toBe(200);
+
+    const refused = await loginAs(user, SAAS);
+    const wrong = await wrongPassword(user.email);
+    expect(refused.status).toBe(401);
+    expect(refused.token).toBeNull();
+    expect(refused.json.error).toEqual(wrong.json.error); // the same code and the same sentence: nothing says the account exists or why
+    expect(refused.text).not.toMatch(/expel|suspend|standing/i);
+    expect((await api("/api/v1/auth/me", { ...SAAS, cookie: held })).status).toBe(401); // the session they held is gone
+
+    expect((await post(pupilUrl(record.id), "admin", { action: "reinstate", reason: "Reinstated on appeal" })).status).toBe(200);
+    expect((await loginAs(user, SAAS)).status).toBe(200);
+  });
+
+  test("a suspended pupil can still sign in; a pupil expelled in one school who is a guardian or an administrator of another can too", async () => {
+    const { user, record } = await expellable();
+    expect((await suspend(pupilUrl(record.id), "admin")).status).toBe(200);
+    expect((await loginAs(user, SAAS)).status).toBe(200);
+    await post(pupilUrl(record.id), "admin", { action: "lift", reason: REASON });
+
+    expect((await expel(record.id)).status).toBe(200);
+    expect((await loginAs(user, SAAS)).status).toBe(401);
+    await addMembership(user.id, b.id, Role.PARENT, null); // somewhere else they are a guardian
+    expect((await loginAs(user, SAAS)).status).toBe(200);
   });
 });
