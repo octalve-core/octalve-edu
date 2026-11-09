@@ -51,8 +51,14 @@ export async function signOut(page: Page) {
   const direct = page.getByRole("button", { name: "Sign out" });
   const menu = page.getByRole("button", { name: /^Account menu for/ });
   await expect(direct.or(menu)).toBeVisible();
-  if (await menu.isVisible()) await menu.click();
-  await page.getByRole("button", { name: "Sign out" }).click();
+  // Right after sign-in the page is still hydrating and prefetching the pages its links lead to; a menu opened under that can be replaced before the click lands on its button ("element was
+  // detached from the DOM, retrying" until the test timed out). So wait until the page is quiet, and if the menu closes under the click, open it again.
+  await waitForHydration(page);
+  await page.waitForLoadState("networkidle");
+  await expect(async () => {
+    if (!(await direct.isVisible()) && (await menu.isVisible())) await menu.click({ timeout: 3000 });
+    await direct.click({ timeout: 3000 });
+  }).toPass({ timeout: 30_000 });
 }
 
 // --- Two-step verification (plan §0.5.D) -------------------------------------------------------------------
