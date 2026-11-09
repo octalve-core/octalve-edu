@@ -153,7 +153,10 @@ export async function removeCreatedTenants(): Promise<void> {
   await db.tenant.deleteMany({ where: { id: { in: ids } } });
 }
 
+// A promotion (task 0031) is append-only evidence that points at sessions, classes, pupils and enrolments with restricting keys; the test-only removal of a school clears it first.
 const PROGRAM_TABLES = [
+  "PromotionRecord",
+  "PromotionBatch",
   "ProgramAttendanceChange",
   "ProgramAttendance",
   "ProgramSession",

@@ -1,0 +1,65 @@
+// --- Promotion: rolling a class into the next session (task 0031; AlEemaan's tasks 0025 and 0037) ---
+//
+// Both tables are APPEND-ONLY (the migration revokes UPDATE, DELETE and TRUNCATE from the application role): a promotion is evidence of what was decided and by whom, so it is never
+// edited. The batch is therefore written ONCE, with its final totals, after the pupils have been processed in the same transaction. Like the program tables they carry no Prisma
+// relations: every link is a composite foreign key on (tenantId, id) in the migration, so a row can never point at another school's session, class or pupil.
+
+enum PromotionDecision {
+  PROMOTED
+  REPEATED
+  GRADUATED
+  WITHDRAWN
+}
+
+enum PromotionDecisionMode {
+  AUTOMATIC
+  OVERRIDDEN
+}
+
+/// One roll of one class from one session into the next.
+model PromotionBatch {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  sourceSessionId    String
+  targetSessionId    String
+  sourceClassGroupId String
+  /// null = the class was the last rung (its pupils graduate).
+  targetClassGroupId String?
+  passMark           Decimal  @db.Decimal(5, 2)
+  totalEvaluated     Int
+  totalPromoted      Int
+  totalRepeated      Int
+  totalGraduated     Int
+  totalWithdrawn     Int
+  /// Pupils left alone because they already had an enrolment in the target session.
+  totalSkipped       Int
+  executedByUserId   String
+  notes              String?
+  createdAt          DateTime @default(now())
+
+  @@unique([tenantId, id])
+  @@index([tenantId, sourceSessionId])
+  @@index([tenantId, targetSessionId])
+  @@index([tenantId, createdAt])
+}
+
+/// What was decided for one pupil in a batch.
+model PromotionRecord {
+  id                 String                @id @default(cuid())
+  tenantId           String
+  batchId            String
+  studentId          String
+  sourceEnrollmentId String
+  /// null for GRADUATED and WITHDRAWN (a check in the migration).
+  targetEnrollmentId String?
+  overallAverage     Decimal?              @db.Decimal(5, 2)
+  /// { "1": 65.4, "2": null, "3": 58 } by period ordinal.
+  termAverages       Json
+  decision           PromotionDecision
+  decisionMode       PromotionDecisionMode
+  overrideReason     String?
+  createdAt          DateTime              @default(now())
+
+  @@unique([tenantId, batchId, studentId])
+  @@index([tenantId, studentId])
+}

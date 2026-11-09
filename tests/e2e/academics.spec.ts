@@ -48,7 +48,7 @@ async function signedInAdmin(page: Page, section: string, name = "Amina Yusuf") 
 }
 
 test.describe("the page", () => {
-  test("an administrator gets the seven sections as links; the address chooses one; an unknown one falls back to the timetable", async ({
+  test("an administrator gets the eight sections as links; the address chooses one; an unknown one falls back to the timetable", async ({
     page,
   }) => {
     await signedInAdmin(page, "sessions");
@@ -62,6 +62,7 @@ test.describe("the page", () => {
       "Classes & subjects",
       "Assessment",
       "Grading",
+      "Promotion",
     ]);
     await expect(sections.getByRole("link", { name: "Sessions & terms" })).toHaveAttribute("aria-current", "page");
     await sections.getByRole("link", { name: "Grading" }).click();

@@ -160,6 +160,8 @@ test.describe("who is running", () => {
     expect(byTable["ProgramScoreChange"]).toEqual(["INSERT", "SELECT"]); // and what each score replaced
     expect(byTable["ProgressTemplate"]).toEqual(["INSERT", "SELECT"]); // a template, once made, is never rewritten
     expect(byTable["ProgressEntryRevision"]).toEqual(["INSERT", "SELECT"]); // nor what an entry said before
+    expect(byTable["PromotionBatch"]).toEqual(["INSERT", "SELECT"]); // a promotion is evidence of what was decided,
+    expect(byTable["PromotionRecord"]).toEqual(["INSERT", "SELECT"]); // and of what was decided for each pupil
     const APPEND_ONLY = new Set([
       "AuditLog",
       "ResultAudit",
@@ -171,6 +173,8 @@ test.describe("who is running", () => {
       "ProgramScoreChange",
       "ProgressTemplate",
       "ProgressEntryRevision",
+      "PromotionBatch",
+      "PromotionRecord",
     ]);
     for (const [table, verbs] of Object.entries(byTable)) {
       if (APPEND_ONLY.has(table)) continue;
@@ -1414,6 +1418,8 @@ test.describe("catalog guard", () => {
       "ProgressRecord",
       "ProgressSeen",
       "ProgressTemplate",
+      "PromotionBatch",
+      "PromotionRecord",
       "QuestionBankAudit",
       "QuestionBankClassTag",
       "QuestionBankImage",

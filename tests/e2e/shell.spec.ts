@@ -242,7 +242,7 @@ test.describe("on a desktop: the sidebar in sections", () => {
     const nav = mainNav(page);
     for (const name of ["Administration", "Learning"]) await expect(sectionButton(page, name)).toHaveAttribute("aria-expanded", "true");
     const pagesOf = (name: string) => nav.locator(`#${"sidebar-section-" + name.toLowerCase()}`).getByRole("link");
-    await expect(pagesOf("Administration")).toHaveText(["Academics", "People", "Finance", "Communication", "Users", "Settings"]);
+    await expect(pagesOf("Administration")).toHaveText(["Academics", "People", "Finance", "Results", "Communication", "Users", "Settings"]);
     await expect(pagesOf("Learning")).toHaveText(["Question bank", "Forms", "Programs"]);
     await expect(nav.locator("ul ul").getByRole("link", { name: "Overview" })).toHaveCount(0); // Overview is not inside a section
   });
@@ -310,7 +310,15 @@ test.describe("on a desktop: the sidebar in sections", () => {
     await signedInAs(page, Role.TEACHING_STAFF);
     await expect(sectionButton(page, "Administration")).toBeVisible();
     await expect(sectionButton(page, "Learning")).toBeVisible();
-    await expect(mainNav(page).getByRole("link")).toHaveText(["Overview", "Academics", "People", "Question bank", "Forms", "Programs"]);
+    await expect(mainNav(page).getByRole("link")).toHaveText([
+      "Overview",
+      "Academics",
+      "People",
+      "Results",
+      "Question bank",
+      "Forms",
+      "Programs",
+    ]);
   });
 
   test("a pupil's sidebar has no sections: Overview and My work", async ({ page }) => {

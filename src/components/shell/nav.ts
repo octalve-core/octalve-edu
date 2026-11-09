@@ -4,6 +4,7 @@ import {
   BookOpenIcon,
   BuildingIcon,
   CalendarIcon,
+  CheckCircle2Icon,
   FileTextIcon,
   GraduationCapIcon,
   HomeIcon,
@@ -54,6 +55,7 @@ export function navFor(school: ShellSchool | null, platform = false): NavItem[] 
       { label: "Academics", href: `/schools/${school.code}/academics`, icon: CalendarIcon, section: "administration" },
       { label: "People", href: `/schools/${school.code}/people`, icon: GraduationCapIcon, section: "administration" },
       { label: "Finance", href: `/schools/${school.code}/finance`, icon: ReceiptIcon, section: "administration" },
+      { label: "Results", href: `/schools/${school.code}/results`, icon: CheckCircle2Icon, section: "administration" },
       { label: "Communication", href: `/schools/${school.code}/communication`, icon: MailIcon, section: "administration" },
       { label: "Users", href: `/schools/${school.code}/users`, icon: UsersIcon, section: "administration" },
       { label: "Question bank", href: `/schools/${school.code}/question-bank`, icon: FileTextIcon, section: "learning" },
@@ -78,6 +80,7 @@ export function navFor(school: ShellSchool | null, platform = false): NavItem[] 
     items.push(
       { label: "Academics", href: `/schools/${school.code}/academics`, icon: CalendarIcon, section: "administration" },
       { label: "People", href: `/schools/${school.code}/people`, icon: GraduationCapIcon, section: "administration" },
+      { label: "Results", href: `/schools/${school.code}/results`, icon: CheckCircle2Icon, section: "administration" },
       // Staff write and browse questions here; whether they may review is decided on the page.
       { label: "Question bank", href: `/schools/${school.code}/question-bank`, icon: FileTextIcon, section: "learning" },
     );
@@ -142,6 +145,7 @@ const SCHOOL_PAGES: Record<string, string> = {
   "": "Overview",
   users: "Users",
   academics: "Academics",
+  results: "Results",
   people: "People",
   finance: "Finance",
   programs: "Programs",
