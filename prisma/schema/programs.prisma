@@ -1,0 +1,149 @@
+// --- Programs (task 0027, slice P1: structure; the Octalve Edu port of AlEemaan's task 0043) ---
+//
+// A program is learning that is not a normal class (a Quran memorisation program that never ends, a three-year course). It sits BESIDE the school's classes: it runs school-wide or in chosen
+// campuses, names its own levels and holds a tree of groups. People, attendance, fees and certificates come in later slices. Every table carries `tenantId` with row-level security and
+// composite keys (ADR 0001). Nothing here is ever hard-deleted (ADR 0004): programs and groups are archived, program admins are ended, and every change is written to ProgramAudit.
+
+enum ProgramKind {
+  ONGOING
+  FIXED_TERM
+}
+
+enum ProgramStatus {
+  DRAFT
+  ACTIVE
+  /// Reached only by the completion slice (P5).
+  COMPLETED
+  ARCHIVED
+}
+
+enum ProgramStaffRole {
+  ADMIN
+  SUPERVISOR
+  TEACHER
+  RECORDER
+}
+
+enum ProgramStaffStatus {
+  ACTIVE
+  ENDED
+}
+
+model Program {
+  id              String        @id @default(cuid())
+  tenantId        String
+  name            String
+  description     String?
+  kind            ProgramKind
+  status          ProgramStatus @default(DRAFT)
+  /// A fixed-term program has both dates (the end is the LAST day: start + duration - 1 day); an ongoing one may have a start and never an end.
+  startsOn        DateTime?     @db.Date
+  endsOn          DateTime?     @db.Date
+  /// Plain id of the school's administrator who created it (like AuditLog.actorUserId: the history outlives the account).
+  createdByUserId String
+  archivedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now()) @updatedAt
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campuses    ProgramCampus[]
+  levelLabels ProgramLevelLabel[]
+  groups      ProgramGroup[]
+  staff       ProgramStaff[]
+  audits      ProgramAudit[]
+
+  /// Lets every table of the program name it with a composite key (a row cannot name another school's program).
+  @@unique([tenantId, id])
+  @@index([tenantId, status])
+}
+
+/// The campuses a program runs in. No row at all means the program runs school-wide (the only way for a school with no campuses).
+model ProgramCampus {
+  tenantId  String
+  programId String
+  campusId  String
+  createdAt DateTime @default(now())
+
+  program Program @relation(fields: [tenantId, programId], references: [tenantId, id], onDelete: Cascade)
+  campus  Campus  @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: Cascade)
+
+  @@id([programId, campusId])
+  @@index([tenantId, campusId])
+}
+
+/// The program's own names for its levels, in order (for example "Section", "Class", "Category"). Level 0 is the top. 1 to 4 of them (the cap is in code and a check).
+model ProgramLevelLabel {
+  tenantId   String
+  programId  String
+  levelIndex Int
+  name       String
+
+  program Program @relation(fields: [tenantId, programId], references: [tenantId, id], onDelete: Cascade)
+
+  @@id([programId, levelIndex])
+  @@index([tenantId])
+}
+
+/// A node of the program's tree. `levelIndex` is its depth (0 = top level) and always equals its parent's plus one; the service keeps that true and checks in the migration refuse a
+/// negative or too-deep value. Live namesakes among siblings are refused by a unique index in the migration SQL (Prisma cannot express a partial, case-insensitive one) and by the service.
+model ProgramGroup {
+  id         String    @id @default(cuid())
+  tenantId   String
+  programId  String
+  parentId   String?
+  levelIndex Int
+  name       String
+  sortOrder  Int       @default(0)
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
+
+  program  Program        @relation(fields: [tenantId, programId], references: [tenantId, id], onDelete: Cascade)
+  parent   ProgramGroup?  @relation("ProgramGroupTree", fields: [tenantId, parentId], references: [tenantId, id], onDelete: NoAction)
+  children ProgramGroup[] @relation("ProgramGroupTree")
+
+  @@unique([tenantId, id])
+  @@index([tenantId, programId, parentId])
+}
+
+/// A person with a role in the program. In slice P1 only ADMIN is used (named by the school's administrator); the other roles are for slice P3. The authority is read at every request from the
+/// person's ACTIVE membership of the school (a staff role, whose campus is empty or one the program runs in), so deactivating the membership ends it at once.
+model ProgramStaff {
+  id              String             @id @default(cuid())
+  tenantId        String
+  programId       String
+  userId          String
+  role            ProgramStaffRole
+  status          ProgramStaffStatus @default(ACTIVE)
+  createdByUserId String
+  createdAt       DateTime           @default(now())
+  endedAt         DateTime?
+
+  program    Program          @relation(fields: [tenantId, programId], references: [tenantId, id], onDelete: Cascade)
+  /// The person must be a member of the school (composite key): the database refuses a program admin who holds no membership.
+  membership TenantMembership @relation("ProgramPlaces", fields: [userId, tenantId], references: [userId, tenantId], onDelete: Cascade)
+
+  @@unique([programId, userId, role])
+  @@unique([tenantId, id])
+  @@index([tenantId, userId, status])
+  @@index([tenantId, programId, status])
+}
+
+/// Append-only history of a program: who changed what, the old and the new value. The application's database role can only INSERT and SELECT it (the migration revokes the rest).
+model ProgramAudit {
+  id          String   @id @default(cuid())
+  tenantId    String
+  programId   String
+  actorUserId String
+  action      String
+  targetType  String
+  targetId    String?
+  beforeValue Json?
+  afterValue  Json?
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  program Program @relation(fields: [tenantId, programId], references: [tenantId, id], onDelete: Cascade)
+
+  @@index([tenantId, programId, createdAt])
+}
