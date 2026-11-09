@@ -135,13 +135,16 @@ test.describe("Programs", () => {
     await expect(page.getByRole("button", { name: "Restore Juz 30–Group 1" })).toBeVisible();
 
     // a program admin
-    await page.getByRole("tab", { name: "Admins" }).click();
+    await page.getByRole("tab", { name: "Staff" }).click();
     await expect(page.getByText("Nobody has been named")).toBeVisible();
-    await page.getByLabel("Name a program admin").selectOption({ label: `${tag} Teacher (North)` });
-    await page.getByRole("button", { name: "Name", exact: true }).click();
+    await page.getByRole("button", { name: "Name a program admin" }).click();
+    await dialog(page)
+      .getByLabel("Member of staff")
+      .selectOption({ label: `${tag} Teacher (Teaching staff, North)` });
+    await dialog(page).getByRole("button", { name: "Name program admin" }).click();
     await expect(page.getByText("The program admin is named.")).toBeVisible();
     await expect(page.getByRole("list", { name: "Program admins" })).toContainText(`${tag} Teacher`);
-    await checkBothThemes(page, "the admins of a program");
+    await checkBothThemes(page, "the staff of a program");
 
     await page.getByRole("tab", { name: "History" }).click();
     const history = page.getByRole("list", { name: /History/ });
@@ -167,9 +170,12 @@ test.describe("Programs", () => {
     const name = `${tag} Tajweed`;
     await makeProgram(page, w, name);
     const url = page.url();
-    await page.getByRole("tab", { name: "Admins" }).click();
-    await page.getByLabel("Name a program admin").selectOption({ label: `${tag} Teacher (North)` });
-    await page.getByRole("button", { name: "Name", exact: true }).click();
+    await page.getByRole("tab", { name: "Staff" }).click();
+    await page.getByRole("button", { name: "Name a program admin" }).click();
+    await dialog(page)
+      .getByLabel("Member of staff")
+      .selectOption({ label: `${tag} Teacher (Teaching staff, North)` });
+    await dialog(page).getByRole("button", { name: "Name program admin" }).click();
     await expect(page.getByText("The program admin is named.")).toBeVisible();
 
     const teacherPage = await (await browser.newContext({ baseURL: SAAS_URL })).newPage();
@@ -180,8 +186,8 @@ test.describe("Programs", () => {
     await dialog(teacherPage).getByRole("button", { name: "Save" }).click();
     await expect(teacherPage.getByText("The details are saved.")).toBeVisible();
     await expect(teacherPage.getByRole("button", { name: "Archive" })).toBeVisible();
-    await teacherPage.getByRole("tab", { name: "Admins" }).click();
-    await expect(teacherPage.getByLabel("Name a program admin")).toHaveCount(0); // the school's administrator names
+    await teacherPage.getByRole("tab", { name: "Staff" }).click();
+    await expect(teacherPage.getByRole("button", { name: "Name a program admin" })).toHaveCount(0); // the school's administrator names
     await teacherPage.context().close();
 
     const campusPage = await (await browser.newContext({ baseURL: SAAS_URL })).newPage();

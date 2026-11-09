@@ -33,6 +33,8 @@ export type EventInput = {
   staffRecordId?: string | null;
   /// The person's account, for a member of staff who has one.
   memberUserId?: string | null;
+  /// A person typed into a program (task 0027, slice P2).
+  participantId?: string | null;
   /// The record's campus (null: the school).
   campusId: string | null;
   action: StandingAction;
@@ -56,6 +58,7 @@ export async function writeEvent(
       studentId: event.studentId ?? null,
       staffRecordId: event.staffRecordId ?? null,
       memberUserId: event.memberUserId ?? null,
+      participantId: event.participantId ?? null,
       campusId: event.campusId,
       action: EVENT_ACTION[event.action],
       reason: event.reason,

@@ -101,4 +101,10 @@ export const updateGroupSchema = z
 /// Slice P1 names program admins only (the other roles come with slice P3). Only the school's administrator may.
 export const nameAdminSchema = z.object({ userId: id("The person") }).strict();
 
+const STAFF_ROLE_NAMES = ["ADMIN", "SUPERVISOR", "TEACHER", "RECORDER"] as const;
+/// Slice P3 names the other three roles too. A program ADMIN is named by the school's administrator only; the other three by the school's administrator or a program admin.
+export const nameStaffSchema = z.object({ userId: id("The person"), role: z.enum(STAFF_ROLE_NAMES).default("ADMIN") }).strict();
+export const staffGroupsSchema = z.object({ groupIds: z.array(id("A group")).max(200) }).strict();
+export const staffCandidatesQuery = z.object({ role: z.enum(STAFF_ROLE_NAMES).default("ADMIN") });
+
 export { switchSettingSchema as programsSettingSchema } from "@/lib/settings/switch-schema";

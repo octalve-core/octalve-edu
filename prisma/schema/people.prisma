@@ -74,6 +74,7 @@ model StaffRecord {
   tenant             Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   campus             Campus?                  @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
   standingEvents     StandingEvent[]
+  programPlaces      ProgramParticipant[]
   membership         TenantMembership?        @relation(fields: [userId, tenantId], references: [userId, tenantId], onDelete: NoAction)
   assignments        StaffSubjectAssignment[]
   invitations        Invitation[]
@@ -135,6 +136,7 @@ model StudentRecord {
   invoices            Invoice[]
   guardianLinkTokens  GuardianLinkToken[]
   standingEvents      StandingEvent[]
+  programPlaces       ProgramParticipant[]
   assignmentSubmissions AssignmentSubmission[]
   quizAttempts        QuizAttempt[]
   courseRegistrations CourseRegistration[]
@@ -181,6 +183,7 @@ model GuardianRecord {
   membership TenantMembership? @relation(fields: [userId, tenantId], references: [userId, tenantId], onDelete: NoAction)
   links      GuardianLink[]
   guardianLinkTokens GuardianLinkToken[]
+  programPlaces      ProgramParticipant[]
 
   @@unique([tenantId, id])
   @@index([tenantId])

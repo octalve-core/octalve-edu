@@ -3,6 +3,12 @@ import { forbidden } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { DisciplineSettingsPanel } from "@/components/settings/DisciplineSettingsPanel";
+import { ProgramAssessmentsSettingsPanel } from "@/components/settings/ProgramAssessmentsSettingsPanel";
+import { ProgramProgressGuardianSettingsPanel } from "@/components/settings/ProgramProgressGuardianSettingsPanel";
+import { ProgramProgressSettingsPanel } from "@/components/settings/ProgramProgressSettingsPanel";
+import { ProgramProgressStudentSettingsPanel } from "@/components/settings/ProgramProgressStudentSettingsPanel";
+import { ProgramFeesSettingsPanel } from "@/components/settings/ProgramFeesSettingsPanel";
+import { ProgramAttendanceSettingsPanel } from "@/components/settings/ProgramAttendanceSettingsPanel";
 import { ProgramsSettingsPanel } from "@/components/settings/ProgramsSettingsPanel";
 import { SchoolSettingsPanel } from "@/components/settings/SchoolSettingsPanel";
 import { hasActiveMfa } from "@/lib/auth/mfa/service";
@@ -41,6 +47,12 @@ export default async function SettingsPage({ params }: { params: Promise<{ code:
       {/* The discipline switch is not a grantable support area (a disciplinary policy): a support view does not see it. */}
       {!tenant.support && <DisciplineSettingsPanel schoolCode={tenant.tenantCode} hasMfa={hasMfa} />}
       {!tenant.support && <ProgramsSettingsPanel schoolCode={tenant.tenantCode} hasMfa={hasMfa} />}
+      {!tenant.support && <ProgramAttendanceSettingsPanel schoolCode={tenant.tenantCode} hasMfa={hasMfa} />}
+      {!tenant.support && <ProgramAssessmentsSettingsPanel schoolCode={tenant.tenantCode} hasMfa={hasMfa} />}
+      {!tenant.support && <ProgramFeesSettingsPanel schoolCode={tenant.tenantCode} hasMfa={hasMfa} />}
+      {!tenant.support && <ProgramProgressSettingsPanel schoolCode={tenant.tenantCode} hasMfa={hasMfa} />}
+      {!tenant.support && <ProgramProgressStudentSettingsPanel schoolCode={tenant.tenantCode} hasMfa={hasMfa} />}
+      {!tenant.support && <ProgramProgressGuardianSettingsPanel schoolCode={tenant.tenantCode} hasMfa={hasMfa} />}
     </div>
   );
 }

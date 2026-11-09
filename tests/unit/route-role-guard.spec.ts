@@ -116,6 +116,18 @@ elsewhere(
   "lib/settings/ceiling-switch.ts: `view` lists only the caller's own campus for anyone who is not the school's administrator; `set` lets a campus administrator change their own campus's value only (any other campus is 404) and only to turn it off; the school's value is the school administrator's, with a fresh proof",
   "GET v1/schools/[code]/settings/programs/route.ts",
   "PATCH v1/schools/[code]/settings/programs/route.ts",
+  "GET v1/schools/[code]/settings/programs-attendance/route.ts",
+  "PATCH v1/schools/[code]/settings/programs-attendance/route.ts",
+  "GET v1/schools/[code]/settings/programs-assessments/route.ts",
+  "PATCH v1/schools/[code]/settings/programs-assessments/route.ts",
+  "GET v1/schools/[code]/settings/programs-progress/route.ts",
+  "PATCH v1/schools/[code]/settings/programs-progress/route.ts",
+  "GET v1/schools/[code]/settings/programs-progress-student/route.ts",
+  "PATCH v1/schools/[code]/settings/programs-progress-student/route.ts",
+  "GET v1/schools/[code]/settings/programs-progress-guardian/route.ts",
+  "PATCH v1/schools/[code]/settings/programs-progress-guardian/route.ts",
+  "GET v1/schools/[code]/settings/programs-fees/route.ts",
+  "PATCH v1/schools/[code]/settings/programs-fees/route.ts",
 );
 elsewhere(
   "lib/finance/part-payment-service.ts `policyView`: lists only the caller's own campus for anyone who is not the school's administrator (the rule is read-only for a campus administrator; the PATCH is the school administrator's, checked in the handler)",
