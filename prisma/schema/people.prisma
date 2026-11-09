@@ -227,5 +227,7 @@ model StudentEnrollment {
   classArm ClassArm        @relation(fields: [tenantId, classArmId], references: [tenantId, id], onDelete: NoAction)
 
   @@unique([tenantId, studentId, sessionId])
+  /// Task 0031: the target of the composite foreign keys of a promotion record.
+  @@unique([tenantId, id])
   @@index([tenantId, classArmId])
 }
