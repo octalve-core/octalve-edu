@@ -122,6 +122,7 @@ model Campus {
   bankSettings          QuestionBankSetting[]
   tenantSettings        TenantSetting[]
   programCampuses       ProgramCampus[]
+  programPlaces         ProgramParticipant[]
   practiceSessions      PracticeSession[]
   questionReports       QuestionReport[]
   questionBankPrintLogs QuestionBankPrintLog[]

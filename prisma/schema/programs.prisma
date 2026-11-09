@@ -42,6 +42,33 @@ model Program {
   /// Plain id of the school's administrator who created it (like AuditLog.actorUserId: the history outlives the account).
   createdByUserId String
   archivedAt      DateTime?
+  /// Slice P3: the program's own attendance switch (the third level under the school's and the campus's) and the percentage under which a person is flagged.
+  attendanceEnabled    Boolean @default(true)
+  lowAttendancePercent Int     @default(75)
+  /// Slice P3b: the program's own assessments switch (default OFF: a program that does not use them shows no tab) and its grade bands ([{ name, from }]).
+  assessmentsEnabled Boolean @default(false)
+  gradeBands         Json?
+  /// Slice P4: the program's own fees switch (default OFF).
+  feesEnabled        Boolean @default(false)
+  /// Slice P5: the wording of the program's certificates (placeholders {name} {program} {from} {to} {school}; plain text), up to two signatories as [{ name, title }], and the completion rule.
+  certTitle               String   @default("Certificate of Completion")
+  certBody                String   @default("This is to certify that {name} has completed {program} at {school}, from {from} to {to}.")
+  certSignatories         Json?
+  completionMinAverage    Decimal? @db.Decimal(5, 2)
+  completionRequirePassed Boolean  @default(false)
+  noCertWhileOwing        Boolean  @default(false)
+  /// Progress records (task 0027 R1 to R4; AlEemaan's task 0044): the program's own switches and settings.
+  progressEnabled             Boolean                @default(false)
+  progressTemplate            String?
+  progressWriters             ProgressWriters        @default(BOTH)
+  progressRequireVerification Boolean                @default(false)
+  progressFourEyes            Boolean                @default(true)
+  progressLockInactivity      Int                    @default(300)
+  progressLockRelease         Int                    @default(30)
+  progressStudentView         Boolean                @default(true)
+  progressGuardianView        Boolean                @default(true)
+  progressGuardianDetail      ProgressGuardianDetail @default(SUMMARY)
+  progressHijriAdjust         Int                    @default(0)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @default(now()) @updatedAt
 
@@ -51,6 +78,11 @@ model Program {
   groups      ProgramGroup[]
   staff       ProgramStaff[]
   audits      ProgramAudit[]
+  participants ProgramParticipant[]
+  assessments  ProgramAssessment[]
+  feeItems     ProgramFeeItem[]
+  certificates ProgramCertificate[]
+  progressTemplates ProgressTemplate[]
 
   /// Lets every table of the program name it with a composite key (a row cannot name another school's program).
   @@unique([tenantId, id])
@@ -102,7 +134,14 @@ model ProgramGroup {
   parent   ProgramGroup?  @relation("ProgramGroupTree", fields: [tenantId, parentId], references: [tenantId, id], onDelete: NoAction)
   children ProgramGroup[] @relation("ProgramGroupTree")
 
+  participants ProgramParticipant[]
+  sessions     ProgramSession[]
+  staffGroups  ProgramStaffGroup[]
+  assessmentGroups ProgramAssessmentGroup[]
+
   @@unique([tenantId, id])
+  /// Lets a place name a group OF ITS OWN PROGRAM with a composite key (the database then refuses a group of another program).
+  @@unique([tenantId, programId, id])
   @@index([tenantId, programId, parentId])
 }
 
@@ -122,9 +161,12 @@ model ProgramStaff {
   program    Program          @relation(fields: [tenantId, programId], references: [tenantId, id], onDelete: Cascade)
   /// The person must be a member of the school (composite key): the database refuses a program admin who holds no membership.
   membership TenantMembership @relation("ProgramPlaces", fields: [userId, tenantId], references: [userId, tenantId], onDelete: Cascade)
+  groups     ProgramStaffGroup[]
 
   @@unique([programId, userId, role])
   @@unique([tenantId, id])
+  /// Lets a table point at a staff place OF ITS OWN PROGRAM with a composite key.
+  @@unique([tenantId, programId, id])
   @@index([tenantId, userId, status])
   @@index([tenantId, programId, status])
 }
@@ -146,4 +188,604 @@ model ProgramAudit {
   program Program @relation(fields: [tenantId, programId], references: [tenantId, id], onDelete: Cascade)
 
   @@index([tenantId, programId, createdAt])
+}
+
+// --- Slice P2: the people of a program (task 0027 section 7; AlEemaan's task 0043 section 9) ---
+
+/// A pupil, a member of staff and a guardian are LINKED (added by pointing at the school's record: their details are read from it every time); an adult or a child with no record is typed in.
+enum ParticipantKind {
+  STUDENT
+  STAFF
+  GUARDIAN
+  ADULT
+  CHILD
+}
+
+enum ProgramPlaceStatus {
+  ACTIVE
+  WITHDRAWN
+  /// Set only by the completion slice (P5).
+  COMPLETED
+}
+
+/// One person's place in one program: one live place per person, in one group, through one campus (or through the school: `campusId` null). There is no separate enrolment table: leaving and
+/// coming back re-opens the same row, so everything that points at the participant keeps one continuous history. The state of a place (taking part, suspended, expelled...) is READ from the
+/// school's own records every time and never stored (`placeState`); only a person typed in carries a standing of their own here.
+model ProgramParticipant {
+  id              String             @id @default(cuid())
+  tenantId        String
+  programId       String
+  kind            ParticipantKind
+  studentId       String?
+  staffRecordId   String?
+  guardianId      String?
+  firstName       String?
+  lastName        String?
+  gender          Gender?
+  dateOfBirth     DateTime?          @db.Date
+  phone           String?
+  email           String?
+  guardianName    String?
+  guardianPhone   String?
+  groupId         String
+  /// The campus the person is in the program through: a linked pupil's or member of staff's own campus (set from the record), a chosen one for a person typed in; null = through the school.
+  campusId        String?
+  status          ProgramPlaceStatus @default(ACTIVE)
+  joinedOn        DateTime           @db.Date
+  endedOn         DateTime?          @db.Date
+  endedReason     String?
+  /// Why a place was completed although the person did not meet the program's rule (kept).
+  completionOverrideReason String?
+  /// Counts only for a person typed in (a database check keeps a linked person at ACTIVE: their standing lives on the school's record).
+  standing        StandingState      @default(ACTIVE)
+  standingUntil   DateTime?          @db.Date
+  createdByUserId String
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @default(now()) @updatedAt
+
+  program     Program         @relation(fields: [tenantId, programId], references: [tenantId, id], onDelete: Cascade)
+  group       ProgramGroup    @relation(fields: [tenantId, programId, groupId], references: [tenantId, programId, id], onDelete: Restrict)
+  campus      Campus?         @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  student     StudentRecord?  @relation(fields: [tenantId, studentId], references: [tenantId, id], onDelete: NoAction)
+  staffRecord StaffRecord?    @relation(fields: [tenantId, staffRecordId], references: [tenantId, id], onDelete: NoAction)
+  guardian    GuardianRecord? @relation(fields: [tenantId, guardianId], references: [tenantId, id], onDelete: NoAction)
+  attendance  ProgramAttendance[]
+  scores      ProgramScore[]
+  feeExemptions ProgramFeeExemption[]
+  invoices    ProgramInvoice[]
+  certificates ProgramCertificate[]
+  progressRecord ProgressRecord?
+
+  @@unique([tenantId, id])
+  /// Lets a table point at a participant OF ITS OWN PROGRAM with a composite key.
+  @@unique([tenantId, programId, id])
+  @@unique([programId, studentId])
+  @@unique([programId, staffRecordId])
+  @@unique([programId, guardianId])
+  @@index([tenantId, programId, status])
+  @@index([tenantId, programId, groupId])
+  @@index([tenantId, programId, campusId])
+  @@index([tenantId, studentId])
+  @@index([tenantId, staffRecordId])
+  @@index([tenantId, guardianId])
+}
+
+// --- Slice P3: program staff with their groups, sessions, the roll call and the correction history (task 0027; AlEemaan's task 0043 section 10) ---
+
+/// The groups a TEACHER or a RECORDER is assigned to (an assignment covers the groups inside it). A supervisor and an admin reach every group and take none.
+model ProgramStaffGroup {
+  tenantId        String
+  programId       String
+  programStaffId  String
+  groupId         String
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  place ProgramStaff @relation(fields: [tenantId, programId, programStaffId], references: [tenantId, programId, id], onDelete: Cascade)
+  group ProgramGroup @relation(fields: [tenantId, programId, groupId], references: [tenantId, programId, id], onDelete: Restrict)
+
+  @@id([programStaffId, groupId])
+  @@index([tenantId, groupId])
+}
+
+/// One group on one day (with a label when there are two a day), opened by the first person who takes the roll. Unique on program, group, day and label (an empty label is one value).
+model ProgramSession {
+  id              String   @id @default(cuid())
+  tenantId        String
+  programId       String
+  groupId         String
+  date            DateTime @db.Date
+  label           String   @default("")
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  group      ProgramGroup        @relation(fields: [tenantId, programId, groupId], references: [tenantId, programId, id], onDelete: Restrict)
+  attendance ProgramAttendance[]
+
+  @@unique([tenantId, id])
+  @@unique([programId, groupId, date, label])
+  @@index([tenantId, programId, date])
+}
+
+/// One mark: a participant on one session. `version` rises with every change so two people cannot silently overwrite each other.
+model ProgramAttendance {
+  id             String           @id @default(cuid())
+  tenantId       String
+  programId      String
+  sessionId      String
+  participantId  String
+  /// The campus of the place when marked (null: through the school).
+  campusId       String?
+  status         AttendanceStatus
+  remarks        String?
+  markedByUserId String
+  markedAt       DateTime         @default(now())
+  updatedAt      DateTime         @default(now()) @updatedAt
+  version        Int              @default(1)
+
+  session     ProgramSession     @relation(fields: [tenantId, sessionId], references: [tenantId, id], onDelete: Restrict)
+  participant ProgramParticipant @relation(fields: [tenantId, programId, participantId], references: [tenantId, programId, id], onDelete: Restrict)
+
+  @@unique([sessionId, participantId])
+  @@index([tenantId, programId, participantId])
+  @@index([tenantId, programId, campusId])
+}
+
+/// Every change of a mark after the first (before, after, who, when, why). No foreign keys on purpose (the history outlives what it is about); append-only for the application's role.
+model ProgramAttendanceChange {
+  id              String           @id @default(cuid())
+  tenantId        String
+  programId       String
+  sessionId       String
+  participantId   String
+  beforeStatus    AttendanceStatus
+  afterStatus     AttendanceStatus
+  beforeRemarks   String?
+  afterRemarks    String?
+  reason          String?
+  changedByUserId String
+  createdAt       DateTime         @default(now())
+
+  @@index([tenantId, programId, sessionId])
+  @@index([tenantId, participantId, createdAt])
+}
+
+// --- Slice P3b: assessments of a program (task 0027; AlEemaan's task 0043 section 8.11) ---
+
+enum ProgramAssessmentStatus {
+  DRAFT
+  OPEN
+  MARKED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ProgramScoreCode {
+  ABSENT
+  EXCUSED
+  EXEMPT
+  NOT_SITTING
+}
+
+/// A dated sitting (test, recitation check, practical...) with a maximum, given to the whole program or to chosen groups. DRAFT -> OPEN (scores can be entered) -> MARKED (every expected score is in)
+/// -> PUBLISHED (the person and their guardian can see their own result) -> ARCHIVED.
+model ProgramAssessment {
+  id              String                  @id @default(cuid())
+  tenantId        String
+  programId       String
+  title           String
+  kind            String                  @default("")
+  date            DateTime                @db.Date
+  maxScore        Decimal                 @db.Decimal(7, 2)
+  passMark        Decimal?                @db.Decimal(7, 2)
+  weight          Decimal                 @default(1) @db.Decimal(5, 2)
+  required        Boolean                 @default(false)
+  status          ProgramAssessmentStatus @default(DRAFT)
+  createdByUserId String
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @default(now()) @updatedAt
+  publishedAt     DateTime?
+
+  program Program                  @relation(fields: [tenantId, programId], references: [tenantId, id], onDelete: Cascade)
+  groups  ProgramAssessmentGroup[]
+  scores  ProgramScore[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, programId, id])
+  @@index([tenantId, programId, status])
+}
+
+/// The groups an assessment is given to; none means the whole program.
+model ProgramAssessmentGroup {
+  tenantId     String
+  programId    String
+  assessmentId String
+  groupId      String
+
+  assessment ProgramAssessment @relation(fields: [tenantId, programId, assessmentId], references: [tenantId, programId, id], onDelete: Cascade)
+  group      ProgramGroup      @relation(fields: [tenantId, programId, groupId], references: [tenantId, programId, id], onDelete: Restrict)
+
+  @@id([assessmentId, groupId])
+  @@index([tenantId, groupId])
+}
+
+/// One score: a number or a code (never both, never neither), the marker and a version so two people cannot silently overwrite each other.
+model ProgramScore {
+  id             String            @id @default(cuid())
+  tenantId       String
+  programId      String
+  assessmentId   String
+  participantId  String
+  /// The campus of the place when scored (null: through the school).
+  campusId       String?
+  score          Decimal?          @db.Decimal(7, 2)
+  code           ProgramScoreCode?
+  comment        String?
+  markedByUserId String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @default(now()) @updatedAt
+  version        Int               @default(1)
+
+  assessment  ProgramAssessment  @relation(fields: [tenantId, programId, assessmentId], references: [tenantId, programId, id], onDelete: Restrict)
+  participant ProgramParticipant @relation(fields: [tenantId, programId, participantId], references: [tenantId, programId, id], onDelete: Restrict)
+
+  @@unique([assessmentId, participantId])
+  @@index([tenantId, programId, participantId])
+  @@index([tenantId, programId, campusId])
+}
+
+/// Every change of a score after the first. No foreign keys on purpose (the history outlives what it is about); append-only for the application's role.
+model ProgramScoreChange {
+  id              String            @id @default(cuid())
+  tenantId        String
+  programId       String
+  assessmentId    String
+  participantId   String
+  beforeScore     Decimal?          @db.Decimal(7, 2)
+  beforeCode      ProgramScoreCode?
+  afterScore      Decimal?          @db.Decimal(7, 2)
+  afterCode       ProgramScoreCode?
+  reason          String?
+  changedByUserId String
+  createdAt       DateTime          @default(now())
+
+  @@index([tenantId, programId, assessmentId])
+  @@index([tenantId, participantId, createdAt])
+}
+
+// --- Slice P4: fees of a program (task 0027; AlEemaan's task 0043 section 11). Tables of their own: the school's Invoice and Payment tables are NOT touched. ---
+
+enum ProgramFeeFrequency {
+  ONCE
+  MONTHLY
+  YEARLY
+}
+
+enum ProgramFeeStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum ProgramFeeBilledTo {
+  PARTICIPANT
+  GUARDIAN
+}
+
+/// One fee a program charges: a name, an amount, how often, and who it is for (`audience`: kinds, campuses and groups; empty means everyone).
+model ProgramFeeItem {
+  id              String              @id @default(cuid())
+  tenantId        String
+  programId       String
+  name            String
+  amount          Decimal             @db.Decimal(12, 2)
+  frequency       ProgramFeeFrequency @default(ONCE)
+  dueDay          Int?
+  audience        Json                @default("{}")
+  discountPercent Decimal?            @db.Decimal(5, 2)
+  billedTo        ProgramFeeBilledTo  @default(PARTICIPANT)
+  status          ProgramFeeStatus    @default(ACTIVE)
+  createdByUserId String
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @default(now()) @updatedAt
+
+  program    Program               @relation(fields: [tenantId, programId], references: [tenantId, id], onDelete: Cascade)
+  exemptions ProgramFeeExemption[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, programId, id])
+  @@index([tenantId, programId, status])
+}
+
+/// People an item does not apply to.
+model ProgramFeeExemption {
+  tenantId        String
+  programId       String
+  feeItemId       String
+  participantId   String
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  item        ProgramFeeItem     @relation(fields: [tenantId, programId, feeItemId], references: [tenantId, programId, id], onDelete: Cascade)
+  participant ProgramParticipant @relation(fields: [tenantId, programId, participantId], references: [tenantId, programId, id], onDelete: Restrict)
+
+  @@id([feeItemId, participantId])
+  @@index([tenantId, participantId])
+}
+
+/// One invoice per program, person and period (generating again never duplicates). A snapshot of the lines and of the billing contact as they were when it was made.
+model ProgramInvoice {
+  id              String        @id @default(cuid())
+  tenantId        String
+  programId       String
+  /// The campus of the place (null: through the school): each campus collects and sees its own money.
+  campusId        String?
+  participantId   String
+  periodKey       String
+  invoiceNo       String
+  totalAmount     Decimal       @db.Decimal(12, 2)
+  amountPaid      Decimal       @default(0) @db.Decimal(12, 2)
+  status          InvoiceStatus @default(UNPAID)
+  dueDate         DateTime?     @db.Date
+  payInFull       Boolean       @default(false)
+  lineItems       Json
+  billingName     String?
+  billingPhone    String?
+  createdByUserId String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now()) @updatedAt
+
+  participant ProgramParticipant       @relation(fields: [tenantId, programId, participantId], references: [tenantId, programId, id], onDelete: Restrict)
+  payments    ProgramPayment[]
+  discounts   ProgramInvoiceDiscount[]
+
+  @@unique([tenantId, invoiceNo])
+  @@unique([tenantId, id])
+  @@unique([tenantId, programId, id])
+  @@unique([programId, participantId, periodKey])
+  @@index([tenantId, programId, campusId, status])
+}
+
+enum ProgramPaymentSource {
+  MANUAL
+  GATEWAY
+}
+
+model ProgramPayment {
+  id               String          @id @default(cuid())
+  tenantId         String
+  programId        String
+  campusId         String?
+  invoiceId        String
+  amount           Decimal         @db.Decimal(12, 2)
+  /// MANUAL: recorded by staff. GATEWAY is reserved for paying through the school's payment gateway (not built yet).
+  source           ProgramPaymentSource @default(MANUAL)
+  providerRef      String
+  status           PaymentStatus   @default(PENDING)
+  verifiedServerSide Boolean       @default(false)
+  channel          String?
+  paidAt           DateTime?
+  receiptNo        String?
+  metadata         Json?
+  recordedByUserId String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @default(now()) @updatedAt
+
+  invoice ProgramInvoice @relation(fields: [tenantId, programId, invoiceId], references: [tenantId, programId, id], onDelete: Restrict)
+
+  @@unique([tenantId, source, providerRef])
+  @@unique([tenantId, receiptNo])
+  @@index([tenantId, programId, invoiceId])
+  @@index([tenantId, programId, campusId, status])
+}
+
+/// Every discount, kept (the invoice total is the lines minus these).
+model ProgramInvoiceDiscount {
+  id              String   @id @default(cuid())
+  tenantId        String
+  programId       String
+  invoiceId       String
+  amount          Decimal  @db.Decimal(12, 2)
+  reason          String
+  appliedByUserId String
+  createdAt       DateTime @default(now())
+
+  invoice ProgramInvoice @relation(fields: [tenantId, programId, invoiceId], references: [tenantId, programId, id], onDelete: Restrict)
+
+  @@index([tenantId, programId, invoiceId])
+}
+
+/// One counter per school, kind and year, so PINV-2026-0001 and PRC-2026-0001 are unique across the school's programs.
+model ProgramCounter {
+  tenantId String
+  kind     String
+  year     Int
+  next     Int    @default(1)
+
+  @@id([tenantId, kind, year])
+}
+
+// --- Slice P5: completion and certificates (task 0027; AlEemaan's task 0043 section 12) ---
+
+enum ProgramCertificateStatus {
+  ISSUED
+  REVOKED
+}
+
+/// A certificate of completion: the wording, the person's name and the signatories as they were when it was issued (a later change never changes it). Nothing is deleted: a withdrawn certificate
+/// says so. `verificationToken` is the 32-character code of the public check (the same shape as the school's other certificates).
+model ProgramCertificate {
+  id                String                   @id @default(cuid())
+  tenantId          String
+  programId         String
+  participantId     String
+  serialNo          String
+  verificationToken String                   @default(dbgenerated("replace((gen_random_uuid())::text, '-'::text, ''::text)"))
+  issuedOn          DateTime                 @db.Date
+  completedOn       DateTime                 @db.Date
+  title             String
+  bodyText          String
+  personName        String
+  programName       String
+  schoolName        String
+  signatories       Json                     @default("[]")
+  status            ProgramCertificateStatus @default(ISSUED)
+  replacesId        String?
+  revokedAt         DateTime?
+  revokedByUserId   String?
+  revokeReason      String?
+  issuedByUserId    String
+  createdAt         DateTime                 @default(now())
+
+  program     Program            @relation(fields: [tenantId, programId], references: [tenantId, id], onDelete: Cascade)
+  participant ProgramParticipant @relation(fields: [tenantId, programId, participantId], references: [tenantId, programId, id], onDelete: Restrict)
+
+  @@unique([tenantId, serialNo])
+  @@unique([verificationToken])
+  @@unique([tenantId, id])
+  @@index([tenantId, programId, participantId])
+}
+
+// --- Progress records (task 0027, R1 to R4; AlEemaan's task 0044): a running log a teacher keeps for each person in a program ---
+
+enum ProgressEntryStatus {
+  DRAFT
+  SUBMITTED
+  VERIFIED
+}
+
+enum ProgressWriters {
+  TEACHERS
+  ASSIGNED
+  BOTH
+}
+
+enum ProgressGuardianDetail {
+  SUMMARY
+  FULL
+}
+
+/// A template of a program's logbook, immutable once written: a change makes a new version and existing records keep theirs (the application's role can only INSERT and SELECT).
+model ProgressTemplate {
+  id              String   @id @default(cuid())
+  tenantId        String
+  programId       String
+  key             String
+  version         Int      @default(1)
+  schema          Json
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  program Program          @relation(fields: [tenantId, programId], references: [tenantId, id], onDelete: Cascade)
+  records ProgressRecord[]
+
+  @@unique([programId, key, version])
+  @@unique([tenantId, id])
+  @@unique([tenantId, programId, id])
+}
+
+/// One record per person in a program (the person's one place), on the template version it was started with.
+model ProgressRecord {
+  id              String   @id @default(cuid())
+  tenantId        String
+  programId       String
+  participantId   String
+  templateId      String
+  profile         Json     @default("{}")
+  version         Int      @default(1)
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  participant ProgramParticipant @relation(fields: [tenantId, programId, participantId], references: [tenantId, programId, id], onDelete: Restrict)
+  template    ProgressTemplate   @relation(fields: [tenantId, programId, templateId], references: [tenantId, programId, id], onDelete: Restrict)
+  entries     ProgressEntry[]
+  seen        ProgressSeen[]
+
+  @@unique([programId, participantId])
+  @@unique([tenantId, programId, participantId])
+  @@unique([tenantId, id])
+  @@unique([tenantId, programId, id])
+  @@index([tenantId, programId])
+}
+
+/// One dated row of a track. Families see only `publishedValues` (the last verified copy).
+model ProgressEntry {
+  id                 String              @id @default(cuid())
+  tenantId           String
+  programId          String
+  recordId           String
+  trackKey           String
+  entryDate          DateTime            @db.Date
+  values             Json
+  status             ProgressEntryStatus @default(DRAFT)
+  version            Int                 @default(1)
+  createdByUserId    String
+  lastEditedByUserId String
+  submittedAt        DateTime?
+  verifiedByUserId   String?
+  verifiedAt         DateTime?
+  returnComment      String?
+  publishedValues    Json?
+  publishedAt        DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @default(now()) @updatedAt
+
+  record ProgressRecord @relation(fields: [tenantId, programId, recordId], references: [tenantId, programId, id], onDelete: Restrict)
+  lock   ProgressLock?
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, programId, id])
+  @@index([tenantId, recordId, trackKey, entryDate])
+  @@index([tenantId, programId, status])
+}
+
+/// Every save of an entry, append-only.
+model ProgressEntryRevision {
+  id           String   @id @default(cuid())
+  tenantId     String
+  programId    String
+  entryId      String
+  recordId     String
+  version      Int
+  action       String
+  userId       String
+  beforeValues Json?
+  afterValues  Json?
+  note         String?
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId, entryId, createdAt])
+  @@index([tenantId, programId, createdAt])
+}
+
+/// The lock on an entry while someone edits it (a heartbeat keeps it; it expires; a manual release waits `releaseAt`).
+model ProgressLock {
+  tenantId     String
+  programId    String
+  entryId      String   @id
+  holderUserId String
+  heartbeatAt  DateTime
+  expiresAt    DateTime
+  releaseAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  entry ProgressEntry @relation(fields: [tenantId, programId, entryId], references: [tenantId, programId, id], onDelete: Cascade)
+
+  @@unique([tenantId, programId, entryId])
+  @@index([expiresAt])
+}
+
+/// "Seen" by a pupil or a guardian for a week.
+model ProgressSeen {
+  id        String   @id @default(cuid())
+  tenantId  String
+  programId String
+  recordId  String
+  actor     String
+  weekStart DateTime @db.Date
+  seenAt    DateTime @default(now())
+
+  record ProgressRecord @relation(fields: [tenantId, programId, recordId], references: [tenantId, programId, id], onDelete: Cascade)
+
+  @@unique([recordId, actor, weekStart])
 }

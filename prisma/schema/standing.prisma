@@ -14,6 +14,8 @@ enum StandingState {
 enum StandingSubject {
   STUDENT
   STAFF
+  /// A person typed into a program who has no school record (task 0027, slice P2): expelled from the program, not the school.
+  PARTICIPANT
 }
 
 enum StandingEventAction {
@@ -35,6 +37,8 @@ model StandingEvent {
   staffRecordId   String?
   /// The person's account (the membership is `userId` + `tenantId`), for a member of staff who has one.
   memberUserId    String?
+  /// A person typed into a program (no foreign key, like the rest of the history: it outlives what it is about).
+  participantId   String?
   /// The record's campus when it was decided (null: the school).
   campusId        String?
   action          StandingEventAction
@@ -52,5 +56,6 @@ model StandingEvent {
   @@index([tenantId, studentId, createdAt])
   @@index([tenantId, staffRecordId, createdAt])
   @@index([tenantId, memberUserId, createdAt])
+  @@index([tenantId, participantId, createdAt])
   @@index([tenantId, campusId, createdAt])
 }
