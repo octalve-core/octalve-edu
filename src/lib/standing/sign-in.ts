@@ -1,4 +1,4 @@
-import { StandingState } from "@prisma/client";
+import { Role, StandingState } from "@prisma/client";
 import { forTenant, forUser } from "@/lib/tenant/for-tenant";
 import { trustedTenantId } from "@/lib/tenant/verified-tenant";
 import { asDate, today, writeEvent } from "./common";
@@ -59,4 +59,25 @@ export async function liftEndedSuspensions(userId: string): Promise<number> {
     if (did) lifted++;
   }
   return lifted;
+}
+
+/// Is this person refused altogether? An expelled pupil is (task 0028, decided 2026-11-08): they cannot sign in, and the answer is the one generic sign-in sentence, the same as for a wrong
+/// password, so nothing says that the account exists or why. It holds only when EVERY place the person can still go is a school that expelled them: a person who is also a guardian,
+/// a member of staff or an administrator anywhere (or a pupil in good standing in another school) can sign in, and each school's own pages and API still close what is closed to
+/// them there (an expelled pupil's record is not reachable in the portal). A person with no active membership at all is not decided here: that is how sign-in already behaved.
+///
+/// The school ids come from the person's OWN membership rows through the user context; each pupil record is read in that school's context.
+export async function isExpelledEverywhere(userId: string): Promise<boolean> {
+  const memberships = await forUser(userId).transaction((tx) =>
+    tx.tenantMembership.findMany({ where: { userId, deactivatedAt: null }, select: { tenantId: true, role: true } }),
+  );
+  if (memberships.length === 0) return false;
+  for (const { tenantId, role } of memberships) {
+    if (role !== Role.STUDENT) return false;
+    const record = await forTenant(trustedTenantId(tenantId)).transaction((tx) =>
+      tx.studentRecord.findFirst({ where: { tenantId, userId }, select: { standing: true } }),
+    );
+    if (record?.standing !== StandingState.EXPELLED) return false;
+  }
+  return true;
 }

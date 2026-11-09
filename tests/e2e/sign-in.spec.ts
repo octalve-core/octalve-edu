@@ -10,6 +10,7 @@ import {
   signInThroughUi,
   signOut,
   trackLoginRequests,
+  waitForHydration,
   HOME_URL,
 } from "./helpers";
 
@@ -477,6 +478,10 @@ test.describe("staying signed in, and signing out", () => {
   test("a normal (non-cache) pageshow does nothing", async ({ page }) => {
     const user = await createUser({ role: Role.ADMIN });
     await signInThroughUi(page, user);
+    // Right after sign-in the page is still hydrating and prefetching the pages its links lead to; deleting the session under those requests made one of them come back signed out, and the
+    // page went to /login (it failed about 2 runs in 5 on a clean `dev`). The test is about a pageshow, so it waits until the page is quiet before it takes the session away.
+    await waitForHydration(page);
+    await page.waitForLoadState("networkidle");
     await db.session.deleteMany({ where: { userId: user.id } });
     await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: false })));
     await page.waitForTimeout(500);
