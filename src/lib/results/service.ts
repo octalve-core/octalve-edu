@@ -429,10 +429,9 @@ export async function getStudentReportCard(
       where: { tenantId, id: studentId },
       include: {
         campus: true,
-        enrollments: {
-          where: { status: "ACTIVE" },
-          include: { classArm: { include: { classGroup: true } }, session: true },
-        },
+        // Every enrolment, not only the ACTIVE one: a card is for a PERIOD, and the pupil's class in that period's session is the one it must show. After a promotion the ACTIVE
+        // enrolment is the next session's, so reading it would put the new class (and the new class's rank) on the card of a past term (task 0031).
+        enrollments: { include: { classArm: { include: { classGroup: true } } } },
       },
     }),
     tx.academicPeriod.findFirst({
@@ -455,7 +454,8 @@ export async function getStudentReportCard(
     include: { subject: true },
   });
 
-  const activeEnrollment = student.enrollments[0];
+  // The enrolment of the period's own session; a pupil who has none in it has no class on the card.
+  const activeEnrollment = student.enrollments.find((e) => e.sessionId === period.sessionId);
   const classArmId = activeEnrollment?.classArmId;
 
   // Retrieve peer results for competition ranking if class arm is known
@@ -463,8 +463,10 @@ export async function getStudentReportCard(
   let classSize: number = 0;
 
   if (classArmId) {
+    // The pupils who were in this arm in that session and finished it there: still ACTIVE, or since promoted, repeating or graduated (a pupil who withdrew, transferred or was
+    // expelled was never ranked, as before).
     const peerEnrollments = await tx.studentEnrollment.findMany({
-      where: { tenantId, classArmId, status: "ACTIVE" },
+      where: { tenantId, classArmId, sessionId: period.sessionId, status: { in: ["ACTIVE", "PROMOTED", "REPEATED", "ALUMNI"] } },
       select: { studentId: true },
     });
     classSize = peerEnrollments.length;

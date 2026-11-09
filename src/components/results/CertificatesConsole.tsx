@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { CertificateStatus } from "@prisma/client";
+import type { CertificateStatus } from "@prisma/client"; // a TYPE import: a value import would bring the Prisma runtime into the page (task 0031)
 import { computeCertificateHash, formatCertificateNumber } from "@/lib/certificates/rules";
 
 interface CertificateItem {
@@ -39,7 +39,7 @@ export function CertificatesConsole({ schoolCode, initialCertificates = [] }: Ce
               title: "Executive Diploma in Renewable Energy & Solar Tech",
               issueDate: new Date(),
             }),
-            status: CertificateStatus.ISSUED,
+            status: "ISSUED",
           },
         ],
   );
@@ -70,7 +70,7 @@ export function CertificatesConsole({ schoolCode, initialCertificates = [] }: Ce
       certificateNo: certNo,
       issueDate: issueDate.toISOString(),
       verificationHash,
-      status: CertificateStatus.ISSUED,
+      status: "ISSUED",
     };
 
     setCertificates((prev) => [newCert, ...prev]);
@@ -80,7 +80,7 @@ export function CertificatesConsole({ schoolCode, initialCertificates = [] }: Ce
   };
 
   const handleRevoke = (id: string) => {
-    setCertificates((prev) => prev.map((c) => (c.id === id ? { ...c, status: CertificateStatus.REVOKED } : c)));
+    setCertificates((prev) => prev.map((c) => (c.id === id ? { ...c, status: "REVOKED" } : c)));
   };
 
   return (
@@ -164,7 +164,7 @@ export function CertificatesConsole({ schoolCode, initialCertificates = [] }: Ce
                 <td className="px-4 py-3 text-center">
                   <span
                     className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      cert.status === CertificateStatus.ISSUED
+                      cert.status === "ISSUED"
                         ? "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300"
                         : "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
                     }`}
@@ -178,7 +178,7 @@ export function CertificatesConsole({ schoolCode, initialCertificates = [] }: Ce
                   </div>
                 </td>
                 <td className="px-4 py-3 text-right space-x-2">
-                  {cert.status === CertificateStatus.ISSUED && (
+                  {cert.status === "ISSUED" && (
                     <button onClick={() => handleRevoke(cert.id)} className="text-xs text-danger-fg hover:underline">
                       Revoke
                     </button>

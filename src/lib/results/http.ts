@@ -95,3 +95,14 @@ export function resultFailure(reason: ResultFailure, message?: string): Response
       return fail(message ?? "Results operation failed.", 400, "BAD_REQUEST");
   }
 }
+
+// --- The Results screens' reads (task 0031) ---
+
+const requiredId = (what: string) => z.string().min(1, `${what} is required`).refine(isPlausibleId, `Not a valid ${what.toLowerCase()}.`);
+
+export const sheetQuerySchema = z.object({
+  periodId: requiredId("Period"),
+  classArmId: requiredId("Class arm"),
+  subjectId: requiredId("Subject"),
+});
+export const rosterQuerySchema = z.object({ periodId: requiredId("Period"), classArmId: requiredId("Class arm") });

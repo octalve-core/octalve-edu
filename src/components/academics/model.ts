@@ -29,6 +29,7 @@ export const SECTIONS = [
   { key: "classes", label: "Classes & subjects" },
   { key: "assessment", label: "Assessment" },
   { key: "grading", label: "Grading" },
+  { key: "promotion", label: "Promotion" },
 ] as const;
 export type SectionKey = (typeof SECTIONS)[number]["key"];
 export const isSection = (value: unknown): value is SectionKey => SECTIONS.some((section) => section.key === value);

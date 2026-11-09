@@ -31,13 +31,14 @@ test.describe("navFor", () => {
     expect(navFor(null)).toMatchObject([{ label: "Your schools", href: "/dashboard" }]);
   });
 
-  test("an ADMIN of a school: Overview, Academics, People, Finance, Communication, Users, Question bank, Forms, Programs and Settings", () => {
+  test("an ADMIN of a school: Overview, Academics, People, Finance, Results, Communication, Users, Question bank, Forms, Programs and Settings", () => {
     const items = navFor(admin);
     expect(items.map((i) => i.label)).toEqual([
       "Overview",
       "Academics",
       "People",
       "Finance",
+      "Results",
       "Communication",
       "Users",
       "Question bank",
@@ -49,12 +50,13 @@ test.describe("navFor", () => {
     expect(items[1].href).toBe("/schools/riverside/academics");
     expect(items[2].href).toBe("/schools/riverside/people");
     expect(items[3].href).toBe("/schools/riverside/finance");
-    expect(items[4].href).toBe("/schools/riverside/communication");
-    expect(items[5].href).toBe("/schools/riverside/users");
-    expect(items[6].href).toBe("/schools/riverside/question-bank");
-    expect(items[7].href).toBe("/schools/riverside/forms");
-    expect(items[8].href).toBe("/schools/riverside/programs");
-    expect(items[9].href).toBe("/schools/riverside/settings");
+    expect(items[4].href).toBe("/schools/riverside/results");
+    expect(items[5].href).toBe("/schools/riverside/communication");
+    expect(items[6].href).toBe("/schools/riverside/users");
+    expect(items[7].href).toBe("/schools/riverside/question-bank");
+    expect(items[8].href).toBe("/schools/riverside/forms");
+    expect(items[9].href).toBe("/schools/riverside/programs");
+    expect(items[10].href).toBe("/schools/riverside/settings");
     expect(items.filter((i) => i.href === null)).toEqual([]);
   });
 
@@ -65,6 +67,7 @@ test.describe("navFor", () => {
       "Academics",
       "People",
       "Finance",
+      "Results",
       "Communication",
       "Users",
       "Question bank",
@@ -104,14 +107,14 @@ test.describe("navFor", () => {
     ]);
   });
 
-  test("staff see Overview, Academics, People (to look at, never to change) and the Question bank (to write in); staff also get Forms; a pupil gets My work; a parent My children — decided by the role IN THAT SCHOOL", () => {
+  test("staff see Overview, Academics, People (to look at, never to change), Results and the Question bank (to write in); staff also get Forms; a pupil gets My work; a parent My children — decided by the role IN THAT SCHOOL", () => {
     // Teachers write and mark forms; non-teaching staff only answer the questionnaires addressed to them, and both reach the same page.
     for (const role of ["TEACHING_STAFF", "NON_TEACHING_STAFF"] as const) {
       const items = navFor({ ...admin, role });
       expect(
         items.map((i) => i.label),
         role,
-      ).toEqual(["Overview", "Academics", "People", "Question bank", "Forms", "Programs"]);
+      ).toEqual(["Overview", "Academics", "People", "Results", "Question bank", "Forms", "Programs"]);
       expect(
         items.map((i) => i.href),
         role,
@@ -119,6 +122,7 @@ test.describe("navFor", () => {
         "/schools/riverside",
         "/schools/riverside/academics",
         "/schools/riverside/people",
+        "/schools/riverside/results",
         "/schools/riverside/question-bank",
         "/schools/riverside/forms",
         "/schools/riverside/programs",
@@ -135,7 +139,15 @@ test.describe("navFor", () => {
       ["My children", "/schools/riverside/children"],
     ]);
     // The same person is an admin in one school and a teacher in another: each school's nav follows its own role.
-    expect(navFor(teacher).map((i) => i.label)).toEqual(["Overview", "Academics", "People", "Question bank", "Forms", "Programs"]);
+    expect(navFor(teacher).map((i) => i.label)).toEqual([
+      "Overview",
+      "Academics",
+      "People",
+      "Results",
+      "Question bank",
+      "Forms",
+      "Programs",
+    ]);
     expect(navFor(admin).map((i) => i.label)).toContain("Users");
     expect(navFor(teacher).map((i) => i.label)).not.toContain("Users"); // the Users page stays the administrators'
   });
@@ -261,7 +273,7 @@ test.describe("groupNav: sections for each kind of person", () => {
     const groups = groupNav(navFor(admin));
     expect(headings(groups)).toEqual([null, "Administration", "Learning"]);
     expect(labels(groups[0].items)).toEqual(["Overview"]);
-    expect(labels(groups[1].items)).toEqual(["Academics", "People", "Finance", "Communication", "Users", "Settings"]);
+    expect(labels(groups[1].items)).toEqual(["Academics", "People", "Finance", "Results", "Communication", "Users", "Settings"]);
     expect(labels(groups[2].items)).toEqual(["Question bank", "Forms", "Programs"]);
 
     const withPlatform = groupNav(navFor(admin, true));
@@ -274,11 +286,11 @@ test.describe("groupNav: sections for each kind of person", () => {
     expect(labels(groups[1].items)).toEqual(["Academics", "People", "Finance", "Communication", "Users"]);
   });
 
-  test("staff: Administration (Academics, People) and Learning (Question bank, Forms, Programs)", () => {
+  test("staff: Administration (Academics, People, Results) and Learning (Question bank, Forms, Programs)", () => {
     for (const role of ["TEACHING_STAFF", "NON_TEACHING_STAFF"] as const) {
       const groups = groupNav(navFor({ ...admin, role }));
       expect(headings(groups), role).toEqual([null, "Administration", "Learning"]);
-      expect(labels(groups[1].items), role).toEqual(["Academics", "People"]);
+      expect(labels(groups[1].items), role).toEqual(["Academics", "People", "Results"]);
       expect(labels(groups[2].items), role).toEqual(["Question bank", "Forms", "Programs"]);
     }
   });
@@ -303,6 +315,7 @@ test.describe("groupNav: sections for each kind of person", () => {
         item.label !== "Academics" &&
         item.label !== "People" &&
         item.label !== "Finance" &&
+        item.label !== "Results" &&
         item.label !== "Communication" &&
         item.label !== "Users",
     );
@@ -328,7 +341,7 @@ test.describe("groupNav: sections for each kind of person", () => {
     const overflow = navFor(admin, true).slice(4);
     const groups = groupNav(overflow);
     expect(headings(groups)).toEqual(["Administration", "Learning", null]);
-    expect(labels(groups[0].items)).toEqual(["Communication", "Users", "Settings"]);
+    expect(labels(groups[0].items)).toEqual(["Results", "Communication", "Users", "Settings"]);
     expect(labels(groups[2].items)).toEqual(["Platform"]);
   });
 });
