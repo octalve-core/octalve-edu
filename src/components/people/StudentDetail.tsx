@@ -141,17 +141,17 @@ export function StudentDetail({
                           Archive
                         </Button>
                         {standing && (
-              <StandingPanel
-                schoolCode={schoolCode}
-                path={`people/students/${studentId}/standing`}
-                subject="student"
-                name={name}
-                canSuspend={standing.canSuspend}
-                canDecide={standing.canDecide}
-                onChanged={() => void reloadAll()}
-              />
-            )}
-          </>
+                          <StandingPanel
+                            schoolCode={schoolCode}
+                            path={`people/students/${studentId}/standing`}
+                            subject="student"
+                            name={name}
+                            canSuspend={standing.canSuspend}
+                            canDecide={standing.canDecide}
+                            onChanged={() => void reloadAll()}
+                          />
+                        )}
+                      </>
                     )}
                     {student.archived && (
                       <Button variant="secondary" loading={busy} aria-label={`Restore ${name}`} onClick={() => void restore()}>

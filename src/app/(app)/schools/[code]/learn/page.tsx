@@ -19,7 +19,10 @@ export default async function LearnPage({ params }: { params: Promise<{ code: st
   if (tenant.role !== "STUDENT") forbidden();
   // A suspension that applies today is told to the pupil (without its reason); an ended one is not.
   const record = await tenant.run((tx) =>
-    tx.studentRecord.findFirst({ where: { tenantId: tenant.tenantId, userId: session.userId }, select: { standing: true, standingUntil: true } }),
+    tx.studentRecord.findFirst({
+      where: { tenantId: tenant.tenantId, userId: session.userId },
+      select: { standing: true, standingUntil: true },
+    }),
   );
   const suspended = record !== null && studentStandingNow(record, today()) === "SUSPENDED";
   return (
