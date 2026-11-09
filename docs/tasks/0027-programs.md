@@ -1,7 +1,7 @@
 # 0027: Programs (learning that is not a normal class) - the Octalve Edu port of AlEemaan's task 0043
 
 - **Period / Focus:** design written 2026-11-04 (docs only); requested by the maintainer on 2026-11-03 for AlEemaan, and parity for Octalve Edu was always the next step. The source is AlEemaan's `docs/tasks/0043-programs.md` (slice P1 built and tested on its branch `claude/programs-p1`; slice P2, people, designed in its section 9).
-- **Status:** Design only. Nothing is built here. Start when AlEemaan's slices P1 and P2 are merged into its `dev`, so there is something to port.
+- **Status:** P0 built (2026-11-08, merged: PR #92). **P1 (structure) built 2026-11-09** on `claude/octalve-screens`, with its API, its pages and its tests (section 6). P2 to P5 not started. Waiting for the migration `20261116090000_programs_structure` on the hosted databases.
 - **Priority:** Medium
 - **Assignee:** next AI / maintainer
 - **Target Branch / PR:** one branch and one PR per slice, off `dev`
@@ -30,10 +30,24 @@ Different, on purpose:
 
 ## 4. Work breakdown
 - [x] P0 The generic tenant-and-campus settings table, its RLS and audit (`TenantSetting`, migration `20261114090000_tenant_settings_part_payment`, built 2026-11-08 with task 0029; the switch helper for `programs.enabled` comes with P1)
-- [ ] P1 Structure (programs, campuses, level names, groups, program admins, the audit, the `programs.enabled` switch, the Programs page, the sidebar entry)
+- [x] P1 Structure (programs, campuses, level names, groups, program admins, the audit, the `programs.enabled` switch, the Programs page, the sidebar entry): built 2026-11-09, section 6. Left for later: a program with a campus of its own (a real `Campus` row made with the program)
 - [ ] P2 People (`ProgramParticipant`, the state of a place read from the school's own records, standing for standalone people, the People tab; AlEemaan's 0043 section 9)
 - [ ] P3 Staff and attendance - [ ] P3b Assessments - [ ] P4 Fees - [ ] P5 Completion and certificates (each as in AlEemaan's 0043)
 - [ ] Tests: unit, API (who may, tenant isolation, campus isolation), integration (RLS, the checks), browser (both themes, phone), the route-role-guard source test, walkthrough rows
 
 ## 5. Not in this task
 Anything AlEemaan's 0043 puts out of scope. Progress records (AlEemaan's 0044) are a separate port.
+
+## 6. Build record, slice P1 (2026-11-09)
+**What exists.** The migration `20261116090000_programs_structure` (additive: four enums, six tables: `Program`, `ProgramCampus`, `ProgramLevelLabel`, `ProgramGroup`, `ProgramStaff`, `ProgramAudit`; every one carries `tenantId`, composite foreign keys and forced row-level security; a live program's name is unique per school and a live group's name per parent, ignoring case; checks hold the levels (0 to 3), the top group having no parent, and a fixed-term program's dates; the audit is append-only by `REVOKE UPDATE, DELETE, TRUNCATE`). `src/lib/programs/` (rules, validation, access, common, settings-service, service, structure-service, staff-service, http), eleven routes under `/api/v1/schools/[code]/programs` and `settings/programs`, the pages `/schools/[code]/programs` and `.../[id]` (Overview, Structure, Admins, History), the Programs setting on the Settings page (the generic switch panel, shared with Discipline) and "Programs" in the sidebar's Learning section for every staff role.
+
+**Decisions made while building.**
+- Authority is read at every request. `ADMIN` is the school-wide administrator ("SUPER"); a program admin is a staff member the school's administrator names, who counts only while their membership is active and their campus is empty or one the program runs in (a school-wide program takes any campus); a `CAMPUS_ADMIN` reads the programs that run in their campus (a school-wide program is not theirs) and changes none. A program the person has no place in is a 404, the same as one that does not exist. A deactivated membership is refused at the door (403) like any non-member.
+- A program runs school-wide (no campus rows) or in chosen campuses. It is **not** narrowed from school-wide to campuses afterwards (it would change who may see it), nor made school-wide by removing its last campus; a campus an admin serves through cannot be removed.
+- Only the school's administrator makes a program, names or ends a program admin, restores an archived program, and adds or removes a campus. A program admin changes the details, the level names, the groups and activates or archives.
+- The `programs.enabled` switch is the shared ceiling switch over `TenantSetting` (the school's value with the fresh proof; a campus can only turn it off). With programs off nothing can be made or changed and only the school's administrator reads; a campus that has them off cannot be given a program.
+- Everything is audited in `ProgramAudit` (who, what, before and after); the history tab is shown to the people who manage the program; names come from the school's own memberships.
+- Left out on purpose: a program with a campus of its own (the AlEemaan "own branch"): it needs the school's campus module and `multiCampusEnabled`, and no school asked for it; a program that wants a campus of its own is made in a school-wide way or with an existing campus.
+- The groups' people (P2), the staff roles and the groups they are assigned to (P3), assessments, fees and certificates are not built; the structure service says where their refusals will go (archiving a group with people in it).
+
+**Hosted databases.** The maintainer runs `20261116090000_programs_structure` (after `20261115090000_standing`); not run on any hosted database here.

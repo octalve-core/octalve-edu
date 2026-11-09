@@ -347,23 +347,25 @@
 
 ## TASK-0027: Programs, learning that is not a normal class (parity with AlEemaan's task 0043)
 
-[Task file](0027-programs.md). Requested by the maintainer on 2026-11-03 for AlEemaan; the Octalve port is designed (docs only, 2026-11-04) and waits for AlEemaan's slices P1 and P2 to be merged into its `dev`.
+[Task file](0027-programs.md). Requested by the maintainer on 2026-11-03 for AlEemaan; the Octalve port was designed 2026-11-04. Slice P1 (the program, its campuses, level names and groups, the audit, the Programs list and page, the `programs.enabled` switch) is built 2026-11-09 on `claude/octalve-screens`; it needs the migration `20261116090000_programs_structure` (the maintainer runs it). The rest follows in the next pull request.
 
-- [x] P0 The generic tenant-and-campus settings table (`TenantSetting`, built 2026-11-08 on `claude/octalve-parity` with the part-payment slice; shared with 0028 and 0029)
-- [ ] P1 Structure - [ ] P2 People - [ ] P3 Staff and attendance - [ ] P3b Assessments - [ ] P4 Fees - [ ] P5 Completion and certificates
-- [ ] Settle the overlap with Phase 5 (vocational cohorts, higher-ed credit units) before P1
+- [x] P0 The generic tenant-and-campus settings table (`TenantSetting`, shared with 0028 and 0029)
+- [x] P1 Structure
+- [ ] P2 People - [ ] P3 Staff and attendance - [ ] P3b Assessments - [ ] P4 Fees - [ ] P5 Completion and certificates
+- [ ] Settle the overlap with Phase 5 (vocational cohorts, higher-ed credit units)
 
 ## TASK-0028: Standing, suspension, expulsion and termination on the school's own records (parity with AlEemaan's task 0045)
 
-[Task file](0028-standing.md). Requested by the maintainer on 2026-11-03 for AlEemaan; designed here 2026-11-04 (docs only).
+[Task file](0028-standing.md). Requested by the maintainer on 2026-11-03 for AlEemaan; designed 2026-11-04, built 2026-11-08 (S1 to S3 API, merged as PR #92) and 2026-11-09 (the screens, the refusal of an expelled pupil at sign-in and the Settings switch, on `claude/octalve-screens`). Needs the migration `20261115090000_standing`.
 
-- [x] S1 Pupils (migration, rules, service, route; built 2026-11-08 on `claude/octalve-parity`, needs the migration `20261115090000_standing`; the Students page is not built) - [x] S2 Staff and the sign-in lift (service, routes, lift) - [~] S3 The campus switch (API built; the Settings tab is not)
-- [x] Tests written (unit, API, integration for the checks, the append-only history and RLS); NOT RUN yet
+- [x] S1 Pupils - [x] S2 Staff and the sign-in lift - [x] S3 The campus switch (API and the Settings panel) - [x] Standing screens (a pupil's and a member of staff's page) - [x] An expelled pupil is refused at sign-in with the generic wrong-password sentence (the maintainer's decision)
+- [x] Tests: unit, API, integration, browser (`finance-standing-screens`)
+- [ ] A notice to the guardian of a suspended child (optional, not built)
 
 ## TASK-0029: Part payment "if allowed" (parity with AlEemaan's task 0046)
 
-[Task file](0029-part-payment.md). Requested by the maintainer on 2026-11-03 for AlEemaan; designed here 2026-11-04 (docs only). Only an `ADMIN` sets the rule (ADR 0016: a campus administrator does not configure fees).
+[Task file](0029-part-payment.md). Requested by the maintainer on 2026-11-03 for AlEemaan; designed 2026-11-04, F1 built 2026-11-08 (PR #92), F2 built 2026-11-09 on `claude/octalve-screens`. Only an `ADMIN` sets the rule (ADR 0016: a campus administrator does not configure fees). Needs the migration `20261114090000_tenant_settings_part_payment`.
 
-- [x] F1 Column, rule, settings, enforcement in both payment paths (built 2026-11-08 on `claude/octalve-parity`; needs the migration `20261114090000_tenant_settings_part_payment`) - [ ] F2 Finance screens: **blocked, Octalve has no mounted Finance page** (the finance components exist but no page imports them); the invoice API already returns the sentence and the flag a screen needs
-- [x] Checked `recordManualPayment` and `initializePayment` for the double-take race AlEemaan found: it was there (no row lock; the manual path did not even refuse more than the balance up front). Fixed with `SELECT ... FOR UPDATE` and a test
-
+- [x] F1 Column, rule, settings, enforcement in both payment paths, with the row lock that closed a double-take race the payment paths had
+- [x] F2 The Finance page (`/schools/[code]/finance`: Invoices, Fee structure, the payment rules, the record-payment dialog, the invoice detail)
+- [ ] The invoice screens for a pupil or a guardian (not built)
