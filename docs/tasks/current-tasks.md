@@ -347,16 +347,17 @@
 
 ## TASK-0027: Programs, learning that is not a normal class (parity with AlEemaan's task 0043)
 
-[Task file](0027-programs.md). Requested by the maintainer on 2026-11-03 for AlEemaan; the Octalve port was designed 2026-11-04. Slice P1 (the program, its campuses, level names and groups, the audit, the Programs list and page, the `programs.enabled` switch) is built 2026-11-09 on `claude/octalve-screens`; it needs the migration `20261116090000_programs_structure` (the maintainer runs it). The rest follows in the next pull request.
+[Task file](0027-programs.md). Requested by the maintainer on 2026-11-03 for AlEemaan; the Octalve port was designed 2026-11-04 and built 2026-11-09 on `claude/octalve-programs` (P1 on `claude/octalve-screens`). Needs the migrations `20261116090000_programs_structure`, `20261117090000_standing_participant_subject`, `20261117100000_program_people`, `20261118090000_program_attendance`, `20261119090000_program_assessments`, `20261120090000_program_fees`, `20261121090000_program_completion`, in that order, on the hosted databases (the maintainer runs them).
 
 - [x] P0 The generic tenant-and-campus settings table (`TenantSetting`, shared with 0028 and 0029)
-- [x] P1 Structure
-- [ ] P2 People - [ ] P3 Staff and attendance - [ ] P3b Assessments - [ ] P4 Fees - [ ] P5 Completion and certificates
+- [x] P1 Structure - [x] P2 People - [x] P3 Staff and attendance - [x] P3b Assessments - [x] P4 Fees (manual payments only: the gateway `pay` route and its webhook are NOT ported) - [x] P5 Completion and certificates (with the public check through `/api/v1/verify-certificate/[token]`)
+- [x] Tests: unit, API, integration (RLS and the append-only tables), the route-area and route-role guards, browser (desktop and phone, both themes, Axe). Results in the task file, section 8
 - [ ] Settle the overlap with Phase 5 (vocational cohorts, higher-ed credit units)
+- [ ] Walkthrough rows (not run)
 
 ## TASK-0028: Standing, suspension, expulsion and termination on the school's own records (parity with AlEemaan's task 0045)
 
-[Task file](0028-standing.md). Requested by the maintainer on 2026-11-03 for AlEemaan; designed 2026-11-04, built 2026-11-08 (S1 to S3 API, merged as PR #92) and 2026-11-09 (the screens, the refusal of an expelled pupil at sign-in and the Settings switch, on `claude/octalve-screens`). Needs the migration `20261115090000_standing`.
+[Task file](0028-standing.md). Requested by the maintainer on 2026-11-03 for AlEemaan; designed 2026-11-04, built 2026-11-08 (S1 to S3 API, merged as PR #92) and 2026-11-09 (the screens, the refusal of an expelled pupil at sign-in and the Settings switch, on `claude/octalve-screens`). Needs the migrations `20261115090000_standing` and, for programs, `20261117090000_standing_participant_subject`.
 
 - [x] S1 Pupils - [x] S2 Staff and the sign-in lift - [x] S3 The campus switch (API and the Settings panel) - [x] Standing screens (a pupil's and a member of staff's page) - [x] An expelled pupil is refused at sign-in with the generic wrong-password sentence (the maintainer's decision)
 - [x] Tests: unit, API, integration, browser (`finance-standing-screens`)
@@ -369,3 +370,12 @@
 - [x] F1 Column, rule, settings, enforcement in both payment paths, with the row lock that closed a double-take race the payment paths had
 - [x] F2 The Finance page (`/schools/[code]/finance`: Invoices, Fee structure, the payment rules, the record-payment dialog, the invoice detail)
 - [ ] The invoice screens for a pupil or a guardian (not built)
+
+## TASK-0030: Progress records (logbooks), the port of AlEemaan's task 0044
+
+[Task file](0030-progress-records.md). Requested by the maintainer on 2026-11-03 for AlEemaan; built 2026-11-09 on `claude/octalve-programs` (slices R1 to R4). Needs the migration `20261122090000_progress_records`.
+
+- [x] R1 Templates (the Quran memorisation booklet and a plain daily log), records, entries by day - [x] R2 Versions, verification with four eyes, the lock on an entry, the week grid and "verify the week" - [x] R3 The pupil's and the guardian's view (verified copy only, "seen" as a record of a week), the three switches - [x] R4 Arabic and English, Gregorian and Hijri, the digits, the print sheet
+- [ ] R5 Translation while typing: **blocked, the maintainer must choose a provider and give credentials**
+- [ ] The Arabic wording needs an Arabic reader
+
