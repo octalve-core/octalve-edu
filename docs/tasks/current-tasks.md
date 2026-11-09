@@ -379,3 +379,13 @@
 - [ ] R5 Translation while typing: **blocked, the maintainer must choose a provider and give credentials**
 - [ ] The Arabic wording needs an Arabic reader
 
+
+## TASK-0031: Promotion and the Results screens (the port of AlEemaan's tasks 0025, 0037 and the results screens)
+
+[Task file](0031-promotion-and-result-sheets.md). Requested by the maintainer on 2026-11-09 ("start", then "implement all in one go then test one by one"); designed and built 2026-11-09 on `claude/octalve-promotion`. Needs the migration `20261123090000_promotion`.
+
+- [x] Promotion: two append-only tables, the pure rules, the service (every refusal before the first write, a roll under a row lock, a pupil already placed is left alone), four routes, the Promotion section of Academic setup (preview, overrides with reasons, confirmation, history)
+- [x] Results: the options, sheet and roster reads, and the page `/schools/[code]/results` (Marks, Review, Report cards), with a "Results" entry in the sidebar
+- [x] The report card shows the pupil's class and rank of the period's own session (it used to show the current class, which a promotion changes)
+- [x] Tests: unit, API (failing first for the report-card fix), integration (RLS), browser on desktop and phone in both themes
+- [ ] Open, the maintainer's: the migration; whether a campus administrator reaches Results (D7); the final-term check as a refusal (D8); tying a saved result's parts to the scheme; streams; report remarks, the payment gate and PDF export; a bulk import; see the task file section 8
