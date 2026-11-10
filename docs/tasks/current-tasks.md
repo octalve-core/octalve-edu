@@ -427,3 +427,14 @@
 - [x] Screens: the class dialog, the classes list, and the roll screen (a "Goes to" choice per pupil, "place every pupil", the roll held until each has a class)
 - [x] Tests: unit 13, API 16, screens 4 (x2 projects); the whole unit and API projects 2,614 passed; four mutants caught
 
+
+## TASK-0036: Report remarks: the teacher's and the principal's words on a pupil's report card
+
+[Task file](0036-report-remarks.md). The second of the items task 0031 left unbuilt, asked for by the maintainer on 2026-11-10; built on `claude/octalve-report-remarks`. **Needs the migration `20261125090000_report_remarks` on the hosted databases (after `20261124090000_streams`).**
+
+- [x] A teacher's and a principal's remark per pupil and term (500 characters; who wrote each is recorded); the principal's is the administrator's alone, the teacher's the administrator's or the teacher's of the pupil's arm; editable until any result of the term is published
+- [x] Shown on the card (screen and print); a pupil or parent sees them once the term's results are published, when they are final
+- [x] The editor in the Cards panel, a field only for each remark the person may write
+- [x] **A bug of task 0031 fixed:** the card of a pupil or parent went empty when the term's results were locked
+- [x] Tests: unit, API and screens (x2 projects), new; ten mutants caught
+

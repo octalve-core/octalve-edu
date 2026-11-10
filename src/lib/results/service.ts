@@ -9,6 +9,7 @@ import { approverScope, inScopeResultIds, NO_SCOPE } from "./approver-scope";
 import { entryProblem, schemesForStudents } from "./scheme";
 import { canTransitionResult, validateComponentScores, generateVerificationToken, calculateVerificationHash } from "./rules";
 import { calculateCompetitionRanks, evaluatePromotion } from "./ranking";
+import { remarksForCard } from "./remarks-service";
 import type { RecordResultsInput, TransitionStatusInput, ResultFailure } from "./http";
 import { triggerResultsPublishedAlerts } from "@/lib/communication/event-triggers";
 
@@ -424,6 +425,10 @@ export async function queryResults(
  * Retrieves the compiled term report card for an individual student.
  * Gated by strict IDOR boundaries: students/parents can only see PUBLISHED results for their own child.
  */
+/// What a pupil or a guardian is shown: published results, and the ones the term has since closed on (PUBLISHED -> LOCKED). Before task 0036 only PUBLISHED was shown, so a pupil's card went
+/// empty the day the term's results were locked.
+const PUBLIC_STATUSES = [ResultStatus.PUBLISHED, ResultStatus.LOCKED];
+
 export async function getStudentReportCard(
   tx: Tx,
   tenantId: string,
@@ -481,7 +486,7 @@ export async function getStudentReportCard(
       tenantId,
       studentId,
       periodId,
-      status: isPublicViewer ? ResultStatus.PUBLISHED : undefined,
+      status: isPublicViewer ? { in: PUBLIC_STATUSES } : undefined,
     },
     include: { subject: true },
   });
@@ -509,7 +514,7 @@ export async function getStudentReportCard(
         tenantId,
         periodId,
         studentId: { in: peerStudentIds },
-        status: isPublicViewer ? ResultStatus.PUBLISHED : undefined,
+        status: isPublicViewer ? { in: PUBLIC_STATUSES } : undefined,
       },
     });
 
@@ -579,6 +584,7 @@ export async function getStudentReportCard(
         promotionOutcome: promotion.outcome,
       },
       subjects: subjectsData,
+      remarks: await remarksForCard(tx, tenantId, { studentId, periodId, armId: classArmId ?? null, viewerRole, viewerUserId }),
     },
   };
 }
