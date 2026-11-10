@@ -1,5 +1,6 @@
 import { test, expect } from "../support/fixtures";
 import { Role, createUser, db, seedInstance, sha256Hex } from "../support/db";
+import { brand } from "@/lib/brand";
 import {
   alerts,
   emailField,
@@ -520,11 +521,16 @@ test.describe("staying signed in, and signing out", () => {
     await expect(page).toHaveURL(/\/login$/);
   });
 
-  test("a signed-out visitor is sent to /login from /dashboard and /, and never sees protected content", async ({ page }) => {
+  test("a signed-out visitor is sent to /login from /dashboard, is shown the landing page (with the way in) at /, and never sees protected content", async ({
+    page,
+  }) => {
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/login$/);
     await expect(page.getByRole("heading", { name: "Sign in to your dashboard" })).toBeVisible();
     await page.goto("/");
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("heading", { level: 1, name: brand.landing.headline })).toBeVisible();
+    await page.getByRole("main").getByRole("link", { name: "Sign in", exact: true }).first().click();
     await expect(page).toHaveURL(/\/login$/);
   });
 

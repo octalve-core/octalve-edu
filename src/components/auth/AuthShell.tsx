@@ -9,8 +9,8 @@ import { brand } from "@/lib/brand";
 /// colour, faint grid, headline, three points) beside the form; on small ones a compact
 /// centred brand header above it. The panel's grid, headline and copyright are decorative
 /// (aria-hidden) — the form side is the only landmark that matters to assistive tech. The logo,
-/// in the panel and in the compact header, is a link to `/` (the start page; for a signed-out
-/// visitor `/` sends them to sign in or set up). A link cannot sit inside an aria-hidden region
+/// in the panel and in the compact header, is a link to `/` (the start page: the landing page for a signed-out
+/// visitor, whose "Sign in" is one press away; a Solo install still being set up goes on to the wizard). A link cannot sit inside an aria-hidden region
 /// (it would be focusable but unannounced), which is why the panel is `role="none"` and only its
 /// decorative parts are hidden. `size` picks the form column's width.
 export function AuthShell({ children, size = "sm" }: { children: ReactNode; size?: "sm" | "md" }) {
