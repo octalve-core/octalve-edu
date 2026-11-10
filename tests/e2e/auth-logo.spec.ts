@@ -8,7 +8,7 @@ import { currentTheme, setTheme } from "../support/theme";
 // The product logo on the signed-out screens is a link to the start page, `/` (AuthShell). Runs on the desktop AND the phone project: the logo is in the brand panel on large screens and in
 // the compact header on phones, and never both at once.
 //
-// What `/` does is not this spec's business (it is a router: a signed-out visitor ends on the sign-in page); this spec pins that the logo is a real link to it, that a keyboard reaches it, that it is announced, and that making it a link did not expose the panel's decorative parts to assistive technology.
+// What `/` shows is the landing page's business (tests/e2e/landing-screens.spec.ts); this spec pins that the logo is a real link to it, that a keyboard reaches it, that it is announced, and that making it a link did not expose the panel's decorative parts to assistive technology.
 
 test.beforeAll(async () => {
   await seedInstance();
@@ -49,11 +49,14 @@ test("a keyboard reaches the logo, and it shows a focus ring", async ({ page }) 
   expect(ring.width).toBeGreaterThanOrEqual(2);
 });
 
-test("from another signed-out screen the logo takes the visitor back to the start, which for a signed-out visitor is the sign-in page", async ({
+test("from another signed-out screen the logo takes the visitor back to the start, which for a signed-out visitor is the landing page, one press from sign-in", async ({
   page,
 }) => {
   await page.goto("/forgot-password");
   await logo(page).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { level: 1, name: brand.landing.headline })).toBeVisible();
+  await page.getByRole("main").getByRole("link", { name: "Sign in", exact: true }).first().click();
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 });

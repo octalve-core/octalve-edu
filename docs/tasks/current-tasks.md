@@ -406,7 +406,7 @@
 
 - [x] `AuthShell`: the logo in the brand panel and in the phone header is a link to `/`; the panel is `role="none"` with its decorative parts `aria-hidden` (a link cannot sit inside an `aria-hidden` region)
 - [x] A browser spec on desktop and phone: one visible logo link to `/`, reachable by keyboard with a visible focus ring, the way back from another screen, the decorative parts still hidden from assistive technology, Axe in both themes
-- [ ] Open, the maintainer's: `/` is a router (signed in to the dashboard, set-up unfinished to set-up, otherwise to sign-in), so the logo reloads the sign-in page when you are already on it; a real landing page at `/` is a product decision, not built
+- [x] The open point (the logo reloaded the sign-in page, because `/` was a router): closed by task 0041, which gives `/` a real landing page; the logo now leads there
 
 ## TASK-0034: The light-theme contrast scans stop failing at random (test-only)
 
@@ -476,3 +476,13 @@
 - [x] The class can be rolled again (the cancelled place is revived, not duplicated) and a pupil can be enrolled by hand into it
 - [x] History: an undone roll is marked with when, who and why; "Undo this roll" with the reason and the password; the refusal's pupils are listed in the dialog
 - [x] Tests: unit, API and screens (x2 projects) new; mutation check (eleven rules broken together, 20 tests fail; the lock's own test is not separable); whole unit and API projects and the related screens run (2,856 passed)
+
+## TASK-0041: The landing page
+
+[Task file](0041-landing-page.md). Closes the open point of task 0033 ("a real landing page at `/` is a product decision"), asked for by the maintainer on 2026-11-10; built on `claude/octalve-landing-page`. No migration. AlEemaan gets its own landing page as a separate task and reuses the component.
+
+- [x] `/` shows a landing page to a signed-out visitor instead of redirecting to `/login`; a signed-in person still goes to `/dashboard` and a fresh Solo install to `/setup`, in that order
+- [x] The page says only what the product does today (each claim is listed in the task file with the screen it rests on); no sign-up, price, trial, figure or testimonial; two links, `/login` and `/verify`; the words live in `brand.landing`, the page in a shared server component
+- [x] Accessible by construction: one `h1`, landmarks, headings in order, focus rings, works without JavaScript; Axe in both themes, no sideways scrolling at 320 px, text on the deep brand band measured at 4.5:1 or better
+- [x] The specs that pinned the redirect (`sign-in`, `auth-logo`) say what is true now
+- [x] Tests: unit, API and screens (x2 projects) new; mutation check in three rounds (it found that Axe cannot judge text over the patterned band, so a measured contrast test was added); whole unit and API projects and the related screens run (3,056 passed, 0 failed, 50 skipped)
