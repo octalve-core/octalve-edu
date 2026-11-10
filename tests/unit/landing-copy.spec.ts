@@ -23,7 +23,8 @@ const everyText = (): string[] => [
 
 test.describe("what the page may say", () => {
   test("it offers no sign-up, price, trial, demo or free plan: none of them exists", () => {
-    const text = `${landing.title} ${landing.description} ${everyText().join(" ")}`.toLowerCase();
+    const text =
+      `${landing.title} ${landing.description} ${everyText().join(" ")} ${landing.links.map((l) => l.label).join(" ")}`.toLowerCase();
     for (const word of ["sign up", "signup", "register", "free", "trial", "price", "pricing", "plan", "demo", "subscribe", "discount"])
       expect(text, `the copy must not mention "${word}"`).not.toContain(word);
   });
@@ -72,6 +73,17 @@ test.describe("the shape of the page", () => {
     expect(landing.title.length).toBeLessThanOrEqual(60);
     expect(landing.description.length).toBeLessThanOrEqual(160);
     expect(landing.description.split(/[.!?](\s|$)/).filter((s) => s.trim().length > 1)).toHaveLength(1);
+  });
+
+  test("the extra links are paths on this site, each with a name that says where it goes, and none is a way to sign up", () => {
+    expect(landing.links.length).toBeGreaterThanOrEqual(1);
+    expect(new Set(landing.links.map((l) => l.href)).size).toBe(landing.links.length);
+    for (const link of landing.links) {
+      expect(link.href, link.label).toMatch(/^\/[a-z0-9/_-]*$/); // a path on this site: never an address elsewhere
+      expect(link.href, link.label).not.toBe("/login"); // sign-in is always offered and is not one of the extras
+      expect(link.label.length, link.label).toBeGreaterThan(5);
+      expect(`${link.label} ${link.href}`.toLowerCase(), link.label).not.toMatch(/sign ?up|register|trial|demo/);
+    }
   });
 
   test("the headline is the one the sign-in panel already uses, so the two never drift apart", () => {

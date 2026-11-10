@@ -34,6 +34,7 @@ async function checkBothThemes(page: Page, what: string) {
 test.use({ baseURL: SAAS_URL });
 
 const landing = brand.landing;
+const extra = landing.links[0]; // the one public page besides sign-in that the brand names
 const headings = (page: Page, level: number) => page.getByRole("heading", { level }).allInnerTexts();
 
 test.beforeAll(async () => {
@@ -78,15 +79,15 @@ test.describe("what a signed-out visitor sees", () => {
     for (const i of landing.howRun.items) await expect(section(landing.howRun.heading)).toContainText(i.text);
   });
 
-  test("the way in and the way to check a report card each lead to a page that works", async ({ page }) => {
+  test("the way in and the brand's own extra link each lead to a page that works", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("main").getByRole("link", { name: "Sign in", exact: true }).first().click();
     await expect(page).toHaveURL(/\/login$/);
     await expect(page.getByRole("heading", { name: "Sign in to your dashboard" })).toBeVisible();
 
     await page.goto("/");
-    await page.getByRole("main").getByRole("link", { name: "Check a report card" }).click();
-    await expect(page).toHaveURL(/\/verify$/);
+    await page.getByRole("main").getByRole("link", { name: extra.label }).click();
+    await expect(page).toHaveURL(new RegExp(`${extra.href}$`));
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 
@@ -95,7 +96,7 @@ test.describe("what a signed-out visitor sees", () => {
     const links = page.getByRole("link", { name: "Sign in", exact: true });
     await expect(links).toHaveCount(4);
     for (let i = 0; i < 4; i += 1) await expect(links.nth(i)).toHaveAttribute("href", "/login");
-    await expect(page.getByRole("link", { name: "Check a report card" })).toHaveCount(2);
+    await expect(page.getByRole("link", { name: extra.label })).toHaveCount(2);
   });
 
   test("the theme switch works, and the choice is kept for the next visit", async ({ page }) => {
@@ -114,8 +115,15 @@ test.describe("what a signed-out visitor sees", () => {
     for (let presses = 0; presses < 8; presses += 1) {
       await page.keyboard.press("Tab");
       stops.push(
-        await page.evaluate(() => {
+        await page.evaluate(async () => {
           const el = document.activeElement as HTMLElement;
+          // Under reduced motion every property "transitions" over 0.01 ms, so the width read in the very instant of the key press can still be the one before the ring: wait for it to settle.
+          await Promise.all(
+            el
+              .getAnimations()
+              .filter((animation) => animation instanceof CSSTransition)
+              .map((animation) => animation.finished.catch(() => undefined)),
+          );
           const style = getComputedStyle(el);
           return {
             name: el.getAttribute("aria-label") ?? el.textContent?.trim() ?? "",
@@ -130,10 +138,10 @@ test.describe("what a signed-out visitor sees", () => {
       "Switch to light theme",
       "Sign in",
       "Sign in",
-      "Check a report card",
+      extra.label,
       "Sign in",
       "Sign in",
-      "Check a report card",
+      extra.label,
     ]);
     for (const stop of stops.slice(0, 7)) {
       expect(stop.style, stop.name).not.toBe("none");

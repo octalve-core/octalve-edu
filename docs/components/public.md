@@ -33,7 +33,7 @@ The landing page a signed-out visitor sees at `/` (task 0041).
 
 | File | Description |
 | --- | --- |
-| `LandingPage.tsx` | Server component, no props: the landing page, built from `brand.landing` only (headline, lead, the six things it covers each with a decorative icon, the four kinds of people, an OPTIONAL "how it is run" pair that is not drawn when the brand has none, and the closing band). Landmarks `header`, `main` and `footer`; one `h1`, an `h2` per section, an `h3` per item; the header has the product name, `ThemeToggle` and "Sign in"; the links are `/login` (four times: header, hero, closing band, footer) and `/verify` ("Check a report card", twice). No image, script, font or storage of its own; written on the server, so it reads without JavaScript. Rendered by `src/app/page.tsx` for a signed-out visitor. |
+| `LandingPage.tsx` | Server component, no props: the landing page, built from `brand.landing` only (headline, lead, the six things it covers each with a decorative icon, the four kinds of people, an OPTIONAL "how it is run" pair that is not drawn when the brand has none, and the closing band). Landmarks `header`, `main` and `footer`; one `h1`, an `h2` per section, an `h3` per item; the header has the product name, `ThemeToggle` and "Sign in"; the links are `/login` (four times: header, hero, closing band, footer) and the brand's `landing.links` (Octalve: "Check a report card", `/verify`; the first is the hero's quiet button and every one is in the footer). No image, script, font or storage of its own; written on the server, so it reads without JavaScript. Rendered by `src/app/page.tsx` for a signed-out visitor. |
 
 ## Colocated with the page (`src/app/login/`)
 
