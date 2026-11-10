@@ -1,0 +1,71 @@
+# 0039: Bulk mark import — fill a class's marks for one subject from a CSV file
+
+- **Period / Focus:** 2026-11-10 (results; new in both products, built on the pattern of the student CSV import and Octalve's scheme rules)
+- **Status:** Built; PR into `dev`
+- **Priority:** High
+- **Assignee:** Claude
+- **Target Branch / PR:** `claude/octalve-mark-import` / PR into `dev`
+- **Started:** 2026-11-10
+
+> **How to tick:** change `[ ]` to `[x]`. The table shows the characters, not a clickable box.
+
+---
+
+## 1. Objective
+
+A teacher (or the administrator) can take the marks sheet of one subject in one class for one term as a CSV file, fill it in a spreadsheet, check it on the screen and import it, instead of typing every mark into the grid. The file goes through exactly the path the grid's Save goes through, so every rule of marks (the class's scheme, the parts, the maximum, DRAFT-only edits, a teacher's assignment, the scheme lock on first save) applies with no second copy of them. All or nothing: one bad row and nothing is saved.
+
+## 2. Context
+
+- The grid is `MarksPanel` (task 0031) over `getSheet` (the pupils on the arm's roll for the period's session, the scheme's parts, what is saved) and saves through `POST /academics/results` = `recordStudentResults` (`service.ts`): the single writer for marks. It decides every refusal before its first write; it ties each pupil to the class's scheme (task 0032: the parts and total are the scheme's; the first save locks the scheme), refuses anything that has left DRAFT, and for a teacher refuses any pupil outside an arm they are assigned to teach the subject in.
+- The people CSV import (`src/lib/people/import.ts`, plan Phase 1.2 decision P8) is the pattern for a file from a stranger's spreadsheet: a dry run that runs the very same code as the real run and writes nothing, every problem reported, re-validated by the real run, a SHA-256 of the file in the audit instead of its content, the RFC 4180 reader in `people/csv.ts` (no dependency), formula-neutralised cells on export.
+- A mark is `Decimal(6,2)`: at most two decimals, at most 9999.99; the grid says "Use a number with at most two decimals." and "At most N."
+
+## 3. Decisions
+
+- **D1. One sheet at a time.** A file is for one (term, class, subject): the one the person has open on the Marks tab. The pupils are identified by **admission number** (printed on the sheet, never an internal id), matched only against the pupils on the roll of that arm for that term: a number that is not on this roll is a row error ("No pupil with this admission number is on the roll of this class for this term.") and says nothing about whether the number exists elsewhere. Matching is exact first, then ignoring case and spacing; if that is ambiguous the row is refused and says so.
+- **D2. The template is the sheet.** `GET /academics/results/import-template?periodId&classArmId&subjectId` returns the sheet as CSV: `admission_no`, `name`, then one column per part of the class's scheme, headed `Part name (max)` (the exam is a part named "Exam"; a class with no scheme has one column `Mark (100)`), one row per pupil on the roll in the sheet's order, with the marks already saved filled in. So a file can be edited and imported again, and importing an unedited template changes nothing. Cells are neutralised against spreadsheet formulas (`csvCell`). The `name` column is for the person; it is never used to find a pupil.
+- **D3. What a header may say.** `admission_no` is required. A part column may be written as the part's name or as `name (max)`; the name is matched ignoring case and spacing and, if a maximum is written, it must be the scheme's ("Test 1 is out of 20 in this class's scheme; the file says 30."). Every part of the scheme must have a column; a column that is not `admission_no`, `name`/`pupil` or a part is refused by name (a mistyped column must not be silently skipped); a column twice is refused. A header problem stops the file there: no row is judged against a header that is wrong.
+- **D4. What a row may say.** Each mark is a plain number with at most two decimals ("12", "12.5", "12.50"), not above its part's maximum. No thousands separators, no comma decimals, no `%`: those are refused in words rather than guessed. A row with every mark blank is **left alone** (reported "No marks: left as it is"); a row with some marks and some blanks is an error ("Fill every part, or leave the whole row blank."), as in the grid. A pupil in the file twice: the second is an error naming the first row. A pupil on the roll who is not in the file is left as they are (counted, not listed).
+- **D5. DRAFT only, and an unchanged mark is not an error.** A result that has left DRAFT (submitted, approved, published, locked) cannot be changed by an import, as it cannot in the grid: a row that would change it is an error naming its status; a row that equals what is saved is "unchanged" (so importing the template again after marks were sent for review is quiet, not an error). A DRAFT whose marks equal the file's is "unchanged" and is **not written** (no new `updatedAt`, no audit noise). Only "new" and "changed" rows are written.
+- **D6. Preview, then import, all or nothing.** `POST /academics/results/import { periodId, classArmId, subjectId, csv, dryRun }`. A dry run judges every row with the very same code as the real run and writes nothing (it does not lock the scheme either). A real run re-checks everything (a dry run proves nothing to the server), and if there is any problem writes nothing. If there is none, it calls `recordStudentResults` with the new and changed rows **in the same transaction**, so the scheme rules, the scheme lock, the grade letter and remark from the default scale, the "Score update" audit rows and the assignment rule are the single writer's, not copied. The answer is a report (200) with `committed` true only when the marks now exist, as the people import answers; a refusal from the writer after the rows were judged (a scheme edited in between, a result submitted in between) is the writer's own sentence and nothing is written.
+- **D7. Who.** `ADMIN` and `TEACHING_STAFF` (the writers of marks; `WRITE_ROLES`); a teacher only for a subject they are assigned to in that arm (else 403, the sheet's answer); another campus's arm, an archived arm and an unknown id are the same 404. Non-teaching staff and campus administrators do not enter marks, so they do not import them (decision D7 of task 0031 stands). The template is the sheet and is readable by exactly the same two roles.
+- **D8. Limits.** The file is at most 1 MiB and 1,000 rows (the people import's limits; 413/400 with a sentence), 12 imports (a dry run and a real run each count) per user per window, UTF-8 (a leading byte-order mark is dropped by the reader, so a file saved by Excel works).
+- **D9. Audited without the marks.** A real run that wrote marks writes `RESULTS_IMPORTED` in the school's audit log: who, the term, class and subject, the counts (rows, new, changed, unchanged, left blank), and the SHA-256 of the file; never the marks (the result history already records each change of score). A dry run and a refused run write nothing.
+- **D10. No support `area` on the import** (state-changing); the template GET declares `results` like the sheet.
+- **D11. The screen.** On the Marks tab, under the grid, "Import marks from a file": download the template, choose a file, "Check the file" (the dry run), a table of what would happen to each row and every problem in words, "Import n marks" enabled only after a clean check of the same file. A file is checked, then imported, never imported unseen. Typed-but-unsaved marks in the grid block the import (the grid is replaced by what the server holds after it), and the screen says so.
+
+## 4. Work breakdown
+
+- [x] Pure rules (`src/lib/results/mark-import.ts`): read the header and the rows against the scheme's parts and the roll; classify each row; the template text.
+- [x] Service (`mark-import-service.ts`): template; import (access through `getSheet`, judge, then `recordStudentResults` in the same transaction; audit).
+- [x] Routes: `GET .../results/import-template`, `POST .../results/import`.
+- [x] Screen: `MarkImport.tsx` on the Marks tab.
+- [x] Tests: unit (the rules), API (every role, every refusal, all or nothing, dry run writes nothing and does not lock the scheme, matching, parts, DRAFT-only, idempotent re-import, teacher assignment, another school, template content and formula neutralisation, audit without marks, limits), screens (template download, check, import, a file with problems; both themes, desktop and phone), mutation check, whole unit and API projects.
+- [x] Docs: tracker, HANDOVER, catalogues, CLAUDE.md banner.
+
+## 5. Not in this task
+
+- A file covering several subjects or several classes (a long format: admission number, subject, part, mark). One sheet at a time matches how marks are entered and how a teacher is assigned.
+- Excel files (`.xlsx`): CSV only (every spreadsheet exports it), no dependency on a binary-format reader for a file from outside.
+- Importing the status changes (submit, approve): the sheet's "Send for review" stays the way to send.
+- Creating pupils or guessing a pupil by name.
+
+## 6. Build record and tests (2026-11-10)
+
+**What changed.** No migration. New: `src/lib/results/mark-import.ts` (the pure rules), `mark-import-service.ts` (template and import), `file-name.ts` (the file-name helper the PDF service also uses now), the routes `GET .../academics/results/import-template` and `POST .../academics/results/import`, `MarkImport.tsx` (mounted under the grid in `MarksPanel`, blocked while typed marks are unsaved). Changed: `http.ts` (`TOO_LARGE` 413, `TOO_MANY_ROWS` 400, `markImportSchema`), `report-card-pdf-service.ts` (uses `fileNamePart`).
+
+**Deployment.** Nothing to run: no migration.
+
+**Gates (order tsc, lint, build, tests).** tsc clean; eslint 0 errors; `pnpm build` OK with both routes in the list; Prettier clean on every file changed; catalogues in sync (821/821).
+
+**Tests (one lane, one worker, the production build).**
+- Unit `mark-import` (new): the template (header, rows in order, saved marks, a class with no scheme, a part with decimals or a comma, formula neutralising, an unedited template changes nothing), the header (any case and spacing, with or without the maximum, any order, a byte-order mark and CRLF, every kind of header problem listed at once and no row judged, a file that is not CSV, empty, header only, empty trailing columns), the marks (plain numbers, every refused form named by part, every problem of a row, blank and half-filled rows, extra values, row numbers), finding the pupil (exact, loose, ambiguous, not on the roll, twice in the file, the name never used), and what happens to a row (new, changed, unchanged, every status that has left DRAFT).
+- API `mark-import` (new): the template (who gets it, the roll, BOM, headers, formula neutralising); a check judges every row and writes nothing and does not lock the scheme; all or nothing (one bad row among good ones saves nothing, header problems judge no row, a pupil not on this roll is the same sentence whoever they are: another class, no class, withdrawn, another school's, a number that does not exist); a real run through the writer (parts and total, drafts, the scheme locked once with its audit, the `RESULTS_IMPORTED` audit row without marks or names); the same file again changes nothing and writes nothing; the downloaded template unedited changes nothing; a changed mark is written and the writer's score audit records it; a result sent for review cannot be changed by a file; who may import (every other role, another school's administrator, signed out); a teacher of another class cannot reach this class; refused ids, a missing or extra field; the 1 MB and 1,000-row limits; a file that is not CSV; twelve a window; a class with no scheme; two imports at the same moment leave one result per pupil.
+- Screens `mark-import-screens` (6 tests, desktop and phone, new): the sheet downloaded with its header and saved marks; check then import (nothing written by the check, the grid shows the marks as drafts afterwards); a file with problems (row by row, nothing imported, a corrected file starts the check again); a header that is wrong; typed marks block the import; the server's own refusal in words and a file over 1 MB refused without being sent. Axe (WCAG 2.2 A/AA) and horizontal overflow in both themes.
+- **Mutation check.** In a copy, ten rules were broken (a result that has left DRAFT changeable; a check that writes; the file not all-or-nothing; the registrar allowed to import; the audit holding the marks; cells not neutralised; no byte-order mark; a pupil allowed twice; the import offered without a clean check; typed marks ignored). After a rebuild every one was caught by a test written for it. Because the API spec runs in order (the first real save locks the scheme), a failure skips the rest, so its mutations were judged in a second run of the spec in default mode in the copy; the copy was restored and rebuilt.
+- **Regression:** the whole `unit` and `api` projects and the related screens (`results-screens`, `report-remarks-screens`, `report-card-gate-screens`, `report-card-pdf-screens`, `verify-screens` and the new ones) on the final build: **2,827 passed, 0 failed.**
+- **What the work found.** One of my own tests sent more than twelve imports from one administrator and met the rate limit, which is the rule working; the sections that send many now use an administrator of their own. A mistake in one of my unit expectations (a spacing variant that is not ambiguous) was corrected. Nothing in the existing code needed changing; the two imports at the same moment, which I expected might race on a first save, did not.
+- **Not run:** the rest of the browser suite, the HTTPS project, anything against a hosted database.
+
+**Left for the maintainer.** A file covers one sheet; a file of several subjects or classes, `.xlsx` files and importing status changes are separate decisions (section 5). The import can be switched off for a school only by taking away the Marks tab's writers: there is no separate switch (marks are the teacher's own work and the import writes exactly what the grid would).
