@@ -32,7 +32,7 @@ export const GET = withAuth(
     const res = await auth.tenant.run((tx) => getStudentReportCard(tx, auth.tenant.tenantId, id, query.periodId, role, auth.userId));
 
     if (!res.ok) {
-      return resultFailure(res.failure);
+      return resultFailure(res.failure, "message" in res ? res.message : undefined);
     }
 
     return ok(res.data);

@@ -46,6 +46,8 @@ const OUT_OF_REACH: Record<string, string> = {
     "not a grantable area: a user's standing and its history (suspension, expulsion, the reasons) is a disciplinary record, which a support view must not read",
   "settings/standing/route.ts":
     "not a grantable area: who may suspend where is the school's own disciplinary policy, which a support view must not read",
+  "settings/report-cards/route.ts":
+    "not a grantable area: whether the school holds report cards for unpaid fees is its own fee policy (finance is not a grantable area, ADR 0017), which a support view must not read",
   "programs/route.ts": "not a grantable area: a program is the school's own structure and its people, which a support view must not read",
   "programs/[id]/route.ts":
     "not a grantable area: a program is the school's own structure and its people, which a support view must not read",

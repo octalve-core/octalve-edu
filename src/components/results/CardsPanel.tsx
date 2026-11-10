@@ -5,6 +5,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/SelectField";
 import { getJson } from "@/components/auth/postJson";
+import { formatNaira } from "@/lib/finance/format";
 import { ListState } from "@/components/academics/parts";
 import { failureText, useApi } from "@/components/academics/useApi";
 import { RemarksEditor } from "./RemarksEditor";
@@ -65,6 +66,12 @@ export function CardsPanel({ schoolCode, institution }: { schoolCode: string; in
           </Button>
           <Button onClick={() => window.print()}>Print</Button>
         </div>
+        {card.feeHold && (
+          <Alert variant="warning" className="print:hidden">
+            This card is held from {card.student.firstName} and their parents until {formatNaira(card.feeHold.outstanding)} in school fees
+            is paid. Staff can still read and print it.
+          </Alert>
+        )}
         <ReportCard card={card} institution={institution} />
         <RemarksEditor
           key={`${card.student.id}-${card.period.id}`}

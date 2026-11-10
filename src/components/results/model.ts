@@ -89,6 +89,8 @@ export type ReportCardData = {
     status: ResultStatus;
     verificationToken: string | null;
   }[];
+  /// Staff only (task 0037): the school holds this card from the pupil and their parents because school fees are owed. A pupil or parent is refused instead.
+  feeHold: { outstanding: number } | null;
   /// The teacher's and the principal's remarks, and what this viewer may do about them (task 0036).
   remarks: CardRemarks;
 };

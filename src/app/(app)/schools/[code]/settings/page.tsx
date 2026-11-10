@@ -10,6 +10,7 @@ import { ProgramProgressStudentSettingsPanel } from "@/components/settings/Progr
 import { ProgramFeesSettingsPanel } from "@/components/settings/ProgramFeesSettingsPanel";
 import { ProgramAttendanceSettingsPanel } from "@/components/settings/ProgramAttendanceSettingsPanel";
 import { ProgramsSettingsPanel } from "@/components/settings/ProgramsSettingsPanel";
+import { ReportCardGatePanel } from "@/components/settings/ReportCardGatePanel";
 import { SchoolSettingsPanel } from "@/components/settings/SchoolSettingsPanel";
 import { hasActiveMfa } from "@/lib/auth/mfa/service";
 import { requireTenantPage } from "@/lib/tenant/page-tenant";
@@ -46,6 +47,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ code:
       </fieldset>
       {/* The discipline switch is not a grantable support area (a disciplinary policy): a support view does not see it. */}
       {!tenant.support && <DisciplineSettingsPanel schoolCode={tenant.tenantCode} hasMfa={hasMfa} />}
+      {!tenant.support && <ReportCardGatePanel schoolCode={tenant.tenantCode} hasMfa={hasMfa} />}
       {!tenant.support && <ProgramsSettingsPanel schoolCode={tenant.tenantCode} hasMfa={hasMfa} />}
       {!tenant.support && <ProgramAttendanceSettingsPanel schoolCode={tenant.tenantCode} hasMfa={hasMfa} />}
       {!tenant.support && <ProgramAssessmentsSettingsPanel schoolCode={tenant.tenantCode} hasMfa={hasMfa} />}
