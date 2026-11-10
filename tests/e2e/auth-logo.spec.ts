@@ -1,0 +1,90 @@
+import AxeBuilder from "@axe-core/playwright";
+import type { Page } from "@playwright/test";
+import { test, expect } from "../support/fixtures";
+import { seedInstance } from "../support/db";
+import { brand } from "@/lib/brand";
+
+// The product logo on the signed-out screens is a link to the start page, `/` (AuthShell). Runs on the desktop AND the phone project: the logo is in the brand panel on large screens and in
+// the compact header on phones, and never both at once.
+//
+// What `/` does is not this spec's business (it is a router: a signed-out visitor ends on the sign-in page); this spec pins that the logo is a real link to it, that a keyboard reaches it, that it is announced, and that making it a link did not expose the panel's decorative parts to assistive technology.
+
+test.beforeAll(async () => {
+  await seedInstance();
+});
+
+const SCREENS = ["/login", "/forgot-password"];
+const logo = (page: Page) => page.getByRole("link", { name: brand.name, exact: true });
+
+test("on a signed-out screen there is exactly one logo link, to /, in the brand panel on a large screen and in the header on a phone", async ({
+  page,
+  isMobile,
+}) => {
+  for (const screen of SCREENS) {
+    await page.goto(screen);
+    await expect(logo(page), screen).toHaveCount(1);
+    await expect(logo(page), screen).toBeVisible();
+    await expect(logo(page), screen).toHaveAttribute("href", "/");
+    const where = isMobile ? page.getByRole("main") : page.locator("aside");
+    await expect(where.getByRole("link", { name: brand.name, exact: true }), screen).toBeVisible();
+  }
+});
+
+test("a keyboard reaches the logo, and it shows a focus ring", async ({ page }) => {
+  await page.goto("/forgot-password");
+  let focused = false;
+  for (let presses = 0; presses < 4 && !focused; presses += 1) {
+    await page.keyboard.press("Tab");
+    focused = await logo(page).evaluate((el) => el === document.activeElement);
+  }
+  expect(focused, "four Tab presses from the top of the page reach the logo").toBe(true);
+  const ring = await logo(page).evaluate((el) => {
+    const style = getComputedStyle(el);
+    return { style: style.outlineStyle, width: Number.parseFloat(style.outlineWidth) };
+  });
+  expect(ring.style).not.toBe("none");
+  expect(ring.width).toBeGreaterThanOrEqual(2);
+});
+
+test("from another signed-out screen the logo takes the visitor back to the start, which for a signed-out visitor is the sign-in page", async ({
+  page,
+}) => {
+  await page.goto("/forgot-password");
+  await logo(page).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+});
+
+test("the panel's headline, blurb, points and copyright are still hidden from assistive technology, and the panel is not a landmark that holds one link", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "the panel only exists from 1024 px up");
+  await page.goto("/login");
+  await expect(page.locator("aside")).toBeVisible();
+  await expect(page.getByRole("complementary")).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 2 })).toHaveCount(0); // the panel's headline is an h2; it stays decorative
+  await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+});
+
+test("the logo passes the accessibility rules in both themes, and the page does not scroll sideways", async ({ page }) => {
+  for (const screen of SCREENS) {
+    await page.goto(screen);
+    const initial = await page.evaluate(() => document.documentElement.dataset.theme ?? "dark");
+    for (const theme of ["dark", "light"]) {
+      await page.evaluate((t) => void (document.documentElement.dataset.theme = t), theme);
+      await page.waitForTimeout(250); // the theme fades for 150 ms: a scan inside it measures a colour between the two
+      const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
+      expect(
+        results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`),
+        `${screen} [${theme}]`,
+      ).toEqual([]);
+      const { scrollWidth, width } = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        width: Math.ceil(Math.min(window.innerWidth, window.visualViewport?.width ?? window.innerWidth)),
+      }));
+      expect(scrollWidth, `${screen} [${theme}] overflows`).toBeLessThanOrEqual(width);
+    }
+    await page.evaluate((t) => void (document.documentElement.dataset.theme = t), initial);
+  }
+});

@@ -399,3 +399,11 @@
 - [x] **A bug of task 0031 fixed:** the Marks sheet offered only the components, so a real scheme's exam mark could not be entered; the sheet answers `examMax` and `parts` and the screen enters them; the 0031 fixtures are schemes the app can make
 - [x] Tests: unit (17), API (12 new, failing first on unmodified `dev`: 9 fail there), the sheet spec and the Marks screen spec (the exam column is missing on `dev`), the full suite
 - [ ] Open, the maintainer's: whether the grade scale is locked by the first result too (it is not); whether a bare score stays refused for a scheme with parts; see the task file section 7
+
+## TASK-0033: The logo on the signed-out screens goes back to the start page
+
+[Task file](0033-logo-home-link.md). Asked for by the maintainer on 2026-11-10 ("make the logos go back to landing page", with a screenshot of the brand panel); built on `claude/octalve-logo-home-link`. The same change is made in AlEemaan (its task 0047).
+
+- [x] `AuthShell`: the logo in the brand panel and in the phone header is a link to `/`; the panel is `role="none"` with its decorative parts `aria-hidden` (a link cannot sit inside an `aria-hidden` region)
+- [x] A browser spec on desktop and phone: one visible logo link to `/`, reachable by keyboard with a visible focus ring, the way back from another screen, the decorative parts still hidden from assistive technology, Axe in both themes
+- [ ] Open, the maintainer's: `/` is a router (signed in to the dashboard, set-up unfinished to set-up, otherwise to sign-in), so the logo reloads the sign-in page when you are already on it; a real landing page at `/` is a product decision, not built
