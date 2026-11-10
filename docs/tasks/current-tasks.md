@@ -388,4 +388,14 @@
 - [x] Results: the options, sheet and roster reads, and the page `/schools/[code]/results` (Marks, Review, Report cards), with a "Results" entry in the sidebar
 - [x] The report card shows the pupil's class and rank of the period's own session (it used to show the current class, which a promotion changes)
 - [x] Tests: unit, API (failing first for the report-card fix), integration (RLS), browser on desktop and phone in both themes
-- [ ] Open, the maintainer's: the migration; whether a campus administrator reaches Results (D7); the final-term check as a refusal (D8); tying a saved result's parts to the scheme; streams; report remarks, the payment gate and PDF export; a bulk import; see the task file section 8
+- [ ] Open, the maintainer's: the migration; whether a campus administrator reaches Results (D7); the final-term check as a refusal (D8); streams; report remarks, the payment gate and PDF export; a bulk import; see the task file section 8
+
+## TASK-0032: A saved result is tied to the class's assessment scheme (the exam is one of its parts, and the first use locks the scheme)
+
+[Task file](0032-result-scheme-tie.md). Asked for by the maintainer on 2026-11-09 ("let's go with your recommendation", after the list of what task 0031 left unbuilt); built 2026-11-09 on `claude/octalve-result-scheme`. **No migration.**
+
+- [x] The save accepts only the scheme's parts (its components, then the exam) with the scheme's maxima and total; a refusal is a sentence that says what the scheme has; with no scheme in force the request stands as it was
+- [x] The first save under a scheme locks it (once, one audit row `ASSESSMENT_SCHEME_LOCKED`); the save takes the shared form of the scheme editor's lock; a change after that is a new version
+- [x] **A bug of task 0031 fixed:** the Marks sheet offered only the components, so a real scheme's exam mark could not be entered; the sheet answers `examMax` and `parts` and the screen enters them; the 0031 fixtures are schemes the app can make
+- [x] Tests: unit (17), API (12 new, failing first on unmodified `dev`: 9 fail there), the sheet spec and the Marks screen spec (the exam column is missing on `dev`), the full suite
+- [ ] Open, the maintainer's: whether the grade scale is locked by the first result too (it is not); whether a bare score stays refused for a scheme with parts; see the task file section 7
