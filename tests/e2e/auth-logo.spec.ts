@@ -32,12 +32,14 @@ test("on a signed-out screen there is exactly one logo link, to /, in the brand 
 
 test("a keyboard reaches the logo, and it shows a focus ring", async ({ page }) => {
   await page.goto("/forgot-password");
+  // The first field has the caret when the page opens (autofocus), so Tab starts in the middle of the page: field, button, link, then round to the top. The logo is the first stop after that on a
+  // large screen and comes after the theme button on a phone. A whole trip round the page is the claim: a keyboard reaches the logo.
   let focused = false;
-  for (let presses = 0; presses < 4 && !focused; presses += 1) {
+  for (let presses = 0; presses < 8 && !focused; presses += 1) {
     await page.keyboard.press("Tab");
     focused = await logo(page).evaluate((el) => el === document.activeElement);
   }
-  expect(focused, "four Tab presses from the top of the page reach the logo").toBe(true);
+  expect(focused, "a full trip of Tab presses round the page reaches the logo").toBe(true);
   const ring = await logo(page).evaluate((el) => {
     const style = getComputedStyle(el);
     return { style: style.outlineStyle, width: Number.parseFloat(style.outlineWidth) };
