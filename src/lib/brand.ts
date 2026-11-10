@@ -74,6 +74,8 @@ export const brand = {
     },
     closingHeading: "Already part of a school on Octalve Edu?",
     closingText: "Sign in to open your school's dashboard.",
+    /// The public pages worth a link besides sign-in (a path on this site): the first is the hero's quiet button, and every one is in the footer. There is no sign-up page, so there is no sign-up link.
+    links: [{ label: "Check a report card", href: "/verify" }],
   },
   /// What the artifact draws as "Branches" is, in this product's data model, a Campus.
   place: { singular: "campus", plural: "campuses", Singular: "Campus", Plural: "Campuses" },

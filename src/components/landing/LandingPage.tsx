@@ -28,6 +28,8 @@ type LandingCopy = {
   howRun?: { heading: string; items: readonly { title: string; text: string }[] };
   closingHeading: string;
   closingText: string;
+  /// The public pages worth a link besides sign-in, as a path on this site: the first is the hero's quiet button, and every one is in the footer.
+  links: readonly { label: string; href: string }[];
 };
 const copy: LandingCopy = brand.landing;
 
@@ -67,9 +69,11 @@ export function LandingPage() {
             <Link href="/login" className={LINK_FILLED}>
               Sign in
             </Link>
-            <Link href="/verify" className={LINK_QUIET}>
-              Check a report card
-            </Link>
+            {copy.links[0] && (
+              <Link href={copy.links[0].href} className={LINK_QUIET}>
+                {copy.links[0].label}
+              </Link>
+            )}
           </div>
         </section>
 
@@ -165,14 +169,16 @@ export function LandingPage() {
                   Sign in
                 </Link>
               </li>
-              <li>
-                <Link
-                  href="/verify"
-                  className={`inline-flex min-h-11 items-center rounded text-fg-2 underline-offset-4 hover:text-fg hover:underline ${RING}`}
-                >
-                  Check a report card
-                </Link>
-              </li>
+              {copy.links.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className={`inline-flex min-h-11 items-center rounded text-fg-2 underline-offset-4 hover:text-fg hover:underline ${RING}`}
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </nav>
         </div>

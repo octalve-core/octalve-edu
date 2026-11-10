@@ -486,3 +486,10 @@
 - [x] Accessible by construction: one `h1`, landmarks, headings in order, focus rings, works without JavaScript; Axe in both themes, no sideways scrolling at 320 px, text on the deep brand band measured at 4.5:1 or better
 - [x] The specs that pinned the redirect (`sign-in`, `auth-logo`) say what is true now
 - [x] Tests: unit, API and screens (x2 projects) new; mutation check in three rounds (it found that Axe cannot judge text over the patterned band, so a measured contrast test was added); whole unit and API projects and the related screens run (3,056 passed, 0 failed, 50 skipped)
+
+## TASK-0042: The landing page's extra links come from the brand file
+
+[Task file](0042-landing-links.md). A follow-up to task 0041, made so that AlEemaan's landing page can reuse the component as it is; built on `claude/octalve-landing-links`. No migration; nothing visible changes in Octalve.
+
+- [x] `brand.landing.links` (`{ label, href }`, paths on this site): the first is the hero's quiet button and every one is in the footer; Octalve's is "Check a report card", `/verify`
+- [x] The unit test holds the links (paths on this site, no repeats, never `/login`, no offer of a sign-up); the specs of task 0041 pass unchanged
