@@ -34,6 +34,11 @@ export default async function StudentPage({ params }: { params: Promise<{ code: 
           studentId={id}
           campuses={campuses}
           canEdit={isAdministrator(tenant.role) && !tenant.support}
+          standing={
+            (tenant.role === "ADMIN" || tenant.role === "CAMPUS_ADMIN") && !tenant.support
+              ? { canSuspend: true, canDecide: tenant.role === "ADMIN" }
+              : null
+          }
           fallbackName={fullName(found.student)}
         />
       </div>

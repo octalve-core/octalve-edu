@@ -32,21 +32,8 @@ export function toNairaDecimal(kobo: number): Prisma.Decimal {
   return new Prisma.Decimal(kobo).div(100);
 }
 
-/**
- * Formats Naira currency representation with thousand separators.
- * E.g. "₦125,000.00"
- */
-export function formatNaira(naira: DecimalLike): string {
-  const d = toDecimal(naira);
-  const num = d.toNumber();
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
-    currencyDisplay: "narrowSymbol",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(num);
-}
+/// Money on a screen: written in `format.ts` (a component in the browser must not import this file), re-exported here for the server code that always imported it from here.
+export { formatNaira } from "./format";
 
 /**
  * Resolves invoice lifecycle status from due amount and payments.

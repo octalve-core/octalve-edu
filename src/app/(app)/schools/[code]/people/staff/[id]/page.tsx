@@ -33,6 +33,11 @@ export default async function StaffPage({ params }: { params: Promise<{ code: st
           staffId={id}
           campuses={campuses}
           canEdit={isAdministrator(tenant.role) && !tenant.support}
+          standing={
+            (tenant.role === "ADMIN" || tenant.role === "CAMPUS_ADMIN") && !tenant.support
+              ? { canSuspend: true, canDecide: tenant.role === "ADMIN" }
+              : null
+          }
           fallbackName={fullName(found.staff)}
         />
       </div>

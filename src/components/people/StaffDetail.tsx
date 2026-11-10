@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { flushSync } from "react-dom";
 import { Alert } from "@/components/ui/Alert";
+import { StandingPanel } from "@/components/standing/StandingPanel";
 import { Button } from "@/components/ui/Button";
 import { ArrowLeftIcon, PlusIcon } from "@/components/ui/icons";
 import { sendJson } from "@/components/auth/postJson";
@@ -29,12 +30,15 @@ export function StaffDetail({
   staffId,
   campuses,
   canEdit,
+  standing = null,
   fallbackName,
 }: {
   schoolCode: string;
   staffId: string;
   campuses: CampusOption[];
   canEdit: boolean;
+  /// Show the member of staff's standing (suspension, termination): null for people who may not see it. `canDecide` is the school's administrator (terminate, reinstate).
+  standing?: { canSuspend: boolean; canDecide: boolean } | null;
   fallbackName: string;
 }) {
   const root = `/api/v1/schools/${schoolCode}/people/staff/${staffId}`;
@@ -330,6 +334,17 @@ export function StaffDetail({
                 staff={staff}
                 assignment={removing.value}
                 onDone={done(removing.hide, "Removed.")}
+              />
+            )}
+            {standing && (
+              <StandingPanel
+                schoolCode={schoolCode}
+                path={`people/staff/${staffId}/standing`}
+                subject="staff"
+                name={name}
+                canSuspend={standing.canSuspend}
+                canDecide={standing.canDecide}
+                onChanged={() => void record.reload()}
               />
             )}
           </>

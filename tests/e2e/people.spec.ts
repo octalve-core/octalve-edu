@@ -35,7 +35,11 @@ test.afterEach(async () => {
 });
 
 const dialog = (page: Page) => page.getByRole("dialog");
-const notice = (page: Page) => page.getByRole("status").filter({ hasText: /\S/ });
+const notice = (page: Page) =>
+  page
+    .getByRole("status")
+    .filter({ hasText: /\S/ })
+    .filter({ hasNotText: /^Loading/ });
 const item = (page: Page, text: string | RegExp) => page.getByRole("listitem").filter({ hasText: text });
 const field = (scope: Locator, label: string) => scope.getByLabel(label, { exact: true });
 let counter = 0;

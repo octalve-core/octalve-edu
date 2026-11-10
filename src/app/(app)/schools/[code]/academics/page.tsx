@@ -9,6 +9,7 @@ import { SectionNav } from "@/components/academics/SectionNav";
 import { SessionsPanel } from "@/components/academics/SessionsPanel";
 import { TimetablePanel } from "@/components/academics/TimetablePanel";
 import { LmsPanel } from "@/components/lms/LmsPanel";
+import { PromotionPanel } from "@/components/academics/promotion/PromotionPanel";
 import { isSection } from "@/components/academics/model";
 import { requireTenantPage } from "@/lib/tenant/page-tenant";
 
@@ -42,7 +43,10 @@ export default async function AcademicsPage({
   // or campus administrator may take is decided by the API and the list it offers (ISS-0013); registrars (non-teaching staff) only look.
   const canTakeRoll = !tenant.support && (tenant.role === "ADMIN" || tenant.role === "CAMPUS_ADMIN" || tenant.role === "TEACHING_STAFF");
 
+  // Rolling a class into the next session is for administrators (the school's, and a campus's for its own classes); the section is not offered to staff and is the 403 view if typed (task 0031).
+  const mayPromote = tenant.role === "ADMIN" || tenant.role === "CAMPUS_ADMIN";
   const section = isSection(asked) ? asked : "timetable";
+  if (section === "promotion" && !mayPromote) forbidden();
   const [campuses, subjects, classGroups] = await tenant.run((tx) =>
     Promise.all([
       tx.campus.findMany({ where: { tenantId: tenant.tenantId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
@@ -59,6 +63,46 @@ export default async function AcademicsPage({
     ]),
   );
 
+  // What the promotion screen picks from: the live sessions of the calendar the person works in and the live classes (a campus administrator: their campus's and the school's).
+  const promotion =
+    section === "promotion"
+      ? await tenant.run(async (tx) => {
+          const scope =
+            tenant.role === "CAMPUS_ADMIN" && tenant.campusId !== null ? { OR: [{ campusId: null }, { campusId: tenant.campusId }] } : {};
+          const campusName = new Map(campuses.map((c) => [c.id, c.name]));
+          const [sessionRows, classRows] = await Promise.all([
+            tx.academicSession.findMany({
+              where: { tenantId: tenant.tenantId, archivedAt: null, ...scope },
+              select: { id: true, label: true, startDate: true, status: true, campusId: true },
+              orderBy: { startDate: "desc" },
+            }),
+            tx.classGroup.findMany({
+              where: { tenantId: tenant.tenantId, archivedAt: null, ...scope },
+              select: { id: true, name: true, sortOrder: true, campusId: true },
+              orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+            }),
+          ]);
+          const scopeOf = (campusId: string | null) => (campusId ? (campusName.get(campusId) ?? "Campus") : "Whole school");
+          return {
+            sessions: sessionRows.map((s) => ({
+              id: s.id,
+              label: s.label,
+              startDate: s.startDate.toISOString().slice(0, 10),
+              status: s.status,
+              campusId: s.campusId,
+              scope: scopeOf(s.campusId),
+            })),
+            classes: classRows.map((c) => ({
+              id: c.id,
+              name: c.name,
+              sortOrder: c.sortOrder,
+              campusId: c.campusId,
+              scope: scopeOf(c.campusId),
+            })),
+          };
+        })
+      : null;
+
   return (
     <div>
       <PageHeader
@@ -73,7 +117,7 @@ export default async function AcademicsPage({
                 : `The school year, classes, subjects, timetable and grading for ${tenant.tenantName}. Nothing here is ever deleted — old items are archived.`
         }
       />
-      <SectionNav schoolCode={tenant.tenantCode} current={section} />
+      <SectionNav schoolCode={tenant.tenantCode} current={section} hide={mayPromote ? [] : ["promotion"]} />
       <div className="mt-8">
         {section === "timetable" && <TimetablePanel schoolCode={tenant.tenantCode} readOnly={readOnly} />}
         {section === "attendance" && <AttendancePanel schoolCode={tenant.tenantCode} readOnly={!canTakeRoll} />}
@@ -94,6 +138,15 @@ export default async function AcademicsPage({
         )}
         {section === "assessment" && <AssessmentPanel schoolCode={tenant.tenantCode} readOnly={readOnly} />}
         {section === "grading" && <GradingPanel schoolCode={tenant.tenantCode} readOnly={readOnly} />}
+        {section === "promotion" && promotion && (
+          <PromotionPanel
+            schoolCode={tenant.tenantCode}
+            sessions={promotion.sessions}
+            classes={promotion.classes}
+            schoolType={tenant.schoolType}
+            readOnly={Boolean(tenant.support)}
+          />
+        )}
       </div>
     </div>
   );

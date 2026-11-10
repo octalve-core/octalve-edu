@@ -279,7 +279,9 @@ test.describe.serial("Phase 1 Complete Operational Lifecycle Walk", () => {
               components: [
                 { name: "Continuous Assessment 1", score: 18, maxScore: 20 },
                 { name: "Continuous Assessment 2", score: 18, maxScore: 20 },
-                { name: "Final Examination", score: 52, maxScore: 60 },
+                // The exam is a part of the result like the others, out of the scheme's examMax, and since task 0032 it is named "Exam" (the name the marks sheet gives it): a result is entered
+                // under the scheme's parts, and the scheme has no name of its own for the exam.
+                { name: "Exam", score: 52, maxScore: 60 },
               ],
             },
           ],

@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
-import { formatNaira } from "@/lib/finance/rules";
+import { formatNaira } from "@/lib/finance/format";
 
 export interface InvoiceListItem {
   id: string;
@@ -117,30 +117,14 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
   const statusBadge = (status: InvoiceListItem["status"]) => {
     switch (status) {
       case "PAID":
-        return (
-          <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-            Paid
-          </span>
-        );
+        return <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-ok-bg text-ok-fg">Paid</span>;
       case "PARTIALLY_PAID":
-        return (
-          <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-            Partial
-          </span>
-        );
+        return <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-warn-bg text-warn-fg">Partial</span>;
       case "WAIVED":
-        return (
-          <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300">
-            Waived
-          </span>
-        );
+        return <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-info-bg text-info-fg">Waived</span>;
       case "UNPAID":
       default:
-        return (
-          <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
-            Unpaid
-          </span>
-        );
+        return <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-danger-bg text-danger-fg">Unpaid</span>;
     }
   };
 
@@ -166,12 +150,12 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
           <p className="mt-1 text-xl sm:text-2xl font-bold text-fg">{formatNaira(totalInvoiced)}</p>
         </div>
         <div className="p-4 rounded-xl border border-line bg-surface shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Total Collected</p>
-          <p className="mt-1 text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400">{formatNaira(totalCollected)}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-ok-fg">Total Collected</p>
+          <p className="mt-1 text-xl sm:text-2xl font-bold text-ok-fg">{formatNaira(totalCollected)}</p>
         </div>
         <div className="p-4 rounded-xl border border-line bg-surface shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400">Outstanding</p>
-          <p className="mt-1 text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400">{formatNaira(totalOutstanding)}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-danger-text">Outstanding</p>
+          <p className="mt-1 text-xl sm:text-2xl font-bold text-danger-text">{formatNaira(totalOutstanding)}</p>
         </div>
         <div className="p-4 rounded-xl border border-line bg-surface shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wider text-brand-fg">Collection Rate</p>
@@ -256,9 +240,7 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
                     </td>
                     <td className="px-4 py-4 text-fg-muted">{inv.period.label}</td>
                     <td className="px-4 py-4 text-right font-medium text-fg">{formatNaira(inv.totalAmount)}</td>
-                    <td className="px-4 py-4 text-right text-emerald-600 dark:text-emerald-400 font-medium">
-                      {formatNaira(inv.amountPaid)}
-                    </td>
+                    <td className="px-4 py-4 text-right text-ok-fg font-medium">{formatNaira(inv.amountPaid)}</td>
                     <td className="px-4 py-4 text-center">{statusBadge(inv.status)}</td>
                     <td className="px-4 py-4 text-right">
                       <Link

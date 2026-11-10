@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { TextField } from "@/components/ui/TextField";
-import { formatNaira } from "@/lib/finance/rules";
+import { formatNaira } from "@/lib/finance/format";
 
 export interface FeeItem {
   id: string;

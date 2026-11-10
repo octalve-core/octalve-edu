@@ -70,3 +70,22 @@ model SettingsChangeAudit {
   @@index([tenantId])
   @@index([tenantId, createdAt])
 }
+
+/// One value of one of the school's generic switches (task 0027, slice P0): the school's value (`campusId` null) or a campus's own. The JSON value is read through a pure resolver
+/// per key (`finance.partPayment` of task 0029, later `programs.enabled` and `standing.campusAdminMaySuspend`); a campus may only tighten what the school decided. One row per
+/// school, campus and key (a unique index in the migration, because `campusId` is nullable). Not the typed `SchoolSettings` row, which has no campus layer.
+model TenantSetting {
+  id          String   @id @default(cuid())
+  tenantId    String
+  campusId    String?
+  key         String
+  value       Json
+  updatedById String
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus    Campus?          @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: Cascade)
+  updatedBy TenantMembership @relation("TenantSettingUpdater", fields: [updatedById, tenantId], references: [userId, tenantId], onDelete: NoAction)
+
+  @@index([tenantId, campusId])
+}

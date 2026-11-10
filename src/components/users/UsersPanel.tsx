@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Alert } from "@/components/ui/Alert";
+import { StandingPanel } from "@/components/standing/StandingPanel";
 import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
 import { PlusIcon } from "@/components/ui/icons";
@@ -73,6 +75,7 @@ export function UsersPanel({
   const [inviteKey, setInviteKey] = useState(0);
   const [editing, setEditing] = useState<Member | null>(null);
   const [deactivating, setDeactivating] = useState<Member | null>(null);
+  const [standingFor, setStandingFor] = useState<Member | null>(null);
   const [busyUser, setBusyUser] = useState<string | null>(null);
   const [busyInvitation, setBusyInvitation] = useState<string | null>(null);
   const summaryRef = useRef<HTMLParagraphElement>(null);
@@ -355,6 +358,14 @@ export function UsersPanel({
                           <Button
                             variant="ghost"
                             className="flex-1 md:flex-none"
+                            onClick={() => setStandingFor(member)}
+                            aria-label={`Standing of ${name}`}
+                          >
+                            Standing
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="flex-1 md:flex-none"
                             onClick={() => setDeactivating(member)}
                             aria-label={`Deactivate ${name}`}
                           >
@@ -362,15 +373,25 @@ export function UsersPanel({
                           </Button>
                         </>
                       ) : (
-                        <Button
-                          variant="secondary"
-                          className="flex-1 md:flex-none"
-                          loading={busy}
-                          onClick={() => reactivate(member)}
-                          aria-label={`Reactivate ${name}`}
-                        >
-                          Reactivate
-                        </Button>
+                        <>
+                          <Button
+                            variant="ghost"
+                            className="flex-1 md:flex-none"
+                            onClick={() => setStandingFor(member)}
+                            aria-label={`Standing of ${name}`}
+                          >
+                            Standing
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            className="flex-1 md:flex-none"
+                            loading={busy}
+                            onClick={() => reactivate(member)}
+                            aria-label={`Reactivate ${name}`}
+                          >
+                            Reactivate
+                          </Button>
+                        </>
                       )}
                     </div>
                   </li>
@@ -448,6 +469,26 @@ export function UsersPanel({
           void refresh();
         }}
       />
+      <Dialog
+        open={standingFor !== null}
+        onClose={() => setStandingFor(null)}
+        title={standingFor ? `Standing of ${displayName(standingFor)}` : "Standing"}
+        description="Suspend, terminate or reinstate this user's place in the school, with a reason that is kept in a history."
+        wide
+      >
+        {standingFor && (
+          <StandingPanel
+            key={standingFor.userId}
+            schoolCode={schoolCode}
+            path={`members/${standingFor.userId}/standing`}
+            subject="member"
+            name={displayName(standingFor)}
+            canSuspend
+            canDecide={actorRole === "ADMIN"}
+            onChanged={() => void refresh()}
+          />
+        )}
+      </Dialog>
       <DeactivateDialog
         member={deactivating}
         onClose={() => setDeactivating(null)}

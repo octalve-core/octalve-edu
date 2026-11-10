@@ -36,6 +36,8 @@ enum EnrollmentStatus {
   WITHDRAWN
   TRANSFERRED
   ALUMNI
+  /// Task 0028: the pupil was expelled; everything that selects pupils by an ACTIVE enrolment drops them without a change. Reinstating puts it back.
+  EXPELLED
 }
 
 /// A member of staff as the SCHOOL knows them — not a sign-in account. userId is null for someone who never signs in (a security guard); when set it must
@@ -63,11 +65,16 @@ model StaffRecord {
   nextOfKinPhone        String?
   nextOfKinAddress      String?
   archivedAt            DateTime?
+  /// Task 0028: ACTIVE, SUSPENDED (until `standingUntil`, or until lifted when null) or TERMINATED.
+  standing              StandingState @default(ACTIVE)
+  standingUntil         DateTime?     @db.Date
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @default(now()) @updatedAt
 
   tenant             Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   campus             Campus?                  @relation(fields: [tenantId, campusId], references: [tenantId, id], onDelete: NoAction)
+  standingEvents     StandingEvent[]
+  programPlaces      ProgramParticipant[]
   membership         TenantMembership?        @relation(fields: [userId, tenantId], references: [userId, tenantId], onDelete: NoAction)
   assignments        StaffSubjectAssignment[]
   invitations        Invitation[]
@@ -113,6 +120,9 @@ model StudentRecord {
   dateOfBirth DateTime  @db.Date
   admissionNo String
   archivedAt  DateTime?
+  /// Task 0028: ACTIVE, SUSPENDED (until `standingUntil`, or until lifted when null) or EXPELLED. A check in the migration holds the combinations.
+  standing      StandingState @default(ACTIVE)
+  standingUntil DateTime?     @db.Date
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @default(now()) @updatedAt
 
@@ -125,6 +135,8 @@ model StudentRecord {
   results             Result[]
   invoices            Invoice[]
   guardianLinkTokens  GuardianLinkToken[]
+  standingEvents      StandingEvent[]
+  programPlaces       ProgramParticipant[]
   assignmentSubmissions AssignmentSubmission[]
   quizAttempts        QuizAttempt[]
   courseRegistrations CourseRegistration[]
@@ -171,6 +183,7 @@ model GuardianRecord {
   membership TenantMembership? @relation(fields: [userId, tenantId], references: [userId, tenantId], onDelete: NoAction)
   links      GuardianLink[]
   guardianLinkTokens GuardianLinkToken[]
+  programPlaces      ProgramParticipant[]
 
   @@unique([tenantId, id])
   @@index([tenantId])
@@ -214,5 +227,7 @@ model StudentEnrollment {
   classArm ClassArm        @relation(fields: [tenantId, classArmId], references: [tenantId, id], onDelete: NoAction)
 
   @@unique([tenantId, studentId, sessionId])
+  /// Task 0031: the target of the composite foreign keys of a promotion record.
+  @@unique([tenantId, id])
   @@index([tenantId, classArmId])
 }

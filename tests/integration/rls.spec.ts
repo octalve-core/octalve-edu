@@ -154,8 +154,30 @@ test.describe("who is running", () => {
     expect(byTable["ResultAudit"]).toEqual(["INSERT", "SELECT"]);
     expect(byTable["SettingsChangeAudit"]).toEqual(["INSERT", "SELECT"]);
     expect(byTable["NotificationAuditLog"]).toEqual(["INSERT", "SELECT"]);
+    expect(byTable["StandingEvent"]).toEqual(["INSERT", "SELECT"]); // a standing history is append-only
+    expect(byTable["ProgramAudit"]).toEqual(["INSERT", "SELECT"]); // so is a program's audit
+    expect(byTable["ProgramAttendanceChange"]).toEqual(["INSERT", "SELECT"]); // and the corrections of attendance
+    expect(byTable["ProgramScoreChange"]).toEqual(["INSERT", "SELECT"]); // and what each score replaced
+    expect(byTable["ProgressTemplate"]).toEqual(["INSERT", "SELECT"]); // a template, once made, is never rewritten
+    expect(byTable["ProgressEntryRevision"]).toEqual(["INSERT", "SELECT"]); // nor what an entry said before
+    expect(byTable["PromotionBatch"]).toEqual(["INSERT", "SELECT"]); // a promotion is evidence of what was decided,
+    expect(byTable["PromotionRecord"]).toEqual(["INSERT", "SELECT"]); // and of what was decided for each pupil
+    const APPEND_ONLY = new Set([
+      "AuditLog",
+      "ResultAudit",
+      "SettingsChangeAudit",
+      "NotificationAuditLog",
+      "StandingEvent",
+      "ProgramAudit",
+      "ProgramAttendanceChange",
+      "ProgramScoreChange",
+      "ProgressTemplate",
+      "ProgressEntryRevision",
+      "PromotionBatch",
+      "PromotionRecord",
+    ]);
     for (const [table, verbs] of Object.entries(byTable)) {
-      if (table === "AuditLog" || table === "ResultAudit" || table === "SettingsChangeAudit" || table === "NotificationAuditLog") continue;
+      if (APPEND_ONLY.has(table)) continue;
       expect(verbs, table).toEqual(["DELETE", "INSERT", "SELECT", "UPDATE"]);
     }
     expect(Object.keys(byTable).length).toBeGreaterThan(10); // and every table is covered, not an empty list
@@ -1368,6 +1390,36 @@ test.describe("catalog guard", () => {
       "Payment",
       "PracticeAttempt",
       "PracticeSession",
+      "Program",
+      "ProgramAssessment",
+      "ProgramAssessmentGroup",
+      "ProgramAttendance",
+      "ProgramAttendanceChange",
+      "ProgramAudit",
+      "ProgramCampus",
+      "ProgramCertificate",
+      "ProgramCounter",
+      "ProgramFeeExemption",
+      "ProgramFeeItem",
+      "ProgramGroup",
+      "ProgramInvoice",
+      "ProgramInvoiceDiscount",
+      "ProgramLevelLabel",
+      "ProgramParticipant",
+      "ProgramPayment",
+      "ProgramScore",
+      "ProgramScoreChange",
+      "ProgramSession",
+      "ProgramStaff",
+      "ProgramStaffGroup",
+      "ProgressEntry",
+      "ProgressEntryRevision",
+      "ProgressLock",
+      "ProgressRecord",
+      "ProgressSeen",
+      "ProgressTemplate",
+      "PromotionBatch",
+      "PromotionRecord",
       "QuestionBankAudit",
       "QuestionBankClassTag",
       "QuestionBankImage",
@@ -1391,12 +1443,14 @@ test.describe("catalog guard", () => {
       "SettingsChangeAudit",
       "StaffRecord",
       "StaffSubjectAssignment",
+      "StandingEvent",
       "StudentEnrollment",
       "StudentRecord",
       "Subject",
       "SubjectOffering",
       "SupportGrant",
       "TenantMembership",
+      "TenantSetting",
       "TenantStats",
       "TimetableSlot",
     ]); // update this list WITH the migration

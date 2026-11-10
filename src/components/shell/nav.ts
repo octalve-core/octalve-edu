@@ -4,10 +4,13 @@ import {
   BookOpenIcon,
   BuildingIcon,
   CalendarIcon,
+  CheckCircle2Icon,
   FileTextIcon,
   GraduationCapIcon,
   HomeIcon,
+  LayersIcon,
   MailIcon,
+  ReceiptIcon,
   SlidersIcon,
   UsersIcon,
 } from "@/components/ui/icons";
@@ -51,10 +54,13 @@ export function navFor(school: ShellSchool | null, platform = false): NavItem[] 
     items.push(
       { label: "Academics", href: `/schools/${school.code}/academics`, icon: CalendarIcon, section: "administration" },
       { label: "People", href: `/schools/${school.code}/people`, icon: GraduationCapIcon, section: "administration" },
+      { label: "Finance", href: `/schools/${school.code}/finance`, icon: ReceiptIcon, section: "administration" },
+      { label: "Results", href: `/schools/${school.code}/results`, icon: CheckCircle2Icon, section: "administration" },
       { label: "Communication", href: `/schools/${school.code}/communication`, icon: MailIcon, section: "administration" },
       { label: "Users", href: `/schools/${school.code}/users`, icon: UsersIcon, section: "administration" },
       { label: "Question bank", href: `/schools/${school.code}/question-bank`, icon: FileTextIcon, section: "learning" },
       { label: "Forms", href: `/schools/${school.code}/forms`, icon: BookOpenIcon, section: "learning" },
+      { label: "Programs", href: `/schools/${school.code}/programs`, icon: LayersIcon, section: "learning" },
       { label: "Settings", href: `/schools/${school.code}/settings`, icon: SlidersIcon, section: "administration" },
     );
   } else if (school.role === "CAMPUS_ADMIN") {
@@ -62,21 +68,26 @@ export function navFor(school: ShellSchool | null, platform = false): NavItem[] 
     items.push(
       { label: "Academics", href: `/schools/${school.code}/academics`, icon: CalendarIcon, section: "administration" },
       { label: "People", href: `/schools/${school.code}/people`, icon: GraduationCapIcon, section: "administration" },
+      { label: "Finance", href: `/schools/${school.code}/finance`, icon: ReceiptIcon, section: "administration" },
       { label: "Communication", href: `/schools/${school.code}/communication`, icon: MailIcon, section: "administration" },
       { label: "Users", href: `/schools/${school.code}/users`, icon: UsersIcon, section: "administration" },
       { label: "Question bank", href: `/schools/${school.code}/question-bank`, icon: FileTextIcon, section: "learning" },
       { label: "Forms", href: `/schools/${school.code}/forms`, icon: BookOpenIcon, section: "learning" },
+      { label: "Programs", href: `/schools/${school.code}/programs`, icon: LayersIcon, section: "learning" },
     );
   } else if (school.role === "TEACHING_STAFF" || school.role === "NON_TEACHING_STAFF") {
     // Staff may look at the school year and at the school's people (read-only; plan 1.2, decisions P2 and P9) — they change none of it.
     items.push(
       { label: "Academics", href: `/schools/${school.code}/academics`, icon: CalendarIcon, section: "administration" },
       { label: "People", href: `/schools/${school.code}/people`, icon: GraduationCapIcon, section: "administration" },
+      { label: "Results", href: `/schools/${school.code}/results`, icon: CheckCircle2Icon, section: "administration" },
       // Staff write and browse questions here; whether they may review is decided on the page.
       { label: "Question bank", href: `/schools/${school.code}/question-bank`, icon: FileTextIcon, section: "learning" },
     );
     // Teachers write and mark forms; non-teaching staff only answer the questionnaires addressed to them. Both reach the page; what each may do is decided there and by the API.
     items.push({ label: "Forms", href: `/schools/${school.code}/forms`, icon: BookOpenIcon, section: "learning" });
+    // A member of staff may be named a program admin; a program they have no place in is simply not listed, so the page is an empty list for them.
+    items.push({ label: "Programs", href: `/schools/${school.code}/programs`, icon: LayersIcon, section: "learning" });
   } else if (school.role === "STUDENT") {
     // A pupil's own work: the practice sets, questionnaires and paper work set for them, and the question practice they do for themselves.
     items.push({ label: "My work", href: `/schools/${school.code}/learn`, icon: BookOpenIcon });
@@ -134,7 +145,10 @@ const SCHOOL_PAGES: Record<string, string> = {
   "": "Overview",
   users: "Users",
   academics: "Academics",
+  results: "Results",
   people: "People",
+  finance: "Finance",
+  programs: "Programs",
   communication: "Communication",
   "question-bank": "Question bank",
   forms: "Forms",
@@ -152,6 +166,10 @@ export function pageLabel(pathname: string): string | null {
   if (match) return SCHOOL_PAGES[match[1] ?? ""] ?? null;
   // A person's own page under People (a student or a member of staff) is still "People" in the breadcrumb.
   if (/^\/schools\/[^/]+\/people\/(?:students|staff)\/[^/]+\/?$/.test(pathname)) return "People";
+  // A program's own page is still "Programs" in the breadcrumb.
+  if (/^\/schools\/[^/]+\/programs\/[^/]+\/?$/.test(pathname)) return "Programs";
+  // An invoice's own page is still "Finance" in the breadcrumb.
+  if (/^\/schools\/[^/]+\/finance\/invoices\/[^/]+\/?$/.test(pathname)) return "Finance";
   // A form's own page is still "Forms" in the breadcrumb.
   if (/^\/schools\/[^/]+\/forms\/[^/]+\/?$/.test(pathname)) return "Forms";
   // Sub-pages under Communication are still "Communication" in the breadcrumb.

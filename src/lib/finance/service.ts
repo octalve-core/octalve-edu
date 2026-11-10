@@ -14,6 +14,8 @@ import {
 import { verifyPaystackSignature, computePayloadHash } from "./crypto";
 import { getPaystackClient, MockPaystackGateway } from "./paystack";
 import { triggerInvoiceIssuedAlerts } from "@/lib/communication/event-triggers";
+import { checkPart } from "./part-payment";
+import { loadEffectivePolicy } from "./part-payment-service";
 
 export interface FeeStructureInput {
   name: string;
@@ -367,6 +369,9 @@ export async function initializePayment(
   callbackUrl?: string,
 ) {
   return forTenant(tenantId).transaction(async (tx) => {
+    // The invoice row is locked from here to the end of the transaction (task 0029): two payments started at the same moment cannot both pass the balance and the part-payment
+    // rule on the numbers they each read.
+    await lockInvoice(tx, tenantId, invoiceId);
     const invoice = await tx.invoice.findFirstOrThrow({
       where: { tenantId, id: invoiceId },
       include: { student: true },
@@ -388,6 +393,17 @@ export async function initializePayment(
     if (amountToPay.gt(balanceDue)) {
       throw new FinanceRefusal("Payment amount cannot exceed the balance due");
     }
+    // Part payment "if allowed" (task 0029): the school's rule and the student's campus's, and the invoice's own "pay in full". NOT applied in `fulfillPayment`: money that was
+    // accepted when it was started is never refused after it has been taken.
+    const policy = await loadEffectivePolicy(tx, tenantId, invoice.student.campusId);
+    const part = checkPart({
+      total: invoice.totalAmount,
+      paid: invoice.amountPaid,
+      amount: amountToPay,
+      policy,
+      payInFull: invoice.payInFull,
+    });
+    if (!part.ok) throw new FinanceRefusal(part.message);
 
     const amountInKobo = toKobo(amountToPay);
     const reference = generatePaymentReference(PaymentProvider.PAYSTACK);
@@ -439,6 +455,12 @@ export async function initializePayment(
  */
 const RECEIPT_RETRY_LIMIT = 50;
 
+/// `SELECT ... FOR UPDATE` on the invoice, in the caller's transaction: the next reader of the row waits until this transaction ends. A row that is not there (or not this school's)
+/// locks nothing, and the read that follows says "not found" as it always did.
+async function lockInvoice(tx: Tx, tenantId: string, invoiceId: string): Promise<void> {
+  await tx.$queryRaw`SELECT "id" FROM "Invoice" WHERE "tenantId" = ${tenantId} AND "id" = ${invoiceId} FOR UPDATE`;
+}
+
 /// The next receipt number for a school and year: `UPDATE ... RETURNING` on the school's counter (the row lock serialises concurrent
 /// fulfilments; the allocation is in the caller's transaction, so a rollback gives the number back). A number someone typed by hand earlier
 /// is skipped, at most RECEIPT_RETRY_LIMIT times, then the whole payment is refused and rolled back.
@@ -462,8 +484,12 @@ export async function recordManualPayment(
   actorUserId: string,
 ) {
   return forTenant(tenantId).transaction(async (tx) => {
+    // Locked from here to the end of the transaction (task 0029): two payments recorded at the same moment cannot together take more than the balance, nor slip under the
+    // part-payment rule on the numbers they each read.
+    await lockInvoice(tx, tenantId, invoiceId);
     const invoice = await tx.invoice.findFirstOrThrow({
       where: { tenantId, id: invoiceId },
+      include: { student: { select: { campusId: true } } },
     });
 
     if (invoice.status === InvoiceStatus.PAID || invoice.status === InvoiceStatus.WAIVED) {
@@ -474,6 +500,18 @@ export async function recordManualPayment(
     if (amountDecimal.lte(0)) {
       throw new FinanceRefusal("Payment amount must be positive");
     }
+    if (amountDecimal.gt(invoice.totalAmount.sub(invoice.amountPaid))) {
+      throw new FinanceRefusal("Payment amount cannot exceed the balance due");
+    }
+    const policy = await loadEffectivePolicy(tx, tenantId, invoice.student.campusId);
+    const part = checkPart({
+      total: invoice.totalAmount,
+      paid: invoice.amountPaid,
+      amount: amountDecimal,
+      policy,
+      payInFull: invoice.payInFull,
+    });
+    if (!part.ok) throw new FinanceRefusal(part.message);
 
     const reference = generatePaymentReference(PaymentProvider.PAYSTACK);
     const year = new Date().getFullYear();
