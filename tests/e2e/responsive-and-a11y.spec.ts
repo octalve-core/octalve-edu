@@ -32,6 +32,7 @@ import {
   verifyButton,
   HOME_URL,
 } from "./helpers";
+import { currentTheme, setTheme } from "../support/theme";
 
 // Runs on the desktop AND the phone project (see playwright.config.ts).
 //  - axe-core, WCAG 2.2 A/AA rules, on every screen and on the STATES that
@@ -109,15 +110,15 @@ async function checkScreen(page: Page, what: string, isMobile: boolean) {
   // Next.js applies a page's <title> a beat after a client-side navigation, and axe's `document-title`
   // rule saw the gap once. Scan the settled page: wait until it has a title.
   await expect(page).toHaveTitle(/\S/);
-  const initial = await page.evaluate(() => document.documentElement.dataset.theme ?? "dark");
+  const initial = await currentTheme(page);
   for (const theme of ["dark", "light"]) {
-    await page.evaluate((t) => void (document.documentElement.dataset.theme = t), theme);
+    await setTheme(page, theme);
     await settled(page);
     await expect(page).toHaveTitle(/\S/); // a router.refresh() re-renders the <title> too; scan the settled page
     await expectAccessible(page, `${what} [${theme} theme]`);
     await expectNoHorizontalScroll(page, `${what} [${theme} theme]`);
   }
-  await page.evaluate((t) => void (document.documentElement.dataset.theme = t), initial);
+  await setTheme(page, initial);
   await settled(page);
   await expectComfortableTapTargets(page, what, isMobile);
 }

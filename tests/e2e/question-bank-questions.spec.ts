@@ -18,6 +18,7 @@ import {
 import { SAAS_URL } from "../support/env";
 import { api as rawApi, cookieHeader, loginAs as rawLogin } from "../support/http";
 import { signInThroughUi } from "./helpers";
+import { currentTheme, setTheme } from "../support/theme";
 
 // The question bank's question screens in a real browser (task 0024 slice E): a teacher writes a question with a picture and sends it, a reviewer approves it, another is sent
 // back with a reason, and an exam approver sees the overlap warning the writer never sees. Each flow is driven by clicking and typing. Axe (WCAG 2.2 A/AA) and a
@@ -40,14 +41,14 @@ async function expectNoHorizontalScroll(page: Page, what: string) {
 }
 async function checkBothThemes(page: Page, what: string) {
   await expect(page).toHaveTitle(/\S/);
-  const initial = await page.evaluate(() => document.documentElement.dataset.theme ?? "dark");
+  const initial = await currentTheme(page);
   for (const theme of ["dark", "light"]) {
-    await page.evaluate((t) => void (document.documentElement.dataset.theme = t), theme);
+    await setTheme(page, theme);
     await page.waitForLoadState("networkidle");
     await expectAccessible(page, `${what} [${theme} theme]`);
     await expectNoHorizontalScroll(page, `${what} [${theme} theme]`);
   }
-  await page.evaluate((t) => void (document.documentElement.dataset.theme = t), initial);
+  await setTheme(page, initial);
 }
 const SHOTS = path.resolve(__dirname, "../../out/screenshots");
 fs.mkdirSync(SHOTS, { recursive: true });

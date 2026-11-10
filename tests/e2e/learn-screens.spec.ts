@@ -6,6 +6,7 @@ import { Role, createTenant, db, removeCreatedTenants, seedInstance, type TestTe
 import { SAAS_URL } from "../support/env";
 import { approvedItem, guardianOf, member, pupil, resetPractice, setBank, type Person } from "../support/qbank-world";
 import { signInThroughUi } from "./helpers";
+import { currentTheme, setTheme } from "../support/theme";
 
 // The pupil's "My work", a guardian's "My children" and the public questionnaire page in a real browser (task 0025, slices O3, O4, O5 and O8). A pupil starts, answers and sees the result of
 // a practice set, answers a questionnaire, asks for paper work to be marked, practises on their own and carries on a session left open; a guardian sees how practice is going as far as the
@@ -29,14 +30,14 @@ async function expectNoHorizontalScroll(page: Page, what: string) {
 }
 async function checkBothThemes(page: Page, what: string) {
   await expect(page).toHaveTitle(/\S/);
-  const initial = await page.evaluate(() => document.documentElement.dataset.theme ?? "dark");
+  const initial = await currentTheme(page);
   for (const theme of ["dark", "light"]) {
-    await page.evaluate((t) => void (document.documentElement.dataset.theme = t), theme);
+    await setTheme(page, theme);
     await page.waitForLoadState("networkidle");
     await expectAccessible(page, `${what} [${theme} theme]`);
     await expectNoHorizontalScroll(page, `${what} [${theme} theme]`);
   }
-  await page.evaluate((t) => void (document.documentElement.dataset.theme = t), initial);
+  await setTheme(page, initial);
 }
 
 test.use({ baseURL: SAAS_URL });

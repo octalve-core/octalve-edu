@@ -14,6 +14,7 @@ import {
 } from "../support/db";
 import { SAAS_URL } from "../support/env";
 import { signInThroughUi } from "./helpers";
+import { currentTheme, setTheme } from "../support/theme";
 
 // The question bank's administration screen in a real browser, desktop and phone (task 0024 slice B): choosing reviewers and the switches. Every change goes through the step-up
 // dialog. The server rules (who is refused what, the audit rows, the narrowing) are the API spec's; this file is about what a person sees and can do, with axe (WCAG 2.2 A/AA) and
@@ -77,9 +78,9 @@ async function settled(page: Page) {
 }
 async function checkScreen(page: Page, what: string, isMobile: boolean) {
   await expect(page).toHaveTitle(/\S/);
-  const initial = await page.evaluate(() => document.documentElement.dataset.theme ?? "dark");
+  const initial = await currentTheme(page);
   for (const theme of ["dark", "light"]) {
-    await page.evaluate((t) => void (document.documentElement.dataset.theme = t), theme);
+    await setTheme(page, theme);
     await settled(page);
     await expectAccessible(page, `${what} [${theme} theme]`);
     const { scrollWidth, innerWidth } = await page.evaluate(() => ({
@@ -88,7 +89,7 @@ async function checkScreen(page: Page, what: string, isMobile: boolean) {
     }));
     expect(scrollWidth, `horizontal overflow on ${what} [${theme} theme]`).toBeLessThanOrEqual(innerWidth);
   }
-  await page.evaluate((t) => void (document.documentElement.dataset.theme = t), initial);
+  await setTheme(page, initial);
   await settled(page);
   if (!isMobile) return;
   const tooSmall = await page.evaluate(() => {

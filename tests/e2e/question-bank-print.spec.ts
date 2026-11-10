@@ -5,6 +5,7 @@ import { Role, createTenant, db, removeCreatedTenants, seedInstance, type TestTe
 import { SAAS_URL } from "../support/env";
 import { approvedItem, member, pupil } from "../support/qbank-world";
 import { signInThroughUi } from "./helpers";
+import { currentTheme, setTheme } from "../support/theme";
 
 // Printing and offering a quiz question back, in a real browser (task 0025, slice O6): a teacher prints a question with the answer key and a reason, a reviewer reads the print log, the log is
 // filtered by what was printed, and a teacher who manages a quiz reads its questions, offers one to the question bank and prints the quiz. The APIs are tested in
@@ -21,9 +22,9 @@ async function expectAccessible(page: Page, what: string) {
 }
 async function checkBothThemes(page: Page, what: string) {
   await expect(page).toHaveTitle(/\S/);
-  const initial = await page.evaluate(() => document.documentElement.dataset.theme ?? "dark");
+  const initial = await currentTheme(page);
   for (const theme of ["dark", "light"]) {
-    await page.evaluate((t) => void (document.documentElement.dataset.theme = t), theme);
+    await setTheme(page, theme);
     await page.waitForLoadState("networkidle");
     await expectAccessible(page, `${what} [${theme} theme]`);
     const { scrollWidth, innerWidth } = await page.evaluate(() => ({
@@ -32,7 +33,7 @@ async function checkBothThemes(page: Page, what: string) {
     }));
     expect(scrollWidth, `horizontal overflow on ${what} [${theme} theme]`).toBeLessThanOrEqual(innerWidth);
   }
-  await page.evaluate((t) => void (document.documentElement.dataset.theme = t), initial);
+  await setTheme(page, initial);
 }
 
 test.use({ baseURL: SAAS_URL });

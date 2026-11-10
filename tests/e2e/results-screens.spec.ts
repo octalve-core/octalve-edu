@@ -5,6 +5,7 @@ import { Role, createTenant, db, removeCreatedTenants, seedInstance, type TestTe
 import { SAAS_URL } from "../support/env";
 import { member, type Person } from "../support/qbank-world";
 import { signInThroughUi } from "./helpers";
+import { currentTheme, setTheme } from "../support/theme";
 
 // The Results page (task 0031) in a real browser: a teacher entering marks built from a scheme's parts, the refusals the screen makes before it asks, sending the marks for review, an approver
 // approving, publishing and returning them, the report cards, and who is let in. The rules are tested in tests/api; this is the screen: what it offers, sends and says, in BOTH themes with Axe
@@ -28,15 +29,15 @@ async function expectNoHorizontalScroll(page: Page, what: string) {
 }
 async function checkBothThemes(page: Page, what: string) {
   await expect(page).toHaveTitle(/\S/);
-  const initial = await page.evaluate(() => document.documentElement.dataset.theme ?? "dark");
+  const initial = await currentTheme(page);
   for (const theme of ["dark", "light"]) {
-    await page.evaluate((t) => void (document.documentElement.dataset.theme = t), theme);
+    await setTheme(page, theme);
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(250); // the theme fades for 150 ms: a scan inside it measures a colour between the two
     await expectAccessible(page, `${what} [${theme} theme]`);
     await expectNoHorizontalScroll(page, `${what} [${theme} theme]`);
   }
-  await page.evaluate((t) => void (document.documentElement.dataset.theme = t), initial);
+  await setTheme(page, initial);
 }
 
 test.use({ baseURL: SAAS_URL });

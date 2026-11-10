@@ -3,6 +3,7 @@ import type { Page } from "@playwright/test";
 import { test, expect } from "../support/fixtures";
 import { seedInstance } from "../support/db";
 import { brand } from "@/lib/brand";
+import { currentTheme, setTheme } from "../support/theme";
 
 // The product logo on the signed-out screens is a link to the start page, `/` (AuthShell). Runs on the desktop AND the phone project: the logo is in the brand panel on large screens and in
 // the compact header on phones, and never both at once.
@@ -72,9 +73,9 @@ test("the panel's headline, blurb, points and copyright are still hidden from as
 test("the logo passes the accessibility rules in both themes, and the page does not scroll sideways", async ({ page }) => {
   for (const screen of SCREENS) {
     await page.goto(screen);
-    const initial = await page.evaluate(() => document.documentElement.dataset.theme ?? "dark");
+    const initial = await currentTheme(page);
     for (const theme of ["dark", "light"]) {
-      await page.evaluate((t) => void (document.documentElement.dataset.theme = t), theme);
+      await setTheme(page, theme);
       await page.waitForTimeout(250); // the theme fades for 150 ms: a scan inside it measures a colour between the two
       const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
       expect(
@@ -87,6 +88,6 @@ test("the logo passes the accessibility rules in both themes, and the page does 
       }));
       expect(scrollWidth, `${screen} [${theme}] overflows`).toBeLessThanOrEqual(width);
     }
-    await page.evaluate((t) => void (document.documentElement.dataset.theme = t), initial);
+    await setTheme(page, initial);
   }
 });

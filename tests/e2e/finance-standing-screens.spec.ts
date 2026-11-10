@@ -5,6 +5,7 @@ import { Role, createTenant, db, removeCreatedTenants, seedInstance, type TestTe
 import { SAAS_URL } from "../support/env";
 import { activeSession, member, pupil, type Person, type Pupil } from "../support/qbank-world";
 import { alerts, emailField, fillCredentials, signInButton, signInThroughUi } from "./helpers";
+import { currentTheme, setTheme } from "../support/theme";
 
 // The Finance page (task 0029 slice F2) and the standing screens (task 0028) in a real browser: the school's invoices, an invoice's page with the rule on parts and the "pay in full" switch,
 // the payment rules (the school's with the fresh proof, a campus's read-only for its administrator), the standing of a pupil and of a member of staff (suspend, lift, expel, terminate,
@@ -28,16 +29,16 @@ async function expectNoHorizontalScroll(page: Page, what: string) {
 }
 async function checkBothThemes(page: Page, what: string) {
   await expect(page).toHaveTitle(/\S/);
-  const initial = await page.evaluate(() => document.documentElement.dataset.theme ?? "dark");
+  const initial = await currentTheme(page);
   for (const theme of ["dark", "light"]) {
-    await page.evaluate((t) => void (document.documentElement.dataset.theme = t), theme);
+    await setTheme(page, theme);
     await page.waitForLoadState("networkidle");
     // the theme fades for 150 ms: a scan taken inside it measures a colour between the two themes
     await page.waitForTimeout(250);
     await expectAccessible(page, `${what} [${theme} theme]`);
     await expectNoHorizontalScroll(page, `${what} [${theme} theme]`);
   }
-  await page.evaluate((t) => void (document.documentElement.dataset.theme = t), initial);
+  await setTheme(page, initial);
 }
 
 test.use({ baseURL: SAAS_URL });

@@ -5,6 +5,7 @@ import { Role, createTenant, db, removeCreatedTenants, seedInstance, type TestTe
 import { SAAS_URL } from "../support/env";
 import { member, pupil, type Person, type Pupil } from "../support/qbank-world";
 import { signInThroughUi } from "./helpers";
+import { currentTheme, setTheme } from "../support/theme";
 
 // The staff Forms screens in a real browser (task 0025, slices O1, O2 and O8): a teacher writes practice sets, questionnaires and paper work, publishes and closes them, opens a form's
 // page, marks an attempt a question at a time and keeps the roll call of paper work; staff answer the questionnaires addressed to them. The APIs are tested in tests/api; this is the
@@ -28,14 +29,14 @@ async function expectNoHorizontalScroll(page: Page, what: string) {
 }
 async function checkBothThemes(page: Page, what: string) {
   await expect(page).toHaveTitle(/\S/);
-  const initial = await page.evaluate(() => document.documentElement.dataset.theme ?? "dark");
+  const initial = await currentTheme(page);
   for (const theme of ["dark", "light"]) {
-    await page.evaluate((t) => void (document.documentElement.dataset.theme = t), theme);
+    await setTheme(page, theme);
     await page.waitForLoadState("networkidle");
     await expectAccessible(page, `${what} [${theme} theme]`);
     await expectNoHorizontalScroll(page, `${what} [${theme} theme]`);
   }
-  await page.evaluate((t) => void (document.documentElement.dataset.theme = t), initial);
+  await setTheme(page, initial);
 }
 
 test.use({ baseURL: SAAS_URL });

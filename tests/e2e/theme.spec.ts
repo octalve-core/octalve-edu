@@ -2,6 +2,7 @@ import { test, expect } from "../support/fixtures";
 import { Role, createUser, seedInstance } from "../support/db";
 import { HTTP_URL } from "../support/env";
 import { api } from "../support/http";
+import { setTheme } from "../support/theme";
 import { emailField, fillCredentials, signInButton, HOME_URL } from "./helpers";
 
 // The light/dark choice is a `theme` cookie the SERVER reads, so the first paint is right
@@ -97,5 +98,29 @@ test.describe("the toggle", () => {
 
     await page.keyboard.press("Tab");
     await expect(emailField(page)).toBeFocused(); // and the tab order carries on into the form
+  });
+});
+
+// The colours TRANSITION when the theme flips (150 ms), and axe samples whatever is painted at that instant, so a scan straight after a flip fails now and then on `color-contrast`.
+// Every spec flips through `setTheme`, which waits for the fade. This is the proof of both halves: a hand-made flip leaves colour transitions running (the window a scan can fall into),
+// and `setTheme` comes back only when none is left.
+test.describe("the colour fade after a theme flip", () => {
+  const running = (page: import("@playwright/test").Page) =>
+    page.evaluate(() => document.getAnimations().filter((a) => a instanceof CSSTransition && a.playState === "running").length);
+
+  test("a flip made by hand leaves colour transitions running; setTheme returns only after they have finished", async ({ page }) => {
+    await page.goto("/login");
+    const started = await page.evaluate(() => {
+      document.documentElement.dataset.theme = "light"; // theme-flip: deliberate (see the guard in tests/unit/theme-flip-guard.spec.ts)
+      return document.getAnimations().filter((a) => a instanceof CSSTransition).length; // reading them brings the style up to date: the fade has begun
+    });
+    expect(started, "the page's colours should fade when the theme flips").toBeGreaterThan(0);
+
+    await setTheme(page, "dark");
+    expect(await running(page), "setTheme must not return while a colour is still fading").toBe(0);
+    await expect(html(page)).toHaveAttribute("data-theme", "dark");
+    await setTheme(page, "light");
+    expect(await running(page)).toBe(0);
+    await expect(html(page)).toHaveAttribute("data-theme", "light");
   });
 });

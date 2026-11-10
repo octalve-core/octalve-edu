@@ -91,6 +91,9 @@ in the app.
   parallelism, because the suites share a database and `setup-handoff.spec.ts` deliberately starts
   from an empty one.
 - **No retries.** A flaky test is a bug to fix (`retries: 0`), not something to retry away.
+- **Flip the theme with `setTheme`** (`support/theme.ts`), never by assigning `dataset.theme` in a spec. The colours fade for 150 ms when the theme flips and axe measures whatever is painted at that
+  instant, so a scan straight after a hand-made flip fails now and then on `color-contrast` (19 of 227 tests in one run, a different set each time). `setTheme` returns only after the fade has
+  finished; `unit/theme-flip-guard` fails a spec that flips by hand (task 0034).
 - **API tests use plain `fetch`**, not Playwright's request context: that keeps a cookie jar which
   would silently attach a session to a request meant to be anonymous.
 - **Prove the test can fail.** Every security-relevant assertion here was *mutation-checked*: inject

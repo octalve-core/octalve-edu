@@ -5,6 +5,7 @@ import { Role, createTenant, removeCreatedTenants, seedInstance, type TestTenant
 import { SAAS_URL } from "../support/env";
 import { member, type Person } from "../support/qbank-world";
 import { signInThroughUi } from "./helpers";
+import { currentTheme, setTheme } from "../support/theme";
 
 // The Programs screens (task 0027, slice P1) in a real browser: the school's administrator makes a program, builds its level names and groups, names a program admin and reads the history;
 // a program admin changes it; a campus administrator only reads it; the school switches programs off. The APIs are tested in tests/api; this is the screen: what is offered to whom, what is
@@ -27,16 +28,16 @@ async function expectNoHorizontalScroll(page: Page, what: string) {
 }
 async function checkBothThemes(page: Page, what: string) {
   await expect(page).toHaveTitle(/\S/);
-  const initial = await page.evaluate(() => document.documentElement.dataset.theme ?? "dark");
+  const initial = await currentTheme(page);
   for (const theme of ["dark", "light"]) {
-    await page.evaluate((t) => void (document.documentElement.dataset.theme = t), theme);
+    await setTheme(page, theme);
     await page.waitForLoadState("networkidle");
     // the theme fades for 150 ms: a scan taken inside it measures a colour between the two themes
     await page.waitForTimeout(250);
     await expectAccessible(page, `${what} [${theme} theme]`);
     await expectNoHorizontalScroll(page, `${what} [${theme} theme]`);
   }
-  await page.evaluate((t) => void (document.documentElement.dataset.theme = t), initial);
+  await setTheme(page, initial);
 }
 
 test.use({ baseURL: SAAS_URL });
