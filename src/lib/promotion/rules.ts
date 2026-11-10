@@ -17,6 +17,8 @@ export interface ClassGroupMinimal {
   /// null = a class of the whole school.
   campusId: string | null;
   archivedAt?: Date | null;
+  /// The stream this class is ("Science"), or null/absent for a class that is not one (task 0035).
+  streamName?: string | null;
 }
 
 export interface ClassArmMinimal {
@@ -63,27 +65,53 @@ export function evaluatePromotionRecommendation(
 const sameLadder = (current: ClassGroupMinimal, candidate: ClassGroupMinimal) =>
   candidate.campusId === current.campusId || (current.campusId !== null && candidate.campusId === null);
 
-/**
- * The class a pupil of `current` moves up into: the live class on the next rung (the lowest `sortOrder` above the current one) of the same ladder. Two classes that share a rung
- * are parallel streams, never the next class of each other. When several classes share the next rung the choice is made the same way every time: the campus's own class before a
- * school-wide one, then by name. No higher class means `current` is the last rung (its pupils graduate).
- */
-export function resolveNextClassGroup(
-  current: ClassGroupMinimal,
-  all: readonly ClassGroupMinimal[],
-): { nextClass: ClassGroupMinimal | null; isTerminalClass: boolean } {
+/** The live classes of the NEXT rung of `current`'s ladder (the lowest `sortOrder` above its own), the campus's own first, then by name. Empty when `current` is the last rung. */
+export function nextRungClasses(current: ClassGroupMinimal, all: readonly ClassGroupMinimal[]): ClassGroupMinimal[] {
   const higher = all.filter((c) => !c.archivedAt && c.id !== current.id && c.sortOrder > current.sortOrder && sameLadder(current, c));
-  if (higher.length === 0) return { nextClass: null, isTerminalClass: true };
+  if (higher.length === 0) return [];
   const rung = Math.min(...higher.map((c) => c.sortOrder));
-  const next = higher
+  return higher
     .filter((c) => c.sortOrder === rung)
     .sort(
       (a, b) =>
         Number(b.campusId === current.campusId) - Number(a.campusId === current.campusId) ||
         a.name.localeCompare(b.name) ||
         a.id.localeCompare(b.id),
-    )[0];
-  return { nextClass: next, isTerminalClass: false };
+    );
+}
+
+const sameStream = (a: string | null | undefined, b: string | null | undefined) =>
+  Boolean(a?.trim()) && Boolean(b?.trim()) && a!.trim().toLowerCase() === b!.trim().toLowerCase();
+
+/**
+ * Where the pupils of `current` go when `rung` (from `nextRungClasses`) is the next rung (task 0035). One class: that one. Several classes and no stream among them: the first, the same way
+ * every time (what the roll did before streams). Several classes with a stream among them: the class of the pupils' own stream, when exactly one qualifies (the campus's own before a
+ * school-wide one); otherwise the stream cannot be worked out, `needsPlacement` is true and `target` is only the suggestion (the first), which the roll will not use without being told.
+ */
+export function streamPlacement(
+  current: ClassGroupMinimal,
+  rung: readonly ClassGroupMinimal[],
+): { target: ClassGroupMinimal | null; needsPlacement: boolean } {
+  if (rung.length === 0) return { target: null, needsPlacement: false };
+  if (rung.length === 1 || !rung.some((c) => c.streamName?.trim())) return { target: rung[0], needsPlacement: false };
+  const matching = rung.filter((c) => sameStream(c.streamName, current.streamName));
+  const own = matching.filter((c) => c.campusId === current.campusId);
+  const candidates = own.length > 0 ? own : matching;
+  if (candidates.length === 1) return { target: candidates[0], needsPlacement: false };
+  return { target: candidates[0] ?? rung[0], needsPlacement: true };
+}
+
+/**
+ * The class a pupil of `current` moves up into: the live class on the next rung (the lowest `sortOrder` above the current one) of the same ladder. Two classes that share a rung
+ * are parallel streams, never the next class of each other. When several classes share the next rung the choice is made the same way every time unless the classes name streams
+ * (see `streamPlacement`). No higher class means `current` is the last rung (its pupils graduate).
+ */
+export function resolveNextClassGroup(
+  current: ClassGroupMinimal,
+  all: readonly ClassGroupMinimal[],
+): { nextClass: ClassGroupMinimal | null; isTerminalClass: boolean } {
+  const rung = nextRungClasses(current, all);
+  return { nextClass: streamPlacement(current, rung).target, isTerminalClass: rung.length === 0 };
 }
 
 /** The arm of the next class a promoted pupil goes to: the arm with the same name (any case), else the first arm. null when the class has no arm. */

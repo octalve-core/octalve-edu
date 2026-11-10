@@ -8,10 +8,15 @@ import { createCampus } from "@/lib/auth/campus-scope";
 import { createClassGroup, listClassGroups } from "@/lib/academics/classes";
 
 // GET  /api/v1/schools/[code]/academics/class-groups   — class groups in progression order, each with its live arms and a subject count.
-// POST /api/v1/schools/[code]/academics/class-groups   { campusId?, name, sortOrder? } — ADMIN only.
+// POST /api/v1/schools/[code]/academics/class-groups   { campusId?, name, sortOrder?, streamName? } — ADMIN only.
 // Reads: ADMIN and staff (staff see school-wide groups and their own campus's). `status` defaults to "live" (not archived).
 const query = z.object({ status: z.enum(["live", "archived", "all"]).default("live"), campusId: idField.optional() });
-const createBody = z.strictObject({ campusId: idField.nullable().optional(), name: nameField, sortOrder: z.number().int().optional() });
+const createBody = z.strictObject({
+  campusId: idField.nullable().optional(),
+  name: nameField,
+  sortOrder: z.number().int().optional(),
+  streamName: z.string().max(200).nullable().optional(),
+});
 
 export const GET = withAuth(
   validate({ query }, async (req, auth: TenantAuthContext, _ctx: unknown, { query: filters }) => {

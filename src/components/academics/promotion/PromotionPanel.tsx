@@ -17,8 +17,11 @@ import { PromotionPreviewTable } from "./PromotionPreviewTable";
 import {
   DECISION_LABEL,
   NO_CHOICE,
+  classLabel,
   finalDecision,
   isOverride,
+  missingPlacements,
+  placedClassId,
   type BatchView,
   type Choice,
   type ClassOption,
@@ -110,8 +113,33 @@ export function PromotionPanel({
       if (row.alreadyEnrolledInTarget) skipped++;
       else counts[finalDecision(row, choices[row.studentId] ?? NO_CHOICE)]++;
     }
-    return { counts, skipped };
+    // With streams: how many of the promoted pupils go to each class (the confirmation names them).
+    const byClass = new Map<string, number>();
+    if (preview && preview.rungClasses.length > 1) {
+      for (const row of preview.students) {
+        const c = choices[row.studentId] ?? NO_CHOICE;
+        if (row.alreadyEnrolledInTarget || finalDecision(row, c) !== "PROMOTED") continue;
+        const id = placedClassId(row, c, preview);
+        if (id) byClass.set(id, (byClass.get(id) ?? 0) + 1);
+      }
+    }
+    return { counts, skipped, byClass };
   }, [preview, choices]);
+  const unplaced = preview ? missingPlacements(preview, choices) : 0;
+
+  /// "Set all": every pupil who is to be promoted goes to this class.
+  function placeAll(classId: string) {
+    if (!preview) return;
+    setChoices((current) => {
+      const next = { ...current };
+      for (const row of preview.students) {
+        if (row.alreadyEnrolledInTarget) continue;
+        const c = current[row.studentId] ?? NO_CHOICE;
+        if (finalDecision(row, c) === "PROMOTED") next[row.studentId] = { ...c, classId, armId: "" };
+      }
+      return next;
+    });
+  }
 
   async function run() {
     if (!preview) return;
@@ -129,6 +157,11 @@ export function PromotionPanel({
         },
       ];
     });
+    const placements = preview.students.flatMap((row) => {
+      const c = choices[row.studentId] ?? NO_CHOICE;
+      if (row.alreadyEnrolledInTarget || finalDecision(row, c) !== "PROMOTED" || c.classId === "") return [];
+      return [{ studentId: row.studentId, classGroupId: c.classId }];
+    });
     const answer = await sendJson(`/api/v1/schools/${schoolCode}/academics/promotion/execute`, "POST", {
       sourceSessionId: sourceId,
       targetSessionId: targetId,
@@ -136,6 +169,7 @@ export function PromotionPanel({
       targetClassGroupId: preview.targetClassGroup?.id ?? null,
       passMark: passMarkNumber,
       overrides,
+      ...(placements.length > 0 ? { placements } : {}),
       ...(notes.trim() ? { notes: notes.trim() } : {}),
     });
     setRunning(false);
@@ -244,8 +278,12 @@ export function PromotionPanel({
             <div className="space-y-4">
               <p className="text-sm text-fg-2" role="status">
                 {preview.sourceClassGroup.name} →{" "}
-                {preview.targetClassGroup ? preview.targetClassGroup.name : "graduation (this is the last class)"}.{" "}
-                {preview.summary.totalEvaluated} pupil
+                {preview.placementNeeded
+                  ? preview.rungClasses.map(classLabel).join(" or ")
+                  : preview.targetClassGroup
+                    ? preview.targetClassGroup.name
+                    : "graduation (this is the last class)"}
+                . {preview.summary.totalEvaluated} pupil
                 {preview.summary.totalEvaluated === 1 ? "" : "s"} on the roll.
               </p>
               {!preview.eligibility.eligible && (
@@ -256,6 +294,27 @@ export function PromotionPanel({
                   {preview.targetClassGroup.name} has no arm yet, so nobody can be promoted into it. Add an arm under Classes &amp;
                   subjects.
                 </Alert>
+              )}
+              {preview.rungClasses.length > 1 && (
+                <Alert variant={preview.placementNeeded ? "warning" : "info"}>
+                  {preview.sourceClassGroup.name} moves up into more than one class.{" "}
+                  {preview.placementNeeded
+                    ? "It is not a stream of any of them, so choose the class of each pupil who is moving up."
+                    : `The pupils go to ${preview.targetClassGroup?.name} unless you choose another class for them.`}
+                </Alert>
+              )}
+              {preview.rungClasses.length > 1 && !readOnly && preview.students.length > 0 && (
+                <div className="sm:max-w-xs">
+                  <SelectField
+                    label="Place every pupil who is moving up in"
+                    value=""
+                    options={[
+                      { value: "", label: "Choose a class" },
+                      ...preview.rungClasses.map((c) => ({ value: c.id, label: classLabel(c) })),
+                    ]}
+                    onChange={(e) => e.target.value && placeAll(e.target.value)}
+                  />
+                </div>
               )}
               {preview.students.length === 0 ? (
                 <p className="rounded-2xl border border-dashed border-line-strong p-8 text-center text-sm text-fg-muted">
@@ -287,6 +346,7 @@ export function PromotionPanel({
                           }}
                           disabled={
                             missingReason ||
+                            unplaced > 0 ||
                             (preview.targetClassGroup !== null && preview.targetArms.length === 0 && plan.counts.PROMOTED > 0)
                           }
                         >
@@ -294,6 +354,12 @@ export function PromotionPanel({
                         </Button>
                         {missingReason && (
                           <p className="mt-2 text-xs text-danger-fg">Give a reason for each pupil you handle differently.</p>
+                        )}
+                        {unplaced > 0 && (
+                          <p className="mt-2 text-xs text-danger-fg">
+                            Choose a class for {unplaced === 1 ? "the pupil" : `each of the ${unplaced} pupils`} who{" "}
+                            {unplaced === 1 ? "is" : "are"} moving up.
+                          </p>
                         )}
                       </div>
                     </div>
@@ -319,6 +385,14 @@ export function PromotionPanel({
                 {plan.counts[d]} to {DECISION_LABEL[d].toLowerCase()}
               </li>
             ))}
+            {preview.rungClasses.length > 1 &&
+              preview.rungClasses
+                .filter((c) => plan.byClass.has(c.id))
+                .map((c) => (
+                  <li key={c.id} className="ml-4 text-fg-muted">
+                    {plan.byClass.get(c.id)} into {classLabel(c)}
+                  </li>
+                ))}
             {plan.skipped > 0 && <li>{plan.skipped} already placed in the next session: left as they are</li>}
           </ul>
           {!preview.eligibility.eligible && <p className="mt-3 text-sm text-warn-fg">{preview.eligibility.reason}</p>}

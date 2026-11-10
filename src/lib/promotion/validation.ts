@@ -31,6 +31,12 @@ export const promotionOverrideSchema = z.strictObject({
     .optional(),
 });
 
+/// Where a promoted pupil goes when the next rung has several classes (task 0035). Not an override: following no rule, there is nothing to give a reason for.
+export const promotionPlacementSchema = z.strictObject({
+  studentId: id("Student"),
+  classGroupId: id("Class"),
+});
+
 export const executePromotionSchema = z
   .strictObject({
     sourceSessionId: id("Source session"),
@@ -40,6 +46,7 @@ export const executePromotionSchema = z
     targetClassGroupId: id("Next class").nullable().optional(),
     passMark: passMarkField.default(50),
     overrides: z.array(promotionOverrideSchema).max(2000, "That is too many overrides.").default([]),
+    placements: z.array(promotionPlacementSchema).max(2000, "That is too many placements.").default([]),
     notes: z.string().trim().max(500, "Notes can be at most 500 characters.").nullable().optional(),
   })
   .superRefine((body, ctx) => {
@@ -49,8 +56,15 @@ export const executePromotionSchema = z
         ctx.addIssue({ code: "custom", path: ["overrides", index, "studentId"], message: "This pupil is listed twice." });
       seen.add(o.studentId);
     });
+    const placed = new Set<string>();
+    body.placements.forEach((o, index) => {
+      if (placed.has(o.studentId))
+        ctx.addIssue({ code: "custom", path: ["placements", index, "studentId"], message: "This pupil is placed twice." });
+      placed.add(o.studentId);
+    });
   });
 
 export type PromotionPreviewQuery = z.infer<typeof promotionPreviewQuerySchema>;
 export type PromotionOverride = z.infer<typeof promotionOverrideSchema>;
+export type PromotionPlacement = z.infer<typeof promotionPlacementSchema>;
 export type ExecutePromotionInput = z.infer<typeof executePromotionSchema>;

@@ -104,6 +104,7 @@ export function ClassesPanel({
                     <h3 className="text-base font-semibold break-words text-fg">{group.name}</h3>
                     <p className="text-xs text-fg-muted">
                       {group.campusName ?? "Whole school"} · {group.subjectCount} {group.subjectCount === 1 ? "subject" : "subjects"}
+                      {group.streamName && ` · ${group.streamName} stream`}
                       {!readOnly && !mayChange(group) && " · Set by the school"}
                     </p>
                   </div>

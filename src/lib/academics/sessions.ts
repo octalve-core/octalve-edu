@@ -132,6 +132,7 @@ export type AcademicFailure =
   | "INVALID_NAME"
   | "INVALID_CAPACITY"
   | "INVALID_SORT_ORDER"
+  | "INVALID_STREAM"
   | "INVALID_CODE"
   | "NAME_TAKEN"
   | "CODE_TAKEN"
