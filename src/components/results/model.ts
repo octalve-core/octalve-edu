@@ -89,6 +89,16 @@ export type ReportCardData = {
     status: ResultStatus;
     verificationToken: string | null;
   }[];
+  /// The teacher's and the principal's remarks, and what this viewer may do about them (task 0036).
+  remarks: CardRemarks;
+};
+
+export type CardRemarks = {
+  teacher: string | null;
+  principal: string | null;
+  editable: boolean;
+  canWriteTeacher: boolean;
+  canWritePrincipal: boolean;
 };
 
 /// A labelled region a keyboard can scroll (axe: scrollable-region-focusable).

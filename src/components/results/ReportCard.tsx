@@ -3,7 +3,7 @@ import { STATUS_LABEL, type ReportCardData } from "./model";
 /// One pupil's report card for one term, on the theme's colours so it reads in both themes (the card it replaces used a fixed palette and `dark:` classes that this app's own theme switch does not
 /// drive). What it shows is what the server sent: a pupil or a guardian is sent only PUBLISHED marks. Printing hides everything around it.
 export function ReportCard({ card, institution }: { card: ReportCardData; institution: string }) {
-  const { student, period, summary, subjects } = card;
+  const { student, period, summary, subjects, remarks } = card;
   const tokens = subjects.filter((s) => s.verificationToken && (s.status === "PUBLISHED" || s.status === "LOCKED"));
   return (
     <article
@@ -108,6 +108,23 @@ export function ReportCard({ card, institution }: { card: ReportCardData; instit
           </tbody>
         </table>
       </div>
+
+      {(remarks.teacher || remarks.principal) && (
+        <section aria-label="Remarks" className="grid gap-4 sm:grid-cols-2">
+          {remarks.teacher && (
+            <div className="rounded-xl border border-line p-4">
+              <h3 className="text-xs font-semibold tracking-wide text-fg-muted uppercase">Teacher&apos;s remark</h3>
+              <p className="mt-2 text-sm whitespace-pre-line text-fg">{remarks.teacher}</p>
+            </div>
+          )}
+          {remarks.principal && (
+            <div className="rounded-xl border border-line p-4">
+              <h3 className="text-xs font-semibold tracking-wide text-fg-muted uppercase">Principal&apos;s remark</h3>
+              <p className="mt-2 text-sm whitespace-pre-line text-fg">{remarks.principal}</p>
+            </div>
+          )}
+        </section>
+      )}
 
       {tokens.length > 0 && (
         <footer className="rounded-xl border border-dashed border-line-strong p-4 text-xs text-fg-muted">

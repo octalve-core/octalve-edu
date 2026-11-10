@@ -96,3 +96,22 @@ model ResultAudit {
   @@index([tenantId, resultId])
   @@index([tenantId, createdAt])
 }
+
+/// The teacher's and the principal's remark on a pupil's report card for one term (task 0036). One row per pupil and term; a row with both remarks cleared is deleted (a check says one is
+/// present). Each remark is 1 to 500 characters and records who wrote it. Like the promotion tables it carries no Prisma relations: the links are composite foreign keys on (tenantId, id) in
+/// the migration, so a remark can never point at another school's pupil or term. Editable until any of the pupil's results for the term is published (a service rule).
+model ReportRemark {
+  id                      String   @id @default(cuid())
+  tenantId                String
+  studentId               String
+  periodId                String
+  teacherRemark           String?
+  teacherRemarkByUserId   String?
+  principalRemark         String?
+  principalRemarkByUserId String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @default(now()) @updatedAt
+
+  @@unique([tenantId, studentId, periodId])
+  @@index([tenantId, periodId])
+}
