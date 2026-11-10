@@ -456,3 +456,12 @@
 - [x] "Download PDF" on a card and "Download all cards (PDF)" on the class list in the Cards panel
 - [x] **A defect found by the maintainer and fixed:** the card told people to check a mark at `/api/v1/verify/<code>` (raw JSON). There is now a public page, `/verify/[code]` and `/verify`, and the card and the PDF print full, clickable links; the never-mounted `VerifyCertificateForm` is removed
 - [x] Tests: unit, API and screens (x2 projects) new; twenty-eight mutant failures across eight mutations; whole unit and API projects run
+
+## TASK-0039: Bulk mark import
+
+[Task file](0039-mark-import.md). The fifth of the items task 0031 left unbuilt, asked for by the maintainer on 2026-11-10; built on `claude/octalve-mark-import`. **No migration.**
+
+- [x] The Marks sheet as a CSV file to fill in (one column per part of the class's scheme, saved marks in place), and an import of that file for one subject in one class and term
+- [x] A check that writes nothing, then an all-or-nothing import through `recordStudentResults` (the scheme's rules, DRAFT-only, a teacher's assignment, the scheme lock) in the same transaction; pupils found by admission number among the pupils on THIS roll only; audited without the marks
+- [x] "Import marks from a file" under the grid: download, choose, check row by row, import; typed-but-unsaved marks block it
+- [x] Tests: unit, API and screens (x2 projects) new; ten mutations caught; whole unit and API projects run

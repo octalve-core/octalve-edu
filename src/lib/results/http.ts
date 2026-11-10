@@ -70,7 +70,9 @@ export type ResultFailure =
   | "FORBIDDEN_STUDENT_ACCESS"
   | "PERIOD_NOT_ACTIVE"
   | "REPORT_CARD_WITHHELD"
-  | "TOO_MANY_CARDS";
+  | "TOO_MANY_CARDS"
+  | "TOO_LARGE"
+  | "TOO_MANY_ROWS";
 
 export function resultFailure(reason: ResultFailure, message?: string): Response {
   switch (reason) {
@@ -96,6 +98,10 @@ export function resultFailure(reason: ResultFailure, message?: string): Response
       return fail(message ?? "The academic period is closed or invalid.", 409, "CONFLICT");
     case "TOO_MANY_CARDS":
       return fail(message ?? "That is too many report cards for one file.", 409, "CONFLICT");
+    case "TOO_LARGE":
+      return fail(message ?? "That file is too large.", 413, "TOO_LARGE");
+    case "TOO_MANY_ROWS":
+      return fail(message ?? "That file has too many rows.", 400, "TOO_MANY_ROWS");
     case "REPORT_CARD_WITHHELD":
       return fail(
         message ?? "This report card is being held until the outstanding school fees are paid. Please contact the school office.",
@@ -117,3 +123,12 @@ export const sheetQuerySchema = z.object({
   subjectId: requiredId("Subject"),
 });
 export const rosterQuerySchema = z.object({ periodId: requiredId("Period"), classArmId: requiredId("Class arm") });
+
+/// Importing marks from a file (task 0039): the sheet it is for, the file's text, and whether this is only a check. `csv` may be up to twice the file limit because JSON escapes every line break.
+export const markImportSchema = z.strictObject({
+  periodId: requiredId("Period"),
+  classArmId: requiredId("Class arm"),
+  subjectId: requiredId("Subject"),
+  csv: z.string({ error: "Send the file's text." }).max(2 * 1024 * 1024),
+  dryRun: z.boolean({ error: "Say whether this is a check (true) or the real import (false)." }),
+});

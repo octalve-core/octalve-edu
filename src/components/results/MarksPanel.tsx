@@ -7,6 +7,7 @@ import { SelectField } from "@/components/ui/SelectField";
 import { sendJson } from "@/components/auth/postJson";
 import { LiveNotice, StatusPill, type Notice } from "@/components/academics/parts";
 import { failureText, useApi } from "@/components/academics/useApi";
+import { MarkImport } from "./MarkImport";
 import { FIELD, REGION, STATUS_LABEL, markProblem, statusTone, type Options, type Sheet, type SheetRow } from "./model";
 
 /// "Marks": enter the marks of one subject for one class and term. Pick the term, the class and the subject (only what the person may enter is offered), type the marks, save, and send the
@@ -317,6 +318,16 @@ function SheetEditor({
             </p>
           )}
         </div>
+      )}
+      {!readOnly && sheet.rows.length > 0 && (
+        <MarkImport
+          base={base}
+          periodId={sheet.period.id}
+          classArmId={sheet.arm.id}
+          subjectId={sheet.subject.id}
+          blocked={dirty.length > 0}
+          onImported={onChanged}
+        />
       )}
     </>
   );

@@ -2,6 +2,7 @@ import type { Tx } from "@/lib/tenant/for-tenant";
 import { getStudentReportCard } from "./service";
 import { classRoster, type SheetCaller } from "./sheet";
 import { renderReportCardsPdf, type PdfCard } from "./report-card-pdf";
+import { fileNamePart } from "./file-name";
 import type { ResultFailure } from "./http";
 
 // Report cards as PDF files (task 0038): one pupil's, and a whole class's in one file. The data comes from the same reads as the screen (`getStudentReportCard`, `classRoster`), so every rule that
@@ -13,14 +14,7 @@ export const MAX_CARDS_PER_FILE = 100;
 export type PdfFailure = { ok: false; failure: ResultFailure; message?: string };
 export type PdfFile = { ok: true; pdf: Buffer; filename: string; pages: number; cards: number; unsupported: number };
 
-/// A name that is safe in a download's file name: letters and digits, the rest one dash.
-const safe = (text: string) =>
-  text
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^A-Za-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 50) || "card";
+const safe = (text: string) => fileNamePart(text, "card");
 
 type CardResult = Awaited<ReturnType<typeof getStudentReportCard>>;
 type CardData = Extract<CardResult, { data: unknown }>["data"];
