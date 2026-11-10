@@ -19,7 +19,8 @@ export const componentScoreItemSchema = z.strictObject({
 export const studentResultEntrySchema = z.strictObject({
   studentId: idField("Student ID"),
   score: z.number().min(0, "Score cannot be negative").max(MAX_MARK, `A score cannot exceed ${MAX_MARK}`).optional(),
-  maxScore: z.number().positive("Max score must be positive").max(MAX_MARK, `A maximum cannot exceed ${MAX_MARK}`).optional().default(100),
+  /// Left out, it is the scheme's total when the class has a scheme, else 100 (the service decides: task 0032).
+  maxScore: z.number().positive("Max score must be positive").max(MAX_MARK, `A maximum cannot exceed ${MAX_MARK}`).optional(),
   components: z.array(componentScoreItemSchema).optional(),
 });
 
