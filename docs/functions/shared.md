@@ -132,6 +132,14 @@ The process-memory store behind the development email inbox.
 | --- | --- | --- | --- | --- |
 | GET, DELETE | `/api/v1/dev/email-inbox` | `dev/email-inbox/route.ts` | Anyone (public: no `withAuth`), gated by `devToolsAccess()`: 404 where the dev tools are off (always in production); on staging the `x-dev-tools-token` header is required; open in development. Not reachable from a support view. | GET returns `{ emails, mode }`: the last 50 messages the `inbox` email transport captured (reset links, notices). DELETE empties the buffer, checking CSRF first. The token is compared in constant time; a missing token is 401 `TOKEN_REQUIRED` at no cost, wrong ones count against 5 per IP per 5 minutes (429 `RATE_LIMITED`), a correct one refunds its slot. `no-store`; listed in `route-role-guard.spec.ts` as public in source by design. |
 
+## `src/lib/pdf/`
+
+A small PDF writer with no dependency (task 0038), for documents that are laid out page by page. The question bank's `printing.ts` (in `src/lib/question-bank/`) is a separate, Latin-only engine for question papers.
+
+| File | Description |
+| --- | --- |
+| `builder.ts` | `PdfBuilder`: PDF 1.4 on A4 with the standard Helvetica (regular, bold) and Courier fonts, no embedding. `addPage`, `selectPage` (draw on an earlier page again, for "Page i of n"), `width` and `wrap` (true text measuring from the Helvetica width tables for U+0020 to U+007E, 556 elsewhere; words kept whole, a word wider than a line cut where it overflows), `text` (left, right or centre aligned, a size, a colour), `line`, `rect` (fill and/or stroke), `link` (a clickable rectangle; only a plain printable-ASCII `http(s)` address is accepted, `false` otherwise, and `(`, `)` and `\` are escaped) and `build(date)` (a real cross-reference table, the document title and author, the clock passed in so the same input is the same bytes). Text is written as hex strings in WinAnsi: Latin-1 and the Windows-1252 punctuation as themselves, a letter with a mark WinAnsi lacks as its base letter (Yoruba), a lone combining mark dropped, anything else a `?`, counted in `unsupported`. Exports `charWidth` and `encodeWinAnsi`. |
+
 ## `src/lib/tools/`
 
 Pure code behind the Quick Tools.
@@ -146,6 +154,7 @@ Small shared modules: brand words, the database client, the dev-tools gate, role
 
 | File | Description |
 | --- | --- |
+| `app-url.ts` | The address this deployment is served from, for a link that is PRINTED or saved (task 0038): `appOrigin(fallback?)` (`APP_URL`, else the request's own address, else `http://localhost:3000`; always `http(s)://host[:port][/path]` without a trailing slash; a value that is not a web address is not used), `verifyPageUrl(origin)` (`<origin>/verify`) and `verifyLink(origin, code)` (`<origin>/verify/<code>`, never an `/api/` path). |
 | `brand.ts` | `brand`: the product's words (`name` "Octalve Edu", `tagline`, `description`, the sign-in `login` headline, blurb and points, and the campus wording `place`). One of the two per-repo brand files (the other is `src/app/brand.css`); the layout, manifest, shell, sign-in screens and email text read it. |
 | `db.ts` | `prisma`: the one `PrismaClient`, cached on `globalThis` outside production so hot reload does not open new connections. It uses `DATABASE_URL`, the unprivileged `app_user` role that row-level security applies to. School code must not import it: ESLint forbids `@/lib/db` under `src/app/(app)/schools/**` and `src/app/api/v1/schools/**`, which use `forTenant` or `tenant.run`. |
 | `dev-tools.ts` | `appEnv()`, `devToolsAccess()` and `devToolsEnabled()`: the one decision on whether any development affordance exists; it fails closed. `appEnv`: `VERCEL_ENV=production` wins, then `APP_ENV` (an unrecognised value means production), else `NODE_ENV=production`. `devToolsAccess`: production `off`; staging `token` only with `DEV_TOOLS=true` and a non-empty `DEV_TOOLS_TOKEN`, else `off`; development `open` unless `DEV_TOOLS=false`. Used by the root layout, the `inbox` email transport and the dev inbox route. |

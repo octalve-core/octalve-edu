@@ -1,8 +1,10 @@
+import { verifyLink, verifyPageUrl } from "@/lib/app-url";
 import { STATUS_LABEL, type ReportCardData } from "./model";
 
 /// One pupil's report card for one term, on the theme's colours so it reads in both themes (the card it replaces used a fixed palette and `dark:` classes that this app's own theme switch does not
 /// drive). What it shows is what the server sent: a pupil or a guardian is sent only PUBLISHED marks. Printing hides everything around it.
-export function ReportCard({ card, institution }: { card: ReportCardData; institution: string }) {
+/// `origin` is the address this site is served from (the verification links are printed in full, so they work on paper and when the card is saved as a PDF from the print dialog).
+export function ReportCard({ card, institution, origin }: { card: ReportCardData; institution: string; origin: string }) {
   const { student, period, summary, subjects, remarks } = card;
   const tokens = subjects.filter((s) => s.verificationToken && (s.status === "PUBLISHED" || s.status === "LOCKED"));
   return (
@@ -128,16 +130,24 @@ export function ReportCard({ card, institution }: { card: ReportCardData; instit
 
       {tokens.length > 0 && (
         <footer className="rounded-xl border border-dashed border-line-strong p-4 text-xs text-fg-muted">
-          <p className="font-semibold text-fg-2">Verification codes</p>
+          <p className="font-semibold text-fg-2">Verification links</p>
           <p className="mt-1">
-            Anyone can check a published mark at <span className="font-semibold">/api/v1/verify/&lt;code&gt;</span>.
+            Anyone can check that a published mark is genuine: open its link, or go to{" "}
+            <span className="font-semibold break-all">{verifyPageUrl(origin)}</span> and type the code at the end of the link.
           </p>
-          <ul className="mt-2 space-y-1">
-            {tokens.map((s) => (
-              <li key={s.subjectId}>
-                {s.subjectName}: <span className="font-mono break-all text-fg-2">{s.verificationToken}</span>
-              </li>
-            ))}
+          <ul className="mt-2 space-y-1.5">
+            {tokens.map((s) => {
+              const url = verifyLink(origin, s.verificationToken!);
+              return (
+                <li key={s.subjectId}>
+                  <span className="font-semibold text-fg-2">{s.subjectName}:</span>{" "}
+                  <a href={url} target="_blank" rel="noopener noreferrer" className="font-mono break-all text-brand-fg underline">
+                    {url}
+                    <span className="sr-only"> (opens in a new tab)</span>
+                  </a>
+                </li>
+              );
+            })}
           </ul>
         </footer>
       )}
