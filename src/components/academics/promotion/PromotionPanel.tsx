@@ -40,6 +40,8 @@ export function PromotionPanel({
   classes,
   schoolType,
   readOnly,
+  canUndo,
+  hasMfa,
 }: {
   schoolCode: string;
   sessions: SessionOption[];
@@ -47,6 +49,9 @@ export function PromotionPanel({
   schoolType: SchoolType;
   /// A support view, or anyone who may not roll: the preview is shown, nothing that writes is drawn.
   readOnly: boolean;
+  /// The school's administrator outside a support view: may undo a roll (task 0040), and `hasMfa` says which proof the dialog asks for.
+  canUndo: boolean;
+  hasMfa: boolean;
 }) {
   const words = periodWords(schoolType);
   const start = useMemo(() => defaultPromotionSessions(sessions), [sessions]);
@@ -205,7 +210,17 @@ export function PromotionPanel({
       <LiveNotice notice={notice} />
 
       {view === "history" ? (
-        <PromotionHistory schoolCode={schoolCode} refreshKey={refresh} />
+        <PromotionHistory
+          schoolCode={schoolCode}
+          refreshKey={refresh}
+          canUndo={canUndo}
+          hasMfa={hasMfa}
+          onUndone={() => {
+            // Pupils' places have moved back: a preview made before is stale.
+            setPreview(null);
+            setChoices({});
+          }}
+        />
       ) : (
         <section aria-labelledby="promotion-heading" className="space-y-4">
           <div>

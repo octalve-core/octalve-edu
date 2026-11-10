@@ -69,6 +69,14 @@ export type BatchView = {
   sourceClassGroup: { id: string; name: string };
   targetClassGroup: { id: string; name: string } | null;
   executedBy: { id: string; name: string | null; email: string | null };
+  /// Set when the roll was undone (task 0040).
+  reversal: {
+    createdAt: string;
+    reason: string;
+    restored: number;
+    cancelled: number;
+    by: { id: string; name: string | null; email: string | null };
+  } | null;
   totals: { evaluated: number; promoted: number; repeated: number; graduated: number; withdrawn: number; skipped: number };
 };
 

@@ -581,7 +581,9 @@ export async function enrolWithin(
     where: { tenantId, studentId, sessionId: input.sessionId },
     include: ENROLMENT_INCLUDE,
   });
-  if (existing && existing.status !== "WITHDRAWN") {
+  // A WITHDRAWN place, or one that an undone roll CANCELLED (task 0040), is brought back to life; any other is a place the pupil already has.
+  const revivable = existing && (existing.status === "WITHDRAWN" || existing.status === "CANCELLED");
+  if (existing && !revivable) {
     return refuse("ALREADY_ENROLLED", {
       classArmId: existing.classArmId,
       armName: existing.classArm.name,
@@ -591,7 +593,7 @@ export async function enrolWithin(
   if (existing) {
     // A withdrawn student coming back into the same session: the row (one per student per session) is reactivated, not duplicated.
     const done = await tx.studentEnrollment.updateMany({
-      where: { id: existing.id, tenantId, status: "WITHDRAWN" },
+      where: { id: existing.id, tenantId, status: { in: ["WITHDRAWN", "CANCELLED"] } },
       data: { status: "ACTIVE", classArmId: arm.arm.id },
     });
     if (done.count !== 1) return refuseAndRollBack("WRONG_STATE");
@@ -602,7 +604,7 @@ export async function enrolWithin(
       "StudentEnrollment",
       "ENROLMENT_REACTIVATED",
       existing.id,
-      { status: "WITHDRAWN", classArmId: existing.classArmId },
+      { status: existing.status, classArmId: existing.classArmId },
       { status: "ACTIVE", classArmId: arm.arm.id, studentId, sessionId: input.sessionId },
     );
     return { ok: true as const, enrolment: toEnrolment(await enrolmentRow(tx, existing.id)), reenrolled: true };

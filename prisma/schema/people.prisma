@@ -38,6 +38,9 @@ enum EnrollmentStatus {
   ALUMNI
   /// Task 0028: the pupil was expelled; everything that selects pupils by an ACTIVE enrolment drops them without a change. Reinstating puts it back.
   EXPELLED
+  /// Task 0040: the roll that placed this pupil here was undone. The row stays (a promotion record points at it and is append-only; an enrolment is unique per pupil and session), is ignored by everything
+  /// that selects by ACTIVE, and is revived when the pupil is rolled or enrolled into that session again.
+  CANCELLED
 }
 
 /// A member of staff as the SCHOOL knows them — not a sign-in account. userId is null for someone who never signs in (a security guard); when set it must

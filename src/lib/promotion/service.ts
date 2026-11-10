@@ -1,6 +1,7 @@
 import { Decimal } from "@prisma/client/runtime/library";
 import { EnrollmentStatus, Prisma, PromotionDecision, PromotionDecisionMode, ResultStatus } from "@prisma/client";
 import type { Tx } from "@/lib/tenant/for-tenant";
+import type { ErrorDetail } from "@/lib/api/envelope";
 import {
   DEFAULT_PASS_MARK,
   campusAdminMayRoll,
@@ -25,6 +26,10 @@ export class PromotionError extends Error {
   constructor(
     message: string,
     public readonly status: 400 | 403 | 404 | 409 = 400,
+    /// What the client reads the refusal by (task 0040: `UNDO_BLOCKED`, `ALREADY_UNDONE`); `PROMOTION_REFUSED` for every refusal of a roll.
+    public readonly code: string = "PROMOTION_REFUSED",
+    /// A list the refusal carries (task 0040: the pupils that stop an undo, one line each).
+    public readonly details?: ErrorDetail[],
   ) {
     super(message);
     this.name = "PromotionError";
@@ -189,7 +194,8 @@ export async function previewPromotion(tx: Tx, tenantId: string, caller: Caller,
     ? new Set(
         (
           await tx.studentEnrollment.findMany({
-            where: { tenantId, sessionId: targetSessionId, studentId: { in: studentIds } },
+            // A place that an undone roll cancelled (task 0040) is not a place: the pupil is rolled normally and the cancelled row is revived.
+            where: { tenantId, sessionId: targetSessionId, studentId: { in: studentIds }, status: { not: EnrollmentStatus.CANCELLED } },
             select: { studentId: true },
           })
         ).map((e) => e.studentId),
@@ -385,6 +391,14 @@ export interface PromotionBatchView {
   sourceClassGroup: { id: string; name: string };
   targetClassGroup: { id: string; name: string } | null;
   executedBy: { id: string; name: string | null; email: string | null };
+  /// Set when the roll was undone (task 0040): when, why, by whom, and how many pupils were put back.
+  reversal: {
+    createdAt: string;
+    reason: string;
+    restored: number;
+    cancelled: number;
+    by: { id: string; name: string | null; email: string | null };
+  } | null;
   totals: { evaluated: number; promoted: number; repeated: number; graduated: number; withdrawn: number; skipped: number };
 }
 
@@ -395,7 +409,9 @@ async function viewBatches(tx: Tx, tenantId: string, rows: BatchRow[]): Promise<
   if (rows.length === 0) return [];
   const sessionIds = [...new Set(rows.flatMap((b) => [b.sourceSessionId, b.targetSessionId]))];
   const classIds = [...new Set(rows.flatMap((b) => [b.sourceClassGroupId, b.targetClassGroupId]).filter((x): x is string => x !== null))];
-  const userIds = [...new Set(rows.map((b) => b.executedByUserId))];
+  const reversals = await tx.promotionReversal.findMany({ where: { tenantId, batchId: { in: rows.map((b) => b.id) } } });
+  const reversalOf = new Map(reversals.map((r) => [r.batchId, r]));
+  const userIds = [...new Set([...rows.map((b) => b.executedByUserId), ...reversals.map((r) => r.reversedByUserId)])];
   const [sessions, classes, users] = await Promise.all([
     tx.academicSession.findMany({ where: { tenantId, id: { in: sessionIds } }, select: { id: true, label: true } }),
     tx.classGroup.findMany({ where: { tenantId, id: { in: classIds } }, select: { id: true, name: true } }),
@@ -418,6 +434,19 @@ async function viewBatches(tx: Tx, tenantId: string, rows: BatchRow[]): Promise<
       name: user.get(b.executedByUserId)?.name ?? null,
       email: user.get(b.executedByUserId)?.email ?? null,
     },
+    reversal: reversalOf.has(b.id)
+      ? {
+          createdAt: reversalOf.get(b.id)!.createdAt.toISOString(),
+          reason: reversalOf.get(b.id)!.reason,
+          restored: reversalOf.get(b.id)!.restored,
+          cancelled: reversalOf.get(b.id)!.cancelled,
+          by: {
+            id: reversalOf.get(b.id)!.reversedByUserId,
+            name: user.get(reversalOf.get(b.id)!.reversedByUserId)?.name ?? null,
+            email: user.get(reversalOf.get(b.id)!.reversedByUserId)?.email ?? null,
+          },
+        }
+      : null,
     totals: {
       evaluated: b.totalEvaluated,
       promoted: b.totalPromoted,
@@ -479,16 +508,15 @@ export async function executePromotion(tx: Tx, tenantId: string, caller: Caller,
 
   // Who already has a place in the target session is read AGAIN, under the lock. The preview's answer was read before the lock: a roll that committed in between would have made it say "already
   // placed" about pupils it had itself just moved, and this roll would then record a batch that "left them as they were".
-  const placedNow = new Set(
-    rosterIds.length
-      ? (
-          await tx.studentEnrollment.findMany({
-            where: { tenantId, sessionId: targetSessionId, studentId: { in: rosterIds } },
-            select: { studentId: true },
-          })
-        ).map((e) => e.studentId)
-      : [],
-  );
+  const targetPlaces = rosterIds.length
+    ? await tx.studentEnrollment.findMany({
+        where: { tenantId, sessionId: targetSessionId, studentId: { in: rosterIds } },
+        select: { id: true, studentId: true, status: true },
+      })
+    : [];
+  const placedNow = new Set(targetPlaces.filter((e) => e.status !== EnrollmentStatus.CANCELLED).map((e) => e.studentId));
+  // A place that an undone roll cancelled (task 0040) is brought back to life, not duplicated: an enrolment is unique per pupil and session.
+  const cancelledPlace = new Map(targetPlaces.filter((e) => e.status === EnrollmentStatus.CANCELLED).map((e) => [e.studentId, e.id]));
 
   for (const pupil of preview.students) {
     const sourceEnrolment = source.get(pupil.studentId);
@@ -533,11 +561,25 @@ export async function executePromotion(tx: Tx, tenantId: string, caller: Caller,
           `${pupil.firstName} ${pupil.lastName} cannot be promoted: ${(placedClassId ? rungById.get(placedClassId)?.name : null) ?? "the next class"} has no arm.`,
           409,
         );
-      const created = await tx.studentEnrollment.create({
-        data: { tenantId, studentId: pupil.studentId, sessionId: targetSessionId, classArmId: armId, status: EnrollmentStatus.ACTIVE },
-        select: { id: true },
-      });
-      targetEnrollmentId = created.id;
+      const revivable = cancelledPlace.get(pupil.studentId);
+      if (revivable) {
+        const revived = await tx.studentEnrollment.updateMany({
+          where: { tenantId, id: revivable, status: EnrollmentStatus.CANCELLED },
+          data: { status: EnrollmentStatus.ACTIVE, classArmId: armId },
+        });
+        if (revived.count !== 1)
+          throw new PromotionError(
+            `${pupil.firstName} ${pupil.lastName}'s place changed while the roll was being made. Generate the preview again.`,
+            409,
+          );
+        targetEnrollmentId = revivable;
+      } else {
+        const created = await tx.studentEnrollment.create({
+          data: { tenantId, studentId: pupil.studentId, sessionId: targetSessionId, classArmId: armId, status: EnrollmentStatus.ACTIVE },
+          select: { id: true },
+        });
+        targetEnrollmentId = created.id;
+      }
     }
 
     if (decision === PromotionDecision.PROMOTED) totals.promoted++;
