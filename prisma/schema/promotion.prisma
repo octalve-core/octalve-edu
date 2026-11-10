@@ -52,6 +52,8 @@ model PromotionRecord {
   sourceEnrollmentId String
   /// null for GRADUATED and WITHDRAWN (a check in the migration).
   targetEnrollmentId String?
+  /// The class the pupil was placed in (task 0035); null on a record made before streams, and for a graduate or a leaver. The batch's own target class applies when it is null.
+  targetClassGroupId String?
   overallAverage     Decimal?              @db.Decimal(5, 2)
   /// { "1": 65.4, "2": null, "3": 58 } by period ordinal.
   termAverages       Json

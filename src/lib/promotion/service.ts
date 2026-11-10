@@ -7,12 +7,13 @@ import {
   classCalendarProblem,
   computeStudentSessionAverage,
   evaluatePromotionRecommendation,
-  resolveNextClassGroup,
+  nextRungClasses,
   resolveTargetArm,
+  streamPlacement,
   sessionPairProblem,
   validateSessionPromotionEligibility,
 } from "./rules";
-import type { ExecutePromotionInput, PromotionOverride, PromotionPreviewQuery } from "./validation";
+import type { ExecutePromotionInput, PromotionOverride, PromotionPlacement, PromotionPreviewQuery } from "./validation";
 
 // Rolling a class into the next session (task 0031; AlEemaan's tasks 0025 and 0037, whose nine faults are built out here from the start - see the task file, section 3.3).
 //
@@ -48,8 +49,21 @@ export interface StudentPreviewRow {
   recommendationReason: string;
   targetClassArmId: string | null;
   targetClassArmName: string | null;
+  /// The class the pupil would be placed in (the next class for a promotion, their own for a repeat), null for a graduate or a leaver (task 0035).
+  targetClassGroupId: string | null;
+  targetClassGroupName: string | null;
+  /// The pupil is to be promoted, has no place in the next session yet, and the next rung has several classes whose stream cannot be worked out from this class: the roll will not guess.
+  needsPlacement: boolean;
   /// The pupil already has an enrolment in the target session: a roll leaves them alone.
   alreadyEnrolledInTarget: boolean;
+}
+
+/// A class a promoted pupil may be placed in: a live class of the next rung, with its live arms.
+export interface RungClass {
+  id: string;
+  name: string;
+  streamName: string | null;
+  arms: { id: string; name: string }[];
 }
 
 export interface PromotionPreview {
@@ -60,6 +74,10 @@ export interface PromotionPreview {
   academicPeriods: { id: string; ordinal: number; label: string; isCurrent: boolean }[];
   eligibility: { eligible: boolean; finalPeriodOrdinal: number; reason?: string };
   targetArms: { id: string; name: string }[];
+  /// Every live class of the next rung (one, or several when a school has streams). The roll's default target is `targetClassGroup`; a pupil may be placed in any of these.
+  rungClasses: RungClass[];
+  /// The stream of this class does not say which of `rungClasses` the pupils go to: every pupil to be promoted needs a placement.
+  placementNeeded: boolean;
   students: StudentPreviewRow[];
   summary: { totalEvaluated: number; totalPromoted: number; totalRepeated: number; totalGraduated: number; totalSkipped: number };
 }
@@ -99,7 +117,7 @@ export async function previewPromotion(tx: Tx, tenantId: string, caller: Caller,
 
   const classes = await tx.classGroup.findMany({
     where: { tenantId },
-    select: { id: true, name: true, sortOrder: true, campusId: true, archivedAt: true },
+    select: { id: true, name: true, sortOrder: true, campusId: true, archivedAt: true, streamName: true },
   });
   const sourceClass = classes.find((c) => c.id === sourceClassGroupId);
   // An archived class has no roll worth rolling and is not offered; naming one is the same 404 as an unknown one.
@@ -112,14 +130,19 @@ export async function previewPromotion(tx: Tx, tenantId: string, caller: Caller,
   const { source } = await checkSessions(tx, tenantId, sourceSessionId, targetSessionId, sourceClass.campusId);
   checkCampus(caller, sourceClass.campusId, source.campusId);
 
-  const { nextClass, isTerminalClass } = resolveNextClassGroup(sourceClass, classes);
-  const targetArms = nextClass
+  const rung = nextRungClasses(sourceClass, classes);
+  const { target: nextClass, needsPlacement: placementNeeded } = streamPlacement(sourceClass, rung);
+  const isTerminalClass = rung.length === 0;
+  const rungArms = rung.length
     ? await tx.classArm.findMany({
-        where: { tenantId, classGroupId: nextClass.id, archivedAt: null },
-        select: { id: true, name: true },
-        orderBy: { name: "asc" },
+        where: { tenantId, classGroupId: { in: rung.map((c) => c.id) }, archivedAt: null },
+        select: { id: true, name: true, classGroupId: true },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
       })
     : [];
+  const armsOf = (classId: string) => rungArms.filter((a) => a.classGroupId === classId).map((a) => ({ id: a.id, name: a.name }));
+  const rungClasses: RungClass[] = rung.map((c) => ({ id: c.id, name: c.name, streamName: c.streamName ?? null, arms: armsOf(c.id) }));
+  const targetArms = nextClass ? armsOf(nextClass.id) : [];
 
   const periods = await tx.academicPeriod.findMany({
     where: { tenantId, sessionId: sourceSessionId, archivedAt: null },
@@ -217,6 +240,19 @@ export async function previewPromotion(tx: Tx, tenantId: string, caller: Caller,
       targetClassArmId: armId,
       targetClassArmName:
         targetArms.find((a) => a.id === armId)?.name ?? (advice.decision === PromotionDecision.PROMOTED ? null : enrolment.classArm.name),
+      targetClassGroupId:
+        advice.decision === PromotionDecision.PROMOTED
+          ? (nextClass?.id ?? null)
+          : advice.decision === PromotionDecision.REPEATED
+            ? sourceClass.id
+            : null,
+      targetClassGroupName:
+        advice.decision === PromotionDecision.PROMOTED
+          ? (nextClass?.name ?? null)
+          : advice.decision === PromotionDecision.REPEATED
+            ? sourceClass.name
+            : null,
+      needsPlacement: placementNeeded && advice.decision === PromotionDecision.PROMOTED && !alreadyEnrolledInTarget,
       alreadyEnrolledInTarget,
     };
   });
@@ -229,14 +265,74 @@ export async function previewPromotion(tx: Tx, tenantId: string, caller: Caller,
     academicPeriods: periods,
     eligibility,
     targetArms,
+    rungClasses,
+    placementNeeded,
     students,
     summary: { totalEvaluated: students.length, totalPromoted, totalRepeated, totalGraduated, totalSkipped },
   };
 }
 
+const nameOf = (r: { firstName: string; lastName: string }) => `${r.firstName} ${r.lastName}`;
+/// "Ada Obi", "Ada Obi and Bayo Ade", "Ada Obi, Bayo Ade, Chi Eze and 4 more": a sentence can name some pupils without becoming a list.
+function namesOf(rows: readonly { firstName: string; lastName: string }[]): string {
+  const shown = rows.slice(0, 3).map(nameOf);
+  if (rows.length > 3) return `${shown.join(", ")} and ${rows.length - 3} more`;
+  return shown.length > 1 ? `${shown.slice(0, -1).join(", ")} and ${shown[shown.length - 1]}` : shown[0];
+}
+
+/// What a placement may ask for (task 0035): a pupil on the roll who is to be promoted and has no place in the next session yet, into a live class of the NEXT rung (never any class of
+/// the school), and, when the stream of this class does not say where its pupils go, one for every pupil who is to be promoted. Returns studentId -> class. Decided before the first write.
+function checkPlacements(
+  preview: PromotionPreview,
+  placements: readonly PromotionPlacement[],
+  overrides: ReadonlyMap<string, PromotionOverride>,
+): Map<string, string> {
+  const roster = new Map(preview.students.map((row) => [row.studentId, row]));
+  const finalDecision = (row: StudentPreviewRow) => overrides.get(row.studentId)?.decision ?? row.recommendedDecision;
+  const allowed = new Set(preview.rungClasses.map((c) => c.id));
+  const placed = new Map<string, string>();
+  for (const p of placements) {
+    const row = roster.get(p.studentId);
+    if (!row)
+      throw new PromotionError(
+        "A placement names a pupil who is not in this class for the source session. Generate the preview again.",
+        409,
+      );
+    if (finalDecision(row) !== PromotionDecision.PROMOTED)
+      throw new PromotionError(`${nameOf(row)} is not being promoted, so there is no next class to choose for them.`, 409);
+    if (row.alreadyEnrolledInTarget)
+      throw new PromotionError(`${nameOf(row)} already has a place in the next session, so there is nothing to choose.`, 409);
+    if (!allowed.has(p.classGroupId))
+      throw new PromotionError(
+        `${preview.sourceClassGroup.name} does not move up into the class chosen for ${nameOf(row)}. Choose ${
+          preview.rungClasses.length > 0 ? `one of ${preview.rungClasses.map((c) => c.name).join(", ")}` : "no class: it is the last one"
+        }.`,
+        409,
+      );
+    placed.set(p.studentId, p.classGroupId);
+  }
+  if (preview.placementNeeded) {
+    const missing = preview.students.filter(
+      (row) => !row.alreadyEnrolledInTarget && finalDecision(row) === PromotionDecision.PROMOTED && !placed.has(row.studentId),
+    );
+    if (missing.length > 0)
+      throw new PromotionError(
+        `${preview.sourceClassGroup.name} moves up into more than one class and is not a stream of any of them. Choose the class for ${namesOf(missing)}.`,
+        409,
+      );
+  }
+  return placed;
+}
+
 /// What an override may ask for: only a pupil on the roll, no PROMOTED where there is no next class, no GRADUATED for a class that has one, and an arm that really belongs to the class the
 /// pupil goes to (the next class for a promotion, the same class for a repeat) and is still in use. Each refusal names the pupil and says what to change.
-async function checkOverrides(tx: Tx, tenantId: string, preview: PromotionPreview, overrides: ReadonlyMap<string, PromotionOverride>) {
+async function checkOverrides(
+  tx: Tx,
+  tenantId: string,
+  preview: PromotionPreview,
+  overrides: ReadonlyMap<string, PromotionOverride>,
+  placements: ReadonlyMap<string, string>,
+) {
   const roster = new Map(preview.students.map((row) => [row.studentId, row]));
   const armIds = [...new Set([...overrides.values()].map((o) => o.targetClassArmId).filter((x): x is string => Boolean(x)))];
   const arms = armIds.length
@@ -264,9 +360,10 @@ async function checkOverrides(tx: Tx, tenantId: string, preview: PromotionPrevie
       );
     }
     if (o.targetClassArmId) {
+      const placed = placements.get(o.studentId);
       const goesTo =
         o.decision === PromotionDecision.PROMOTED
-          ? preview.targetClassGroup
+          ? (preview.rungClasses.find((c) => c.id === placed) ?? preview.targetClassGroup)
           : o.decision === PromotionDecision.REPEATED
             ? preview.sourceClassGroup
             : null;
@@ -338,7 +435,7 @@ async function viewBatches(tx: Tx, tenantId: string, rows: BatchRow[]): Promise<
  * target session is left alone (never overwritten: it may be a placement an administrator made by hand). The batch is written ONCE, with its final totals, because the table is append-only.
  */
 export async function executePromotion(tx: Tx, tenantId: string, caller: Caller, input: ExecutePromotionInput) {
-  const { sourceSessionId, targetSessionId, sourceClassGroupId, targetClassGroupId, passMark, overrides, notes } = input;
+  const { sourceSessionId, targetSessionId, sourceClassGroupId, targetClassGroupId, passMark, overrides, placements, notes } = input;
 
   const preview = await previewPromotion(tx, tenantId, caller, { sourceSessionId, targetSessionId, sourceClassGroupId, passMark });
 
@@ -347,16 +444,20 @@ export async function executePromotion(tx: Tx, tenantId: string, caller: Caller,
     throw new PromotionError("The class these pupils move to has changed since the preview was made. Generate the preview again.", 409);
   }
   const overrideMap = new Map(overrides.map((o) => [o.studentId, o]));
-  await checkOverrides(tx, tenantId, preview, overrideMap);
+  const placementMap = checkPlacements(preview, placements, overrideMap);
+  await checkOverrides(tx, tenantId, preview, overrideMap, placementMap);
 
   // Somebody is to be promoted into a class that has no arm: refuse now, before the first write, instead of failing half way through the roll.
-  if (preview.targetClassGroup && preview.targetArms.length === 0) {
-    const movers = preview.students.filter(
-      (p) => !p.alreadyEnrolledInTarget && (overrideMap.get(p.studentId)?.decision ?? p.recommendedDecision) === PromotionDecision.PROMOTED,
-    );
-    if (movers.length > 0) {
+  const rungById = new Map(preview.rungClasses.map((c) => [c.id, c]));
+  const classOf = (studentId: string) => placementMap.get(studentId) ?? preview.targetClassGroup?.id ?? null;
+  const movers = preview.students.filter(
+    (p) => !p.alreadyEnrolledInTarget && (overrideMap.get(p.studentId)?.decision ?? p.recommendedDecision) === PromotionDecision.PROMOTED,
+  );
+  for (const classId of new Set(movers.map((m) => classOf(m.studentId)))) {
+    const goesTo = classId ? rungById.get(classId) : undefined;
+    if (goesTo && goesTo.arms.length === 0) {
       throw new PromotionError(
-        `${preview.targetClassGroup.name} has no arm yet, so nobody can be promoted into it. Add an arm under Classes & subjects first.`,
+        `${goesTo.name} has no arm yet, so nobody can be promoted into it. Add an arm under Classes & subjects first.`,
         409,
       );
     }
@@ -416,14 +517,20 @@ export async function executePromotion(tx: Tx, tenantId: string, caller: Caller,
     if (moved.count === 0) continue;
 
     let targetEnrollmentId: string | null = null;
+    let placedClassId: string | null = null;
     if (decision === PromotionDecision.PROMOTED || decision === PromotionDecision.REPEATED) {
       const promoted = decision === PromotionDecision.PROMOTED;
-      // The arm follows the FINAL decision: the matching arm of the next class for a promotion, the pupil's own arm for a repeat; an arm the administrator chose wins (checked above).
+      // The class follows the FINAL decision too: the one the pupil was placed in (or the next class) for a promotion, their own for a repeat.
+      placedClassId = promoted ? classOf(pupil.studentId) : sourceClassGroupId;
+      // The arm follows the FINAL decision: the matching arm of that class for a promotion, the pupil's own arm for a repeat; an arm the administrator chose wins (checked above).
       const armId =
-        override?.targetClassArmId || (promoted ? resolveTargetArm(pupil.currentArmName, preview.targetArms) : pupil.currentArmId);
+        override?.targetClassArmId ||
+        (promoted
+          ? resolveTargetArm(pupil.currentArmName, (placedClassId ? rungById.get(placedClassId)?.arms : null) ?? [])
+          : pupil.currentArmId);
       if (!armId)
         throw new PromotionError(
-          `${pupil.firstName} ${pupil.lastName} cannot be promoted: ${preview.targetClassGroup?.name ?? "the next class"} has no arm.`,
+          `${pupil.firstName} ${pupil.lastName} cannot be promoted: ${(placedClassId ? rungById.get(placedClassId)?.name : null) ?? "the next class"} has no arm.`,
           409,
         );
       const created = await tx.studentEnrollment.create({
@@ -444,6 +551,7 @@ export async function executePromotion(tx: Tx, tenantId: string, caller: Caller,
       studentId: pupil.studentId,
       sourceEnrollmentId: sourceEnrolment.id,
       targetEnrollmentId,
+      targetClassGroupId: targetEnrollmentId ? placedClassId : null,
       overallAverage: pupil.overallAverage === null ? null : new Decimal(pupil.overallAverage),
       termAverages: pupil.termAverages as unknown as Prisma.InputJsonValue,
       decision,
@@ -494,6 +602,7 @@ export async function executePromotion(tx: Tx, tenantId: string, caller: Caller,
         sourceClassGroupId,
         targetClassGroupId: preview.targetClassGroup?.id ?? null,
         totals: { evaluated: preview.students.length, ...totals },
+        placements: placementMap.size,
       },
     },
   });

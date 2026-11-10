@@ -13,6 +13,7 @@ import { auditAcademic, refuse, type AcademicResult } from "@/lib/academics/sess
 type TenantCtx = TenantAuthContext["tenant"];
 
 export const GROUP_NAME_MAX = 60;
+export const STREAM_NAME_MAX = 40;
 export const ARM_NAME_MAX = 30;
 export const SUBJECT_NAME_MAX = 80;
 export const MAX_ARMS_PER_GROUP = 26;
@@ -25,6 +26,8 @@ export type ClassGroupView = {
   campusName: string | null;
   name: string;
   sortOrder: number;
+  /// The stream this class is ("Science"), or null (task 0035).
+  streamName: string | null;
   archived: boolean;
   arms: ArmView[];
   subjectCount: number;
@@ -52,10 +55,20 @@ const toGroup = (row: GroupRow): ClassGroupView => ({
   campusName: row.campus?.name ?? null,
   name: row.name,
   sortOrder: row.sortOrder,
+  streamName: row.streamName,
   archived: row.archivedAt !== null,
   arms: row.arms.map(toArm),
   subjectCount: row._count.offerings,
 });
+
+/// A stream as typed: nothing (or blank) means "no stream" (null); otherwise one trimmed line of 1 to 40 characters. `undefined` is not a stream: the caller says "unchanged".
+export function cleanStream(value: unknown): { ok: true; value: string | null } | { ok: false } {
+  if (value === null) return { ok: true, value: null };
+  if (typeof value !== "string") return { ok: false };
+  const cleaned = value.replace(/\s+/g, " ").trim();
+  if (cleaned === "") return { ok: true, value: null };
+  return cleaned.length <= STREAM_NAME_MAX ? { ok: true, value: cleaned } : { ok: false };
+}
 
 /// Which class groups this member may see (decision 7): an ADMIN every campus's; anyone else the school-wide ones and their own campus's.
 export function groupsVisibleTo(tenant: TenantCtx): Prisma.ClassGroupWhereInput {
@@ -131,10 +144,12 @@ export async function getClassGroup(tenant: TenantCtx, id: string): Promise<Acad
 export async function createClassGroup(
   tenant: TenantCtx,
   actorUserId: string,
-  input: { campusId?: string | null; name: unknown; sortOrder?: unknown },
+  input: { campusId?: string | null; name: unknown; sortOrder?: unknown; streamName?: unknown },
 ): Promise<AcademicResult<{ group: ClassGroupView }>> {
   const name = cleanName(input.name, GROUP_NAME_MAX);
   if (!name) return refuse("INVALID_NAME");
+  const stream = input.streamName === undefined ? ({ ok: true, value: null } as const) : cleanStream(input.streamName);
+  if (!stream.ok) return refuse("INVALID_STREAM");
   const sortOrder = input.sortOrder === undefined ? 0 : input.sortOrder;
   if (!validSortOrder(sortOrder)) return refuse("INVALID_SORT_ORDER");
   const campusId = input.campusId ?? null;
@@ -147,11 +162,15 @@ export async function createClassGroup(
     await lockGroupScope(tx, tenantId, campusId);
     if (await tx.classGroup.findFirst({ where: { tenantId, campusId, name, archivedAt: null }, select: { id: true } }))
       return refuse("NAME_TAKEN");
-    const created = await tx.classGroup.create({ data: { tenantId, campusId, name, sortOrder }, include: GROUP_INCLUDE });
+    const created = await tx.classGroup.create({
+      data: { tenantId, campusId, name, sortOrder, streamName: stream.value },
+      include: GROUP_INCLUDE,
+    });
     await auditAcademic(tx, tenantId, actorUserId, "ClassGroup", "CLASS_GROUP_CREATED", created.id, undefined, {
       name,
       campusId,
       sortOrder,
+      streamName: stream.value,
     });
     return { ok: true, group: toGroup(created) };
   });
@@ -161,7 +180,7 @@ export async function updateClassGroup(
   tenant: TenantCtx,
   actorUserId: string,
   id: string,
-  input: { name?: unknown; sortOrder?: unknown },
+  input: { name?: unknown; sortOrder?: unknown; streamName?: unknown },
 ): Promise<AcademicResult<{ group: ClassGroupView; changed: boolean }>> {
   const { tenantId } = tenant;
   return tenant.run(async (tx) => {
@@ -172,7 +191,10 @@ export async function updateClassGroup(
     if (!name) return refuse("INVALID_NAME");
     const sortOrder = input.sortOrder === undefined ? current.sortOrder : input.sortOrder;
     if (!validSortOrder(sortOrder)) return refuse("INVALID_SORT_ORDER");
-    if (name === current.name && sortOrder === current.sortOrder) return { ok: true, group: toGroup(current), changed: false };
+    const stream = input.streamName === undefined ? ({ ok: true, value: current.streamName } as const) : cleanStream(input.streamName);
+    if (!stream.ok) return refuse("INVALID_STREAM");
+    if (name === current.name && sortOrder === current.sortOrder && stream.value === current.streamName)
+      return { ok: true, group: toGroup(current), changed: false };
     await lockGroupScope(tx, tenantId, current.campusId);
     if (
       name !== current.name &&
@@ -183,7 +205,7 @@ export async function updateClassGroup(
     ) {
       return refuse("NAME_TAKEN");
     }
-    await tx.classGroup.update({ where: { id }, data: { name, sortOrder } });
+    await tx.classGroup.update({ where: { id }, data: { name, sortOrder, streamName: stream.value } });
     await auditAcademic(
       tx,
       tenantId,
@@ -191,8 +213,8 @@ export async function updateClassGroup(
       "ClassGroup",
       "CLASS_GROUP_UPDATED",
       id,
-      { name: current.name, sortOrder: current.sortOrder },
-      { name, sortOrder },
+      { name: current.name, sortOrder: current.sortOrder, streamName: current.streamName },
+      { name, sortOrder, streamName: stream.value },
     );
     return { ok: true, group: toGroup(await tx.classGroup.findUniqueOrThrow({ where: { id }, include: GROUP_INCLUDE })), changed: true };
   });

@@ -31,8 +31,14 @@ export type PreviewRow = {
   recommendationReason: string;
   targetClassArmId: string | null;
   targetClassArmName: string | null;
+  /// The class the pupil would go to (task 0035) and whether the roll will not guess it.
+  targetClassGroupId: string | null;
+  targetClassGroupName: string | null;
+  needsPlacement: boolean;
   alreadyEnrolledInTarget: boolean;
 };
+
+export type RungClass = { id: string; name: string; streamName: string | null; arms: { id: string; name: string }[] };
 
 export type Preview = {
   sourceClassGroup: { id: string; name: string };
@@ -42,13 +48,16 @@ export type Preview = {
   academicPeriods: { id: string; ordinal: number; label: string; isCurrent: boolean }[];
   eligibility: { eligible: boolean; finalPeriodOrdinal: number; reason?: string };
   targetArms: { id: string; name: string }[];
+  /// The live classes of the next rung: one, or several when the school has streams.
+  rungClasses: RungClass[];
+  placementNeeded: boolean;
   students: PreviewRow[];
   summary: { totalEvaluated: number; totalPromoted: number; totalRepeated: number; totalGraduated: number; totalSkipped: number };
 };
 
-/// What the administrator chose for one pupil; `decision` "" = as advised.
-export type Choice = { decision: Decision | ""; armId: string; reason: string };
-export const NO_CHOICE: Choice = { decision: "", armId: "", reason: "" };
+/// What the administrator chose for one pupil; `decision` "" = as advised, `classId` "" = the class the roll suggests (a placement, task 0035).
+export type Choice = { decision: Decision | ""; armId: string; reason: string; classId: string };
+export const NO_CHOICE: Choice = { decision: "", armId: "", reason: "", classId: "" };
 
 export type BatchView = {
   id: string;
@@ -89,3 +98,20 @@ export const isOverride = (row: PreviewRow, choice: Choice) =>
 // column of a wide table widens the whole PAGE, and a phone zooms out to fit it.
 export const REGION =
   "relative overflow-x-auto rounded-2xl border border-line focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+
+/// The label of a class in a choice: its name, and its stream when it has one and the name does not already say so.
+export const classLabel = (c: RungClass) =>
+  c.streamName && !c.name.toLowerCase().includes(c.streamName.toLowerCase()) ? `${c.name} (${c.streamName})` : c.name;
+
+/// The class a pupil who is to be promoted will go to: the one chosen, else the one the roll suggests. null when the roll will not guess (a placement is needed) or there is none.
+export const placedClassId = (row: PreviewRow, choice: Choice, preview: Preview): string | null =>
+  choice.classId !== "" ? choice.classId : preview.placementNeeded ? null : (preview.targetClassGroup?.id ?? null);
+
+/// Pupils who are to be promoted, have no place yet, and have no class to go to: the roll is held until each has one.
+export const missingPlacements = (preview: Preview, choices: Record<string, Choice>): number =>
+  preview.students.filter(
+    (row) =>
+      !row.alreadyEnrolledInTarget &&
+      finalDecision(row, choices[row.studentId] ?? NO_CHOICE) === "PROMOTED" &&
+      placedClassId(row, choices[row.studentId] ?? NO_CHOICE, preview) === null,
+  ).length;

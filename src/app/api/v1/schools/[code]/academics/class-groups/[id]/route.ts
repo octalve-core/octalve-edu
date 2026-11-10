@@ -7,11 +7,15 @@ import { classGroupScope } from "@/lib/auth/campus-scope";
 import { getClassGroup, updateClassGroup } from "@/lib/academics/classes";
 
 // GET   /api/v1/schools/[code]/academics/class-groups/[id]  — the group with its live arms.
-// PATCH /api/v1/schools/[code]/academics/class-groups/[id]  { name?, sortOrder? } — ADMIN only. The campus is fixed at creation.
+// PATCH /api/v1/schools/[code]/academics/class-groups/[id]  { name?, sortOrder?, streamName? } — ADMIN only; a blank or null streamName clears the stream. The campus is fixed at creation.
 type Ctx = { params: Promise<{ code: string; id: string }> };
 const patchBody = z
-  .strictObject({ name: nameField.optional(), sortOrder: z.number().int().optional() })
-  .refine((value) => Object.values(value).some((v) => v !== undefined), "Give a name, an order, or both.");
+  .strictObject({
+    name: nameField.optional(),
+    sortOrder: z.number().int().optional(),
+    streamName: z.string().max(200).nullable().optional(),
+  })
+  .refine((value) => Object.values(value).some((v) => v !== undefined), "Give a name, an order, a stream, or any of them.");
 
 export const GET = withAuth(
   async (_req, auth: TenantAuthContext, ctx: Ctx) => {

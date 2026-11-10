@@ -417,3 +417,13 @@
 - [x] `unit/theme-flip-guard` fails a spec that assigns `dataset.theme` itself; a proof test in `theme.spec.ts` shows a hand-made flip leaves transitions running and `setTheme` returns only when none is left
 - [x] Failing first: the same 227 tests with `setTheme` reduced to the old no-wait flip: 21 fail (19 are light-theme `color-contrast`, 2 are the proof test)
 
+## TASK-0035: Streams: a pupil goes to the stream the school chooses when a class is rolled
+
+[Task file](0035-streams.md). The first of the items task 0031 left unbuilt ("streams, report remarks, a payment gate, PDF report cards, bulk mark import, undoing a promotion"), asked for by the maintainer on 2026-11-10; built on `claude/octalve-streams`. **Needs the migration `20261124090000_streams` on the hosted databases (after `20261123090000_promotion`).**
+
+- [x] A class can say which stream it is (`ClassGroup.streamName`, 1 to 40 characters or none); a school with none sees no change
+- [x] A pupil stays in their stream when the class is rolled; when the stream cannot be worked out the roll asks (a placement per pupil) and refuses to guess
+- [x] The roll records the class each pupil was placed in; a placement may only go to a live class of the next rung
+- [x] Screens: the class dialog, the classes list, and the roll screen (a "Goes to" choice per pupil, "place every pupil", the roll held until each has a class)
+- [x] Tests: unit 13, API 16, screens 4 (x2 projects); the whole unit and API projects 2,614 passed; four mutants caught
+

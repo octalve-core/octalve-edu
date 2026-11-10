@@ -120,6 +120,10 @@ export function academicFailure(reason: AcademicFailure, detail?: Record<string,
       return fail("The order must be a whole number from 0 to 999.", 400, "VALIDATION", [
         { path: "body.sortOrder", message: "A whole number from 0 to 999." },
       ]);
+    case "INVALID_STREAM":
+      return fail("A stream is a name of up to 40 characters, or left empty.", 400, "VALIDATION", [
+        { path: "body.streamName", message: "Up to 40 characters, or empty for no stream." },
+      ]);
     case "INVALID_CODE":
       return fail("A subject code is 1 to 12 letters or digits.", 400, "VALIDATION", [
         { path: "body.code", message: "1 to 12 letters or digits, no spaces." },

@@ -7,6 +7,7 @@ import {
   DECISION_PAST,
   NO_CHOICE,
   REGION,
+  classLabel,
   finalDecision,
   isOverride,
   percent,
@@ -39,8 +40,13 @@ export function PromotionPreviewTable({
     { value: "REPEATED", label: DECISION_LABEL.REPEATED },
     { value: "WITHDRAWN", label: DECISION_LABEL.WITHDRAWN },
   ];
-  const armsOf = (decision: Decision): SelectOption[] | null =>
-    decision === "PROMOTED" ? preview.targetArms.map((a) => ({ value: a.id, label: a.name })) : null;
+  // Several classes on the next rung (streams): a promoted pupil's class is chosen here, and the arms offered are that class's.
+  const severalClasses = preview.rungClasses.length > 1;
+  const armsOf = (decision: Decision, classId: string): SelectOption[] | null => {
+    if (decision !== "PROMOTED") return null;
+    const chosen = classId ? preview.rungClasses.find((c) => c.id === classId) : undefined;
+    return (chosen?.arms ?? preview.targetArms).map((a) => ({ value: a.id, label: a.name }));
+  };
 
   return (
     <div role="region" aria-label={`Pupils of ${preview.sourceClassGroup.name}`} tabIndex={0} className={REGION}>
@@ -75,7 +81,7 @@ export function PromotionPreviewTable({
           {preview.students.map((row) => {
             const choice = choices[row.studentId] ?? NO_CHOICE;
             const decision = finalDecision(row, choice);
-            const arms = armsOf(decision);
+            const arms = armsOf(decision, choice.classId);
             const overridden = isOverride(row, choice);
             const name = `${row.firstName} ${row.lastName}`;
             return (
@@ -112,6 +118,23 @@ export function PromotionPreviewTable({
                           options={decisionOptions}
                           onChange={(e) => onChoice(row.studentId, { ...choice, decision: e.target.value as Decision | "", armId: "" })}
                         />
+                        {severalClasses && decision === "PROMOTED" && (
+                          <SelectField
+                            label={`Class for ${name}`}
+                            hideLabel
+                            value={choice.classId}
+                            options={[
+                              {
+                                value: "",
+                                label: preview.placementNeeded
+                                  ? "Choose a class"
+                                  : `Class: ${preview.targetClassGroup?.name ?? "the next one"}`,
+                              },
+                              ...preview.rungClasses.map((c) => ({ value: c.id, label: classLabel(c) })),
+                            ]}
+                            onChange={(e) => onChoice(row.studentId, { ...choice, classId: e.target.value, armId: "" })}
+                          />
+                        )}
                         {arms && arms.length > 0 && (
                           <SelectField
                             label={`Arm for ${name}`}

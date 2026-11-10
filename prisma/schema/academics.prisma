@@ -90,6 +90,8 @@ model ClassGroup {
   sortOrder  Int       @default(0)
   /// The section (Primary, JSS, SSS) this class belongs to, if any (ADR 0018). A class with no section is reached only by a General or a Class approval scope.
   sectionId  String?
+  /// The stream this class is ("Science", "Arts"), or null for a class that is not one (task 0035). A pupil who moves up stays in their stream; a rung with several classes and a stream among them asks where the others go. The migration checks it is trimmed and 1 to 40 characters.
+  streamName String?
   archivedAt DateTime?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @default(now()) @updatedAt

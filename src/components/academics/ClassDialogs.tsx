@@ -39,6 +39,7 @@ export function ClassGroupDialog({
 }) {
   const [name, setName] = useState(group?.name ?? "");
   const [sortOrder, setSortOrder] = useState(group ? String(group.sortOrder) : "");
+  const [stream, setStream] = useState(group?.streamName ?? "");
   const [campusId, setCampusId] = useState("");
 
   async function submit(): Promise<Outcome> {
@@ -51,11 +52,13 @@ export function ClassGroupDialog({
       ? sendJson(`${base(schoolCode)}/class-groups/${group.id}`, "PATCH", {
           name: name.trim(),
           ...(order === undefined ? {} : { sortOrder: order }),
+          streamName: stream.trim() === "" ? null : stream.trim(),
         })
       : sendJson(`${base(schoolCode)}/class-groups`, "POST", {
           name: name.trim(),
           campusId: ownCampusId ?? (campusId || null),
           ...(order === undefined ? {} : { sortOrder: order }),
+          ...(stream.trim() === "" ? {} : { streamName: stream.trim() }),
         });
   }
 
@@ -67,7 +70,7 @@ export function ClassGroupDialog({
       description="A class is a level of the school, such as Year 7. Its arms (7A, 7B) are added to it afterwards."
       submitLabel={group ? "Save changes" : "Create class"}
       pendingLabel="Saving…"
-      fields={["name", "sortOrder", "campusId"]}
+      fields={["name", "sortOrder", "streamName", "campusId"]}
       onSubmit={submit}
       onDone={onDone}
     >
@@ -89,6 +92,16 @@ export function ClassGroupDialog({
             error={errors.sortOrder}
             hint="Lower numbers come first, so classes are listed in the order pupils move up."
             inputMode="numeric"
+            autoComplete="off"
+            disabled={pending}
+          />
+          <TextField
+            label="Stream (optional)"
+            value={stream}
+            onChange={(e) => setStream(e.target.value)}
+            error={errors.streamName}
+            hint="Only if this class is one stream of its level, such as Science or Arts. A pupil then stays in their stream when the class is promoted."
+            maxLength={40}
             autoComplete="off"
             disabled={pending}
           />
