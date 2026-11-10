@@ -407,3 +407,13 @@
 - [x] `AuthShell`: the logo in the brand panel and in the phone header is a link to `/`; the panel is `role="none"` with its decorative parts `aria-hidden` (a link cannot sit inside an `aria-hidden` region)
 - [x] A browser spec on desktop and phone: one visible logo link to `/`, reachable by keyboard with a visible focus ring, the way back from another screen, the decorative parts still hidden from assistive technology, Axe in both themes
 - [ ] Open, the maintainer's: `/` is a router (signed in to the dashboard, set-up unfinished to set-up, otherwise to sign-in), so the logo reloads the sign-in page when you are already on it; a real landing page at `/` is a product decision, not built
+
+## TASK-0034: The light-theme contrast scans stop failing at random (test-only)
+
+[Task file](0034-theme-fade-contrast-flake.md). Found by the full-suite runs of tasks 0031 to 0033 (a handful of light-theme `color-contrast` failures, a different set each run, each passing alone); built 2026-11-10 on `fix/theme-fade-contrast-flake`. **Tests only; no application code, no migration.** AlEemaan already had the fix (its `page` fixture asks for reduced motion) and is not touched.
+
+- [x] Cause: the colours fade for 150 ms after a theme flip and the specs scanned inside the fade; the specs flipped the theme by hand and waited for `networkidle`, which says nothing about a CSS transition
+- [x] `tests/support/theme.ts` (`setTheme` flips and waits for every running CSS transition; `currentTheme`); fourteen browser specs use it
+- [x] `unit/theme-flip-guard` fails a spec that assigns `dataset.theme` itself; a proof test in `theme.spec.ts` shows a hand-made flip leaves transitions running and `setTheme` returns only when none is left
+- [x] Failing first: the same 227 tests with `setTheme` reduced to the old no-wait flip: 21 fail (19 are light-theme `color-contrast`, 2 are the proof test)
+

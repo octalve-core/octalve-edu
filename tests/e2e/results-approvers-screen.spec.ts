@@ -16,6 +16,7 @@ import {
 } from "../support/db";
 import { SAAS_URL } from "../support/env";
 import { signInThroughUi } from "./helpers";
+import { currentTheme, setTheme } from "../support/theme";
 
 // The Results approval tab of the school's settings in a real browser, desktop and phone (ADR 0018, task 0020 slice 3): the sections of the school and which class is in which,
 // where each approver approves, and the setting for a class with no section. Every change asks for the fresh proof, so every journey here goes through the step-up dialog.
@@ -91,9 +92,9 @@ async function settled(page: Page) {
 /// The state on screen, in both themes, with no horizontal scroll, and on a phone every control at least 44 x 44 CSS px.
 async function checkScreen(page: Page, what: string, isMobile: boolean) {
   await expect(page).toHaveTitle(/\S/);
-  const initial = await page.evaluate(() => document.documentElement.dataset.theme ?? "dark");
+  const initial = await currentTheme(page);
   for (const theme of ["dark", "light"]) {
-    await page.evaluate((t) => void (document.documentElement.dataset.theme = t), theme);
+    await setTheme(page, theme);
     await settled(page);
     await expectAccessible(page, `${what} [${theme} theme]`);
     const { scrollWidth, innerWidth } = await page.evaluate(() => ({
@@ -102,7 +103,7 @@ async function checkScreen(page: Page, what: string, isMobile: boolean) {
     }));
     expect(scrollWidth, `horizontal overflow on ${what} [${theme} theme]`).toBeLessThanOrEqual(innerWidth);
   }
-  await page.evaluate((t) => void (document.documentElement.dataset.theme = t), initial);
+  await setTheme(page, initial);
   await settled(page);
   if (!isMobile) return;
   const tooSmall = await page.evaluate(() => {

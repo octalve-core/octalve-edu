@@ -5,6 +5,7 @@ import { Role, createTenant, db, removeCreatedTenants, seedInstance, type TestTe
 import { SAAS_URL } from "../support/env";
 import { approvedItem, member, pupil, setBank, type Person, type Pupil } from "../support/qbank-world";
 import { signInThroughUi } from "./helpers";
+import { currentTheme, setTheme } from "../support/theme";
 
 // The question bank's reports in a real browser (task 0025, slice O6): a teacher reports a problem on a question, a reviewer reads the reports and answers them, and a reporter reads
 // their own. The APIs are tested in tests/api/question-report-guards.spec.ts and question-report-regrade.spec.ts; this is the screen: what is offered to whom, what is said when the person
@@ -20,9 +21,9 @@ async function expectAccessible(page: Page, what: string) {
 }
 async function checkBothThemes(page: Page, what: string) {
   await expect(page).toHaveTitle(/\S/);
-  const initial = await page.evaluate(() => document.documentElement.dataset.theme ?? "dark");
+  const initial = await currentTheme(page);
   for (const theme of ["dark", "light"]) {
-    await page.evaluate((t) => void (document.documentElement.dataset.theme = t), theme);
+    await setTheme(page, theme);
     await page.waitForLoadState("networkidle");
     await expectAccessible(page, `${what} [${theme} theme]`);
     const { scrollWidth, innerWidth } = await page.evaluate(() => ({
@@ -31,7 +32,7 @@ async function checkBothThemes(page: Page, what: string) {
     }));
     expect(scrollWidth, `horizontal overflow on ${what} [${theme} theme]`).toBeLessThanOrEqual(innerWidth);
   }
-  await page.evaluate((t) => void (document.documentElement.dataset.theme = t), initial);
+  await setTheme(page, initial);
 }
 
 test.use({ baseURL: SAAS_URL });
