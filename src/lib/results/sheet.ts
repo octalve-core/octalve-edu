@@ -2,6 +2,7 @@ import { EnrollmentStatus, ResultStatus, SessionStatus } from "@prisma/client";
 import type { Tx } from "@/lib/tenant/for-tenant";
 import { assignedArmIds } from "@/lib/attendance/access";
 import { approverScope, NO_SCOPE } from "./approver-scope";
+import { schemeForClassGroup } from "./scheme";
 import type { ServiceResult } from "./service";
 
 // What the Results screens read (task 0031): the choices an entry sheet offers, the sheet itself and the class list of the report-cards tab. Reads only: saving goes through the existing
@@ -173,7 +174,15 @@ export async function getSheet(
     period: { id: string; label: string; sessionId: string; sessionLabel: string };
     arm: { id: string; name: string; classGroupName: string };
     subject: { id: string; name: string };
-    scheme: { id: string | null; name: string | null; totalMax: number; components: { name: string; maxScore: number }[] };
+    /// `components` as the scheme defines them; `parts` what a result is entered under (the components, then the exam: task 0032, D0).
+    scheme: {
+      id: string | null;
+      name: string | null;
+      totalMax: number;
+      examMax: number;
+      components: { name: string; maxScore: number }[];
+      parts: { name: string; maxScore: number }[];
+    };
     rows: SheetRow[];
   }>
 > {
@@ -205,14 +214,7 @@ export async function getSheet(
     : [];
   const byStudent = new Map(saved.map((r) => [r.studentId, r]));
 
-  const withParts = { include: { components: { orderBy: { sortOrder: "asc" as const } } } };
-  const scheme =
-    (await tx.assessmentScheme.findFirst({ where: { tenantId, classGroupId: arm.classGroup.id, archivedAt: null }, ...withParts })) ??
-    (await tx.assessmentScheme.findFirst({
-      where: { tenantId, classGroupId: null, archivedAt: null },
-      orderBy: { createdAt: "asc" },
-      ...withParts,
-    }));
+  const scheme = await schemeForClassGroup(tx, tenantId, arm.classGroup.id);
 
   return {
     ok: true,
@@ -220,14 +222,7 @@ export async function getSheet(
       period: { id: period.id, label: period.label, sessionId: period.session.id, sessionLabel: period.session.label },
       arm: { id: arm.id, name: arm.name, classGroupName: arm.classGroup.name },
       subject,
-      scheme: scheme
-        ? {
-            id: scheme.id,
-            name: scheme.name,
-            totalMax: Number(scheme.totalMax),
-            components: scheme.components.map((c) => ({ name: c.name, maxScore: Number(c.maxScore) })),
-          }
-        : { id: null, name: null, totalMax: 100, components: [] },
+      scheme: scheme ?? { id: null, name: null, totalMax: 100, examMax: 0, components: [], parts: [] },
       rows: enrolments.map(({ student }) => {
         const r = byStudent.get(student.id);
         return {

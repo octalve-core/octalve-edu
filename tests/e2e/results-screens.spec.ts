@@ -55,7 +55,7 @@ test.afterEach(async () => {
   await removeCreatedTenants();
 });
 
-/// A school with an active session and a current term, Form 1 A with two pupils, Mathematics (offered to Form 1) built from CA /40 and Exam /60, and a teacher assigned to it.
+/// A school with an active session and a current term, Form 1 A with two pupils, Mathematics (offered to Form 1) built from CA /40 and an exam /60 (a scheme with one component, CA 40, and examMax 60), and a teacher assigned to it.
 async function arrange() {
   school = await createTenant({ name: `${tag} School` });
   const session = await db.academicSession.create({
@@ -84,12 +84,8 @@ async function arrange() {
       name: `${tag} scheme`,
       totalMax: 100,
       examMax: 60,
-      components: {
-        create: [
-          { name: "CA", maxScore: 40, sortOrder: 1 },
-          { name: "Exam", maxScore: 60, sortOrder: 2 },
-        ],
-      },
+      // The scheme rule is components + exam = total: CA /40 and the exam /60 (examMax) make 100. The screen asks for the exam as a part of its own (task 0032).
+      components: { create: [{ name: "CA", maxScore: 40, sortOrder: 1 }] },
     },
   });
   const pupils: Record<string, string> = {};
@@ -167,6 +163,13 @@ test("a teacher enters marks from the scheme's parts; a bad or half-filled row s
   const saved = await db.result.findFirst({ where: { tenantId: school.id, studentId: pupils.Ada } });
   expect(Number(saved!.score)).toBe(75.5);
   expect(saved!.status).toBe("DRAFT");
+  // The exam is saved as a part of its own (task 0032; before it, a real scheme's exam mark could not be entered at all), out of the scheme's total, and the first save locked the scheme.
+  expect(saved!.componentScores).toEqual([
+    { name: "CA", score: 30, maxScore: 40 },
+    { name: "Exam", score: 45.5, maxScore: 60 },
+  ]);
+  expect(Number(saved!.maxScore)).toBe(100);
+  expect((await db.assessmentScheme.findFirstOrThrow({ where: { tenantId: school.id } })).lockedAt).not.toBeNull();
 
   // Send it for review: the status moves, and the row can no longer be typed into.
   await page.getByRole("button", { name: "Send 1 saved for review", exact: true }).click();
@@ -178,6 +181,38 @@ test("a teacher enters marks from the scheme's parts; a bad or half-filled row s
   await expect(after.getByLabel(`CA for ${tag}Ada Marks`)).toBeDisabled();
   expect((await db.result.findFirst({ where: { tenantId: school.id, studentId: pupils.Ada } }))!.status).toBe("SUBMITTED");
   await checkBothThemes(page, "the marks sheet after review");
+});
+
+test("a teacher whose sheet went stale because the class's scheme was replaced meanwhile is told what the scheme has now, and nothing is saved", async ({
+  page,
+}) => {
+  const { teacher, group } = await arrange();
+  await signInThroughUi(page, teacher.user);
+  await page.goto(results("marks"));
+  await expect(marks(page).getByRole("columnheader", { name: "Exam /60" })).toBeVisible();
+  const ada = marks(page)
+    .getByRole("row")
+    .filter({ hasText: `${tag}Ada` });
+  await ada.getByLabel(`CA for ${tag}Ada Marks`).fill("30");
+  await ada.getByLabel(`Exam for ${tag}Ada Marks`).fill("45");
+
+  // Meanwhile an administrator replaces the class's scheme (nothing is saved under the old one, so it is not locked and may simply be archived): Test /50 and an exam /50.
+  await db.assessmentScheme.updateMany({ where: { tenantId: school.id, classGroupId: group.id }, data: { archivedAt: new Date() } });
+  await db.assessmentScheme.create({
+    data: {
+      tenantId: school.id,
+      classGroupId: group.id,
+      name: `${tag} second scheme`,
+      totalMax: 100,
+      examMax: 50,
+      components: { create: [{ name: "Test", maxScore: 50, sortOrder: 1 }] },
+    },
+  });
+  await page.getByRole("button", { name: "Save marks", exact: true }).click();
+  const refusal = page.getByRole("alert").filter({ hasText: "is not a part of the scheme" });
+  await expect(refusal).toContainText(`"CA" is not a part of the scheme "${tag} second scheme"`);
+  await expect(refusal).toContainText("Test (out of 50), Exam (out of 50)");
+  expect(await db.result.count({ where: { tenantId: school.id } })).toBe(0);
 });
 
 test("an administrator approves, publishes and returns marks on the Review tab; a reason is required to return", async ({ page }) => {

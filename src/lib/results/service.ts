@@ -2,8 +2,11 @@ import { Decimal } from "@prisma/client/runtime/library";
 import { ResultStatus, Permission, type Prisma } from "@prisma/client";
 import type { Tx } from "@/lib/tenant/for-tenant";
 import { gradeFor } from "@/lib/academics/scoring";
+import { lockScheme, shareSchemeLock } from "@/lib/academics/assessment";
+import { auditAcademic } from "@/lib/academics/sessions";
 import { assignedArmIds } from "@/lib/attendance/access";
 import { approverScope, inScopeResultIds, NO_SCOPE } from "./approver-scope";
+import { entryProblem, schemesForStudents } from "./scheme";
 import { canTransitionResult, validateComponentScores, generateVerificationToken, calculateVerificationHash } from "./rules";
 import { calculateCompetitionRanks, evaluatePromotion } from "./ranking";
 import type { RecordResultsInput, TransitionStatusInput, ResultFailure } from "./http";
@@ -88,6 +91,10 @@ export async function recordStudentResults(
     }
   }
 
+  // The scheme each pupil is entered under (task 0032). The shared scheme lock is taken first, so no edit of a scheme can land between this read and the lock taken below.
+  await shareSchemeLock(tx, tenantId);
+  const schemes = await schemesForStudents(tx, tenantId, period.sessionId, studentIds);
+
   const entries: Array<{
     studentId: string;
     finalScore: number;
@@ -98,8 +105,16 @@ export async function recordStudentResults(
   }> = [];
 
   for (const entry of input.results) {
+    const scheme = schemes.get(entry.studentId) ?? null;
     let finalScore = entry.score ?? 0;
-    const maxScore = entry.maxScore ?? 100;
+    let maxScore = entry.maxScore ?? 100;
+
+    // Under a scheme the parts and the total are the scheme's, whatever the request says; with no scheme there is nothing to tie to and the request stands as it always did.
+    if (scheme) {
+      const problem = entryProblem(scheme, entry);
+      if (problem) return { ok: false, failure: "SCHEME_VALIDATION_FAILED", message: problem };
+      maxScore = scheme.totalMax;
+    }
 
     if (entry.components && entry.components.length > 0) {
       const compValidation = validateComponentScores(entry.components, entry.score);
@@ -142,6 +157,23 @@ export async function recordStudentResults(
     return { ok: false, failure: "NOT_EDITABLE", message: NOT_EDITABLE };
   }
   const existing = new Map(held.map((row) => [row.studentId, row]));
+
+  // The first save under a scheme locks it (task 0032): from then on a change to it is a new version, and the database refuses an edit in place. Every refusal above has been decided, so a
+  // refused request locks nothing. In id order, so two overlapping saves cannot wait on each other.
+  const used = [...new Set(entries.map((entry) => schemes.get(entry.studentId)?.id).filter((id): id is string => id !== undefined))].sort();
+  for (const id of used) {
+    if (await lockScheme(tx, tenantId, id))
+      await auditAcademic(
+        tx,
+        tenantId,
+        actorUserId,
+        "AssessmentScheme",
+        "ASSESSMENT_SCHEME_LOCKED",
+        id,
+        { locked: false },
+        { locked: true, periodId: input.periodId },
+      );
+  }
 
   const savedIds: string[] = [];
 

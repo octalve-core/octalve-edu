@@ -132,7 +132,7 @@ function SheetEditor({
   readOnly: boolean;
   onChanged: (text: string) => Promise<void>;
 }) {
-  const parts = sheet.scheme.components;
+  const parts = sheet.scheme.parts; // the components, then the exam (task 0032): without it a real scheme's exam mark could not be entered
   const [typed, setTyped] = useState<Record<string, string[]>>(() => {
     // What each input starts with: the saved parts (or the saved total when the school has no parts).
     const start: Record<string, string[]> = {};

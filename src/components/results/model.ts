@@ -27,7 +27,15 @@ export type Sheet = {
   period: { id: string; label: string; sessionId: string; sessionLabel: string };
   arm: { id: string; name: string; classGroupName: string };
   subject: { id: string; name: string };
-  scheme: { id: string | null; name: string | null; totalMax: number; components: { name: string; maxScore: number }[] };
+  /// `parts` is what a result is entered under: the scheme's components, then the exam when it has one (task 0032, D0).
+  scheme: {
+    id: string | null;
+    name: string | null;
+    totalMax: number;
+    examMax: number;
+    components: { name: string; maxScore: number }[];
+    parts: { name: string; maxScore: number }[];
+  };
   rows: SheetRow[];
 };
 export type SheetRow = {

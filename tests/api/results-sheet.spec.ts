@@ -219,7 +219,13 @@ test.describe("the options", () => {
 
 test.describe("the marks sheet", () => {
   type Sheet = {
-    scheme: { id: string | null; totalMax: number; components: { name: string; maxScore: number }[] };
+    scheme: {
+      id: string | null;
+      totalMax: number;
+      examMax: number;
+      components: { name: string; maxScore: number }[];
+      parts: { name: string; maxScore: number }[];
+    };
     rows: {
       studentId: string;
       standing: string;
@@ -241,17 +247,18 @@ test.describe("the marks sheet", () => {
   });
 
   test("with no scheme the sheet is one mark out of 100; the school's single scheme is used when the class has none; the class's own wins", async () => {
-    expect((await sheet("admin")).scheme).toMatchObject({ id: null, totalMax: 100, components: [] });
+    expect((await sheet("admin")).scheme).toMatchObject({ id: null, totalMax: 100, examMax: 0, components: [], parts: [] });
     const wide = await db.assessmentScheme.create({
       data: {
         tenantId: a.id,
         name: uniq("School scheme "),
         totalMax: 100,
         examMax: 60,
+        // components + exam = total (the scheme rule): 15 + 25 + 60 = 100. Created out of order, so the sheet's own ordering is what is checked.
         components: {
           create: [
-            { name: "Exam", maxScore: 60, sortOrder: 2 },
-            { name: "CA", maxScore: 40, sortOrder: 1 },
+            { name: "CA 2", maxScore: 25, sortOrder: 2 },
+            { name: "CA 1", maxScore: 15, sortOrder: 1 },
           ],
         },
       },
@@ -259,9 +266,16 @@ test.describe("the marks sheet", () => {
     const viaSchool = (await sheet("admin")).scheme;
     expect(viaSchool.id).toBe(wide.id);
     expect(viaSchool.components).toEqual([
-      { name: "CA", maxScore: 40 },
-      { name: "Exam", maxScore: 60 },
+      { name: "CA 1", maxScore: 15 },
+      { name: "CA 2", maxScore: 25 },
     ]); // in the scheme's own order
+    // what a result is entered under: the components, then the exam, out of examMax (task 0032)
+    expect(viaSchool).toMatchObject({ examMax: 60 });
+    expect(viaSchool.parts).toEqual([
+      { name: "CA 1", maxScore: 15 },
+      { name: "CA 2", maxScore: 25 },
+      { name: "Exam", maxScore: 60 },
+    ]);
     const own = await db.assessmentScheme.create({
       data: {
         tenantId: a.id,
@@ -269,15 +283,19 @@ test.describe("the marks sheet", () => {
         name: uniq("Form 1 scheme "),
         totalMax: 50,
         examMax: 30,
-        components: {
-          create: [
-            { name: "Test", maxScore: 20, sortOrder: 1 },
-            { name: "Exam", maxScore: 30, sortOrder: 2 },
-          ],
-        },
+        components: { create: [{ name: "Test", maxScore: 20, sortOrder: 1 }] }, // 20 + the exam 30 = 50
       },
     });
-    expect((await sheet("admin")).scheme).toMatchObject({ id: own.id, totalMax: 50 });
+    expect((await sheet("admin")).scheme).toMatchObject({
+      id: own.id,
+      totalMax: 50,
+      examMax: 30,
+      components: [{ name: "Test", maxScore: 20 }],
+      parts: [
+        { name: "Test", maxScore: 20 },
+        { name: "Exam", maxScore: 30 },
+      ],
+    });
     await db.assessmentScheme.updateMany({ where: { id: { in: [wide.id, own.id] } }, data: { archivedAt: new Date() } }); // an archived scheme is not used
     expect((await sheet("admin")).scheme.id).toBeNull();
   });
