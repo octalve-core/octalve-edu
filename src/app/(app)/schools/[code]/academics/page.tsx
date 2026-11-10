@@ -11,6 +11,7 @@ import { TimetablePanel } from "@/components/academics/TimetablePanel";
 import { LmsPanel } from "@/components/lms/LmsPanel";
 import { PromotionPanel } from "@/components/academics/promotion/PromotionPanel";
 import { isSection } from "@/components/academics/model";
+import { hasActiveMfa } from "@/lib/auth/mfa/service";
 import { requireTenantPage } from "@/lib/tenant/page-tenant";
 
 export const metadata: Metadata = { title: "Academic setup" };
@@ -30,7 +31,7 @@ export default async function AcademicsPage({
   const { code } = await params;
   const { section: asked } = await searchParams;
   // The attendance section is its own support area; everything else here is academic setup (ADR 0017).
-  const { tenant } = await requireTenantPage(code, asked === "attendance" ? "attendance" : "academics");
+  const { session, tenant } = await requireTenantPage(code, asked === "attendance" ? "attendance" : "academics");
   if (tenant.role !== "ADMIN" && tenant.role !== "CAMPUS_ADMIN" && tenant.role !== "TEACHING_STAFF" && tenant.role !== "NON_TEACHING_STAFF")
     forbidden();
   const readOnly = tenant.role !== "ADMIN" || Boolean(tenant.support); // a support view only reads
@@ -47,6 +48,9 @@ export default async function AcademicsPage({
   const mayPromote = tenant.role === "ADMIN" || tenant.role === "CAMPUS_ADMIN";
   const section = isSection(asked) ? asked : "timetable";
   if (section === "promotion" && !mayPromote) forbidden();
+  // Undoing a roll (task 0040) is the school's administrator's, with a fresh proof; the dialog asks for the password or the code the person has.
+  const canUndo = tenant.role === "ADMIN" && !tenant.support;
+  const hasMfa = section === "promotion" && canUndo ? await hasActiveMfa(session.userId) : false;
   const [campuses, subjects, classGroups] = await tenant.run((tx) =>
     Promise.all([
       tx.campus.findMany({ where: { tenantId: tenant.tenantId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
@@ -145,6 +149,8 @@ export default async function AcademicsPage({
             classes={promotion.classes}
             schoolType={tenant.schoolType}
             readOnly={Boolean(tenant.support)}
+            canUndo={canUndo}
+            hasMfa={hasMfa}
           />
         )}
       </div>

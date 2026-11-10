@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { PromotionDecision } from "@prisma/client";
 import { isPlausibleId } from "@/lib/academics/http";
+import { stepUpProofSchema } from "@/lib/school-settings/http";
 
 // The shapes the promotion routes accept. Bodies are STRICT objects: a field the server does not read is a refusal, not a silent drop (AlEemaan's task 0037 found a console that sent
 // `targetArmId` and `reason` for `targetClassArmId` and `overrideReason` and lost every override's arm and reason because its schema was not strict).
@@ -68,3 +69,14 @@ export type PromotionPreviewQuery = z.infer<typeof promotionPreviewQuerySchema>;
 export type PromotionOverride = z.infer<typeof promotionOverrideSchema>;
 export type PromotionPlacement = z.infer<typeof promotionPlacementSchema>;
 export type ExecutePromotionInput = z.infer<typeof executePromotionSchema>;
+
+/// Undoing a roll (task 0040): why, and a fresh proof of who is asking. Strict, like every promotion body.
+export const undoPromotionSchema = z.strictObject({
+  reason: z
+    .string({ error: "Say why this roll is being undone." })
+    .trim()
+    .min(1, "Say why this roll is being undone.")
+    .max(500, "The reason can be at most 500 characters."),
+  stepUp: stepUpProofSchema,
+});
+export type UndoPromotionInput = z.infer<typeof undoPromotionSchema>;

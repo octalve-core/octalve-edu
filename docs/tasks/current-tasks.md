@@ -465,3 +465,14 @@
 - [x] A check that writes nothing, then an all-or-nothing import through `recordStudentResults` (the scheme's rules, DRAFT-only, a teacher's assignment, the scheme lock) in the same transaction; pupils found by admission number among the pupils on THIS roll only; audited without the marks
 - [x] "Import marks from a file" under the grid: download, choose, check row by row, import; typed-but-unsaved marks block it
 - [x] Tests: unit, API and screens (x2 projects) new; ten mutations caught; whole unit and API projects run
+
+## TASK-0040: Undoing a promotion
+
+[Task file](0040-undo-promotion.md). The sixth of the items task 0031 left unbuilt, asked for by the maintainer on 2026-11-10; built on `claude/octalve-undo-promotion`. **Needs the migration `20261126090000_promotion_undo` on the hosted databases (after `20261125090000_report_remarks`; additive: one enum value and one append-only table), run by the maintainer.**
+
+- [x] A roll that was a mistake is taken back, whole, as a NEW recorded fact (`PromotionReversal`, append-only, one per roll); the roll and its records are never edited. Every pupil's place in the source session is ACTIVE again, and the new place a promotion or a repeat made becomes CANCELLED (a new enrolment status)
+- [x] Whole roll or nothing: a pupil whose place was changed or used since (marks, a report remark, an invoice, attendance in the target session; a place moved on or changed by hand) stops it, by name, and nothing moves
+- [x] The school's administrator only, with a fresh proof and a reason; audited; a roll is undone once, even by two undos at the same moment
+- [x] The class can be rolled again (the cancelled place is revived, not duplicated) and a pupil can be enrolled by hand into it
+- [x] History: an undone roll is marked with when, who and why; "Undo this roll" with the reason and the password; the refusal's pupils are listed in the dialog
+- [x] Tests: unit, API and screens (x2 projects) new; mutation check (eleven rules broken together, 20 tests fail; the lock's own test is not separable); whole unit and API projects and the related screens run (2,856 passed)

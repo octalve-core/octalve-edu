@@ -17,7 +17,7 @@ export async function promotionCall(work: () => Promise<Response>): Promise<Resp
   try {
     return await work();
   } catch (error) {
-    if (error instanceof PromotionError) return fail(error.message, error.status, "PROMOTION_REFUSED");
+    if (error instanceof PromotionError) return fail(error.message, error.status, error.code, error.details);
     throw error;
   }
 }

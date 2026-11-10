@@ -65,3 +65,21 @@ model PromotionRecord {
   @@unique([tenantId, batchId, studentId])
   @@index([tenantId, studentId])
 }
+
+/// An undone roll (task 0040): one row per batch that was taken back, with who, why and how many pupils were put back. APPEND-ONLY like the batch it points at (the migration revokes UPDATE, DELETE and
+/// TRUNCATE): the roll and its records are never edited, the undo is a fact of its own. At most one per roll (the unique key), so a roll is undone once.
+model PromotionReversal {
+  id               String   @id @default(cuid())
+  tenantId         String
+  batchId          String
+  reversedByUserId String
+  /// 1 to 500 characters (a check in the migration).
+  reason           String
+  /// Pupils put back where they came from, and of those how many had a new placement that was cancelled.
+  restored         Int
+  cancelled        Int
+  createdAt        DateTime @default(now())
+
+  @@unique([tenantId, batchId])
+  @@index([tenantId, createdAt])
+}
