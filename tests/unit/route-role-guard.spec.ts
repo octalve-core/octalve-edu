@@ -111,6 +111,8 @@ elsewhere(
   "lib/settings/ceiling-switch.ts `set`: a campus administrator changes their own campus's value only (any other campus is 404) and only to turn it off; the school's value is the school administrator's, with a fresh proof. `view` lists only the caller's own campus for anyone who is not the school's administrator",
   "PATCH v1/schools/[code]/settings/standing/route.ts",
   "GET v1/schools/[code]/settings/standing/route.ts",
+  "PATCH v1/schools/[code]/settings/report-cards/route.ts",
+  "GET v1/schools/[code]/settings/report-cards/route.ts",
 );
 elsewhere(
   "lib/settings/ceiling-switch.ts: `view` lists only the caller's own campus for anyone who is not the school's administrator; `set` lets a campus administrator change their own campus's value only (any other campus is 404) and only to turn it off; the school's value is the school administrator's, with a fresh proof",

@@ -10,6 +10,8 @@ import { entryProblem, schemesForStudents } from "./scheme";
 import { canTransitionResult, validateComponentScores, generateVerificationToken, calculateVerificationHash } from "./rules";
 import { calculateCompetitionRanks, evaluatePromotion } from "./ranking";
 import { remarksForCard } from "./remarks-service";
+import { feeHoldFor } from "./report-card-gate";
+import { withheldMessage } from "./fee-hold";
 import type { RecordResultsInput, TransitionStatusInput, ResultFailure } from "./http";
 import { triggerResultsPublishedAlerts } from "@/lib/communication/event-triggers";
 
@@ -481,6 +483,12 @@ export async function getStudentReportCard(
     return { ok: false, failure: "NOT_FOUND" as const };
   }
 
+  // The payment gate (task 0037): a pupil or parent is not given the card while the school holds it for unpaid fees; staff are told it is held instead (`feeHold` below).
+  const hold = await feeHoldFor(tx, tenantId, { id: student.id, campusId: student.campusId });
+  if (hold && isPublicViewer) {
+    return { ok: false, failure: "REPORT_CARD_WITHHELD" as const, message: withheldMessage(hold.outstanding) };
+  }
+
   const results = await tx.result.findMany({
     where: {
       tenantId,
@@ -584,6 +592,7 @@ export async function getStudentReportCard(
         promotionOutcome: promotion.outcome,
       },
       subjects: subjectsData,
+      feeHold: hold ? { outstanding: Number(hold.outstanding) } : null,
       remarks: await remarksForCard(tx, tenantId, { studentId, periodId, armId: classArmId ?? null, viewerRole, viewerUserId }),
     },
   };

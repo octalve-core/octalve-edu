@@ -438,3 +438,11 @@
 - [x] **A bug of task 0031 fixed:** the card of a pupil or parent went empty when the term's results were locked
 - [x] Tests: unit, API and screens (x2 projects), new; ten mutants caught
 
+## TASK-0037: The payment gate on report cards
+
+[Task file](0037-report-card-payment-gate.md). The third of the items task 0031 left unbuilt, asked for by the maintainer on 2026-11-10; built on `claude/octalve-report-card-gate`. **No migration.**
+
+- [x] A school can hold a pupil's report card back from the pupil and their parents while school fees that are due are owed (off until the school turns it on; staff are never held)
+- [x] Settings: Report cards (the school's administrator, with a fresh proof; a campus can hold for itself and never release what the school holds), audited
+- [x] The refusal says what is owed and what to do; staff are told on the card what holds it
+- [x] Tests: unit, API and screens (x2 projects) new; eleven mutants caught; whole unit and API projects run
