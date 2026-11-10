@@ -24,6 +24,15 @@ the files of `src/app/` that wrap every page (root layout, web manifest, icons, 
 | `/q/[code]/[token]` | `q/[code]/[token]/page.tsx` | A public questionnaire (slice O5), open to anyone with the link and signed out on purpose (`force-dynamic`). The token is the whole secret of a public form, so the page is kept out of search engines (`robots: noindex, nofollow`) and does not pass its address on (`referrer: no-referrer`). Renders `PublicQuestionnaire`, which reads the questionnaire from the public API; the school in the address must be the school that owns the questionnaire, otherwise the same "not found" as an unknown link. |
 
 
+## Checking a published mark
+
+Anyone with the link printed on a report card (task 0038). Signed out on purpose; both pages are `force-dynamic`, `robots: noindex, nofollow` and `referrer: no-referrer` (the code is the whole secret of a lookup). They read the answer from the public API `GET /api/v1/verify/[token]`, which limits attempts per IP and says `noindex` itself.
+
+| Route | File | Description |
+| --- | --- | --- |
+| `/verify` | `verify/page.tsx` | The page to type or paste a code into. Renders `VerifyCredential` (no code) inside `AuthShell`: a field that takes the bare 32-character code in any letter case, or the whole verification link, and sends the person to `/verify/<code>`; anything else is refused in words on the page. |
+| `/verify/[code]` | `verify/[code]/page.tsx` | The link printed on a report card and in its PDF. Renders `VerifyCredential` with the code inside `AuthShell`: "This mark is genuine" with the school, the pupil, the session, the term, the subject, the grade and the date published (never the score or the admission number), or "Nothing found for this code" (an unknown code, a mark that is not published, a link cut short), or "The check did not finish" (too many attempts, no network). |
+
 ## App-level files (`src/app/`)
 
 | Route | File | Description |

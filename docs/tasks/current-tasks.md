@@ -446,3 +446,13 @@
 - [x] Settings: Report cards (the school's administrator, with a fresh proof; a campus can hold for itself and never release what the school holds), audited
 - [x] The refusal says what is owed and what to do; staff are told on the card what holds it
 - [x] Tests: unit, API and screens (x2 projects) new; eleven mutants caught; whole unit and API projects run
+
+## TASK-0038: PDF report cards, and a real page to check a mark
+
+[Task file](0038-report-card-pdf.md). The fourth of the items task 0031 left unbuilt, asked for by the maintainer on 2026-11-10; built on `claude/octalve-report-card-pdf`. **No migration.**
+
+- [x] A report card as a PDF, one pupil's or a whole class's in one file (at most 100 cards), by the same rules as the card on the screen (the payment gate, which results a pupil sees, the remarks); every download audited
+- [x] A hand-written PDF writer (real text measuring, a table that continues across pages, clickable links); Latin-1 and Windows-1252 only, other characters counted in a header
+- [x] "Download PDF" on a card and "Download all cards (PDF)" on the class list in the Cards panel
+- [x] **A defect found by the maintainer and fixed:** the card told people to check a mark at `/api/v1/verify/<code>` (raw JSON). There is now a public page, `/verify/[code]` and `/verify`, and the card and the PDF print full, clickable links; the never-mounted `VerifyCertificateForm` is removed
+- [x] Tests: unit, API and screens (x2 projects) new; twenty-eight mutant failures across eight mutations; whole unit and API projects run

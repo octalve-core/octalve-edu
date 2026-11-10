@@ -73,7 +73,7 @@ The Solo install's first-run bootstrap. It has no `withAuth` (no session exists 
 
 ## API routes: Public verification (`/api/v1/verify/`)
 
-Outside verifiers check a published result without signing in. It is not a school route, so it declares no support `area`.
+Outside verifiers check a published result without signing in. It is not a school route, so it declares no support `area`. People do not use this address: they open the public page `/verify/[code]` (or type the code on `/verify`), which reads this route (task 0038; `docs/pages/public.md`), and the report card and its PDF print `<site>/verify/<code>`, never an `/api/` path.
 
 | Method | Route | File | Who | Description |
 | --- | --- | --- | --- | --- |

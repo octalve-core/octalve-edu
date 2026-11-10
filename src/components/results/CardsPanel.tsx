@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/SelectField";
 import { getJson } from "@/components/auth/postJson";
+import { downloadBlob, getForPdf } from "@/components/question-bank/pdf";
 import { formatNaira } from "@/lib/finance/format";
 import { ListState } from "@/components/academics/parts";
 import { failureText, useApi } from "@/components/academics/useApi";
@@ -12,10 +13,20 @@ import { RemarksEditor } from "./RemarksEditor";
 import { ReportCard } from "./ReportCard";
 import { REGION, type Options, type ReportCardData, type RosterRow } from "./model";
 
+const noSubscription = () => () => {};
+/// The address this page was opened on ("" while the page is built on the server, which never shows a card).
+const useOrigin = () =>
+  useSyncExternalStore(
+    noSubscription,
+    () => window.location.origin,
+    () => "",
+  );
+
 /// "Report cards": pick a term and a class, see the pupils and how many of their marks are published, open one pupil's card and print it. The card is the one the report-card API builds; this
 /// screen adds nothing the API would not give the same person.
 export function CardsPanel({ schoolCode, institution }: { schoolCode: string; institution: string }) {
   const base = `/api/v1/schools/${schoolCode}`;
+  const origin = useOrigin();
   const options = useApi(`${base}/academics/results/options`);
   const data = options.reply?.data as Options | undefined;
   const [chosenPeriod, setPeriodId] = useState("");
@@ -28,6 +39,7 @@ export function CardsPanel({ schoolCode, institution }: { schoolCode: string; in
   const [card, setCard] = useState<ReportCardData | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   const roster = useApi(
     periodId && armId ? `${base}/academics/results/roster?${new URLSearchParams({ periodId, classArmId: armId })}` : null,
@@ -41,6 +53,16 @@ export function CardsPanel({ schoolCode, institution }: { schoolCode: string; in
     setOpening(null);
     if (!answer.ok) return setProblem(failureText(answer.status, answer.message));
     setCard(answer.data as unknown as ReportCardData);
+  }
+
+  /// Asks for a PDF and saves it as a file; the server's own sentence is shown when it refuses.
+  async function download(path: string, what: string) {
+    setDownloading(what);
+    setProblem(null);
+    const result = await getForPdf(path);
+    setDownloading(null);
+    if (!result.ok) return setProblem(failureText(result.reply.status, result.reply.message));
+    downloadBlob(result.blob, result.name);
   }
 
   if (options.error) return <Alert variant="error">{options.error}</Alert>;
@@ -61,18 +83,37 @@ export function CardsPanel({ schoolCode, institution }: { schoolCode: string; in
     return (
       <section aria-label="Report card" className="space-y-4">
         <div className="flex flex-wrap gap-3 print:hidden">
-          <Button variant="secondary" onClick={() => setCard(null)}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setCard(null);
+              setProblem(null);
+            }}
+          >
             Back to the class
           </Button>
           <Button onClick={() => window.print()}>Print</Button>
+          <Button
+            variant="secondary"
+            loading={downloading === "card"}
+            onClick={() =>
+              void download(
+                `${base}/people/students/${card.student.id}/report-card/pdf?${new URLSearchParams({ periodId: card.period.id })}`,
+                "card",
+              )
+            }
+          >
+            Download PDF
+          </Button>
         </div>
+        {problem && <Alert variant="error">{problem}</Alert>}
         {card.feeHold && (
           <Alert variant="warning" className="print:hidden">
             This card is held from {card.student.firstName} and their parents until {formatNaira(card.feeHold.outstanding)} in school fees
             is paid. Staff can still read and print it.
           </Alert>
         )}
-        <ReportCard card={card} institution={institution} />
+        <ReportCard card={card} institution={institution} origin={origin} />
         <RemarksEditor
           key={`${card.student.id}-${card.period.id}`}
           schoolCode={schoolCode}
@@ -109,6 +150,18 @@ export function CardsPanel({ schoolCode, institution }: { schoolCode: string; in
         />
       </div>
       {problem && <Alert variant="error">{problem}</Alert>}
+      <div>
+        <Button
+          variant="secondary"
+          loading={downloading === "class"}
+          disabled={rows.length === 0}
+          onClick={() =>
+            void download(`${base}/academics/results/report-cards/pdf?${new URLSearchParams({ periodId, classArmId: armId })}`, "class")
+          }
+        >
+          Download all cards (PDF)
+        </Button>
+      </div>
       <ListState
         loading={roster.loading}
         error={roster.error}

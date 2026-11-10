@@ -69,7 +69,8 @@ export type ResultFailure =
   | "NOT_ASSIGNED"
   | "FORBIDDEN_STUDENT_ACCESS"
   | "PERIOD_NOT_ACTIVE"
-  | "REPORT_CARD_WITHHELD";
+  | "REPORT_CARD_WITHHELD"
+  | "TOO_MANY_CARDS";
 
 export function resultFailure(reason: ResultFailure, message?: string): Response {
   switch (reason) {
@@ -93,6 +94,8 @@ export function resultFailure(reason: ResultFailure, message?: string): Response
       return fail(message ?? "You are not authorized to view this student's report card.", 403, "FORBIDDEN");
     case "PERIOD_NOT_ACTIVE":
       return fail(message ?? "The academic period is closed or invalid.", 409, "CONFLICT");
+    case "TOO_MANY_CARDS":
+      return fail(message ?? "That is too many report cards for one file.", 409, "CONFLICT");
     case "REPORT_CARD_WITHHELD":
       return fail(
         message ?? "This report card is being held until the outstanding school fees are paid. Please contact the school office.",
