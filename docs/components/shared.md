@@ -21,7 +21,7 @@ The shared building blocks (buttons, fields, dialog, alerts, icons, theme); they
 | `Switch.tsx` | `Switch({ id, checked, onChange, disabled, aria-label, aria-describedby })`: an on/off switch as a real `<button role="switch" aria-checked>`, named by a `<label htmlFor>` pointing at its `id` or by `aria-label`. The button is 44 x 44 CSS px (the tap size every phone screen holds to); the track drawn inside is the familiar 44 x 24. Space and Enter toggle it. Used by the five switches of the school settings Configuration tab (ISS-0033). |
 | `TextField.tsx` | `TextField({ label, hint, error, trailing, labelAction, ... })`: a labelled `<input>` with a real `<label htmlFor>`, hint and error linked by `aria-describedby` and `aria-invalid` on error; `trailing` sits inside the right edge, `labelAction` at the end of the label row; accepts `ref`. No `use client`. |
 | `ThemeProvider.tsx` | Client component: `ThemeProvider({ initialTheme })` holds the theme the server read from the cookie; `useTheme()` returns `{ theme, toggleTheme }` and throws outside the provider. Toggling sets `<html data-theme>` and writes the `theme` cookie (`Path=/`, one year, `SameSite=Lax`, `Secure` over https). |
-| `ThemeToggle.tsx` | Client component: an icon button that flips light and dark through `useTheme`; its label names the action ("Switch to light theme" or "Switch to dark theme") and the icon shows the theme you would get. |
+| `ThemeToggle.tsx` | Client component: an icon button that flips light and dark through `useTheme`; its label names the action ("Switch to light theme" or "Switch to dark theme", or the `labels` it is given for a page in another language: task 0044) and the icon shows the theme you would get. |
 
 ## `src/components/shell/`
 
