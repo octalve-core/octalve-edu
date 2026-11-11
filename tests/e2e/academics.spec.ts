@@ -435,12 +435,19 @@ test.describe("assessment schemes", () => {
   }) => {
     await signedInAdmin(page, "assessment");
     await expect(page.getByText("No assessment scheme yet.")).toBeVisible();
+    // Task 0048: the screen says why a scheme in use is replaced, not edited.
+    await expect(page.getByText(/Once marks have been entered under a scheme it is locked/)).toBeVisible();
     await page.getByRole("button", { name: "New scheme" }).click();
     await field(dialog(page), "Name").fill("Standard");
     await field(dialog(page), "Exam mark").fill("60");
     await field(dialog(page), "Component 1 name").fill("CA 1");
     await field(dialog(page), "Component 1 maximum").fill("30");
     await expect(dialog(page).getByText(/add up to\s*90\s*of\s*100/)).toBeVisible();
+    // The school may name its exam (task 0048); a name a component already has is refused where it was typed.
+    await field(dialog(page), "What the exam is called (optional)").fill("ca 1");
+    await dialog(page).getByRole("button", { name: "Create scheme" }).click();
+    await expect(dialog(page).getByText("A component already has that name. Give the exam a different one.")).toBeVisible();
+    await field(dialog(page), "What the exam is called (optional)").fill("Endterm");
     await dialog(page).getByRole("button", { name: "Create scheme" }).click();
     await expect(dialog(page).getByText(/add up to 90, not the total/)).toBeVisible(); // refused by the server, shown at the exam mark
     await field(dialog(page), "Component 1 maximum").fill("40");
@@ -454,8 +461,11 @@ test.describe("assessment schemes", () => {
     await expect(card).toContainText("School default");
     await expect(card).toContainText("Not used yet");
     await expect(card).toContainText("CA 1");
+    await expect(card).toContainText("Endterm"); // the exam's tile carries the school's name for it, not "Exam"
+    await expect(card.getByText("Exam", { exact: true })).toHaveCount(0);
 
     await page.getByRole("button", { name: "Edit Standard" }).click();
+    await expect(field(dialog(page), "What the exam is called (optional)")).toHaveValue("Endterm");
     await field(dialog(page), "Name").fill("Standard v1");
     await dialog(page).getByRole("button", { name: "Save changes" }).click();
     await expect(notice(page)).toContainText("Saved Standard v1.");
@@ -469,9 +479,12 @@ test.describe("assessment schemes", () => {
     await expect(dialog(page).getByText("Results already use version 1")).toBeVisible();
     await field(dialog(page), "Exam mark").fill("50");
     await field(dialog(page), "Component 1 maximum").fill("50");
+    await expect(field(dialog(page), "What the exam is called (optional)")).toHaveValue("Endterm"); // a new version starts from the name it had
+    await field(dialog(page), "What the exam is called (optional)").fill("Final Examination");
     await dialog(page).getByRole("button", { name: "Create new version" }).click();
     await expect(notice(page)).toContainText("Version 2 of Standard v1 is ready.");
     await expect(item(page, /Standard v1.*Version 2/)).toContainText("Not used yet");
+    await expect(item(page, /Standard v1.*Version 2/)).toContainText("Final Examination");
     await page.getByLabel("Show", { exact: true }).selectOption("all");
     await expect(item(page, /Standard v1.*Version 1/)).toContainText("Archived");
   });

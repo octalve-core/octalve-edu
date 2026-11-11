@@ -16,7 +16,7 @@ import {
 import { getScheme, updateScheme } from "@/lib/academics/assessment";
 
 // GET   /api/v1/schools/[code]/academics/assessment-schemes/[id]  — the scheme, its components, and its canonical snapshot (JSON + SHA-256).
-// PATCH /api/v1/schools/[code]/academics/assessment-schemes/[id]  { name?, totalMax?, examMax?, components? } — ADMIN only, and only while NOTHING
+// PATCH /api/v1/schools/[code]/academics/assessment-schemes/[id]  { name?, totalMax?, examMax?, examName?, components? } — ADMIN only, and only while NOTHING
 // uses the scheme yet; once a result does it is LOCKED (409 LOCKED) and a change is a new version. The scope (class) is fixed at creation.
 type Ctx = { params: Promise<{ code: string; id: string }> };
 const patchBody = z
@@ -24,6 +24,8 @@ const patchBody = z
     name: nameField.optional(),
     totalMax: markField.optional(),
     examMax: markField.optional(),
+    /// What the school calls the exam part ("Final Examination", "Endterm"); null or blank = the default "Exam". The service cleans it and checks its length and that no component has the name (task 0048).
+    examName: z.string().max(200, "Name the exam with 1 to 40 characters.").nullable().optional(),
     components: componentsField.optional(),
   })
   .refine((value) => Object.values(value).some((v) => v !== undefined), "Give something to change.");

@@ -21,6 +21,8 @@ export type SchemeView = {
   name: string;
   totalMax: number;
   examMax: number;
+  /// What the school calls the exam part (task 0048); null = the default, "Exam".
+  examName: string | null;
   version: number;
   locked: boolean;
   supersedesId: string | null;
@@ -41,6 +43,7 @@ const toScheme = (row: SchemeRow): SchemeView => ({
   name: row.name,
   totalMax: num(row.totalMax),
   examMax: num(row.examMax),
+  examName: row.examName,
   version: row.version,
   locked: row.lockedAt !== null,
   supersedesId: row.supersedesId,
@@ -78,12 +81,26 @@ export async function shareSchemeLock(tx: Tx, tenantId: string) {
 }
 
 export type SchemeInputComponents = readonly { name: unknown; maxScore: unknown }[];
-type Parsed = { components: { name: string; maxScore: number; sortOrder: number }[]; totalMax: number; examMax: number };
+type Parsed = {
+  components: { name: string; maxScore: number; sortOrder: number }[];
+  totalMax: number;
+  examMax: number;
+  examName: string | null;
+};
+
+/// The name a school gave the exam part, cleaned like a component's (runs of whitespace become one space, trimmed): null for "none given" (null, undefined or blank), and "" for something that is not text,
+/// which `checkScheme` refuses. Whether it is 1 to 40 characters and free of a component's name is `checkScheme`'s.
+function cleanExamName(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") return "";
+  return value.replace(/\s+/g, " ").trim() || null;
+}
 
 /// Cleans and validates the numbers and components of a scheme with the pure rule; the components keep the order they were given in (that is their sortOrder).
 function parseScheme(input: {
   totalMax: unknown;
   examMax: unknown;
+  examName: unknown;
   components: SchemeInputComponents;
 }): { ok: true; value: Parsed } | { ok: false; detail: { problem: SchemeProblem; index?: number; sum?: number } } {
   const components = input.components.map((component, sortOrder) => ({
@@ -91,14 +108,16 @@ function parseScheme(input: {
     maxScore: component.maxScore as number,
     sortOrder,
   }));
-  const bad = checkScheme({ totalMax: input.totalMax as number, examMax: input.examMax as number, components });
+  const examName = cleanExamName(input.examName);
+  const bad = checkScheme({ totalMax: input.totalMax as number, examMax: input.examMax as number, examName, components });
   if (bad) return { ok: false, detail: bad };
-  return { ok: true, value: { components, totalMax: input.totalMax as number, examMax: input.examMax as number } };
+  return { ok: true, value: { components, totalMax: input.totalMax as number, examMax: input.examMax as number, examName } };
 }
-const asRecord = (view: Pick<SchemeView, "name" | "totalMax" | "examMax" | "components">) => ({
+const asRecord = (view: Pick<SchemeView, "name" | "totalMax" | "examMax" | "examName" | "components">) => ({
   name: view.name,
   totalMax: view.totalMax,
   examMax: view.examMax,
+  examName: view.examName,
   components: view.components.map((component) => ({ name: component.name, maxScore: component.maxScore })),
 });
 
@@ -148,13 +167,21 @@ export async function getScheme(
 export async function createScheme(
   tenant: TenantCtx,
   actorUserId: string,
-  input: { classGroupId?: string | null; name: unknown; totalMax?: unknown; examMax: unknown; components: SchemeInputComponents },
+  input: {
+    classGroupId?: string | null;
+    name: unknown;
+    totalMax?: unknown;
+    examMax: unknown;
+    examName?: unknown;
+    components: SchemeInputComponents;
+  },
 ): Promise<AcademicResult<{ scheme: SchemeView }>> {
   const name = cleanName(input.name, SCHEME_NAME_MAX);
   if (!name) return refuse("INVALID_NAME");
   const parsed = parseScheme({
     totalMax: input.totalMax === undefined ? 100 : input.totalMax,
     examMax: input.examMax,
+    examName: input.examName,
     components: input.components,
   });
   if (!parsed.ok) return refuse("SCHEME_INVALID", parsed.detail);
@@ -180,7 +207,14 @@ export async function createScheme(
     if (await tx.assessmentScheme.findFirst({ where: { tenantId, name, archivedAt: null }, select: { id: true } }))
       return refuse("NAME_TAKEN");
     const created = await tx.assessmentScheme.create({
-      data: { tenantId, classGroupId, name, totalMax: parsed.value.totalMax, examMax: parsed.value.examMax },
+      data: {
+        tenantId,
+        classGroupId,
+        name,
+        totalMax: parsed.value.totalMax,
+        examMax: parsed.value.examMax,
+        examName: parsed.value.examName,
+      },
     });
     await tx.assessmentComponent.createMany({
       data: parsed.value.components.map((component) => ({ tenantId, schemeId: created.id, ...component })),
@@ -190,6 +224,7 @@ export async function createScheme(
       classGroupId,
       totalMax: parsed.value.totalMax,
       examMax: parsed.value.examMax,
+      examName: parsed.value.examName,
       components: parsed.value.components.map((component) => ({ name: component.name, maxScore: component.maxScore })),
     });
     return {
@@ -204,7 +239,7 @@ export async function updateScheme(
   tenant: TenantCtx,
   actorUserId: string,
   id: string,
-  input: { name?: unknown; totalMax?: unknown; examMax?: unknown; components?: SchemeInputComponents },
+  input: { name?: unknown; totalMax?: unknown; examMax?: unknown; examName?: unknown; components?: SchemeInputComponents },
 ): Promise<AcademicResult<{ scheme: SchemeView; changed: boolean }>> {
   const { tenantId } = tenant;
   return tenant.run(async (tx) => {
@@ -218,6 +253,7 @@ export async function updateScheme(
     const parsed = parseScheme({
       totalMax: input.totalMax === undefined ? before.totalMax : input.totalMax,
       examMax: input.examMax === undefined ? before.examMax : input.examMax,
+      examName: input.examName === undefined ? before.examName : input.examName,
       components: input.components ?? before.components,
     });
     if (!parsed.ok) return refuse("SCHEME_INVALID", parsed.detail);
@@ -225,6 +261,7 @@ export async function updateScheme(
       name,
       totalMax: parsed.value.totalMax,
       examMax: parsed.value.examMax,
+      examName: parsed.value.examName,
       components: parsed.value.components.map((c) => ({ name: c.name, maxScore: c.maxScore })),
     };
     if (JSON.stringify(asRecord(before)) === JSON.stringify(after)) return { ok: true, scheme: before, changed: false };
@@ -234,7 +271,10 @@ export async function updateScheme(
       (await tx.assessmentScheme.findFirst({ where: { tenantId, name, archivedAt: null, id: { not: id } }, select: { id: true } }))
     )
       return refuse("NAME_TAKEN");
-    await tx.assessmentScheme.update({ where: { id }, data: { name, totalMax: parsed.value.totalMax, examMax: parsed.value.examMax } });
+    await tx.assessmentScheme.update({
+      where: { id },
+      data: { name, totalMax: parsed.value.totalMax, examMax: parsed.value.examMax, examName: parsed.value.examName },
+    });
     await tx.assessmentComponent.deleteMany({ where: { tenantId, schemeId: id } });
     await tx.assessmentComponent.createMany({
       data: parsed.value.components.map((component) => ({ tenantId, schemeId: id, ...component })),
@@ -254,7 +294,7 @@ export async function newSchemeVersion(
   tenant: TenantCtx,
   actorUserId: string,
   id: string,
-  changes: { name?: unknown; totalMax?: unknown; examMax?: unknown; components?: SchemeInputComponents },
+  changes: { name?: unknown; totalMax?: unknown; examMax?: unknown; examName?: unknown; components?: SchemeInputComponents },
 ): Promise<AcademicResult<{ scheme: SchemeView }>> {
   const { tenantId } = tenant;
   return tenant.run(async (tx) => {
@@ -268,6 +308,7 @@ export async function newSchemeVersion(
     const parsed = parseScheme({
       totalMax: changes.totalMax === undefined ? before.totalMax : changes.totalMax,
       examMax: changes.examMax === undefined ? before.examMax : changes.examMax,
+      examName: changes.examName === undefined ? before.examName : changes.examName,
       components: changes.components ?? before.components,
     });
     if (!parsed.ok) return refuse("SCHEME_INVALID", parsed.detail);
@@ -285,6 +326,7 @@ export async function newSchemeVersion(
         name,
         totalMax: parsed.value.totalMax,
         examMax: parsed.value.examMax,
+        examName: parsed.value.examName,
         version: old.version + 1,
         supersedesId: id,
       },
@@ -305,6 +347,7 @@ export async function newSchemeVersion(
         name,
         totalMax: parsed.value.totalMax,
         examMax: parsed.value.examMax,
+        examName: parsed.value.examName,
         components: parsed.value.components.map((c) => ({ name: c.name, maxScore: c.maxScore })),
       },
     );

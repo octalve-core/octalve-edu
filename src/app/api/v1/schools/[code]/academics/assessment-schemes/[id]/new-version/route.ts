@@ -14,7 +14,7 @@ import {
 } from "@/lib/academics/http";
 import { newSchemeVersion } from "@/lib/academics/assessment";
 
-// POST /api/v1/schools/[code]/academics/assessment-schemes/[id]/new-version  { name?, totalMax?, examMax?, components? } — ADMIN only.
+// POST /api/v1/schools/[code]/academics/assessment-schemes/[id]/new-version  { name?, totalMax?, examMax?, examName?, components? } — ADMIN only.
 // For a LOCKED scheme (a result uses it): copies it as version + 1 with the given changes, archives the old one. 409 NOT_LOCKED for an unlocked one
 // (edit it in place instead). An empty body copies it unchanged.
 type Ctx = { params: Promise<{ code: string; id: string }> };
@@ -22,6 +22,8 @@ const body = z.strictObject({
   name: nameField.optional(),
   totalMax: markField.optional(),
   examMax: markField.optional(),
+  /// What the school calls the exam part ("Final Examination", "Endterm"); null or blank = the default "Exam". The service cleans it and checks its length and that no component has the name (task 0048).
+  examName: z.string().max(200, "Name the exam with 1 to 40 characters.").nullable().optional(),
   components: componentsField.optional(),
 });
 

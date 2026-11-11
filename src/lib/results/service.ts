@@ -3,6 +3,7 @@ import { ResultStatus, Permission, type Prisma } from "@prisma/client";
 import type { Tx } from "@/lib/tenant/for-tenant";
 import { gradeFor } from "@/lib/academics/scoring";
 import { lockScheme, shareSchemeLock } from "@/lib/academics/assessment";
+import { lockScale, shareScaleLock } from "@/lib/academics/grading";
 import { auditAcademic } from "@/lib/academics/sessions";
 import { assignedArmIds } from "@/lib/attendance/access";
 import { approverScope, inScopeResultIds, NO_SCOPE } from "./approver-scope";
@@ -68,7 +69,8 @@ export async function recordStudentResults(
     return { ok: false, failure: "NOT_FOUND", message: "Academic period or subject not found." };
   }
 
-  // Fetch tenant default grade scale if one exists
+  // Fetch tenant default grade scale if one exists. The shared scale lock is taken first, so no edit of the scale can land between this read and the lock taken below (task 0048).
+  await shareScaleLock(tx, tenantId);
   const defaultScale = await tx.gradeScale.findFirst({
     where: { tenantId, isDefault: true, archivedAt: null },
     include: { bands: true },
@@ -193,6 +195,20 @@ export async function recordStudentResults(
         { locked: true, periodId: input.periodId },
       );
   }
+
+  // The first save that grades a result by the default grade scale locks that scale too (task 0048, as the scheme above and as AlEemaan does): a grade letter stored with a result must go on meaning what
+  // it meant, so from now on a change to the scale is a new version, and the database refuses an edit in place. Every refusal above has been decided, so a refused request locks nothing.
+  if (defaultScale && defaultScale.bands.length > 0 && entries.length > 0 && (await lockScale(tx, tenantId, defaultScale.id)))
+    await auditAcademic(
+      tx,
+      tenantId,
+      actorUserId,
+      "GradeScale",
+      "GRADE_SCALE_LOCKED",
+      defaultScale.id,
+      { locked: false },
+      { locked: true, periodId: input.periodId },
+    );
 
   const savedIds: string[] = [];
 

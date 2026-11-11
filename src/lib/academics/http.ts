@@ -158,6 +158,9 @@ export function academicFailure(reason: AcademicFailure, detail?: Record<string,
         COMPONENT_NAME_INVALID: "Give each component a name of 1 to 40 characters.",
         COMPONENT_NAME_DUPLICATE: "Two components have the same name.",
         COMPONENT_MAX_NOT_POSITIVE: "Each component's maximum must be more than zero.",
+        EXAM_NAME_INVALID: "Name the exam with 1 to 40 characters, or leave the name empty.",
+        EXAM_NAME_DUPLICATE: "A component already has that name. Give the exam a different one.",
+        EXAM_NAME_WITHOUT_EXAM: "The exam is worth nothing here, so it has no name. Clear the name or give the exam a mark.",
         SUM_MISMATCH: `The components and the exam add up to ${sum ?? "a different number"}, not the total.`,
       };
       const message = MESSAGES[problem] ?? "Check the scheme.";
@@ -166,11 +169,13 @@ export function academicFailure(reason: AcademicFailure, detail?: Record<string,
           ? "body.examMax"
           : problem.startsWith("COMPONENT") || (problem === "PRECISION" && detail?.index !== undefined)
             ? `body.components.${String(detail?.index ?? 0)}`
-            : problem.startsWith("EXAM")
-              ? "body.examMax"
-              : problem.startsWith("TOTAL")
-                ? "body.totalMax"
-                : "body.components";
+            : problem.startsWith("EXAM_NAME")
+              ? "body.examName"
+              : problem.startsWith("EXAM")
+                ? "body.examMax"
+                : problem.startsWith("TOTAL")
+                  ? "body.totalMax"
+                  : "body.components";
       return fail(message, 400, "VALIDATION", [{ path, message }]);
     }
     case "BANDS_INVALID": {

@@ -16,7 +16,7 @@ import {
 import { createScheme, listSchemes } from "@/lib/academics/assessment";
 
 // GET  /api/v1/schools/[code]/academics/assessment-schemes   — how marks are built (components + exam = total), newest version first per name.
-// POST /api/v1/schools/[code]/academics/assessment-schemes   { classGroupId?, name, totalMax?, examMax, components } — ADMIN only.
+// POST /api/v1/schools/[code]/academics/assessment-schemes   { classGroupId?, name, totalMax?, examMax, examName?, components } — ADMIN only.
 // `classGroupId` null/omitted is the school default; one live scheme per scope. Reads: ADMIN and staff (staff see the default and the schemes of
 // classes they can see). `status` defaults to "live".
 const query = z.object({ status: z.enum(["live", "archived", "all"]).default("live"), classGroupId: idField.optional() });
@@ -25,6 +25,8 @@ const createBody = z.strictObject({
   name: nameField,
   totalMax: markField.optional(),
   examMax: markField,
+  /// What the school calls the exam part ("Final Examination", "Endterm"); null or blank = the default "Exam". The service cleans it and checks its length and that no component has the name (task 0048).
+  examName: z.string().max(200, "Name the exam with 1 to 40 characters.").nullable().optional(),
   components: componentsField,
 });
 

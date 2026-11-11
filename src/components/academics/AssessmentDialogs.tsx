@@ -37,6 +37,7 @@ export function SchemeFormDialog({
   const [classGroupId, setClassGroupId] = useState("");
   const [total, setTotal] = useState(scheme ? markText(scheme.totalMax) : "100");
   const [exam, setExam] = useState(scheme ? markText(scheme.examMax) : "");
+  const [examName, setExamName] = useState(scheme?.examName ?? "");
   const [rows, setRows] = useState<Row[]>(
     scheme ? scheme.components.map((c) => ({ name: c.name, max: markText(c.maxScore) })) : [{ name: "", max: "" }],
   );
@@ -63,6 +64,8 @@ export function SchemeFormDialog({
       name: name.trim(),
       totalMax,
       examMax,
+      // What the school calls the exam (task 0048); empty = the default, "Exam".
+      examName: examName.trim() || null,
       components: rows.map((row) => ({ name: row.name.trim(), maxScore: parseMark(row.max) })),
     };
     if (mode === "create")
@@ -83,7 +86,7 @@ export function SchemeFormDialog({
       }
       submitLabel={mode === "version" ? "Create new version" : mode === "edit" ? "Save changes" : "Create scheme"}
       pendingLabel="Saving…"
-      fields={["name", "classGroupId", "totalMax", "examMax", "components"]}
+      fields={["name", "classGroupId", "totalMax", "examMax", "examName", "components"]}
       onSubmit={submit}
       onDone={onDone}
       wide
@@ -134,6 +137,16 @@ export function SchemeFormDialog({
               disabled={pending}
             />
           </div>
+          <TextField
+            label="What the exam is called (optional)"
+            value={examName}
+            onChange={(e) => setExamName(e.target.value)}
+            error={errors.examName}
+            hint="Such as Final Examination or Endterm. Left empty it is called Exam. Teachers see this name when they enter marks."
+            maxLength={40}
+            autoComplete="off"
+            disabled={pending}
+          />
           <fieldset className="space-y-3">
             <legend className="mb-1 text-xs font-semibold tracking-wide text-fg-2 uppercase">Continuous assessment components</legend>
             {rows.map((row, index) => (
