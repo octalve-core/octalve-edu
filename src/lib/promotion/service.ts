@@ -13,6 +13,7 @@ import {
   streamPlacement,
   sessionPairProblem,
   validateSessionPromotionEligibility,
+  finalTermGap,
 } from "./rules";
 import type { ExecutePromotionInput, PromotionOverride, PromotionPlacement, PromotionPreviewQuery } from "./validation";
 
@@ -78,6 +79,8 @@ export interface PromotionPreview {
   passMark: number;
   academicPeriods: { id: string; ordinal: number; label: string; isCurrent: boolean }[];
   eligibility: { eligible: boolean; finalPeriodOrdinal: number; reason?: string };
+  /// Advice (task 0047): how many pupils to be rolled have no published marks for the final period, so their average does not count it. `null` when nobody is missing. Never a refusal.
+  finalTermGap: { ordinal: number; label: string; pupils: number } | null;
   targetArms: { id: string; name: string }[];
   /// Every live class of the next rung (one, or several when a school has streams). The roll's default target is `targetClassGroup`; a pupil may be placed in any of these.
   rungClasses: RungClass[];
@@ -270,6 +273,7 @@ export async function previewPromotion(tx: Tx, tenantId: string, caller: Caller,
     passMark,
     academicPeriods: periods,
     eligibility,
+    finalTermGap: finalTermGap(periods, students),
     targetArms,
     rungClasses,
     placementNeeded,

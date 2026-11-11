@@ -152,6 +152,8 @@ export {
   campusAdminMayRoll,
   classCalendarProblem,
   defaultPromotionSessions,
+  finalTermGap,
+  finalTermGapText,
   sessionAfter,
   sessionPairProblem,
   type SessionChoice,

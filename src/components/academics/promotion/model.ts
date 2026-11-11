@@ -47,6 +47,8 @@ export type Preview = {
   passMark: number;
   academicPeriods: { id: string; ordinal: number; label: string; isCurrent: boolean }[];
   eligibility: { eligible: boolean; finalPeriodOrdinal: number; reason?: string };
+  /// Advice only (task 0047): pupils to be rolled with no published marks for the final period.
+  finalTermGap: { ordinal: number; label: string; pupils: number } | null;
   targetArms: { id: string; name: string }[];
   /// The live classes of the next rung: one, or several when the school has streams.
   rungClasses: RungClass[];

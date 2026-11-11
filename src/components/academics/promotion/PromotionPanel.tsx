@@ -8,7 +8,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
 import { getJson, sendJson } from "@/components/auth/postJson";
-import { defaultPromotionSessions, sessionAfter } from "@/lib/promotion/choices";
+import { defaultPromotionSessions, finalTermGapText, sessionAfter } from "@/lib/promotion/choices";
 import { LiveNotice, useDialog, type Notice } from "../parts";
 import { periodWords } from "../model";
 import { failureText } from "../useApi";
@@ -304,6 +304,12 @@ export function PromotionPanel({
               {!preview.eligibility.eligible && (
                 <Alert variant="warning">{preview.eligibility.reason} You can still go on: the school may promote early.</Alert>
               )}
+              {preview.finalTermGap && (
+                <Alert variant="warning">
+                  {finalTermGapText(preview.finalTermGap)} You can still go on: publish the term&apos;s results first if you want them
+                  counted.
+                </Alert>
+              )}
               {preview.targetClassGroup && preview.targetArms.length === 0 && (
                 <Alert variant="error">
                   {preview.targetClassGroup.name} has no arm yet, so nobody can be promoted into it. Add an arm under Classes &amp;
@@ -411,6 +417,7 @@ export function PromotionPanel({
             {plan.skipped > 0 && <li>{plan.skipped} already placed in the next session: left as they are</li>}
           </ul>
           {!preview.eligibility.eligible && <p className="mt-3 text-sm text-warn-fg">{preview.eligibility.reason}</p>}
+          {preview.finalTermGap && <p className="mt-3 text-sm text-warn-fg">{finalTermGapText(preview.finalTermGap)}</p>}
           <p className="mt-3 text-sm text-fg-muted">
             This is recorded for good. Rolling the same class again is safe: pupils who have already been dealt with are left alone, and a
             second roll with nobody left is refused.
