@@ -567,3 +567,14 @@
 - [x] A fresh test lane applied all 50 migrations with `migrate deploy`; `prisma migrate status` up to date; 292 API specs on these tables and the whole unit project (1,214) pass
 - [x] Found: `scripts/lanes.mjs sync` left empty folders for removed migrations, which fails the setup step with P3015 for any lane; fixed (a directory gone from the checkout and empty is removed)
 - [ ] Open for the maintainer: reset any local database that applied the old six (`octalve_edu`, `octalve_edu_test`: `prisma migrate reset`); whether to squash the 50 older migrations too; the old remote database described in HANDOVER section 3 (31 migrations, October) if it still exists
+
+## TASK-0050: The whole migration history becomes one baseline
+
+[Task file](0050-squash-all-migrations.md). Asked by the maintainer on 2026-11-11 ("squash all"; no production or preview database exists); built on `claude/octalve-squash-all`. 50 migrations become one; no schema change.
+
+- [x] `20260927053552_baseline` is the final schema (`pg_dump --schema-only`, edited: psql-only lines and session settings removed, the migrator's role written as `CURRENT_USER`, control characters written as escapes); the 50 folders are removed
+- [x] Same schema, compared as bytes: 13,391 of 13,404 lines identical, 13 CHECK lines differ only in AND bracketing, nothing else; a control differs; a reload is a fixed point
+- [x] Fresh lane databases migrated by `migrate deploy`: unit and API 2,936 passed, integration 696 passed, five browser specs 145 passed, 0 failed
+- [x] Found: a plain concatenation fails (enum values); my first file lost four carriage returns (text-mode read) and my first comparison could not see it (caught by `source-hygiene`); the `integration` project was not in earlier regressions and `rls.spec.ts` was red on `dev` since tasks 0036 and 0040 (fixed, four lines)
+- [x] `question-bank-schema.spec.ts` no longer reads a migration file: two tests ported to the catalog (mutation-checked 3 of 3), two about historical file content removed
+- [ ] Open for the maintainer: reset `octalve_edu`, `octalve_edu_test` and lanes 6 to 8 (`prisma migrate reset` / drop); the old remote database in HANDOVER section 3 if it still exists

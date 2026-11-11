@@ -162,6 +162,7 @@ test.describe("who is running", () => {
     expect(byTable["ProgressEntryRevision"]).toEqual(["INSERT", "SELECT"]); // nor what an entry said before
     expect(byTable["PromotionBatch"]).toEqual(["INSERT", "SELECT"]); // a promotion is evidence of what was decided,
     expect(byTable["PromotionRecord"]).toEqual(["INSERT", "SELECT"]); // and of what was decided for each pupil
+    expect(byTable["PromotionReversal"]).toEqual(["INSERT", "SELECT"]); // and so is the undoing of a roll (task 0040)
     const APPEND_ONLY = new Set([
       "AuditLog",
       "ResultAudit",
@@ -175,6 +176,7 @@ test.describe("who is running", () => {
       "ProgressEntryRevision",
       "PromotionBatch",
       "PromotionRecord",
+      "PromotionReversal",
     ]);
     for (const [table, verbs] of Object.entries(byTable)) {
       if (APPEND_ONLY.has(table)) continue;
@@ -1420,6 +1422,7 @@ test.describe("catalog guard", () => {
       "ProgressTemplate",
       "PromotionBatch",
       "PromotionRecord",
+      "PromotionReversal",
       "QuestionBankAudit",
       "QuestionBankClassTag",
       "QuestionBankImage",
@@ -1435,6 +1438,7 @@ test.describe("catalog guard", () => {
       "QuizAttempt",
       "QuizQuestion",
       "ReceiptCounter",
+      "ReportRemark",
       "Result",
       "ResultApprovalScope",
       "ResultAudit",
