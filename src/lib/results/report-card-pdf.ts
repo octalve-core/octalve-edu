@@ -1,5 +1,6 @@
 import { verifyLink, verifyPageUrl } from "@/lib/app-url";
 import { PdfBuilder, type Rgb } from "@/lib/pdf/builder";
+import { clusters } from "@/lib/pdf/unicode-text";
 
 // A pupil's report card as a PDF (task 0038): the same facts as the card on the screen, laid out on A4, one card to a page (more when the subjects need it), several cards in one file for a class.
 // Pure: it draws the data it is given. What a viewer is allowed to see (the payment gate, which results a pupil sees, when remarks are shown) is decided before the data gets here.
@@ -41,12 +42,13 @@ const WARN: Rgb = [0.62, 0.18, 0.1];
 const LINK: Rgb = [0.08, 0.25, 0.66];
 const OFFICIAL = new Set(["PUBLISHED", "LOCKED"]);
 
-/// Cut a text to a width with an ellipsis, so a long name cannot run over its neighbour.
+/// Cut a text to a width with an ellipsis, so a long name cannot run over its neighbour. It cuts between grapheme clusters, never between a letter and its mark (task 0045).
 function fit(pdf: PdfBuilder, text: string, font: "regular" | "bold", size: number, width: number): string {
   if (pdf.width(text, font, size) <= width) return text;
-  let cut = text.length;
-  while (cut > 1 && pdf.width(`${text.slice(0, cut)}…`, font, size) > width) cut--;
-  return `${text.slice(0, cut)}…`;
+  const parts = clusters(text);
+  let cut = parts.length;
+  while (cut > 1 && pdf.width(`${parts.slice(0, cut).join("")}…`, font, size) > width) cut--;
+  return `${parts.slice(0, cut).join("")}…`;
 }
 
 const markText = (score: number, max: number) => `${score} / ${max}`;

@@ -135,11 +135,26 @@ The process-memory store behind the development email inbox.
 
 ## `src/lib/pdf/`
 
-A small PDF writer with no dependency (task 0038), for documents that are laid out page by page. The question bank's `printing.ts` (in `src/lib/question-bank/`) is a separate, Latin-only engine for question papers.
+A small PDF writer (task 0038), for documents that are laid out page by page; it embeds Noto fonts for text the standard fonts cannot draw (task 0045, with `fontkit` and `bidi-js`). The question bank's `printing.ts` (in `src/lib/question-bank/`) is a separate, Latin-only engine for question papers.
 
 | File | Description |
 | --- | --- |
-| `builder.ts` | `PdfBuilder`: PDF 1.4 on A4 with the standard Helvetica (regular, bold) and Courier fonts, no embedding. `addPage`, `selectPage` (draw on an earlier page again, for "Page i of n"), `width` and `wrap` (true text measuring from the Helvetica width tables for U+0020 to U+007E, 556 elsewhere; words kept whole, a word wider than a line cut where it overflows), `text` (left, right or centre aligned, a size, a colour), `line`, `rect` (fill and/or stroke), `link` (a clickable rectangle; only a plain printable-ASCII `http(s)` address is accepted, `false` otherwise, and `(`, `)` and `\` are escaped) and `build(date)` (a real cross-reference table, the document title and author, the clock passed in so the same input is the same bytes). Text is written as hex strings in WinAnsi: Latin-1 and the Windows-1252 punctuation as themselves, a letter with a mark WinAnsi lacks as its base letter (Yoruba), a lone combining mark dropped, anything else a `?`, counted in `unsupported`. Exports `charWidth` and `encodeWinAnsi`. |
+| `builder.ts` | `PdfBuilder`: PDF 1.4 on A4. A text that WinAnsi can write exactly (printable ASCII, Latin-1, the Windows-1252 punctuation, after NFC) is drawn as it always was, with the standard Helvetica (regular, bold) and Courier fonts and no embedding, so a document of such words is byte-identical to what it was; any other text (a Yoruba mark, Arabic, Cyrillic, Greek, the naira sign) is drawn with the embedded Noto fonts (task 0045, `needsUnicode`). `addPage`, `selectPage` (draw on an earlier page again, for "Page i of n"), `width` and `wrap` (true text measuring: the Helvetica width tables for U+0020 to U+007E and 556 elsewhere, or the advances of the laid-out glyphs for a Unicode text; words kept whole, a word wider than a line cut between grapheme clusters where it overflows), `text` (left, right or centre aligned, a size, a colour), `line`, `rect` (fill and/or stroke), `link` (a clickable rectangle; only a plain printable-ASCII `http(s)` address is accepted, `false` otherwise, and `(`, `)` and `\` are escaped) and `build(date)` (a real cross-reference table, the document title and author, UTF-16 when they hold a mark, the clock passed in so the same input is the same bytes). A Unicode text is one text object with a font switch for each run and every glyph placed by its own matrix (a mark sits above or below its letter); the fonts are Type0 / CIDFontType2 with `Identity-H`, cut to the glyphs the document uses and Flate-compressed, with a widths array and a `ToUnicode` map so the text can be copied and searched. A character no embedded font has is drawn `?`, counted in `unsupported`. Exports `charWidth`, `encodeWinAnsi` and `needsUnicode`. |
+| `unicode-text.ts` | The pure parts of Unicode text (task 0045): `drawable` (NFC; tabs and line ends become spaces), `visualRuns` (splits a line into runs of one font and one direction level with `bidi-js`, puts the runs in visual order, replaces a bracket read right to left by its mirror, drops the invisible direction marks and the byte-order mark), `reorder` (rule L2 over whole runs), `clusters` (grapheme clusters, so a cut never separates a letter from its mark), `hasArabic` and `utf16Hex`. No I/O and no PDF. |
+| `unicode-fonts.ts` | `UnicodeFontSet` and `loadUnicodeFonts()`: reads the four Noto files in `fonts/` once per process (the only I/O the PDF writer does) and, through `fontkit`, lays a run out (substitutions, mark positions, kerning), says whether a font has a character, and cuts a subset. Two instances of each font on purpose: one lays text out and one cuts subsets, because `fontkit` keeps a glyph object per glyph number for the life of a font and a subset's component glyphs (the `e` of `é`) would otherwise forget which character they stand for. |
+| `fonts/NotoSans-Regular.ttf` | Noto Sans Regular (Latin with every Yoruba letter and mark, Greek, Cyrillic), SIL Open Font License 1.1. |
+| `fonts/NotoSans-Bold.ttf` | Noto Sans Bold. |
+| `fonts/NotoNaskhArabic-Regular.ttf` | Noto Naskh Arabic Regular (the Arabic script), SIL Open Font License 1.1. |
+| `fonts/NotoNaskhArabic-Bold.ttf` | Noto Naskh Arabic Bold. |
+| `fonts/OFL.txt` | The licence of the four fonts; it travels with them into the deployed function (`next.config.ts`, `outputFileTracingIncludes` for the two report-card PDF routes). |
+
+## `src/types/`
+
+Declarations for packages that ship none.
+
+| File | Description |
+| --- | --- |
+| `bidi-js.d.ts` | The part of `bidi-js` that `src/lib/pdf/unicode-text.ts` uses (`getEmbeddingLevels`, `getMirroredCharacter`), task 0045. |
 
 ## `src/lib/tools/`
 

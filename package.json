@@ -44,8 +44,10 @@
   "dependencies": {
     "@prisma/client": "6.19.3",
     "bcryptjs": "^3.0.3",
+    "bidi-js": "1.0.3",
     "bullmq": "^6.3.15",
     "cloudinary": "2.11.0",
+    "fontkit": "2.0.4",
     "ioredis": "^6.0.0",
     "next": "16.3.6",
     "qrcode": "1.5.4",
@@ -58,6 +60,7 @@
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "1.56.1",
     "@tailwindcss/postcss": "^4",
+    "@types/fontkit": "^2.0.9",
     "@types/node": "^20",
     "@types/qrcode": "1.5.6",
     "@types/react": "^19",

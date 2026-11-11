@@ -1,7 +1,7 @@
 import "../support/env";
 import { test, expect } from "@playwright/test";
 import { renderReportCardsPdf, type PdfCard } from "@/lib/results/report-card-pdf";
-import { pdfDeclaredPages, pdfLinks, pdfPages, pdfProblems } from "../support/pdf";
+import { pdfDeclaredPages, pdfEmbeddedFonts, pdfLinks, pdfPages, pdfProblems } from "../support/pdf";
 
 // A report card as a PDF (task 0038): what is on it, that it never runs off a page, and that several cards are several pages.
 
@@ -138,17 +138,46 @@ test.describe("one card", () => {
     expect(bare).not.toContain("TEACHER'S REMARK");
   });
 
-  test("letters of a Nigerian name that WinAnsi lacks are written without their marks, and nothing is a question mark", () => {
+  test("a Nigerian name is drawn as it is written, with its marks (task 0045), and nothing is a question mark", () => {
     const named = card({ student: { firstName: "Ọ̀lá", lastName: "Adébáyọ̀ Ṣ", admissionNo: "1", classGroup: "JSS 1", classArm: "A" } });
     const out = render([named]);
     expect(out.unsupported).toBe(0);
-    expect(pdfPages(out.pdf)[0]).toContain("Olá Adébáyo S");
-    expect(pdfPages(out.pdf)[0]).not.toContain("?");
+    const page = pdfPages(out.pdf)[0];
+    expect(page).toContain("Ọ̀lá Adébáyọ̀ Ṣ".normalize("NFC"));
+    expect(page).not.toContain("?");
+    expect(pdfEmbeddedFonts(out.pdf).some((f) => f.includes("NotoSans"))).toBe(true);
+    expect(pdfProblems(out.pdf)).toEqual([]);
   });
 
-  test("characters the standard fonts cannot show are counted, not hidden", () => {
-    const out = render([card({ student: { firstName: "احمد", lastName: "Obi", admissionNo: "1", classGroup: "JSS 1", classArm: "A" } })]);
-    expect(out.unsupported).toBe(4);
+  test("an Arabic name is drawn too, with the Arabic font, and a card whose words are all WinAnsi embeds no font at all", () => {
+    const arabic = render([
+      card({ student: { firstName: "محمد", lastName: "Obi", admissionNo: "1", classGroup: "JSS 1", classArm: "A" } }),
+    ]);
+    expect(arabic.unsupported).toBe(0);
+    expect(pdfEmbeddedFonts(arabic.pdf).some((f) => f.includes("NotoNaskhArabic"))).toBe(true);
+    expect(pdfPages(arabic.pdf)[0]).toContain("دمحم"); // glyphs stand in the order they are drawn: right to left reads reversed
+    expect(pdfProblems(arabic.pdf)).toEqual([]);
+    const plain = render([card()]);
+    expect(pdfEmbeddedFonts(plain.pdf)).toEqual([]);
+    expect(plain.pdf.includes(Buffer.from("/CIDFontType2"))).toBe(false);
+  });
+
+  test("characters no embedded font has are counted, not hidden", () => {
+    const out = render([card({ student: { firstName: "中文", lastName: "Obi", admissionNo: "1", classGroup: "JSS 1", classArm: "A" } })]);
+    expect(out.unsupported).toBe(2);
+    expect(pdfPages(out.pdf)[0]).toContain("?? Obi");
+    expect(pdfPages(out.pdf)[0]).not.toContain("\ufffd");
+  });
+
+  test("a very long name with marks is cut with an ellipsis between letters, never leaving a mark alone", () => {
+    const long = "Ọ̀".repeat(60);
+    const [page] = text([card({ student: { firstName: long, lastName: "Ṣ", admissionNo: "1", classGroup: "JSS 1", classArm: "A" } })]);
+    expect(page).toContain("…");
+    const shown = page.split("\n").find((line) => line.includes("…") && line.includes("Ọ")) ?? "";
+    expect(shown.startsWith("\u0300")).toBe(false);
+    expect([...shown.normalize("NFD")].filter((ch) => ch === "\u0300").length).toBe(
+      [...shown.normalize("NFD")].filter((ch) => ch === "\u0323").length,
+    );
   });
 
   test("a very long name is cut with an ellipsis and does not run over its neighbour", () => {
