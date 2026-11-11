@@ -66,6 +66,9 @@ export function syncLane(n) {
       if (entry.isDirectory()) walk(path.join(current, entry.name), r);
       else if (!wanted.has(r)) fs.rmSync(path.join(current, entry.name));
     }
+    // A directory that no longer exists in the checkout and is now empty goes too. An empty migration folder is not harmless: `prisma migrate
+    // deploy` stops with P3015 ("Could not find the migration file"), which is what a lane gets when a branch removes or merges migrations.
+    if (rel && !fs.existsSync(path.join(repo, rel)) && fs.readdirSync(current).length === 0) fs.rmdirSync(current);
   };
   walk(dir);
 
