@@ -1,7 +1,5 @@
 import "../support/env";
 import { test, expect } from "@playwright/test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { TEST_DATABASE_URL } from "../support/env";
 import { addMembership, createTenant, createUser, db, removeCreatedTenants, Role, type TestTenant } from "../support/db";
@@ -12,7 +10,7 @@ import { STORE_NAMES } from "@/lib/storage/types";
 
 // The question bank's tables (task 0024, migration 20261101090000_question_bank): the database itself refuses what the design says must never happen, whichever code writes, and
 // keeps one school's questions from ever reaching another's. Written before any service code, so the service is built to fit rules that already hold.
-//   - the migration is additive and every table has row-level security in the same file;
+//   - every table has row-level security, enabled and forced (read from the migrated database);
 //   - a fifth image, an image with no description, a rating question in the assessment bank, a subject reviewer without a subject, a duplicate reviewer or setting, a switch
 //     changed without a fresh re-authentication, an approved item that does not say who approved it;
 //   - any change to or removal of a review, a version or an audit row (a school being removed as a whole is the one exception);
@@ -71,43 +69,31 @@ const image = (itemId: string, over: Record<string, unknown> = {}) =>
   });
 const inFuture = (ms = 3_600_000) => new Date(Date.now() + ms);
 
-test.describe("the migration is additive", () => {
-  const sql = readFileSync(join(process.cwd(), "prisma", "migrations", "20261101090000_question_bank", "migration.sql"), "utf8");
-  const statements = sql
-    .split("\n")
-    .filter((line) => !line.trim().startsWith("--"))
-    .join("\n");
-
-  test("it creates 6 enums and 9 tables, and everything else it touches is a new question bank table", () => {
-    expect(statements.match(/^CREATE TYPE /gm)).toHaveLength(6);
-    expect(statements.match(/^CREATE TABLE /gm)).toHaveLength(9);
-    const created = [...statements.matchAll(/^CREATE TABLE "([^"]+)"/gm)].map((m) => m[1]);
-    for (const table of created) expect(table, table).toMatch(/^Question(Bank|Overlap)/);
-    const touched = [
-      ...statements.matchAll(
-        /^(?:ALTER TABLE|CREATE (?:UNIQUE )?INDEX "[^"]+" ON|CREATE TRIGGER "[^"]+" [A-Z ]+(?: OF [^O]+)? ON|CREATE POLICY \w+ ON)\s+"([^"]+)"/gm,
-      ),
-    ].map((m) => m[1]);
-    expect(touched.length).toBeGreaterThan(30);
-    for (const table of touched) expect(created, table).toContain(table);
-  });
-
-  test("it never drops, updates, deletes or inserts anything", () => {
-    expect(statements).not.toMatch(/^\s*(DROP|DELETE|UPDATE|INSERT|TRUNCATE)\b/im);
-  });
-
-  test("every table has row-level security enabled AND forced in the same file, and there is no policy that lets the application delete an item", () => {
-    const created = [...statements.matchAll(/^CREATE TABLE "([^"]+)"/gm)].map((m) => m[1]);
-    for (const table of created) {
-      expect(statements, table).toContain(`ALTER TABLE "${table}" ENABLE ROW LEVEL SECURITY;`);
-      expect(statements, table).toContain(`ALTER TABLE "${table}" FORCE ROW LEVEL SECURITY;`);
+test.describe("the schema as migrated", () => {
+  // These used to read the question-bank migration file; the migration history was squashed into one baseline (task 0050), so they now ask the database what it holds.
+  test("every question-bank table has row-level security enabled AND forced, and there is no policy that lets the application delete an item", async () => {
+    const tables = await db.$queryRawUnsafe<{ relname: string; on: boolean; forced: boolean }[]>(
+      `SELECT c.relname, c.relrowsecurity AS "on", c.relforcerowsecurity AS forced FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname ~ '^Question(Bank|Overlap)' ORDER BY c.relname`,
+    );
+    expect(tables.length).toBeGreaterThanOrEqual(9);
+    for (const t of tables) {
+      expect(t.on, `${t.relname} row-level security enabled`).toBe(true);
+      expect(t.forced, `${t.relname} row-level security forced`).toBe(true);
     }
-    expect(statements).not.toMatch(/CREATE POLICY \w+ ON "QuestionBankItem" FOR DELETE/);
+    const deletePolicies = await db.$queryRawUnsafe<{ policyname: string }[]>(
+      `SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'QuestionBankItem' AND cmd = 'DELETE'`,
+    );
+    expect(deletePolicies).toEqual([]);
   });
 
-  test("the list of stores in the database check is exactly the list of stores the code knows", () => {
-    const listed = statements.match(/"store" IN \(([^)]*)\)/)?.[1] ?? "";
-    expect([...listed.matchAll(/'([a-z0-9]+)'/g)].map((m) => m[1]).sort()).toEqual([...STORE_NAMES].sort());
+  test("the list of stores in the database check is exactly the list of stores the code knows", async () => {
+    const defs = await db.$queryRawUnsafe<{ def: string }[]>(
+      `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE contype = 'c' AND conrelid::regclass::text ~ 'Question' AND pg_get_constraintdef(oid) ~ '\\mstore\\M'`,
+    );
+    expect(defs.length, "one check names the stores").toBe(1);
+    const listed = [...defs[0].def.matchAll(/'([a-z0-9]+)'::text/g)].map((m) => m[1]);
+    expect([...new Set(listed)].sort()).toEqual([...STORE_NAMES].sort());
   });
 });
 
