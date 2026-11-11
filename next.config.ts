@@ -32,6 +32,13 @@ const nextConfig: NextConfig = {
   // status code and the view of that one response — the authorization decision itself is ours, in
   // lib/tenant/page-tenant.ts, not Next's.
   experimental: { authInterrupts: true },
+  // The PDF writer's Unicode fonts (task 0045): `fontkit` and `bidi-js` are required at run time from node_modules instead of being bundled, and the font files (read from disk by
+  // src/lib/pdf/unicode-fonts.ts) are copied into the two functions that write report-card PDFs.
+  serverExternalPackages: ["fontkit", "bidi-js"],
+  outputFileTracingIncludes: {
+    "/api/v1/schools/[code]/people/students/[id]/report-card/pdf": ["./src/lib/pdf/fonts/**"],
+    "/api/v1/schools/[code]/academics/results/report-cards/pdf": ["./src/lib/pdf/fonts/**"],
+  },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

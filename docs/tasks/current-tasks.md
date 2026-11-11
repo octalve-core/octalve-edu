@@ -512,3 +512,15 @@
 - [x] With no props every default is the literal it replaced: a source-level unit test holds it (a component cannot be rendered in the unit project: Playwright replaces React's JSX runtime); the props themselves are exercised by AlEemaan's specs (its tasks 0049 and 0050)
 - [x] Tests: unit `landing-direction` (new, 4 tests, each caught by its own mutation); 169 passed, 0 failed, 3 skipped by design over the specs of tasks 0041 and 0042, sign-in, logo and the browser-wide responsive spec
 
+
+## TASK-0045: Report-card PDFs draw every name and remark as written
+
+[Task file](0045-pdf-unicode.md). The open point of task 0038 (decision D6: a Unicode font would draw every name exactly); built on `claude/octalve-pdf-unicode`. No migration; two new dependencies (`fontkit`, `bidi-js`).
+
+- [x] Text WinAnsi can write exactly is drawn as before (same bytes, no font embedded); any other text (Yoruba marks, Arabic, Cyrillic, Greek, the naira sign) is drawn with embedded Noto Sans / Noto Naskh Arabic subsets: shaped (`fontkit`), put in order (`bidi-js`), searchable (`ToUnicode`); what neither font holds is still `?` and counted
+- [x] Measuring, wrapping and the card's ellipsis work on the laid-out glyphs and cut between grapheme clusters; the document title and author are UTF-16 when they hold a mark
+- [x] The fonts and their licence ship with the two report-card PDF functions (`outputFileTracingIncludes`; the build's trace files checked)
+- [x] Read and drawn by software that is not ours: `pdftotext`, `pdffonts`, Ghostscript, and Chromium's output of the same text compared
+- [x] Tests: unit `pdf-unicode` (new, 31 tests) and the report-card unit and API specs extended; mutation check of 16 changes, each run alone (13 caught by tests, 1 caught only after a test was added, 2 equivalent); the whole unit and API projects and three browser specs on a clean build: 2,881 passed, 0 failed, 0 skipped (unit and API) and 37 passed in three browser specs
+- [x] Found by the regression: literal invisible characters in the new source, forbidden by `source-hygiene`; fixed as escapes
+- [ ] Not built: right-aligning a right-to-left remark or mirroring the card; scripts neither font holds; the question bank's exam-paper writer (Latin-only, separate); a reader of Arabic or Yoruba looking at a printed card

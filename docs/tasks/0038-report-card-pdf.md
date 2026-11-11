@@ -50,7 +50,7 @@ Let staff download a report card as a PDF file, one pupil's or a whole class's i
 
 ## 5. Not in this task
 
-- A Unicode font (Yoruba marks, Arabic and the like are drawn as base letters or counted `?`): see D6.
+- ~~A Unicode font (Yoruba marks, Arabic and the like are drawn as base letters or counted `?`): see D6.~~ Done in task 0045 (`docs/tasks/0045-pdf-unicode.md`): Noto fonts are embedded for any text WinAnsi cannot write.
 - A QR code for each link (a printed card is checked by typing the code, or by opening the link from the PDF). The certificates' QR (`CertificatePrint`) pointed at `/api/v1/verify-certificate/<token>`, a JSON address, for the same reason this task fixes the card: its page was the follow-up. **Done in task 0043:** the page answers for certificates and the QR is the page's link.
 - Sending the PDF by e-mail, or a school-branded letterhead (the school's logo).
 - A pupil or parent results screen.
@@ -76,4 +76,4 @@ Let staff download a report card as a PDF file, one pupil's or a whole class's i
 - **What the work found.** (1) The card from task 0031 told people to check a mark at an API path (the maintainer saw it on the PDF): fixed (D8 to D11). (2) One of my own tests counted the subject name once and failed when the links section printed it again as a label; the test now counts the table and the links list separately.
 - **Not run:** the rest of the browser suite, the HTTPS project, anything against a hosted database.
 
-**Left for the maintainer.** ~~Certificates (`/api/v1/verify-certificate/<token>`, the QR on a printed certificate) have the same raw-address problem~~ (done in task 0043: `/verify/[code]` answers for certificates, and a browser that opens an old raw address is sent there). A Unicode font would draw every name exactly (D6).
+**Left for the maintainer.** ~~Certificates (`/api/v1/verify-certificate/<token>`, the QR on a printed certificate) have the same raw-address problem~~ (done in task 0043: `/verify/[code]` answers for certificates, and a browser that opens an old raw address is sent there). ~~A Unicode font would draw every name exactly (D6).~~ (done in task 0045: Noto Sans and Noto Naskh Arabic are embedded for any text WinAnsi cannot write; D6 still describes the standard-font path, which every all-WinAnsi text still takes.)

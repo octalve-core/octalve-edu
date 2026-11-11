@@ -269,13 +269,19 @@ test.describe("one pupil's card", () => {
     expect(await audits("REPORT_CARD_PDF_DOWNLOADED", p.id)).toHaveLength(3); // the refusals are not downloads
   });
 
-  test("a name with letters outside Latin-1 is written without their marks and nothing is a question mark; letters the fonts lack are counted in a header", async () => {
+  test("a name with letters outside Latin-1 is drawn as written (Yoruba marks, Arabic), nothing is a question mark, and the header counts only what no embedded font has (task 0045)", async () => {
     const yoruba = await pupil({ first: "Ọ̀lá", last: "Ṣéyí" });
     const res = await get("admin", yoruba.id);
     expect(res.headers.get("x-report-card-unsupported-characters")).toBe("0");
-    expect(textOf(res)).toContain("Ol\u00e1 S\u00e9y\u00ed");
+    expect(textOf(res)).toContain("Ọ̀lá Ṣéyí".normalize("NFC"));
+    expect(textOf(res)).not.toContain("?");
     const arabic = await pupil({ first: "أحمد", last: "Obi" });
-    expect(Number((await get("admin", arabic.id)).headers.get("x-report-card-unsupported-characters"))).toBe(4);
+    const arabicRes = await get("admin", arabic.id);
+    expect(arabicRes.headers.get("x-report-card-unsupported-characters")).toBe("0");
+    expect(textOf(arabicRes)).toContain("Obi دمحأ"); // an Arabic first name makes the line right to left: it stands at the right, its letters (glyphs read in drawing order) reversed
+    expect(textOf(arabicRes)).not.toContain("\ufffd");
+    const chinese = await pupil({ first: "中文", last: "Obi" });
+    expect(Number((await get("admin", chinese.id)).headers.get("x-report-card-unsupported-characters"))).toBe(2);
   });
 
   test("a download is audited with who, the role and the pages; the same person again is a second row", async () => {
