@@ -81,13 +81,14 @@ test.describe("navFor", () => {
     expect(navFor(null).map((i) => i.label)).not.toContain("Platform");
   });
 
-  test("a CAMPUS_ADMIN sees Overview, Academics, People, Finance, Communication, Users, Question bank, Forms and Programs - never the school's Settings", () => {
+  test("a CAMPUS_ADMIN sees Overview, Academics, People, Finance, Results, Communication, Users, Question bank, Forms and Programs - never the school's Settings", () => {
     const items = navFor({ ...admin, role: "CAMPUS_ADMIN" });
     expect(items.map((i) => i.label)).toEqual([
       "Overview",
       "Academics",
       "People",
       "Finance",
+      "Results",
       "Communication",
       "Users",
       "Question bank",
@@ -99,6 +100,7 @@ test.describe("navFor", () => {
       "/schools/riverside/academics",
       "/schools/riverside/people",
       "/schools/riverside/finance",
+      "/schools/riverside/results",
       "/schools/riverside/communication",
       "/schools/riverside/users",
       "/schools/riverside/question-bank",
@@ -283,7 +285,7 @@ test.describe("groupNav: sections for each kind of person", () => {
 
   test("a CAMPUS_ADMIN has no Settings in Administration", () => {
     const groups = groupNav(navFor({ ...admin, role: "CAMPUS_ADMIN" }));
-    expect(labels(groups[1].items)).toEqual(["Academics", "People", "Finance", "Communication", "Users"]);
+    expect(labels(groups[1].items)).toEqual(["Academics", "People", "Finance", "Results", "Communication", "Users"]);
   });
 
   test("staff: Administration (Academics, People, Results) and Learning (Question bank, Forms, Programs)", () => {

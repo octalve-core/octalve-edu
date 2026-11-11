@@ -21,5 +21,5 @@ export const POST = withAuth(
 
     return ok(res.data);
   }),
-  { tenant: true, roles: ["ADMIN", "TEACHING_STAFF"] },
+  { tenant: true, roles: ["ADMIN", "CAMPUS_ADMIN", "TEACHING_STAFF"] },
 );

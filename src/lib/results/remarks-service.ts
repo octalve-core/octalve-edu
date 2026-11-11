@@ -1,6 +1,7 @@
 import { Prisma, ResultStatus } from "@prisma/client";
 import type { Tx } from "@/lib/tenant/for-tenant";
 import { assignedArmIds } from "@/lib/attendance/access";
+import { OUTSIDE_CAMPUS, isCampusAdmin, mayChangeClass, ownsNothing } from "./campus-admin";
 import { cleanRemark, remarkChange, remarkPermissions, remarksVisibleTo, type RemarkChange, type RemarkKey } from "./remarks";
 
 // Report remarks (task 0036): saving them, and reading them for a card. Every refusal is decided BEFORE the first write, and a refusal is a returned failure (the route answers it with its
@@ -27,18 +28,33 @@ const FROZEN = [ResultStatus.PUBLISHED, ResultStatus.LOCKED];
 const frozen = async (tx: Tx, tenantId: string, studentId: string, periodId: string) =>
   (await tx.result.count({ where: { tenantId, studentId, periodId, status: { in: FROZEN } } })) > 0;
 
+/// Whether the arm is a class of exactly this campus (not a school-wide one, not another campus's): the classes a campus administrator writes remarks for (task 0046).
+async function armIsOfCampus(tx: Tx, tenantId: string, armId: string, campusId: string | null): Promise<boolean> {
+  const arm = await tx.classArm.findFirst({ where: { tenantId, id: armId }, select: { classGroup: { select: { campusId: true } } } });
+  return arm !== null && mayChangeClass(campusId, arm.classGroup.campusId);
+}
+
 /// The remarks as one viewer sees them on the card, and what that viewer may do. `armId` is the pupil's arm in the term's session (null when they had none).
 export async function remarksForCard(
   tx: Tx,
   tenantId: string,
-  input: { studentId: string; periodId: string; armId: string | null; viewerRole: string; viewerUserId: string },
+  input: {
+    studentId: string;
+    periodId: string;
+    armId: string | null;
+    viewerRole: string;
+    viewerUserId: string;
+    viewerCampusId?: string | null;
+  },
 ): Promise<CardRemarks> {
-  const { studentId, periodId, armId, viewerRole, viewerUserId } = input;
+  const { studentId, periodId, armId, viewerRole, viewerUserId, viewerCampusId = null } = input;
   const [isFrozen, row] = await Promise.all([
     frozen(tx, tenantId, studentId, periodId),
     tx.reportRemark.findUnique({ where: { tenantId_studentId_periodId: { tenantId, studentId, periodId } } }),
   ]);
-  const teaches = viewerRole === "TEACHING_STAFF" && armId !== null && (await assignedArmIds(tx, tenantId, viewerUserId)).has(armId);
+  const teaches =
+    (viewerRole === "TEACHING_STAFF" && armId !== null && (await assignedArmIds(tx, tenantId, viewerUserId)).has(armId)) ||
+    (isCampusAdmin(viewerRole) && armId !== null && (await armIsOfCampus(tx, tenantId, armId, viewerCampusId)));
   const may = remarkPermissions(viewerRole, teaches);
   const seen = remarksVisibleTo(viewerRole, isFrozen);
   return {
@@ -82,6 +98,7 @@ export async function saveReportRemarks(
   ]);
   if (!student || !period) return refuse(404, "NOT_FOUND", NO_SUCH_PUPIL);
   // A member of one campus reaches that campus's pupils and the school's, as everywhere else.
+  if (ownsNothing(caller.role, caller.campusId)) return refuse(404, "NOT_FOUND", NO_SUCH_PUPIL);
   if (caller.role !== "ADMIN" && caller.campusId !== null && student.campusId !== null && student.campusId !== caller.campusId)
     return refuse(404, "NOT_FOUND", NO_SUCH_PUPIL);
   // The pupil's place in that term's session: a remark is about a term the pupil was on the roll of. (A pupil who left, was promoted or graduated since still was.)
@@ -91,9 +108,13 @@ export async function saveReportRemarks(
   });
   if (!enrolment) return refuse(404, "NOT_FOUND", NO_SUCH_PUPIL);
 
-  const teaches = caller.role === "TEACHING_STAFF" && (await assignedArmIds(tx, tenantId, caller.userId)).has(enrolment.classArmId);
+  const teaches =
+    (caller.role === "TEACHING_STAFF" && (await assignedArmIds(tx, tenantId, caller.userId)).has(enrolment.classArmId)) ||
+    (isCampusAdmin(caller.role) && (await armIsOfCampus(tx, tenantId, enrolment.classArmId, caller.campusId)));
   // A teacher who does not teach this pupil is told what an unknown pupil is told.
   if (caller.role === "TEACHING_STAFF" && !teaches) return refuse(404, "NOT_FOUND", NO_SUCH_PUPIL);
+  // A campus administrator is refused a pupil of a school-wide class, or one in no class of their campus (the pupils of other campuses were not found above).
+  if (isCampusAdmin(caller.role) && !teaches) return refuse(403, "FORBIDDEN", OUTSIDE_CAMPUS);
   const may = remarkPermissions(caller.role, teaches);
   if (clean.principalRemark !== undefined && !may.principal)
     return refuse(403, "FORBIDDEN", "Only the school administrator writes the principal's remark.");

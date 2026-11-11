@@ -33,11 +33,13 @@ test.describe("cleanRemark", () => {
 });
 
 test.describe("remarkPermissions", () => {
-  test("the administrator writes both; a teacher only the teacher's, and only for a pupil of their arm; everyone else nothing", () => {
+  test("the administrator writes both; a teacher only the teacher's, and only for a pupil of their arm; a campus administrator only the teacher's, and only for a pupil of a class of their own campus (task 0046); everyone else nothing", () => {
     expect(remarkPermissions("ADMIN", false)).toEqual({ teacher: true, principal: true });
     expect(remarkPermissions("TEACHING_STAFF", true)).toEqual({ teacher: true, principal: false });
     expect(remarkPermissions("TEACHING_STAFF", false)).toEqual({ teacher: false, principal: false });
-    for (const role of ["NON_TEACHING_STAFF", "STUDENT", "PARENT", "CAMPUS_ADMIN", "SOMETHING_ELSE"])
+    expect(remarkPermissions("CAMPUS_ADMIN", true)).toEqual({ teacher: true, principal: false });
+    expect(remarkPermissions("CAMPUS_ADMIN", false)).toEqual({ teacher: false, principal: false });
+    for (const role of ["NON_TEACHING_STAFF", "STUDENT", "PARENT", "SOMETHING_ELSE"])
       for (const teaches of [true, false])
         expect(remarkPermissions(role, teaches), `${role} ${teaches}`).toEqual({ teacher: false, principal: false });
   });

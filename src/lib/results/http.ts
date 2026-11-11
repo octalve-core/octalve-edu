@@ -2,9 +2,10 @@ import { z } from "zod";
 import { fail } from "@/lib/api/envelope";
 import { ResultStatus } from "@prisma/client";
 import { isPlausibleId } from "@/lib/academics/http";
+import { OUTSIDE_CAMPUS } from "./campus-admin";
 
-export const STAFF_READ_ROLES = ["ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF"] as const;
-export const WRITE_ROLES = ["ADMIN", "TEACHING_STAFF"] as const;
+export const STAFF_READ_ROLES = ["ADMIN", "CAMPUS_ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF"] as const;
+export const WRITE_ROLES = ["ADMIN", "CAMPUS_ADMIN", "TEACHING_STAFF"] as const;
 
 /// The largest mark the column holds (`Result.score` and `maxScore` are Decimal(6,2)): a larger one is a refusal, not a database error.
 const MAX_MARK = 9999.99;
@@ -67,6 +68,7 @@ export type ResultFailure =
   | "SCORE_OUT_OF_BOUNDS"
   | "NOT_EDITABLE"
   | "NOT_ASSIGNED"
+  | "OUTSIDE_CAMPUS"
   | "FORBIDDEN_STUDENT_ACCESS"
   | "PERIOD_NOT_ACTIVE"
   | "REPORT_CARD_WITHHELD"
@@ -92,6 +94,8 @@ export function resultFailure(reason: ResultFailure, message?: string): Response
       return fail(message ?? "That result has left DRAFT and cannot be changed here.", 409, "CONFLICT");
     case "NOT_ASSIGNED":
       return fail(message ?? "You are not assigned to teach this subject to this class.", 403, "FORBIDDEN");
+    case "OUTSIDE_CAMPUS":
+      return fail(message ?? OUTSIDE_CAMPUS, 403, "FORBIDDEN");
     case "FORBIDDEN_STUDENT_ACCESS":
       return fail(message ?? "You are not authorized to view this student's report card.", 403, "FORBIDDEN");
     case "PERIOD_NOT_ACTIVE":

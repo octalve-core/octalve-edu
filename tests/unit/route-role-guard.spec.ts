@@ -99,6 +99,11 @@ const callsCampusHelper = (source: string) => CAMPUS_HELPERS.some((name) => sour
 const CAMPUS_CHECKED_ELSEWHERE: Record<string, string> = {};
 const elsewhere = (reason: string, ...keys: string[]) => keys.forEach((key) => (CAMPUS_CHECKED_ELSEWHERE[key] = reason));
 
+elsewhere(
+  "lib/results/service.ts transitionResultStatuses: `campusOf` (a result of another campus is not found, a school-wide pupil's is visible) and the approver scope of ADR 0018 (`approverScope` / `inScopeResultIds`); a campus administrator is never an `isAdmin` there, so approving, publishing and locking need CAN_APPROVE_RESULTS (task 0046)",
+  "POST v1/schools/[code]/academics/results/transition/route.ts",
+);
+
 const MEMBERS =
   "lib/members/service.ts: campusActorRefusal (own campus only; nothing at or above the caller's level; no permission grants)";
 elsewhere(
@@ -277,7 +282,7 @@ test.describe("a handler that lets a campus administrator write asks about THEIR
     expect(stale).toEqual([]);
   });
 
-  test("school-only routes never list the campus administrator: settings, campuses, fee structures, discounts, invoice generation, grade scales, subjects, assessment schemes, results", () => {
+  test("school-only routes never list the campus administrator: settings, campuses, fee structures, discounts, invoice generation, grade scales, subjects, assessment schemes", () => {
     const schoolOnly = [
       "v1/schools/[code]/settings/route.ts",
       "v1/schools/[code]/campuses/route.ts",
@@ -286,7 +291,6 @@ test.describe("a handler that lets a campus administrator write asks about THEIR
       "v1/schools/[code]/academics/grade-scales/",
       "v1/schools/[code]/academics/subjects/",
       "v1/schools/[code]/academics/assessment-schemes/",
-      "v1/schools/[code]/academics/results/",
     ];
     const offenders = handlers()
       .filter((h) => schoolOnly.some((p) => h.key.includes(` ${p}`) || h.key.endsWith(` ${p}`)))
@@ -306,5 +310,64 @@ test.describe("a handler that lets a campus administrator write asks about THEIR
       true,
     );
     expect(all.filter((h) => LETS_CAMPUS_ADMIN_ACT.test(h.source)).length).toBeGreaterThan(40);
+  });
+});
+
+// Results (task 0046, decision D7 of task 0031): the results routes list the campus administrator through the constants of lib/results/http.ts, which a scan of the handler's own source cannot see, so each one
+// is named here with the place where its campus is checked. A new route under academics/results/ (or a new card, PDF or remark route) fails this test until it is added with its place.
+const RESULTS_ROUTES: Record<string, string> = {
+  "GET v1/schools/[code]/academics/results/route.ts":
+    "lib/results/service.ts queryResults: campusOf (the campus's pupils and the school-wide ones)",
+  "POST v1/schools/[code]/academics/results/route.ts":
+    "lib/results/service.ts recordStudentResults: campusOf, the term's calendar, and pupilsOutsideCampus (only pupils on the roll of a class of the administrator's own campus)",
+  "GET v1/schools/[code]/academics/results/sheet/route.ts":
+    "lib/results/sheet.ts getSheet: campusAllows, and mayChangeClass (a school-wide class is the school administrator's: 403)",
+  "GET v1/schools/[code]/academics/results/roster/route.ts": "lib/results/sheet.ts classRoster: campusAllows and the term's calendar",
+  "GET v1/schools/[code]/academics/results/options/route.ts":
+    "lib/results/sheet.ts entryOptions: campusAllows; entry pairs only for classes of the administrator's own campus",
+  "GET v1/schools/[code]/academics/results/import-template/route.ts": "lib/results/mark-import-service.ts through getSheet",
+  "POST v1/schools/[code]/academics/results/import/route.ts":
+    "lib/results/mark-import-service.ts through getSheet and recordStudentResults",
+  "POST v1/schools/[code]/academics/results/transition/route.ts":
+    "lib/results/service.ts transitionResultStatuses (see CAMPUS_CHECKED_ELSEWHERE)",
+  "GET v1/schools/[code]/academics/results/report-cards/pdf/route.ts":
+    "lib/results/sheet.ts classRoster, then the cards of the pupils it names",
+  "GET v1/schools/[code]/people/students/[id]/report-card/route.ts": "studentReadScope (the campus's pupils and the school-wide ones)",
+  "GET v1/schools/[code]/people/students/[id]/report-card/pdf/route.ts": "studentReadScope (the campus's pupils and the school-wide ones)",
+  "PUT v1/schools/[code]/people/students/[id]/report-remarks/route.ts":
+    "lib/results/remarks-service.ts saveReportRemarks: the campus rule and armIsOfCampus (the teacher's remark for a class of the administrator's own campus)",
+};
+
+test.describe("the results routes and the campus administrator (task 0046)", () => {
+  const all = () => new Map(handlers().map((h) => [h.key, h.source]));
+
+  test("every results, report-card and remark handler is named here with the place its campus is checked", () => {
+    const named = handlers()
+      .filter(
+        (h) =>
+          h.key.includes(" v1/schools/[code]/academics/results/") || /people\/students\/\[id\]\/(report-card|report-remarks)/.test(h.key),
+      )
+      .map((h) => h.key);
+    expect(named.filter((key) => !(key in RESULTS_ROUTES))).toEqual([]);
+    expect(Object.keys(RESULTS_ROUTES).filter((key) => !all().has(key))).toEqual([]);
+  });
+
+  test("the lists the routes use name the campus administrator, so the places above are reached", () => {
+    const http = readFileSync(join(__dirname, "../../src/lib/results/http.ts"), "utf8");
+    expect(http).toMatch(/STAFF_READ_ROLES = \[[^\]]*"CAMPUS_ADMIN"/);
+    expect(http).toMatch(/WRITE_ROLES = \[[^\]]*"CAMPUS_ADMIN"/);
+    for (const key of [
+      "GET v1/schools/[code]/people/students/[id]/report-card/route.ts",
+      "GET v1/schools/[code]/people/students/[id]/report-card/pdf/route.ts",
+    ]) {
+      const source = all().get(key)!;
+      expect(source, key).toContain('"CAMPUS_ADMIN"');
+      // `studentAccess` returns at once for a campus administrator, so these two routes judge their campus themselves.
+      expect(source, key).toContain("studentReadScope(");
+      // ... and ONLY for them: the helper answers 403 to every role that is not an administrator, so a call for all roles would shut out the teacher, the pupil and the parent.
+      expect(source, key).toMatch(
+        /if \(auth\.tenant\.role === "CAMPUS_ADMIN"\) \{\s+const outOfCampus = await studentReadScope\(auth, id\);/,
+      );
+    }
   });
 });
