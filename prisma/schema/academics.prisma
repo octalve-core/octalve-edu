@@ -215,6 +215,8 @@ model AssessmentScheme {
   name         String
   totalMax     Decimal   @default(100) @db.Decimal(6, 2)
   examMax      Decimal   @db.Decimal(6, 2)
+  /// What the school calls the exam part ("Final Examination", "Endterm"), 1 to 40 characters; null = the default "Exam" (task 0048). Part of the locked fields: a change after the first result is a new version.
+  examName     String?
   version      Int       @default(1)
   /// Set (once, never cleared) the first time a result references this scheme; from then on it and its components are immutable.
   lockedAt     DateTime?

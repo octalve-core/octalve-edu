@@ -44,6 +44,10 @@ export function AssessmentPanel({ schoolCode, readOnly = false }: { schoolCode: 
           <p className="mt-1 text-sm text-fg-muted">
             How a mark is built. One scheme can be the school&apos;s default; a class may have its own.
           </p>
+          <p className="mt-1 text-sm text-fg-muted">
+            Once marks have been entered under a scheme it is locked: it can no longer be edited, only replaced by a new version, which
+            applies to marks entered from then on.
+          </p>
         </div>
         {!readOnly && (
           <Button onClick={() => (setNotice(null), form.show({ mode: "create", scheme: null }))}>
@@ -125,7 +129,7 @@ export function AssessmentPanel({ schoolCode, readOnly = false }: { schoolCode: 
                   </div>
                 ))}
                 <div className="rounded-xl bg-surface-2 px-3 py-2">
-                  <dt className="text-xs text-fg-muted">Exam</dt>
+                  <dt className="text-xs text-fg-muted">{scheme.examName ?? "Exam"}</dt>
                   <dd className="font-semibold text-fg">{scheme.examMax}</dd>
                 </div>
                 <div className="rounded-xl bg-brand-tint px-3 py-2">

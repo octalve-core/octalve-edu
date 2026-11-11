@@ -546,3 +546,14 @@
 - [x] Tests: unit `promotion-final-term` (new, 6 tests), API `promotion` (the preview: 3 pupils; null when nobody is missing; 1 when one is), browser `promotion-screens` (the preview and the dialog); mutation check of 9 changes, each run alone, all caught (N7 and N8 each fail a different browser test, so the preview's warning and the dialog's line are held apart); static gates clean
 - [x] Regression on a clean build: unit and API 2,882 passed, 2 failed, 4 did not run (two tests that send many requests at once, run while four test lanes shared one database server: `finance` failed with "Too many database connections", `portal-practice` got a 500 and I did not read a connection message for it; both passed in full when run alone afterwards, 25 of 25); four browser specs 43 passed
 - [ ] Open for the maintainer: whether the advice should become a refusal an administrator can override with a reason; naming the pupils or offering to publish the term from the dialog
+
+## TASK-0048: The points left open by task 0032
+
+[Task file](0048-scheme-points.md). The four points of task 0032, approved by the maintainer on 2026-11-11; built on `claude/octalve-scheme-points`. **One migration, the maintainer's: `20261127090000_exam_name`** (additive).
+
+- [x] A school names its exam part (`AssessmentScheme.examName`): cleaned, 1 to 40 characters, never a component's name, only with an exam; on the sheet, the import template and the saved parts; in the snapshot only when set; frozen with the locked scheme (the trigger replaced); carried by a new version
+- [x] The default grade scale locks with the first result it grades (shared scale lock, `lockScale`, one `GRADE_SCALE_LOCKED` audit row); a refused save locks nothing; afterwards a scale change is a new version
+- [x] A bare score where the scheme has parts stays refused (pinned by an API test)
+- [x] The scheme screen says a locked scheme is replaced by a new version
+- [x] Tests: unit (the rule, the snapshot, the parts), API (`results-scheme-points`: the name end to end, the trigger, the bare score, the scale lock), the Academic setup screens; mutation check of 20 changes, each run alone, all caught; static gates; regression on a clean build, unit and API 2,902 passed and 0 failed, four browser specs 99 passed and 0 failed (earlier attempts were invalid: connection slots exhausted by parallel lanes, ports held by leftovers of a killed run, and a run lost without an error while the machine was short of memory; that last one had two failures in unrelated specs whose messages I did not read, and both passed in the final run)
+- [ ] For the maintainer: run the migration; tell schools that a class's scheme is edited only as a new version after its first marks

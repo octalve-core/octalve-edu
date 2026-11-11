@@ -10,7 +10,17 @@ const scheme = (
   over: Partial<SchemeWithParts> = {},
 ): SchemeWithParts => {
   const total = components.reduce((n, c) => n + c.maxScore, examMax);
-  return { id: "s1", name: "Standard", totalMax: total, examMax, components, parts: entryParts(components, examMax), ...over };
+  const examName = over.examName ?? null;
+  return {
+    id: "s1",
+    name: "Standard",
+    totalMax: total,
+    examMax,
+    examName,
+    components,
+    parts: entryParts(components, examMax, examName),
+    ...over,
+  };
 };
 const CA = [
   { name: "CA 1", maxScore: 20 },
@@ -24,6 +34,32 @@ test.describe("the parts a result is entered under", () => {
 
   test("an examMax of 0 means there is no exam, so there is no exam part", () => {
     expect(entryParts(CA, 0)).toEqual(CA);
+  });
+
+  test("a school's own name for the exam is the exam part's name (task 0048); no name, or no exam, changes nothing", () => {
+    expect(entryParts(CA, 60, "Final Examination")).toEqual([...CA, { name: "Final Examination", maxScore: 60 }]);
+    expect(entryParts(CA, 60, null)).toEqual([...CA, { name: "Exam", maxScore: 60 }]);
+    expect(entryParts(CA, 60, "")).toEqual([...CA, { name: "Exam", maxScore: 60 }]);
+    expect(entryParts(CA, 0, "Endterm")).toEqual(CA); // no exam, so nothing to name
+  });
+
+  test("a scheme with a named exam asks for, and accepts, that name and no other", () => {
+    const named = scheme(CA, 60, { examName: "Endterm" });
+    expect(named.parts.map((p) => p.name)).toEqual(["CA 1", "CA 2", "Endterm"]);
+    expect(
+      partsProblem(named, [
+        { name: "CA 1", maxScore: 20 },
+        { name: "CA 2", maxScore: 20 },
+        { name: "Endterm", maxScore: 60 },
+      ]),
+    ).toBeNull();
+    expect(
+      partsProblem(named, [
+        { name: "CA 1", maxScore: 20 },
+        { name: "CA 2", maxScore: 20 },
+        { name: "Exam", maxScore: 60 },
+      ]),
+    ).toMatch(/"Exam" is not a part of the scheme "Standard"\. It has: CA 1 \(out of 20\), CA 2 \(out of 20\), Endterm \(out of 60\)\./);
   });
 
   test("the input is not changed, and the result is a copy", () => {

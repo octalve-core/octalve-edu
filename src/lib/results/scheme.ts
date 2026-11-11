@@ -16,16 +16,20 @@ export type SchemeWithParts = {
   name: string;
   totalMax: number;
   examMax: number;
+  /// What the school calls the exam part (task 0048); null = the default, "Exam".
+  examName: string | null;
   /// The scheme's continuous-assessment components, as it defines them.
   components: SchemePart[];
   /// What a result is entered under: the components, then the exam when there is one.
   parts: SchemePart[];
 };
 
-/// The parts a result is entered under: the components in order, then "Exam" out of `examMax` when `examMax` is above 0 (0 means no exam). If a component is already called "Exam" (ignoring case), the exam
-/// part is called "Final exam", then "Examination", then "Exam 2", "Exam 3"…, so the names stay unique.
-export function entryParts(components: readonly SchemePart[], examMax: number): SchemePart[] {
+/// The parts a result is entered under: the components in order, then the exam out of `examMax` when `examMax` is above 0 (0 means no exam). The exam is called what the school named it (`examName`, task
+/// 0048: the scheme refuses a name a component already has); with no name given it is "Exam", and if a component is already called "Exam" (ignoring case) it is "Final exam", then "Examination", then
+/// "Exam 2", "Exam 3"…, so the names stay unique.
+export function entryParts(components: readonly SchemePart[], examMax: number, examName?: string | null): SchemePart[] {
   if (!(examMax > 0)) return components.map((c) => ({ ...c }));
+  if (examName) return [...components.map((c) => ({ ...c })), { name: examName, maxScore: examMax }];
   const taken = new Set(components.map((c) => c.name.toLowerCase()));
   const candidates = ["Exam", "Final exam", "Examination"];
   let name = candidates.find((candidate) => !taken.has(candidate.toLowerCase()));
@@ -40,13 +44,22 @@ type Row = {
   name: string;
   totalMax: { toString(): string };
   examMax: { toString(): string };
+  examName: string | null;
   components: { name: string; maxScore: { toString(): string } }[];
 };
 
 const view = (row: Row): SchemeWithParts => {
   const components = row.components.map((c) => ({ name: c.name, maxScore: Number(c.maxScore) }));
   const examMax = Number(row.examMax);
-  return { id: row.id, name: row.name, totalMax: Number(row.totalMax), examMax, components, parts: entryParts(components, examMax) };
+  return {
+    id: row.id,
+    name: row.name,
+    totalMax: Number(row.totalMax),
+    examMax,
+    examName: row.examName,
+    components,
+    parts: entryParts(components, examMax, row.examName),
+  };
 };
 
 /// The school's live school-wide scheme, or null.

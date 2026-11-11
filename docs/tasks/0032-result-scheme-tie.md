@@ -61,8 +61,10 @@
 
 ## 7. Open for the maintainer
 
-- Whether the grade scale should be locked by the first result as AlEemaan does (it is not here).
-- Whether a bare `score` should stay allowed for a scheme that has parts (D3 refuses it).
+**Decided by the maintainer on 2026-11-11 and built in task 0048** (`docs/tasks/0048-scheme-points.md`): the grade scale is locked by the first result it grades; a bare `score` stays refused for a scheme that has parts; the exam part's name is the school's to choose (a nullable `examName`, one migration); schools are told that a locked scheme is replaced by a new version. The points as they were asked:
+
+- ~~Whether the grade scale should be locked by the first result as AlEemaan does (it is not here).~~ Yes.
+- ~~Whether a bare `score` should stay allowed for a scheme that has parts (D3 refuses it).~~ It stays refused.
 - **The exam part's name.** A scheme has an `examMax` but no name for the exam, so the part is called "Exam" everywhere (D0). The one existing test that saved under a real scheme, the Phase 1 lifecycle walk, had called it "Final Examination" and was changed to "Exam": that is the only existing expectation this task changed. A school that wants its own word ("Final Examination", "Endterm") needs an `examName` on the scheme: a column, so a migration; not done.
 
 ## 8. Build record and tests (2026-11-09 and 10)

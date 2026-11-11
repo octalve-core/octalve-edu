@@ -184,6 +184,8 @@ export async function getSheet(
       name: string | null;
       totalMax: number;
       examMax: number;
+      /// What the school calls the exam part (task 0048); null = "Exam".
+      examName: string | null;
       components: { name: string; maxScore: number }[];
       parts: { name: string; maxScore: number }[];
     };
@@ -231,7 +233,7 @@ export async function getSheet(
       period: { id: period.id, label: period.label, sessionId: period.session.id, sessionLabel: period.session.label },
       arm: { id: arm.id, name: arm.name, classGroupName: arm.classGroup.name },
       subject,
-      scheme: scheme ?? { id: null, name: null, totalMax: 100, examMax: 0, components: [], parts: [] },
+      scheme: scheme ?? { id: null, name: null, totalMax: 100, examMax: 0, examName: null, components: [], parts: [] },
       rows: enrolments.map(({ student }) => {
         const r = byStudent.get(student.id);
         return {

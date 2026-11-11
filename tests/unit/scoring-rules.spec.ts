@@ -79,6 +79,37 @@ test.describe("checkScheme — components + exam = total, exactly", () => {
   });
 });
 
+test.describe("checkScheme — the name of the exam part (task 0048)", () => {
+  const c = (name: string, maxScore: number) => ({ name, maxScore });
+  const base = { totalMax: 100, examMax: 60, components: [c("CA 1", 20), c("CA 2", 20)] };
+  test("no name, or a name of 1 to 40 characters, is valid", () => {
+    expect(checkScheme(base)).toBeNull();
+    expect(checkScheme({ ...base, examName: null })).toBeNull();
+    expect(checkScheme({ ...base, examName: "Endterm" })).toBeNull();
+    expect(checkScheme({ ...base, examName: "x" })).toBeNull();
+    expect(checkScheme({ ...base, examName: "x".repeat(40) })).toBeNull();
+  });
+  test("an empty name or one over 40 characters is EXAM_NAME_INVALID", () => {
+    expect(checkScheme({ ...base, examName: "" })).toEqual({ problem: "EXAM_NAME_INVALID" });
+    expect(checkScheme({ ...base, examName: "x".repeat(41) })).toEqual({ problem: "EXAM_NAME_INVALID" });
+  });
+  test("a name a component already has, in any case, is EXAM_NAME_DUPLICATE (a result stores its parts by name)", () => {
+    expect(checkScheme({ ...base, examName: "CA 1" })).toEqual({ problem: "EXAM_NAME_DUPLICATE" });
+    expect(checkScheme({ ...base, examName: "ca 2" })).toEqual({ problem: "EXAM_NAME_DUPLICATE" });
+  });
+  test("a name for an exam worth nothing is EXAM_NAME_WITHOUT_EXAM", () => {
+    expect(checkScheme({ totalMax: 100, examMax: 0, examName: "Endterm", components: [c("Coursework", 100)] })).toEqual({
+      problem: "EXAM_NAME_WITHOUT_EXAM",
+    });
+    expect(checkScheme({ totalMax: 100, examMax: 0, examName: null, components: [c("Coursework", 100)] })).toBeNull();
+  });
+  test("the name is judged before the sum, so a wrong name is reported even when the marks do not add up too", () => {
+    expect(checkScheme({ totalMax: 100, examMax: 10, examName: "CA 1", components: [c("CA 1", 20)] })).toEqual({
+      problem: "EXAM_NAME_DUPLICATE",
+    });
+  });
+});
+
 test.describe("snapshotScheme — what a result will store", () => {
   const scheme = {
     totalMax: 100,
@@ -93,6 +124,15 @@ test.describe("snapshotScheme — what a result will store", () => {
     expect(snapshotScheme(scheme).json).toBe(
       '{"totalMax":"100.00","examMax":"60.00","components":[{"name":"CA1","maxScore":"10.00"},{"name":"CA2","maxScore":"10.00"},{"name":"Test","maxScore":"20.00"}]}',
     );
+  });
+  test("a scheme with a named exam stores the name; one without it keeps the bytes and the hash it always had (task 0048)", () => {
+    const without = snapshotScheme(scheme);
+    expect(snapshotScheme({ ...scheme, examName: null })).toEqual(without);
+    expect(snapshotScheme({ ...scheme, examName: "" })).toEqual(without);
+    const named = snapshotScheme({ ...scheme, examName: "Endterm" });
+    expect(named.json).toContain('"examMax":"60.00","examName":"Endterm","components"');
+    expect(named.sha256).not.toBe(without.sha256);
+    expect(snapshotScheme({ ...scheme, examName: "Final" }).sha256).not.toBe(named.sha256);
   });
   test("the hash does not depend on the order the components were given in, nor on how a number was written — and changes with ANY real difference", () => {
     const shuffled = { ...scheme, components: [scheme.components[2], scheme.components[0], scheme.components[1]] };

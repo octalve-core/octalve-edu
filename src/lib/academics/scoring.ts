@@ -20,9 +20,12 @@ const fixed = (hundredths: number) => (hundredths / 100).toFixed(2);
 
 export const MAX_COMPONENTS = 10;
 export const COMPONENT_NAME_MAX = 40;
+/// The name of the exam part a school may choose (task 0048): the same bound as a component's.
+export const EXAM_NAME_MAX = 40;
 
 export type ComponentInput = { name: string; maxScore: number };
-export type SchemeInput = { totalMax: number; examMax: number; components: readonly ComponentInput[] };
+/// `examName`: the school's name for the exam part, already cleaned (whitespace collapsed, trimmed); null or absent = the default "Exam".
+export type SchemeInput = { totalMax: number; examMax: number; examName?: string | null; components: readonly ComponentInput[] };
 export type SchemeProblem =
   | "PRECISION"
   | "TOTAL_NOT_POSITIVE"
@@ -32,6 +35,9 @@ export type SchemeProblem =
   | "COMPONENT_NAME_INVALID"
   | "COMPONENT_NAME_DUPLICATE"
   | "COMPONENT_MAX_NOT_POSITIVE"
+  | "EXAM_NAME_INVALID"
+  | "EXAM_NAME_DUPLICATE"
+  | "EXAM_NAME_WITHOUT_EXAM"
   | "SUM_MISMATCH";
 
 /// A scheme is valid when every maximum is positive (the exam's may be zero), names are 1–40 characters and unique ignoring case, there are 1–10
@@ -56,6 +62,12 @@ export function checkScheme(input: SchemeInput): { problem: SchemeProblem; index
     if (max <= 0) return { problem: "COMPONENT_MAX_NOT_POSITIVE", index };
     sum += max;
   }
+  // The name of the exam part (task 0048): 1 to 40 characters, never a name a component already has (a result stores its parts by name), and only where there is an exam to name.
+  if (input.examName !== undefined && input.examName !== null) {
+    if (input.examName.length < 1 || input.examName.length > EXAM_NAME_MAX) return { problem: "EXAM_NAME_INVALID" };
+    if (exam === 0) return { problem: "EXAM_NAME_WITHOUT_EXAM" };
+    if (seen.has(input.examName.toLowerCase())) return { problem: "EXAM_NAME_DUPLICATE" };
+  }
   return sum === total ? null : { problem: "SUM_MISMATCH", sum: sum / 100 };
 }
 
@@ -67,6 +79,7 @@ export type SchemeSnapshot = { json: string; sha256: string };
 export function snapshotScheme(scheme: {
   totalMax: number;
   examMax: number;
+  examName?: string | null;
   components: readonly { name: string; maxScore: number; sortOrder: number }[];
 }): SchemeSnapshot {
   const components = [...scheme.components]
@@ -75,6 +88,8 @@ export function snapshotScheme(scheme: {
   const json = JSON.stringify({
     totalMax: fixed(toHundredths(scheme.totalMax) ?? NaN),
     examMax: fixed(toHundredths(scheme.examMax) ?? NaN),
+    // Only when the school named it: a scheme that did not keeps the bytes (and the hash) it always had.
+    ...(scheme.examName ? { examName: scheme.examName } : {}),
     components,
   });
   return { json, sha256: crypto.createHash("sha256").update(json).digest("hex") };

@@ -53,6 +53,11 @@ const asRecord = (view: Pick<ScaleView, "name" | "bands">) => ({
 async function lockScales(tx: Tx, tenantId: string) {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`grade-scale:${tenantId}`}::text))`;
 }
+/// The SHARED form of the scale lock (task 0048), taken by a save of results before it reads the default scale: any number of saves hold it together, a save waits for an edit that is in progress and an
+/// edit waits for the saves in progress, so the scale a save grades with is the scale it then locks. Held to the end of the transaction.
+export async function shareScaleLock(tx: Tx, tenantId: string) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock_shared(hashtext(${`grade-scale:${tenantId}`}::text))`;
+}
 const findScale = (tx: Tx, tenantId: string, id: string) => tx.gradeScale.findFirst({ where: { id, tenantId }, include: SCALE_INCLUDE });
 
 type RawBand = { min: unknown; max: unknown; letter: unknown; remark: unknown };
