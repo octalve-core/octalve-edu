@@ -125,7 +125,7 @@ test("the link on a report card opens onto the answer: the school, the pupil, th
   // Kept out of search engines, and does not pass its address on.
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
   await expect(page.locator('meta[name="referrer"]')).toHaveAttribute("content", "no-referrer");
-  await page.getByRole("link", { name: "Check another mark" }).click();
+  await page.getByRole("link", { name: "Check another code" }).click();
   await expect(page).toHaveURL(/\/verify$/);
 });
 
@@ -134,7 +134,9 @@ test("a code that no published mark has, a mark not yet published, and an incomp
   // A well-formed code nobody has.
   await page.goto(`/verify/${"0".repeat(32)}`);
   await expect(page.getByRole("heading", { name: "Nothing found for this code" })).toBeVisible();
-  await expect(page.getByRole("alert").filter({ hasText: "No published mark was found for this code." })).toBeVisible();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "No published mark or issued certificate was found for this code." }),
+  ).toBeVisible();
   await checkBothThemes(page, "a code with no mark");
   // A draft's code is as good as no code: nothing about it is told.
   await page.goto(`/verify/${draftCode}`);
@@ -152,23 +154,23 @@ test("a code that no published mark has, a mark not yet published, and an incomp
 test("the check page takes a typed code, a pasted link, or refuses what is not a code, in words", async ({ page }) => {
   const { code } = await arrange();
   await page.goto("/verify");
-  await expect(page.getByRole("heading", { name: "Check a report card mark" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Check a mark or certificate" })).toBeVisible();
   await checkBothThemes(page, "the check page");
   const box = page.getByLabel("Verification code");
   await box.fill("not a code");
-  await page.getByRole("button", { name: "Check this mark" }).click();
+  await page.getByRole("button", { name: "Check this code" }).click();
   await expect(page.getByText("That is not a verification code.")).toBeVisible();
   await expect(page).toHaveURL(/\/verify$/);
   await checkBothThemes(page, "the check page with a refusal");
   // Typed, in capitals and with spaces: the same code.
   await box.fill(`  ${code.toUpperCase()} `);
-  await page.getByRole("button", { name: "Check this mark" }).click();
+  await page.getByRole("button", { name: "Check this code" }).click();
   await expect(page).toHaveURL(new RegExp(`/verify/${code}$`));
   await expect(page.getByRole("heading", { name: "This mark is genuine" })).toBeVisible();
   // The whole link, as pasted from the report card.
   await page.goto("/verify");
   await page.getByLabel("Verification code").fill(`${SAAS_URL}/verify/${code}`);
-  await page.getByRole("button", { name: "Check this mark" }).click();
+  await page.getByRole("button", { name: "Check this code" }).click();
   await expect(page).toHaveURL(new RegExp(`/verify/${code}$`));
   await expect(page.getByRole("heading", { name: "This mark is genuine" })).toBeVisible();
 });

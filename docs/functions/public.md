@@ -73,7 +73,7 @@ The Solo install's first-run bootstrap. It has no `withAuth` (no session exists 
 
 ## API routes: Public verification (`/api/v1/verify/`)
 
-Outside verifiers check a published result without signing in. It is not a school route, so it declares no support `area`. People do not use this address: they open the public page `/verify/[code]` (or type the code on `/verify`), which reads this route (task 0038; `docs/pages/public.md`), and the report card and its PDF print `<site>/verify/<code>`, never an `/api/` path.
+Outside verifiers check a published result without signing in. It is not a school route, so it declares no support `area`. People do not use this address: they open the public page `/verify/[code]` (or type the code on `/verify`), which reads this route (task 0038; `docs/pages/public.md`), and the report card and its PDF print `<site>/verify/<code>`, never an `/api/` path. A browser that does open this address (a card printed before task 0043 may carry it) is sent to the page: when its `Accept` names `text/html` (`wantsPage` in `src/lib/api/wants-page.ts`) and the token is well formed, the answer is `307` with the relative `Location: /verify/<token>`, no JSON and no attempt counted; a script, `Accept: */*`, `application/json` or no header gets what is described below. Every response says `Vary: Accept`.
 
 | Method | Route | File | Who | Description |
 | --- | --- | --- | --- | --- |
@@ -81,7 +81,7 @@ Outside verifiers check a published result without signing in. It is not a schoo
 
 ## API routes: Certificate verification (`/api/v1/verify-certificate/`)
 
-The public lookup of a vocational certificate by its verification token. It is not the route for published results, which is `/api/v1/verify/[token]`.
+The public lookup of a certificate by its verification token: a school's vocational certificate, or a certificate of completion of a program. It is not the route for published results, which is `/api/v1/verify/[token]`. People do not use this address either: the QR code and the printed address of a certificate are `<site>/verify/<token>` (task 0043), and a browser that opens this address, as the QR codes printed before that task do, is sent to that page exactly as the mark route does (`307`, relative `Location`, no attempt counted, `Vary: Accept`); a script gets the answer below.
 
 | Method | Route | File | Who | Description |
 | --- | --- | --- | --- | --- |
