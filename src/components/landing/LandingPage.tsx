@@ -67,6 +67,10 @@ const RING = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visib
 const LINK_FILLED = `inline-flex min-h-11 items-center justify-center rounded-xl bg-brand-strong px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-strong/25 transition-colors hover:bg-brand-strong-hover ${RING}`;
 const LINK_TEXT = `inline-flex min-h-11 items-center rounded px-2 text-sm font-medium text-fg-2 underline-offset-4 hover:text-fg hover:underline ${RING}`;
 const LINK_QUIET = `inline-flex min-h-11 items-center justify-center rounded-xl border border-line-strong bg-surface px-5 py-3 text-sm font-semibold text-fg transition-colors hover:bg-surface-2 ${RING}`;
+// Cards sit as many to a row as divides them evenly where the width allows: four go two by two (three by three would leave one alone on a second row); six, and any number that has no
+// better layout, go three by three. The default is the class string the page always had.
+const COVERS_GRID_DEFAULT = "sm:grid-cols-2 lg:grid-cols-3";
+const COVERS_GRID: Record<number, string> = { 4: "sm:grid-cols-2" };
 const FRAME = "mx-auto w-full max-w-6xl px-4 sm:px-8";
 
 export function LandingPage({ copy = brand.landing, name = brand.name, labels = ENGLISH_LABELS, lang, dir, switchTo }: LandingProps = {}) {
@@ -118,7 +122,7 @@ export function LandingPage({ copy = brand.landing, name = brand.name, labels = 
             <h2 id="landing-covers" className="text-2xl font-bold tracking-tight sm:text-3xl">
               {copy.coversHeading}
             </h2>
-            <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className={`mt-8 grid gap-4 ${COVERS_GRID[copy.covers.length] ?? COVERS_GRID_DEFAULT}`}>
               {copy.covers.map((item) => {
                 const Icon = item.icon ? (ICONS[item.icon] ?? UsersIcon) : null;
                 return (
