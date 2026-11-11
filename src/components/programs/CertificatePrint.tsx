@@ -8,10 +8,11 @@ import { Button } from "@/components/ui/Button";
 import { getJson } from "@/components/auth/postJson";
 import { failureText } from "@/components/academics/useApi";
 import type { Reply } from "@/components/auth/postJson";
+import { verifyLink } from "@/lib/app-url";
 import { longDate } from "@/lib/programs/completion-rules";
 import type { CertificateView } from "@/lib/programs/completion-service";
 
-// A certificate, print-ready (task 0027, slice P5): the school's name, the wording as it was when issued, the signatories, and a QR code to the public check page. Printed from the browser
+// A certificate, print-ready (task 0027, slice P5): the school's name, the wording as it was when issued, the signatories, and a QR code to the public check page (`/verify/<code>`, the page that checks marks too). Printed from the browser
 // (Print, or Save as PDF); the page is one page, and the controls are hidden on paper. The QR is drawn as plain SVG squares: no markup from outside is ever inserted.
 
 const say = (reply: Reply, fallback: string): string => (reply.ok ? fallback : failureText(reply.status, reply.message) || fallback);
@@ -60,7 +61,7 @@ export function CertificatePrint({ schoolCode, programId, certId }: { schoolCode
       </div>
     );
   if (!cert) return <p className="text-sm text-fg-muted">Loading…</p>;
-  const url = `${origin}/api/v1/verify-certificate/${cert.verificationToken}`;
+  const url = verifyLink(origin, cert.verificationToken); // the public page, never an API address (task 0043)
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">

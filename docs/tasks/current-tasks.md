@@ -493,3 +493,13 @@
 
 - [x] `brand.landing.links` (`{ label, href }`, paths on this site): the first is the hero's quiet button and every one is in the footer; Octalve's is "Check a report card", `/verify`
 - [x] The unit test holds the links (paths on this site, no repeats, never `/login`, no offer of a sign-up); the specs of task 0041 pass unchanged
+
+## TASK-0043: A certificate is checked on the same public page as a mark
+
+[Task file](0043-certificate-verify-page.md). The open point of task 0038 (the QR on a printed certificate opened JSON); built on `claude/octalve-certificate-verify`. No migration; no new route.
+
+- [x] `/verify/[code]` answers for a mark, a school's own certificate and a certificate of completion (genuine, withdrawn, does not match the school's record, nothing found, or "the check did not finish" when a lookup is limited); never a score, an admission number or a certificate's metadata
+- [x] The QR and printed address of a certificate are `<site>/verify/<token>` (`verifyLink`), never an API path
+- [x] A browser that opens an old raw `/api/v1/verify/<code>` or `/api/v1/verify-certificate/<code>` address is sent to the page (`307`, relative `Location`, no attempt counted, `Vary: Accept`); scripts still get the same JSON
+- [x] The check page takes a certificate's code, its whole link and the old raw addresses (nothing after the code)
+- [x] Tests: unit, API and screens (x2 projects) new; mutation check in four rounds (15 mutations, each caught by its own test); 25 related spec files run on a clean build (309 passed, 0 failed, 1 skipped by design)

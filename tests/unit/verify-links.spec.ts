@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 import { appOrigin, verifyLink, verifyPageUrl } from "@/lib/app-url";
 import { VERIFY_CODE, parseVerifyCode } from "@/lib/results/verify-code";
 
-// The address printed on a report card for checking a mark (task 0038): where it comes from, what it looks like, and how a typed or pasted code is read.
+// The address printed on a report card or a certificate for checking a mark or certificate (tasks 0038 and 0043): where it comes from, what it looks like, and how a typed or pasted code is read.
 
 const CODE = "0123456789abcdef0123456789abcdef";
 
@@ -63,6 +63,17 @@ test.describe("reading a code that was typed or pasted", () => {
     ])
       expect(parseVerifyCode(link), link).toBe(CODE);
   });
+  test("the raw API addresses that earlier printed cards and certificates carry are read too (task 0043)", () => {
+    for (const link of [
+      `https://octalve.example/api/v1/verify/${CODE}`,
+      `https://octalve.example/api/v1/verify-certificate/${CODE}`,
+      `/api/v1/verify-certificate/${CODE}/`,
+      `http://localhost:3000/api/v1/verify-certificate/${CODE}?x=1`,
+      ` HTTPS://OCTALVE.EXAMPLE/API/V1/VERIFY-CERTIFICATE/${CODE.toUpperCase()} `,
+      `https://octalve.example/verify-certificate/${CODE}`,
+    ])
+      expect(parseVerifyCode(link), link).toBe(CODE);
+  });
   test("anything else is not a code: short, long, wrong letters, an API address, a code in the middle of other text", () => {
     for (const input of [
       "",
@@ -71,6 +82,9 @@ test.describe("reading a code that was typed or pasted", () => {
       `${CODE}0`,
       CODE.replace(/.$/, "g"),
       `https://octalve.example/api/v1/verify/${CODE}x`,
+      `https://octalve.example/api/v1/verify-certificate/${CODE}x`,
+      `https://octalve.example/api/v1/verify-certificate/${CODE}/extra`,
+      `https://octalve.example/api/v1/verifyx/${CODE}`,
       `see ${CODE} for details`,
       `https://octalve.example/verify/${CODE}/extra`,
     ])
