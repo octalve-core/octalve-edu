@@ -160,13 +160,22 @@ const sheetUrl = (armId = armA, subjectId = maths, code = a.code) =>
 const rosterUrl = (armId = armA, code = a.code) => `${base(code)}/roster?${new URLSearchParams({ periodId, classArmId: armId })}`;
 
 test.describe("who reads what", () => {
-  test("signed out, a pupil, a campus administrator and another school's administrator reach none of the three", async () => {
+  test("signed out, a pupil and another school's administrator reach none of the three", async () => {
     for (const url of [`${base()}/options`, sheetUrl(), rosterUrl()]) {
       expect((await api(url, SAAS)).status, url).toBe(401);
       for (const who of ["pupilUser", "adminB"]) expect((await get(url, who)).status, `${url} ${who}`).toBe(403);
-      // A campus administrator is not on the results API's list of roles (task 0031, D7).
-      expect((await get(url, "campusAdmin")).status, `${url} campusAdmin`).toBe(403);
     }
+  });
+
+  // Task 0046 (decision D7 of task 0031): a campus administrator is on the results roles, held to their own campus. The whole rule is tested in results-campus-admin.spec.ts.
+  test("a campus administrator reads the options and the class lists of their campus and the school's, and a marks sheet only for a class of their own campus", async () => {
+    expect((await get(`${base()}/options`, "campusAdmin")).status).toBe(200);
+    expect((await get(rosterUrl(armA), "campusAdmin")).status).toBe(200); // a class of the whole school: visible
+    expect((await get(rosterUrl(northArm), "campusAdmin")).status).toBe(200);
+    expect((await get(rosterUrl(southArm), "campusAdmin")).status).toBe(404); // another campus's: the answer of an unknown id
+    expect((await get(sheetUrl(northArm), "campusAdmin")).status).toBe(200);
+    expect((await get(sheetUrl(armA), "campusAdmin")).status).toBe(403); // a class of the whole school: visible, not theirs to enter marks for
+    expect((await get(sheetUrl(southArm), "campusAdmin")).status).toBe(404);
   });
 
   test("a registrar reads the options and the class list, but not a marks sheet", async () => {

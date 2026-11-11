@@ -305,9 +305,7 @@ test("report cards: choose a class, open a pupil's card, see the published marks
   await expect(list).toBeVisible();
 });
 
-test("a registrar reads and reviews but does not enter marks and cannot approve; a campus administrator and a pupil are shut out", async ({
-  page,
-}) => {
+test("a registrar reads and reviews but does not enter marks and cannot approve", async ({ page }) => {
   await arrange();
   const registrar = await member(school, Role.NON_TEACHING_STAFF, null, `${tag} Registrar`);
   await signInThroughUi(page, registrar.user);
@@ -321,13 +319,22 @@ test("a registrar reads and reviews but does not enter marks and cannot approve;
   await checkBothThemes(page, "the review tab of a registrar");
 });
 
-test("a campus administrator is shown the 403 view (the results API is not theirs, decision D7)", async ({ page }) => {
+test("a campus administrator opens Results, with the Marks, Review and Cards tabs (task 0046, decision D7 of task 0031)", async ({
+  page,
+}) => {
   await arrange();
   const campus = await createTenant({ name: `${tag} Campus School`, campuses: ["North"] });
   const campusAdmin = await member(campus, Role.CAMPUS_ADMIN, campus.campuses[0].id, `${tag} Campus Admin`);
   await signInThroughUi(page, campusAdmin.user);
   await page.goto(`/schools/${campus.code}/results`);
-  await expect(page.getByRole("heading", { level: 1, name: "You don't have access to this school" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Results" })).toBeVisible();
+  const nav = page.getByRole("navigation", { name: "Results sections" });
+  for (const tab of ["Marks", "Review", "Cards"]) await expect(nav.getByRole("link", { name: tab })).toBeVisible();
+  // Without the approval permission they enter and send marks for review but have no Approve button.
+  await page.goto(`/schools/${campus.code}/results?tab=review`);
+  await expect(page.getByRole("button", { name: "Approve", exact: true })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: "Review" })).toHaveAttribute("aria-current", "page");
+  await checkBothThemes(page, "Results for a campus administrator");
 });
 
 test("a teacher with no assignment is told so instead of being shown an empty sheet", async ({ page }) => {

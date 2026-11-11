@@ -282,7 +282,8 @@ test.describe("classes and arms", () => {
         403,
       );
     }
-    expect((await api(`${base()}/academics/results`, as("campusAdmin"))).status).toBe(403);
+    // The results are theirs to read since task 0046 (decision D7 of task 0031); entering and approving are tested in results-campus-admin.spec.ts.
+    expect((await api(`${base()}/academics/results`, as("campusAdmin"))).status).toBe(200);
   });
 });
 

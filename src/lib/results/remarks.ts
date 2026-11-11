@@ -17,11 +17,12 @@ export function cleanRemark(value: unknown): { ok: true; value: string | null } 
   return { ok: true, value: text };
 }
 
-/// What a person may write on the card of a pupil of one arm: the principal's remark is the administrator's alone; the teacher's is the administrator's or the teacher's who is assigned to the
-/// pupil's arm. Everyone else (non-teaching staff, a pupil, a parent, a campus administrator while they are off the results roles) writes nothing.
-export function remarkPermissions(role: string, teachesThePupilsArm: boolean): { teacher: boolean; principal: boolean } {
+/// What a person may write on the card of a pupil of one arm: the principal's remark is the school administrator's alone; the teacher's is the administrator's, the teacher's who is assigned to the
+/// pupil's arm, or a campus administrator's for a pupil in a class of their own campus (task 0046). `reachesThePupilsArm` says whether the arm is one this person teaches (a teacher) or is a class of
+/// their own campus (a campus administrator). Everyone else (non-teaching staff, a pupil, a parent) writes nothing.
+export function remarkPermissions(role: string, reachesThePupilsArm: boolean): { teacher: boolean; principal: boolean } {
   if (role === "ADMIN") return { teacher: true, principal: true };
-  if (role === "TEACHING_STAFF") return { teacher: teachesThePupilsArm, principal: false };
+  if (role === "TEACHING_STAFF" || role === "CAMPUS_ADMIN") return { teacher: reachesThePupilsArm, principal: false };
   return { teacher: false, principal: false };
 }
 

@@ -4,6 +4,7 @@ import { validate } from "@/lib/api/validate";
 import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { isPlausibleId } from "@/lib/academics/http";
 import { studentAccess } from "@/lib/attendance/access";
+import { studentReadScope } from "@/lib/auth/campus-scope";
 import { resultFailure } from "@/lib/results/http";
 import { getStudentReportCard } from "@/lib/results/service";
 
@@ -26,10 +27,18 @@ export const GET = withAuth(
     // attendance history applies. A student and a parent are judged by getStudentReportCard.
     const noAccess = await studentAccess(auth, id);
     if (noAccess) return noAccess;
+    // `studentAccess` governs teachers and other staff and returns at once for a campus administrator, whose campus is judged here (task 0046, ADR 0016): their campus's pupils and the school's.
+    // Only for them: `studentReadScope` answers 403 to any role that is not an administrator, and a pupil, a parent and the staff are judged above and in `getStudentReportCard`.
+    if (auth.tenant.role === "CAMPUS_ADMIN") {
+      const outOfCampus = await studentReadScope(auth, id);
+      if (outOfCampus) return outOfCampus;
+    }
 
     const role = auth.tenant.role;
 
-    const res = await auth.tenant.run((tx) => getStudentReportCard(tx, auth.tenant.tenantId, id, query.periodId, role, auth.userId));
+    const res = await auth.tenant.run((tx) =>
+      getStudentReportCard(tx, auth.tenant.tenantId, id, query.periodId, role, auth.userId, auth.tenant.campusId),
+    );
 
     if (!res.ok) {
       return resultFailure(res.failure, "message" in res ? res.message : undefined);
@@ -37,5 +46,5 @@ export const GET = withAuth(
 
     return ok(res.data);
   }),
-  { tenant: true, area: "results", roles: ["ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF", "STUDENT", "PARENT"] },
+  { tenant: true, area: "results", roles: ["ADMIN", "CAMPUS_ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF", "STUDENT", "PARENT"] },
 );

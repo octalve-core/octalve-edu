@@ -11,6 +11,7 @@ import { canTransitionResult, validateComponentScores, generateVerificationToken
 import { calculateCompetitionRanks, evaluatePromotion } from "./ranking";
 import { remarksForCard } from "./remarks-service";
 import { feeHoldFor } from "./report-card-gate";
+import { OUTSIDE_CAMPUS, isCampusAdmin, ownsNothing, pupilsOutsideCampus } from "./campus-admin";
 import { withheldMessage } from "./fee-hold";
 import type { RecordResultsInput, TransitionStatusInput, ResultFailure } from "./http";
 import { triggerResultsPublishedAlerts } from "@/lib/communication/event-triggers";
@@ -20,6 +21,7 @@ export type ServiceResult<T> = { ok: true; data: T } | { ok: false; failure: Res
 /// What a member anchored to a campus works with: that campus's students and the school-wide ones (the rule `transitionResultStatuses` has always
 /// applied). `undefined` (no restriction) for an ADMIN and for a member of no campus.
 function campusOf(role: string, campusId: string | null): Prisma.StudentRecordWhereInput | undefined {
+  if (ownsNothing(role, campusId)) return { id: { in: [] } };
   return role === "ADMIN" || campusId === null ? undefined : { OR: [{ campusId: null }, { campusId }] };
 }
 
@@ -55,7 +57,10 @@ export async function recordStudentResults(
 ): Promise<ServiceResult<{ count: number; saved: string[] }>> {
   // Validate period and subject exist
   const [period, subject] = await Promise.all([
-    tx.academicPeriod.findFirst({ where: { tenantId, id: input.periodId, archivedAt: null } }),
+    tx.academicPeriod.findFirst({
+      where: { tenantId, id: input.periodId, archivedAt: null },
+      include: { session: { select: { campusId: true } } },
+    }),
     tx.subject.findFirst({ where: { tenantId, id: input.subjectId, archivedAt: null } }),
   ]);
 
@@ -75,6 +80,17 @@ export async function recordStudentResults(
   const known = await tx.studentRecord.count({ where: { tenantId, id: { in: studentIds }, ...campusOf(caller.role, caller.campusId) } });
   if (known !== studentIds.length) {
     return { ok: false, failure: "NOT_FOUND", message: "A student in this request was not found." };
+  }
+
+  // A campus administrator enters marks only for pupils on the roll of a class of their own campus, in a term of their campus's calendar or the school's (task 0046, ADR 0016): another
+  // campus's term is "not found", and a pupil of a school-wide class, or one not on the roll of a class of their campus, is not theirs to change. An ADMIN is not held to it.
+  if (isCampusAdmin(caller.role)) {
+    if (period.session.campusId !== null && period.session.campusId !== caller.campusId) {
+      return { ok: false, failure: "NOT_FOUND", message: "Academic period or subject not found." };
+    }
+    if ((await pupilsOutsideCampus(tx, tenantId, caller.campusId, period.sessionId, studentIds)).length > 0) {
+      return { ok: false, failure: "OUTSIDE_CAMPUS", message: OUTSIDE_CAMPUS };
+    }
   }
 
   // A teacher records a subject only for the students on the roll of an arm they are assigned to teach it in (an ACTIVE enrolment in this period's
@@ -438,6 +454,8 @@ export async function getStudentReportCard(
   periodId: string,
   viewerRole: string,
   viewerUserId: string,
+  /// The campus the viewer's membership is anchored to; only a campus administrator's remark rights depend on it (task 0046).
+  viewerCampusId: string | null = null,
 ) {
   // IDOR Verification
   if (viewerRole === "STUDENT") {
@@ -593,7 +611,14 @@ export async function getStudentReportCard(
       },
       subjects: subjectsData,
       feeHold: hold ? { outstanding: Number(hold.outstanding) } : null,
-      remarks: await remarksForCard(tx, tenantId, { studentId, periodId, armId: classArmId ?? null, viewerRole, viewerUserId }),
+      remarks: await remarksForCard(tx, tenantId, {
+        studentId,
+        periodId,
+        armId: classArmId ?? null,
+        viewerRole,
+        viewerUserId,
+        viewerCampusId,
+      }),
     },
   };
 }

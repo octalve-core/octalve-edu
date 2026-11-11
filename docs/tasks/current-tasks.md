@@ -524,3 +524,14 @@
 - [x] Tests: unit `pdf-unicode` (new, 31 tests) and the report-card unit and API specs extended; mutation check of 16 changes, each run alone (13 caught by tests, 1 caught only after a test was added, 2 equivalent); the whole unit and API projects and three browser specs on a clean build: 2,881 passed, 0 failed, 0 skipped (unit and API) and 37 passed in three browser specs
 - [x] Found by the regression: literal invisible characters in the new source, forbidden by `source-hygiene`; fixed as escapes
 - [ ] Not built: right-aligning a right-to-left remark or mirroring the card; scripts neither font holds; the question bank's exam-paper writer (Latin-only, separate); a reader of Arabic or Yoruba looking at a printed card
+
+## TASK-0046: A campus administrator reaches Results
+
+[Task file](0046-campus-admin-results.md). Decision D7 of task 0031, approved by the maintainer on 2026-11-11; built on `claude/octalve-results-access`. No migration.
+
+- [x] `CAMPUS_ADMIN` is on the results role lists (marks, review, import, remarks, report cards and their PDF) and on the Results page and sidebar
+- [x] They read their campus's pupils and the school's, and enter marks, import them and write the teacher's remark only for pupils on the roll of a class of their own campus; a class of the whole school is 403, another campus's pupil, class or term the 404 of an unknown id; all or nothing
+- [x] The principal's remark stays the school administrator's alone; unlocking a LOCKED result stays the school administrator's alone
+- [x] **Found:** a campus administrator can never hold `CAN_APPROVE_RESULTS` (a database constraint), so approving and publishing their campus's marks is the school administrator's and the named approvers'
+- [x] Tests: unit (`results-campus-admin`, the guard test for every results route, the menu), API (`results-campus-admin`: two campuses, 17 tests; `results-sheet` updated), browser (the Results page for a campus administrator); mutation check of 19 changes, each run alone, all caught; static gates; regression on a clean build: the first run found a real bug (the card and card-PDF routes asked `studentReadScope` of every role, so a teacher, a pupil and a parent got 403: 23 failures, fixed and held by two mutations); the second run unit and API 2,907 passed and 1 failed (`program-completion`, a feature this task does not touch, 401 for another school's administrator; it passed alone, 11 of 11, and I did not find the cause, so it is recorded as unexplained under load), browser 137 passed
+- [ ] Open for the maintainer: whether a campus administrator should approve for their own campus (a migration or a rule); the principal's remark for them

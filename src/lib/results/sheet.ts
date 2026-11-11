@@ -2,6 +2,7 @@ import { EnrollmentStatus, ResultStatus, SessionStatus } from "@prisma/client";
 import type { Tx } from "@/lib/tenant/for-tenant";
 import { assignedArmIds } from "@/lib/attendance/access";
 import { approverScope, NO_SCOPE } from "./approver-scope";
+import { OUTSIDE_CAMPUS, isCampusAdmin, mayChangeClass, ownsNothing } from "./campus-admin";
 import { schemeForClassGroup } from "./scheme";
 import type { ServiceResult } from "./service";
 
@@ -15,7 +16,8 @@ import type { ServiceResult } from "./service";
 export type SheetCaller = { role: string; campusId: string | null; userId: string; permissions?: readonly string[] };
 
 const campusAllows = (caller: SheetCaller, classCampusId: string | null) =>
-  caller.role === "ADMIN" || caller.campusId === null || classCampusId === null || classCampusId === caller.campusId;
+  !ownsNothing(caller.role, caller.campusId) &&
+  (caller.role === "ADMIN" || caller.campusId === null || classCampusId === null || classCampusId === caller.campusId);
 
 const notFound = (message: string): { ok: false; failure: "NOT_FOUND"; message: string } => ({ ok: false, failure: "NOT_FOUND", message });
 
@@ -55,6 +57,7 @@ async function assignedPairs(tx: Tx, tenantId: string, userId: string): Promise<
  * class offers; a teacher only their assignments; other staff none (they still get the periods: a reviewer needs them). A campus-anchored member gets their campus's sessions and the school's.
  */
 export async function entryOptions(tx: Tx, tenantId: string, caller: SheetCaller) {
+  if (ownsNothing(caller.role, caller.campusId)) return { periods: [], pairs: [], arms: [] };
   const sessions = await tx.academicSession.findMany({
     where: {
       tenantId,
@@ -102,13 +105,14 @@ export async function entryOptions(tx: Tx, tenantId: string, caller: SheetCaller
   });
   const arms = allArms.filter((arm) => campusAllows(caller, arm.classGroup.campusId));
 
-  // Entering: an administrator every arm with each subject its class offers, a teacher only their assignments, other staff nothing.
+  // Entering: an administrator every arm with each subject its class offers, a campus administrator the same for the classes of their own campus only (not the school-wide ones: task 0046),
+  // a teacher only their assignments, other staff nothing.
   let pairs: PairOption[] = [];
-  if (caller.role === "ADMIN" || caller.role === "TEACHING_STAFF") {
+  if (caller.role === "ADMIN" || isCampusAdmin(caller.role) || caller.role === "TEACHING_STAFF") {
     const mine = caller.role === "TEACHING_STAFF" ? await assignedPairs(tx, tenantId, caller.userId) : null;
     const subjects = mine ? await tx.subject.findMany({ where: { tenantId, archivedAt: null }, select: { id: true, name: true } }) : [];
     const subjectName = new Map(subjects.map((x) => [x.id, x.name]));
-    for (const arm of arms) {
+    for (const arm of isCampusAdmin(caller.role) ? arms.filter((a) => mayChangeClass(caller.campusId, a.classGroup.campusId)) : arms) {
       const base = { classArmId: arm.id, armName: arm.name, classGroupId: arm.classGroup.id, classGroupName: arm.classGroup.name };
       if (mine) {
         for (const key of mine) {
@@ -199,6 +203,11 @@ export async function getSheet(
   ]);
   if (!period || !arm || arm.classGroup.archivedAt || !subject || !campusAllows(caller, arm.classGroup.campusId))
     return notFound("No such class, subject or term.");
+  // A campus administrator enters marks for a class of their own campus, in a term of their campus's calendar or the school's (task 0046); a school-wide class is the school administrator's.
+  if (isCampusAdmin(caller.role)) {
+    if (period.session.campusId !== null && period.session.campusId !== caller.campusId) return notFound("No such class, subject or term.");
+    if (!mayChangeClass(caller.campusId, arm.classGroup.campusId)) return { ok: false, failure: "OUTSIDE_CAMPUS", message: OUTSIDE_CAMPUS };
+  }
   if (caller.role === "TEACHING_STAFF" && !(await assignedPairs(tx, tenantId, caller.userId)).has(`${arm.id}:${subject.id}`)) {
     return { ok: false, failure: "NOT_ASSIGNED", message: "You are not assigned to teach this subject to this class." };
   }
@@ -278,7 +287,7 @@ export async function classRoster(
   const [period, arm] = await Promise.all([
     tx.academicPeriod.findFirst({
       where: { tenantId, id: q.periodId, archivedAt: null },
-      include: { session: { select: { label: true } } },
+      include: { session: { select: { label: true, campusId: true } } },
     }),
     tx.classArm.findFirst({
       where: { tenantId, id: q.classArmId, archivedAt: null },
@@ -286,6 +295,8 @@ export async function classRoster(
     }),
   ]);
   if (!period || !arm || !campusAllows(caller, arm.classGroup.campusId)) return notFound("No such class or term.");
+  if (isCampusAdmin(caller.role) && period.session.campusId !== null && period.session.campusId !== caller.campusId)
+    return notFound("No such class or term.");
   if (caller.role === "TEACHING_STAFF") {
     const scope = (caller.permissions ?? []).includes("CAN_APPROVE_RESULTS") ? await approverScope(tx, tenantId, caller.userId) : NO_SCOPE;
     const mine = scope.general || scope.armIds.has(arm.id) || (await assignedArmIds(tx, tenantId, caller.userId)).has(arm.id);

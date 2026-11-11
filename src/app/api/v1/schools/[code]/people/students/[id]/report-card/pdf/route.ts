@@ -5,6 +5,7 @@ import { withAuth, type TenantAuthContext } from "@/lib/auth/with-auth";
 import { reserveAttempt } from "@/lib/auth/rate-limit";
 import { isPlausibleId } from "@/lib/academics/http";
 import { studentAccess } from "@/lib/attendance/access";
+import { studentReadScope } from "@/lib/auth/campus-scope";
 import { resultFailure } from "@/lib/results/http";
 import { appOrigin } from "@/lib/app-url";
 import { singleCardPdf } from "@/lib/results/report-card-pdf-service";
@@ -23,6 +24,12 @@ export const GET = withAuth(
     if (!isPlausibleId(id)) return fail("No such student.", 404, "NOT_FOUND");
     const noAccess = await studentAccess(auth, id);
     if (noAccess) return noAccess;
+    // A campus administrator's campus is judged here (`studentAccess` returns at once for them): their campus's pupils and the school's, never another campus's (task 0046). Only for them:
+    // `studentReadScope` answers 403 to any role that is not an administrator.
+    if (auth.tenant.role === "CAMPUS_ADMIN") {
+      const outOfCampus = await studentReadScope(auth, id);
+      if (outOfCampus) return outOfCampus;
+    }
     if (!(await reserveAttempt(`results:pdf:${auth.tenant.tenantId}:${auth.userId}`, PDFS_PER_WINDOW)))
       return fail("Too many downloads. Please try again in a few minutes.", 429, "RATE_LIMITED");
     const file = await auth.tenant.run((tx) =>
@@ -47,5 +54,5 @@ export const GET = withAuth(
       },
     });
   }),
-  { tenant: true, area: "results", roles: ["ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF", "STUDENT", "PARENT"] },
+  { tenant: true, area: "results", roles: ["ADMIN", "CAMPUS_ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF", "STUDENT", "PARENT"] },
 );

@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 // Results (task 0031): entering marks, reviewing and publishing them, and the report cards. It is a screen over the results API (lib/results), which decides on every request who may enter which
 // subject in which class, who may approve what (the permission and the scope of ADR 0018), and what a pupil or parent is sent. The page only decides what to DRAW. The roles are those of the
-// results API: administrators, teachers and other staff. A campus administrator is not on that list (see the task file, decision D7), so they get the 403 view.
+// results API: administrators, campus administrators (their own campus only: task 0046), teachers and other staff.
 export default async function ResultsPage({
   params,
   searchParams,
@@ -23,9 +23,10 @@ export default async function ResultsPage({
   const { code } = await params;
   const { tab: asked } = await searchParams;
   const { tenant } = await requireTenantPage(code, "results");
-  if (tenant.role !== "ADMIN" && tenant.role !== "TEACHING_STAFF" && tenant.role !== "NON_TEACHING_STAFF") forbidden();
+  if (tenant.role !== "ADMIN" && tenant.role !== "CAMPUS_ADMIN" && tenant.role !== "TEACHING_STAFF" && tenant.role !== "NON_TEACHING_STAFF")
+    forbidden();
 
-  const enters = tenant.role === "ADMIN" || tenant.role === "TEACHING_STAFF";
+  const enters = tenant.role === "ADMIN" || tenant.role === "CAMPUS_ADMIN" || tenant.role === "TEACHING_STAFF";
   const isAdmin = tenant.role === "ADMIN";
   const canApprove = !tenant.support && (isAdmin || (tenant.permissions ?? []).includes("CAN_APPROVE_RESULTS"));
   const tab = isResultTab(asked) && (enters || asked !== "marks") ? asked : enters ? "marks" : "review";
