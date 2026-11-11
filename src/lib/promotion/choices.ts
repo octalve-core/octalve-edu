@@ -60,3 +60,22 @@ export function campusAdminMayRoll(ownCampusId: string | null, classCampusId: st
   if (classCampusId !== null) return classCampusId === ownCampusId;
   return sessionCampusId === ownCampusId;
 }
+
+/// The pupils of a roll who have no PUBLISHED (or locked) marks for the session's final period, as advice for the confirm step (task 0047, decision D8 of task 0031). It is advice, never a refusal:
+/// a pupil's average counts only the terms the school has stood behind, so a pupil with nothing for the last term is judged on the earlier ones, and the school may want to publish first. A pupil who
+/// already has a place in the next session is left alone by a roll, so is not counted. `null` when the session has no periods or nobody is missing.
+export function finalTermGap(
+  periods: readonly { ordinal: number; label: string }[],
+  rows: readonly { alreadyEnrolledInTarget: boolean; termAverages: Readonly<Record<number, number | null>> }[],
+): { ordinal: number; label: string; pupils: number } | null {
+  if (periods.length === 0) return null;
+  const last = periods.reduce((a, b) => (b.ordinal > a.ordinal ? b : a));
+  const pupils = rows.filter((row) => !row.alreadyEnrolledInTarget && (row.termAverages[last.ordinal] ?? null) === null).length;
+  return pupils === 0 ? null : { ordinal: last.ordinal, label: last.label, pupils };
+}
+
+/// The sentence the promotion screen shows for that advice.
+export function finalTermGapText(gap: { label: string; pupils: number }): string {
+  const one = gap.pupils === 1;
+  return `${gap.pupils} pupil${one ? " has" : "s have"} no published marks for ${gap.label}, so ${one ? "their average leaves" : "their averages leave"} it out.`;
+}

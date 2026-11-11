@@ -535,3 +535,14 @@
 - [x] **Found:** a campus administrator can never hold `CAN_APPROVE_RESULTS` (a database constraint), so approving and publishing their campus's marks is the school administrator's and the named approvers'
 - [x] Tests: unit (`results-campus-admin`, the guard test for every results route, the menu), API (`results-campus-admin`: two campuses, 17 tests; `results-sheet` updated), browser (the Results page for a campus administrator); mutation check of 19 changes, each run alone, all caught; static gates; regression on a clean build: the first run found a real bug (the card and card-PDF routes asked `studentReadScope` of every role, so a teacher, a pupil and a parent got 403: 23 failures, fixed and held by two mutations); the second run unit and API 2,907 passed and 1 failed (`program-completion`, a feature this task does not touch, 401 for another school's administrator; it passed alone, 11 of 11, and I did not find the cause, so it is recorded as unexplained under load), browser 137 passed
 - [ ] Open for the maintainer: whether a campus administrator should approve for their own campus (a migration or a rule); the principal's remark for them
+
+## TASK-0047: The promotion screen says how many pupils have no published marks for the last term
+
+[Task file](0047-promotion-final-term-advice.md). Decision D8 of task 0031, approved by the maintainer on 2026-11-11; built on `claude/octalve-promotion-advice`. No migration, no new route.
+
+- [x] `previewPromotion` returns `finalTermGap`: the pupils to be rolled (no place in the next session yet) with no PUBLISHED or LOCKED mark for the session's last period; `null` when nobody is missing or the session has no periods
+- [x] The promotion panel shows it in a warning in the preview and as a line in the confirm dialog; nothing is refused, the roll still goes through, and the advice is not stored in the batch
+- [x] The rule is pure and in `choices.ts` (no imports, so the browser can run it), re-exported by `rules.ts`
+- [x] Tests: unit `promotion-final-term` (new, 6 tests), API `promotion` (the preview: 3 pupils; null when nobody is missing; 1 when one is), browser `promotion-screens` (the preview and the dialog); mutation check of 9 changes, each run alone, all caught (N7 and N8 each fail a different browser test, so the preview's warning and the dialog's line are held apart); static gates clean
+- [x] Regression on a clean build: unit and API 2,882 passed, 2 failed, 4 did not run (two tests that send many requests at once, run while four test lanes shared one database server: `finance` failed with "Too many database connections", `portal-practice` got a 500 and I did not read a connection message for it; both passed in full when run alone afterwards, 25 of 25); four browser specs 43 passed
+- [ ] Open for the maintainer: whether the advice should become a refusal an administrator can override with a reason; naming the pupils or offering to publish the term from the dialog

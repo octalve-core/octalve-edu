@@ -146,6 +146,9 @@ test("the administrator picks a class and reads what the rule advises, in both t
   await expect(row("none")).toContainText("No published term scores");
   await expect(row("none")).toContainText("Repeated");
   expect(Object.keys(made)).toHaveLength(3);
+  // Advice (task 0047): one pupil has nothing published for the last term, so their average leaves it out; the roll is still possible.
+  await expect(page.getByText("1 pupil has no published marks for First Term, so their average leaves it out.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Review and roll", exact: true })).toBeEnabled();
   await checkBothThemes(page, "the promotion preview");
 });
 
@@ -171,6 +174,7 @@ test("changing a decision needs a reason; the roll is confirmed, recorded, and s
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("2 to promote"); // the strong pupil and the weak one now
   await expect(dialog).toContainText("1 to repeat");
+  await expect(dialog).toContainText("1 pupil has no published marks for First Term, so their average leaves it out."); // task 0047
   await checkBothThemes(page, "the confirmation dialog");
   await dialog.getByRole("button", { name: "Roll the class", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "Year 1 was rolled: 2 promoted, 1 repeating" })).toBeVisible();

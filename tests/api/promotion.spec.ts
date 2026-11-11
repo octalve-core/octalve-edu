@@ -273,6 +273,21 @@ test.describe("the preview", () => {
     expect(p.targetClassGroup.id).toBe(w.g2);
     expect(p.eligibility.eligible).toBe(true);
     expect(p.summary).toMatchObject({ totalEvaluated: 6, totalPromoted: 3, totalRepeated: 3, totalGraduated: 0, totalSkipped: 0 });
+    // Advice (task 0047, decision D8 of task 0031): three pupils have no published mark for the last period (good, none and the one with only a draft earlier); it is advice, the roll is not refused.
+    expect(p.finalTermGap).toMatchObject({ ordinal: 3, pupils: 3 });
+  });
+
+  test("the advice about the final term counts the pupils with no published marks for it, and is null when nobody is missing (task 0047)", async () => {
+    const w = await world();
+    await pupil(w, "1A", [60, 60, 60]);
+    await pupil(w, "1A", [null, null, 70]);
+    expect((await get(previewUrl(w), "admin")).json.data.preview.finalTermGap).toBeNull();
+    await pupil(w, "1A", [60, 60, null]);
+    const gap = (await get(previewUrl(w), "admin")).json.data.preview.finalTermGap;
+    expect(gap).toMatchObject({ ordinal: 3, pupils: 1 });
+    expect(typeof gap.label).toBe("string");
+    // Advice, not a refusal: the roll still goes through.
+    expect((await get(previewUrl(w), "admin")).status).toBe(200);
   });
 
   test("the pass mark is the school's to set, and a nonsense one is refused", async () => {
