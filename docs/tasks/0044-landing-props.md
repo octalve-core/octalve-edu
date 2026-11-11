@@ -30,6 +30,7 @@
 - **D4. `lang` and `dir` go on the page's outer element only when given.** With neither, React writes no attribute, so the markup is the same as before this task. (A unit test would be the natural proof, but a component cannot be rendered in the unit project: its loader replaces React's JSX runtime. So the default is held by a source-level unit test and by Octalve's existing browser specs of the page, which pass unchanged; the props themselves are exercised by AlEemaan's browser specs, tasks 0049 and 0050, which run the same file.)
 - **D5. `switchTo`** is `{ href, label, lang }`: a quiet text link in the header, before the theme button, its label written in the OTHER language and marked with that language (`lang` and `hrefLang`), so a screen reader says it in the right voice. It is a plain link to another page: no script, nothing remembered.
 - **D6. Nothing else changes:** no new colours, no new class names beyond the one for the switch link, no migration, no change to what `/` decides, no copy change in Octalve.
+- **D7. The cards' grid follows their number (added in a follow-up PR, 2026-11-11).** AlEemaan's four branch cards in the three-column grid left one card alone on a second row. Four cards now sit two by two (`sm:grid-cols-2`); every other number keeps the grid the page always had (`sm:grid-cols-2 lg:grid-cols-3`), so Octalve's six cards are unchanged.
 
 ## 4. Work breakdown
 
@@ -38,6 +39,8 @@
 - [x] A unit test of what can be held without rendering (no side-named class in the component; the English labels; every prop optional; `/` calls it with none; the language and direction written only when given).
 - [x] The browser specs of tasks 0041 and 0042, the sign-in and logo specs and the browser-wide responsive spec pass unchanged.
 - [x] Docs: components catalogue, HANDOVER, tracker, CLAUDE.md banner.
+
+- [x] D7 in a follow-up PR: the cards' grid follows their number (a source-level unit test holds the rule; AlEemaan's browser spec measures the four cards two by two).
 
 ## 5. Not in this task
 
@@ -58,5 +61,7 @@
 **Mutation check (one unit-only round, no rebuild needed; applied in the lane copy, restored with `lanes.mjs sync` and checked identical with `cmp`).** Four mutations, four failing tests, one each: **M17** a `pl-4` added to a class: "it names no side" (received `" pl-"`); **M18** the English sign-in label changed to "Log in": "the component's own English words" (expected "Sign in", received "Log in"); **M19** a language written when none is given (`lang={lang ?? "en"}`): "the language and the direction are written only when given"; **M20** `/` calls the component with a prop: "every prop is optional and the component is called with none by `/`".
 
 **Not run.** The whole unit and API projects; the HTTPS project; a character-for-character comparison of the default markup with `dev` (cannot run here, see above); the props in a browser in this repository (AlEemaan's specs do).
+
+**Follow-up PR (D7, the grid).** Found when AlEemaan's four branch cards were photographed: four cards in the three-column grid left one alone on a second row. `COVERS_GRID` maps a count to its classes (four: `sm:grid-cols-2`), the default is the class string the page always had; Octalve's six cards render the same classes. Tests: the unit `landing-direction` (5 tests now) holds the rule in the source; AlEemaan's browser spec measures the four cards two by two. Run on a clean build (lane 3): unit `landing-direction` and `landing-copy`, API `landing-router`, browser (desktop and phone) `landing-screens` and `auth-logo`: **56 passed, 0 failed, 1 skipped** (`auth-logo` on the phone project, by design). One mutation (the four-card rule changed back to three by three, unit-only, restored and checked identical): exactly one of the five `landing-direction` tests fails, the new one ("the cards' grid follows their number").
 
 **Left for the maintainer.** Nothing to run on any database.

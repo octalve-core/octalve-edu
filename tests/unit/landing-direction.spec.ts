@@ -31,6 +31,13 @@ test.describe("given nothing, it says what the page always said", () => {
     expect(ENGLISH_LABELS.theme).toEqual({ toLight: "Switch to light theme", toDark: "Switch to dark theme" });
   });
 
+  test("the cards' grid follows their number: four sit two by two, anything else keeps the grid the page always had (task 0044, D7)", () => {
+    const component = source("src/components/landing/LandingPage.tsx");
+    expect(component).toContain('const COVERS_GRID_DEFAULT = "sm:grid-cols-2 lg:grid-cols-3";');
+    expect(component).toContain('const COVERS_GRID: Record<number, string> = { 4: "sm:grid-cols-2" };');
+    expect(component).toContain("COVERS_GRID[copy.covers.length] ?? COVERS_GRID_DEFAULT");
+  });
+
   test("every prop is optional and the component is called with none by `/`", () => {
     const page = source("src/app/page.tsx");
     expect(page).toMatch(/<LandingPage\s*\/>/);
