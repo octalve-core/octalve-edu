@@ -8,6 +8,8 @@
 
 > **How to tick:** change `[ ]` to `[x]`.
 
+> **Migration note (task 0049, 2026-11-11):** `20261122090000_progress_records` no longer exists as a folder: the six migrations that were waiting for a hosted database were merged into one, `20261122090000_progress_promotion_results`, with the same schema (`docs/tasks/0049-squash-pending-migrations.md`). The text below is the record of what was built then and keeps the old name.
+
 ## 1. Objective
 A running log a teacher keeps for each person in a program (one row a day: what was done, from where to where, a rating, a note), verified before families see it, written by one person at a time, and shown to the pupil and the guardian (a summary by default). The first template is the Quran memorisation booklet (the 114 surahs by number, names in English and Arabic, only references stored, never the text); the second is a plain daily log. The same tool serves any program.
 

@@ -9,6 +9,8 @@
 
 > **How to tick:** change `[ ]` to `[x]`. The table shows the characters, not a clickable box.
 
+> **Migration note (task 0049, 2026-11-11):** `20261123090000_promotion`, `20261124090000_streams` no longer exist as folders: the six migrations that were waiting for a hosted database were merged into one, `20261122090000_progress_promotion_results`, with the same schema (`docs/tasks/0049-squash-pending-migrations.md`). The text below is the record of what was built then and keeps the old names.
+
 ---
 
 ## 1. Objective

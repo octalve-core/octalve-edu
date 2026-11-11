@@ -557,3 +557,13 @@
 - [x] The scheme screen says a locked scheme is replaced by a new version
 - [x] Tests: unit (the rule, the snapshot, the parts), API (`results-scheme-points`: the name end to end, the trigger, the bare score, the scale lock), the Academic setup screens; mutation check of 20 changes, each run alone, all caught; static gates; regression on a clean build, unit and API 2,902 passed and 0 failed, four browser specs 99 passed and 0 failed (earlier attempts were invalid: connection slots exhausted by parallel lanes, ports held by leftovers of a killed run, and a run lost without an error while the machine was short of memory; that last one had two failures in unrelated specs whose messages I did not read, and both passed in the final run)
 - [ ] For the maintainer: run the migration; tell schools that a class's scheme is edited only as a new version after its first marks
+
+## TASK-0049: The six waiting migrations become one
+
+[Task file](0049-squash-pending-migrations.md). Asked by the maintainer on 2026-11-11 (no production or preview database exists yet); built on `claude/octalve-squash-migrations`. One migration replaces six; no schema change.
+
+- [x] `20261122090000_progress_promotion_results` is the six files in their old order under banners; the six folders are removed
+- [x] Same schema: `pg_dump --schema-only` of "the six in order" and "the one file", from the same base, identical (13,427 lines); a control with one of the six left out differs; none of the six writes data
+- [x] A fresh test lane applied all 50 migrations with `migrate deploy`; `prisma migrate status` up to date; 292 API specs on these tables and the whole unit project (1,214) pass
+- [x] Found: `scripts/lanes.mjs sync` left empty folders for removed migrations, which fails the setup step with P3015 for any lane; fixed (a directory gone from the checkout and empty is removed)
+- [ ] Open for the maintainer: reset any local database that applied the old six (`octalve_edu`, `octalve_edu_test`: `prisma migrate reset`); whether to squash the 50 older migrations too; the old remote database described in HANDOVER section 3 (31 migrations, October) if it still exists

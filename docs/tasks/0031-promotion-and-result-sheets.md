@@ -8,6 +8,8 @@
 
 > **How to tick:** change `[ ]` to `[x]`.
 
+> **Migration note (task 0049, 2026-11-11):** `20261122090000_progress_records`, `20261123090000_promotion` no longer exist as folders: the six migrations that were waiting for a hosted database were merged into one, `20261122090000_progress_promotion_results`, with the same schema (`docs/tasks/0049-squash-pending-migrations.md`). The text below is the record of what was built then and keeps the old names.
+
 ## 1. Objective
 (a) **Promotion:** at the end of a session an administrator picks a class, sees each pupil's term averages and what the rule advises (promote, repeat, graduate), overrides any of them with a reason, and rolls the class into the next session in one safe, repeatable step, with a history of every roll.
 (b) **Results screens:** Octalve has a results API (record, query, transition, report card) and orphan components, but **no page**. A teacher cannot enter marks, an approver cannot review them and a registrar cannot print a report card without writing API calls. This task adds the page and the three small read endpoints it needs.
