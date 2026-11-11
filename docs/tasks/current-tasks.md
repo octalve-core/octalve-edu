@@ -503,3 +503,12 @@
 - [x] A browser that opens an old raw `/api/v1/verify/<code>` or `/api/v1/verify-certificate/<code>` address is sent to the page (`307`, relative `Location`, no attempt counted, `Vary: Accept`); scripts still get the same JSON
 - [x] The check page takes a certificate's code, its whole link and the old raw addresses (nothing after the code)
 - [x] Tests: unit, API and screens (x2 projects) new; mutation check in four rounds (15 mutations, each caught by its own test); 25 related spec files run on a clean build (309 passed, 0 failed, 1 skipped by design)
+
+## TASK-0044: The landing page component takes its words, language and direction as props
+
+[Task file](0044-landing-props.md). A prerequisite for AlEemaan's landing page about the school (its task 0049) and its Arabic version (0050); built on `claude/octalve-landing-props`. No migration; nothing visible changes in Octalve.
+
+- [x] `LandingPage` takes optional `copy`, `name`, `labels`, `lang`, `dir` and `switchTo`; every default is what the page always said; a card's icon is optional; `ThemeToggle` takes optional `labels`
+- [x] With no props every default is the literal it replaced: a source-level unit test holds it (a component cannot be rendered in the unit project: Playwright replaces React's JSX runtime); the props themselves are exercised by AlEemaan's specs (its tasks 0049 and 0050)
+- [x] Tests: unit `landing-direction` (new, 4 tests, each caught by its own mutation); 169 passed, 0 failed, 3 skipped by design over the specs of tasks 0041 and 0042, sign-in, logo and the browser-wide responsive spec
+
