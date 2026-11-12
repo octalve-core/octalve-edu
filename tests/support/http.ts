@@ -86,7 +86,16 @@ export function sessionCookie(res: ApiResponse, name = COOKIE_NAME): ParsedCooki
   return res.setCookies.map(parseSetCookie).find((c) => c.name === name);
 }
 
-export const cookieHeader = (token: string, name = COOKIE_NAME) => `${name}=${token}`;
+/// A sign-in that did not produce a session returns `token: null` (see `loginAs`), and `cookieHeader(login.token!)` would turn that into the cookie `name=null`, which the API answers with a
+/// bare 401 on the first protected call, far from the cause. So an empty token stops here and says what happened (task 0051).
+export const cookieHeader = (token: string | null | undefined, name = COOKIE_NAME) => {
+  if (!token) {
+    throw new Error(
+      `cookieHeader: no session token (${token === "" ? "empty" : String(token)}): the sign-in that should have produced it did not set a session cookie`,
+    );
+  }
+  return `${name}=${token}`;
+};
 
 /// `remember` is sent only when given, so a bare `loginAs(user)` exercises the API's default
 /// (not remembered: a session cookie and a 12-hour server-side cap).
