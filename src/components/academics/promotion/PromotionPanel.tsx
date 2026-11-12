@@ -267,6 +267,7 @@ export function PromotionPanel({
             />
             <TextField
               label="Pass mark (%)"
+              info="promotion.passmark"
               inputMode="decimal"
               value={passMark}
               error={passMarkOk ? null : "Give a number from 0 to 100."}

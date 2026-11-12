@@ -130,6 +130,7 @@ export function StudentsPanel({ schoolCode, campuses, canEdit }: { schoolCode: s
         />
         <SelectField
           label="Show"
+          info="students.show"
           value={status}
           onChange={(e) => (setStatus(e.target.value), setPage(1))}
           options={[

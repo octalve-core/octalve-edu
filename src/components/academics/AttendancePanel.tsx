@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/Button";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { SelectField } from "@/components/ui/SelectField";
 import { LiveNotice, ListState, type Notice } from "./parts";
 import { sendJson } from "@/components/auth/postJson";
@@ -213,9 +214,12 @@ export function AttendancePanel({ schoolCode, readOnly = false }: { schoolCode: 
         </div>
 
         <div>
-          <label htmlFor="attendance-date" className="block text-sm font-medium text-fg mb-1">
-            Date
-          </label>
+          <div className="mb-1 flex items-center gap-1.5">
+            <label htmlFor="attendance-date" className="block text-sm font-medium text-fg">
+              Date
+            </label>
+            <InfoTip tip="attendance.window" />
+          </div>
           <input
             id="attendance-date"
             type="date"

@@ -1,4 +1,6 @@
 import { useId, type InputHTMLAttributes, type ReactNode, type Ref } from "react";
+import { InfoTip } from "./InfoTip";
+import type { InfoTipKey } from "./info-tips";
 
 export type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "id"> & {
   label: string;
@@ -11,6 +13,8 @@ export type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, "id"> &
   labelAction?: ReactNode;
   /// Visually hide the label (it stays the accessible name) - for a grid of rows where the column heading says it.
   hideLabel?: boolean;
+  /// An info icon beside the label (task 0055): a sibling of the label, never inside it, so the field's accessible name is the label alone. Ignored with `hideLabel`.
+  info?: InfoTipKey;
   ref?: Ref<HTMLInputElement>;
 };
 
@@ -27,6 +31,7 @@ export function TextField({
   trailing,
   labelAction,
   hideLabel = false,
+  info,
   className = "",
   ref,
   ...rest
@@ -40,9 +45,18 @@ export function TextField({
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between gap-3">
-        <label htmlFor={inputId} className={hideLabel ? "sr-only" : "block text-xs font-semibold tracking-wide text-fg-2 uppercase"}>
-          {label}
-        </label>
+        {info && !hideLabel ? (
+          <span className="flex items-center gap-1.5">
+            <label htmlFor={inputId} className="block text-xs font-semibold tracking-wide text-fg-2 uppercase">
+              {label}
+            </label>
+            <InfoTip tip={info} />
+          </span>
+        ) : (
+          <label htmlFor={inputId} className={hideLabel ? "sr-only" : "block text-xs font-semibold tracking-wide text-fg-2 uppercase"}>
+            {label}
+          </label>
+        )}
         {labelAction}
       </div>
       <div className="relative">

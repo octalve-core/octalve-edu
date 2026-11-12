@@ -104,6 +104,7 @@ export function StaffPanel({ schoolCode, campuses, canEdit }: { schoolCode: stri
         />
         <SelectField
           label="Show"
+          info="staff.show"
           value={status}
           onChange={(e) => (setStatus(e.target.value), setPage(1))}
           options={[

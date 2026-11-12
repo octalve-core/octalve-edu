@@ -616,3 +616,13 @@
 - [x] **Found: nothing consumes the queue.** `createNotificationDispatchWorker` and `defaultNotificationDispatcher` are never started or called outside the tests, so every broadcast and every automatic alert stays `QUEUED` for ever, with or without keys. Not built: the maintainer chooses (task file section 5: a cron route, a separate worker host, or sending in the request)
 - [ ] Not done: the worker; real delivery (no key exists to try it with); the maintainer's setup (a Resend account and verified domain, `RESEND_API_KEY`, `EMAIL_FROM`, `APP_URL`; `TERMII_API_KEY` and `TERMII_SENDER_ID`); mutation passes (deferred to the end of PHASE 2)
 
+
+## TASK-0055: Info icons: a short explanation of an item or a section, on hover, in the same way everywhere
+
+[Task file](0055-info-tips.md). The maintainer's "in both apps, I want to add the info icon to many places such that when hovered on, it displays information for the user to understand that item or section of the App, but make sure the info icon does not disfigure the design" (2026-11-12); built on `claude/info-tips`, the same component and rules as AlEemaan's task 0054 (AlEemaan PRs #176 and #177). No migration, no API.
+
+- [x] `InfoTip` (AlEemaan's final component, copied unchanged, with the two placement fixes that AlEemaan's browser runs found) and Octalve's own registry `info-tips.ts`; `SelectField` and `TextField` take `info` (a sibling of the label, never inside it).
+- [x] Six tips placed, each checked against Octalve's own source (table in the task file): the session lifecycle (24-hour close countdown, Close sooner, reopen), grade-scale versions, the attendance edit window, the promotion pass mark, and the Students and Staff "Show" filters. Not one of AlEemaan's was copied: several do not apply here because Octalve already prints that text, and some rules differ.
+- [x] Not placed on purpose: the Communication tips (Octalve's message tags are never filled in, and nothing consumes the dispatch queue, so a "Queued" tip would say something untrue); headings that already print their answer.
+- [x] Tests: 88 passed, 0 failed, 4 skipped (the device-only ones): new unit spec, new browser spec on desktop and phone (each icon in place, hover, keyboard, Escape, phone tap, no layout shift, the page neither wider nor scrolled, axe in dark and light), and the existing academics, attendance, people and promotion-screens specs, unchanged. Not run: the whole suite, mutation passes (deferred), the Solo-mode server, a real phone or screen reader.
+- [ ] Later, module by module: Settings, Results, Finance, Programs, Forms, Question bank, Users, Support, the portal; the Communication tips after their fixes; the walkthrough shows one icon and the final video is made after this ships.
