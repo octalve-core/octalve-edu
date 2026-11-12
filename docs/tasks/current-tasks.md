@@ -660,5 +660,13 @@
 - [x] The Communication screen sends the rest of a broadcast in the background (`useQueuePump`), shows "Sending messages: 40 of 200" with a progress bar, pauses with Try again when the server cannot be reached, and carries on when the screen is opened with messages still due. Nothing is kept in the browser
 - [x] Tests: 77 passed on lane 1, then 86 passed with the phone project added after one wording change (the new route-guard entries, 4 integration, the API and 3 end-to-end specs, with the existing communication, cron and drain specs); see the task file
 - [ ] Not run: the new specs against the unfixed code (the integration spec imports a module that did not exist); the whole suite; mutation passes (deferred)
-- [ ] Known: the pause after five calls that claimed nothing shows the "server could not be reached" line (it should say another screen is sending). Not fixed here
+- [x] The pause after five calls that claimed nothing used to show the "server could not be reached" line; fixed in [task 0059](0059-pump-pause-wording.md)
 - [ ] **For the maintainer:** unchanged from TASK-0057: promote `dev` to `master` and `prod` when you choose (`CRON_SECRET` is already set for Production); the Resend and Termii keys
+
+
+## TASK-0059: The sending line said "the server could not be reached" when another screen was sending the rest
+
+[Task file](0059-pump-pause-wording.md). A known flaw of task 0058; built on `claude/octalve-pump-pause-wording`. No migration. AlEemaan's task 0067 is the same change.
+
+- [x] The paused state has a reason (`unreachable` or `elsewhere`) and the line says which; the test written first failed on the unfixed build (4 passed, 1 failed); 9 passed, 0 failed on the fixed build (desktop and phone)
+- [ ] Not done: the whole suite; mutation passes (deferred)
