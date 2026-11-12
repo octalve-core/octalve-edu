@@ -169,6 +169,28 @@ model Payslip {
 }
 ```
 
+### 2.3 Staff lifecycle additions (asked for by the maintainer on 2026-11-12; parked, not designed)
+
+Five features are added to this module's scope. **None is built and no table exists for any of them.** Each starts with its own design doc, written before any code, and with the maintainer's answers to the questions below.
+
+**What exists today, so that nothing is built twice**
+
+- **Student attendance is built** (the Attendance page: the daily roll call of an arm, its summary, the form teacher and explicit grants). Staff attendance is a different thing: nothing records whether a member of staff came in.
+- **Standing is built for staff**: suspend and terminate with a reason and a history (task 0045 in AlEemaan, task 0028 in Octalve), plus archive and restore, and unlinking a person's sign-in from their record. These are the pieces an offboarding would use; they are not an offboarding.
+- **Recruitment has no pipeline.** The old school site had a vacancy form (`docs/legacy-feature-inventory.md`, section 1.9); only the public form is on record.
+
+| # | Feature | What it would cover (a starting point to confirm, not a decision) | Builds on | Questions for the maintainer |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | **Staff attendance** | A daily mark per staff member (present, late, absent, on leave, excused) for the branch or campus they work in; who records it; lateness rules; a summary by person and period; an export. It feeds leave balances and payroll deductions. | `StaffRecord`; the student Attendance screens for the shape and the branch or campus rule | Does each person mark their own arrival, or does a head or the administrator? Any place or QR check, or none in the first version? May a teacher see colleagues' marks? |
+| 2 | **Staff leave** | Leave types (annual, sick, maternity or paternity, study, compassionate, unpaid); a yearly entitlement per type; a request, then approval by a head or the administrator; a balance; a calendar of who is away; the periods that need cover. An approved leave marks the days "on leave" in staff attendance. | `StaffRecord`; the approval-by-assignment pattern (ADR 0018); the timetable | Entitlements per school and per kind of contract; who approves, and at which campus; carry-over; public holidays; may a medical reason be written down, and who reads it? |
+| 3 | **Staff offboarding** | Resignation, termination, retirement and end of contract: notice and last day; a checklist (return keys and equipment, hand over classes, revoke access, final pay, exit interview, an experience letter); on the last day the sign-in is deactivated or unlinked, the teacher assignments and any approver scope end, and the record becomes read-only history. | Standing (`TERMINATED`), archive, unlink sign-in, teacher assignments, approver scopes (ADR 0018); payroll (M2) and assets (M5) when they exist | How long must a leaver's record be kept? Who runs and signs off the checklist? What does a leaver still see, if anything? |
+| 4 | **Recruitment** | A vacancy (open, close); a public application page with a CV upload; shortlist; interview scheduling and scores; an offer; on acceptance, "hire" creates the staff record and sends the invitation, so nothing is typed twice (as admissions does for pupils). | The admissions pipeline (M1, section 7) and its zero-rekeying conversion; the public site's forms; invitations | What does the public careers page say? Who sees applicants? How long are unsuccessful applicants' details kept? |
+| 5 | **Performance and appraisal** | Appraisal cycles (a term or a year); a template of criteria with weights and a rating scale; a self-assessment, then the reviewer's; classroom-observation records; goals for the next cycle; sign-off by both; a history per person. | `StaffRecord`; teacher assignments; optionally results aggregates | Who may read an appraisal (the person, their reviewer, the administrator)? Does it feed pay or promotion? What is the rating scale? |
+
+**Suggested order, to confirm:** staff attendance and leave together first (an approved leave sets the attendance status, and both feed payroll); then offboarding, which mostly stitches together pieces that exist; then recruitment, which shares the admissions pipeline; and performance and appraisal last, because it needs people to have been in the system for a cycle. Milestone **M2b** in section 8.
+
+**For all five:** the same tenant and campus scoping and row-level security as every other table; an append-only audit; and leave reasons, applicants' details and appraisals are **sensitive personal data**, so who may read each is decided with the maintainer before any table is made (the Nigeria Data Protection Act applies; the school's obligations are to be checked, not assumed). Parity: both products get them, designed once and built in the repository that is ready first, as with programs and standing.
+
 ---
 
 ## 3. Module 2: Library Management
@@ -578,6 +600,7 @@ model ApplicationDocument {
 | :--- | :--- | :--- | :--- |
 | **M1** | **Admissions CRM** | Public application portal, exam/interview scheduling, automated offer letters, zero-rekeying student enrollment. | Core SIS (Students, Guardians) |
 | **M2** | **Extended HR & Payroll** | Salary structures, statutory deduction engines (PAYE, Pension), monthly run workflow, payslip generator. | Extended `StaffRecord` (Already landed) |
+| **M2b** | **Staff lifecycle** (asked for 2026-11-12; not designed) | Staff attendance, staff leave, staff offboarding, recruitment, performance and appraisal (section 2.3). | M2 (Extended `StaffRecord`); M1 pipeline for recruitment; standing and approvals as built |
 | **M3** | **Library Management** | Book cataloging, barcode copy tracking, circulation desk, overdue fine automation. | Core SIS (Students, Staff) |
 | **M4** | **Transport & Fleet** | Bus fleet inventory, routes, ordered stops, passenger manifests, term transport billing. | Core SIS & Finance Billing |
 | **M5** | **Inventory & Assets** | Store requisitions, lab equipment serial tracking, uniforms stock ledger, threshold alerts. | Multi-campus infrastructure |

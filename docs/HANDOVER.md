@@ -92,6 +92,9 @@ A detailed technical blueprint is documented in:
    - Entrance exams, interview scoring rubrics, offer letters, waitlist ranking engine.
    - **Zero-Rekeying Promotion Engine:** Atomic conversion of accepted applicants directly into permanent `StudentRecord`, `GuardianRecord`, and portal credentials with zero duplicate entry.
 
+### Asked for later (2026-11-12; parked, not designed):
+Staff attendance, staff leave, staff offboarding, recruitment, and performance and appraisal (milestone M2b). Student attendance is already built; standing (suspend and terminate) exists for staff but is not an offboarding. Scope, what each builds on, the questions for the maintainer and a suggested order: [`docs/tasks/0016-phase-4-operations-and-admissions-blueprint.md`](docs/tasks/0016-phase-4-operations-and-admissions-blueprint.md), section 2.3. Each needs its own design doc first.
+
 ---
 
 ## 5. Verification & Test Suite Health
