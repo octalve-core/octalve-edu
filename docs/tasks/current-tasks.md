@@ -597,3 +597,12 @@
 - [x] The `https` project and the 46 e2e files on the baseline: desktop run 384 passed, 9 skipped, 0 failed; phone run 342 passed, 43 skipped, 0 failed (skips are viewport conditions in the specs)
 - [ ] Not done: any hosted database, the old remote database of HANDOVER section 3, data in tenant tables; the maintainer decides whether that database is dropped or adopted
 
+## TASK-0053: The walkthrough video and PDF for Octalve Edu: the plan (P0)
+
+[Task file](0053-walkthrough-plan.md). The maintainer's "start the walkthrough videos for both ... all pages, features, buttons" (2026-11-12); built on `claude/octalve-walkthrough-plan`. A plan only: no harness, matrix or journey code.
+
+- [x] The state found: Octalve's first walkthrough version (never run) has the right wizard fields but does not type the setup token, branches on what it sees, and its runner defaults to the wrong database role, gives no `DIRECT_URL` and has no safety check; it is replaced, not extended
+- [x] What differs from AlEemaan: two deployment modes (Solo with the wizard, SaaS with the platform superadministrator), schools in the address, seven kinds of person, 36 pages and 294 API routes, tenants, support access, custom domains
+- [x] The plan: port AlEemaan's harness (P0.1), the computed part of the matrix (P0.2), the rows by hand (P0.3), then chapters C01 to C09 for Solo and S01 to S04 for SaaS
+- [ ] Waiting for the maintainer: Solo first then SaaS as two deliverables; which names to use; the open campus-administrator approval decision; whether to link the video guide from the account menu
+
