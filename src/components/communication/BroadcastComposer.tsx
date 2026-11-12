@@ -28,6 +28,8 @@ interface BroadcastComposerProps {
   campuses: CampusOption[];
   classArms: ClassArmOption[];
   onBroadcastSent?: () => void;
+  /// The broadcast was queued for `total` people: the panel sends it in the background and shows the progress.
+  onQueued?: (progress: { total: number; done: number; sent: number; failed: number; retrying: number }) => void;
 }
 
 // What the preview shows in place of each tag. They are made-up samples (the preview has no recipient); the server fills in the real values per recipient (tags.ts, task 0056).
@@ -38,7 +40,7 @@ const SAMPLES: Record<string, string> = {
   date: "16 Oct 2026",
 };
 
-export function BroadcastComposer({ schoolCode, campuses, classArms, onBroadcastSent }: BroadcastComposerProps) {
+export function BroadcastComposer({ schoolCode, campuses, classArms, onBroadcastSent, onQueued }: BroadcastComposerProps) {
   const [channel, setChannel] = useState<NotificationChannel>(NotificationChannel.EMAIL);
   const [audienceRole, setAudienceRole] = useState<"ALL" | "GUARDIAN" | "STAFF">("ALL");
   const [campusId, setCampusId] = useState<string>("");
@@ -111,6 +113,8 @@ export function BroadcastComposer({ schoolCode, campuses, classArms, onBroadcast
     setSuccess(`Broadcast queued successfully for ${count} recipient${count === 1 ? "" : "s"} via ${channel}.`);
     setBody("");
     setSubject("");
+    // the rows are queued; sending starts at once, a batch at a time, with the progress above the tabs (task 0058)
+    if (count > 0) onQueued?.({ total: count, done: 0, sent: 0, failed: 0, retrying: 0 });
     onBroadcastSent?.();
   };
 
