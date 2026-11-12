@@ -132,6 +132,9 @@ process.env.FORCE_MOCK_PAYSTACK = "true";
 process.env.ALLOW_MOCK_PAYMENTS_IN_PRODUCTION = "true";
 process.env.PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || "mock_sk_test_octalve_secret";
 
+/// The secret the servers under test hold as CRON_SECRET (task 0057): a scheduler's call to the dispatch route carries it as a bearer token. At least 16 characters, as the route demands.
+export const TEST_CRON_SECRET = "test-cron-secret-0123456789abcdef";
+
 /// Environment for the Next.js servers under test. Explicit and complete on
 /// purpose: nothing from a developer's shell or .env may change what is tested.
 export function serverEnv(appUrl: string): Record<string, string> {
@@ -158,6 +161,11 @@ export function serverEnv(appUrl: string): Record<string, string> {
     // Question pictures are kept in the server's own memory (the test harness is the only thing allowed to ask for this on a production-shaped server).
     IMAGE_STORE: "memory",
     ALLOW_MEMORY_IMAGE_STORE_IN_PRODUCTION: "true",
+    // The dispatch route (task 0057) reads the queue and SENDS what is due, so a test server must never be able to send a real message: whatever the developer's shell holds, the sender
+    // keys are empty here (the senders then fail closed, task 0054), and the route's secret is the known test one.
+    CRON_SECRET: TEST_CRON_SECRET,
+    RESEND_API_KEY: "",
+    TERMII_API_KEY: "",
   };
 }
 

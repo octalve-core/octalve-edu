@@ -44,6 +44,10 @@ allow(
   "POST v1/webhooks/paystack/route.ts",
 );
 allow(
+  "a scheduler (Vercel Cron) calls it, with no session and no school: the bearer CRON_SECRET is the credential, compared in constant time, and the route is refused outright (503) while no secret of at least 16 characters is set (lib/queue/cron-auth.ts, tests/api/cron-dispatch.spec.ts)",
+  "GET v1/cron/dispatch-notifications/route.ts",
+);
+allow(
   "dev-only inbox, refused unless the dev tools are switched on (tests/api/dev-inbox.spec.ts); public in source by design",
   "GET v1/dev/email-inbox/route.ts",
   "DELETE v1/dev/email-inbox/route.ts",

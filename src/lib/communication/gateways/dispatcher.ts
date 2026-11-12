@@ -1,6 +1,6 @@
 import { NotificationChannel } from "@prisma/client";
 import { type NotificationDispatchJobData } from "@/lib/queue/definitions";
-import { type DispatchHandlerResult } from "@/lib/queue/dispatch-worker";
+import { type DispatchHandlerResult } from "@/lib/queue/dispatch-lifecycle";
 import { sendEmail } from "./email";
 import { sendTermiiMessage } from "./termii";
 

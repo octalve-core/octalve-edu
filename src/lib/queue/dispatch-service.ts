@@ -1,7 +1,6 @@
 import { NotificationChannel, NotificationDispatchStatus } from "@prisma/client";
 import { forTenant } from "../tenant/for-tenant";
 import { trustedTenantId } from "../tenant/verified-tenant";
-import { getNotificationDispatchQueue, type NotificationDispatchJobData } from "./definitions";
 
 export interface EnqueueDispatchParams {
   tenantId: string;
@@ -9,29 +8,34 @@ export interface EnqueueDispatchParams {
   recipientAddress: string;
   recipientUserId?: string | null;
   templateId?: string | null;
+  /// Not stored and not used by the cron drain (the row carries the rendered subject and body); kept so that callers and a future queue worker (option B of task 0054) need not change.
   templateCode?: string;
   subject?: string | null;
   body: string;
   metadata?: Record<string, unknown> | null;
+  /// Not used: rows are taken oldest first. Kept for the same reason as `templateCode`.
   priority?: number; // 1 = High, 5 = Normal, 10 = Low
 }
 
 export interface EnqueueDispatchResult {
   dispatchId: string;
+  /// Always undefined now: there is no queue job, the row is the queue (task 0057). Kept so that callers need not change.
   jobId?: string;
   status: NotificationDispatchStatus;
 }
 
 /**
- * Persists a NotificationDispatch row in QUEUED status and pushes a job to BullMQ.
+ * Persists a NotificationDispatch row in QUEUED status, and nothing else: the row IS the queue (task 0057). A scheduler calls GET /api/v1/cron/dispatch-notifications, which takes the due rows and
+ * sends them (lib/queue/dispatch-drain.ts). It used to push a BullMQ job to Redis as well; nothing took that job off, and where no Redis was reachable the push threw AFTER the row was written, so a
+ * broadcast failed half-way with some messages queued. The BullMQ definitions and the worker stay in the tree for option B (a worker host); this function does not use them.
  * Uses forTenant to respect multi-tenant RLS.
  */
 export async function enqueueNotificationDispatch(params: EnqueueDispatchParams): Promise<EnqueueDispatchResult> {
-  const { tenantId, channel, recipientAddress, recipientUserId, templateId, templateCode, subject, body, metadata, priority } = params;
+  const { tenantId, channel, recipientAddress, recipientUserId, templateId, subject, body, metadata } = params;
 
   const verifiedTenant = trustedTenantId(tenantId);
 
-  // 1. Create database dispatch row under tenant context
+  // Create the dispatch row under tenant context
   const dispatch = await forTenant(verifiedTenant).transaction(async (tx) => {
     return tx.notificationDispatch.create({
       data: {
@@ -48,28 +52,8 @@ export async function enqueueNotificationDispatch(params: EnqueueDispatchParams)
     });
   });
 
-  // 2. Prepare queue job payload
-  const jobData: NotificationDispatchJobData = {
-    dispatchId: dispatch.id,
-    tenantId,
-    channel,
-    recipientAddress,
-    recipientUserId,
-    subject,
-    body,
-    templateCode,
-    metadata,
-  };
-
-  // 3. Push to BullMQ queue
-  const queue = getNotificationDispatchQueue();
-  const job = await queue.add(`dispatch:${channel}:${dispatch.id}`, jobData, {
-    priority: priority || (channel === NotificationChannel.SMS ? 1 : 5),
-  });
-
   return {
     dispatchId: dispatch.id,
-    jobId: job.id,
     status: dispatch.status,
   };
 }
