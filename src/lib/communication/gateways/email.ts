@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { devToolsEnabled } from "@/lib/dev-tools";
 import { recordDevEmail } from "@/lib/dev/email-inbox";
+import { notSetUp, standInAllowed } from "./stand-in";
 
 export interface SendEmailParams {
   to: string | string[];
@@ -47,6 +48,11 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
   const apiKey = process.env.RESEND_API_KEY;
   const defaultFrom = process.env.EMAIL_FROM || "Octalve Edu <notifications@octalve.com>";
   const from = params.from || defaultFrom;
+
+  // No key: the stand-in only where nothing real is expected to leave (tests, dev tools on). Anywhere else, in production, a send with no key is a failed send that says so (task 0054).
+  if (!apiKey && !standInAllowed()) {
+    return { success: false, error: notSetUp("Email", "RESEND_API_KEY") };
+  }
 
   // Mock / Dev mode fallback
   if (!apiKey || process.env.NODE_ENV === "test" || devToolsEnabled()) {

@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { devToolsEnabled } from "@/lib/dev-tools";
+import { notSetUp, standInAllowed } from "./stand-in";
 
 export interface TermiiSendParams {
   to: string; // Recipient phone number
@@ -84,6 +85,11 @@ export async function sendTermiiMessage(params: TermiiSendParams): Promise<Termi
       success: false,
       error: `Invalid phone number format: "${params.to}"`,
     };
+  }
+
+  // No key: the stand-in only where nothing real is expected to leave (tests, dev tools on). Anywhere else, in production, a send with no key is a failed send that says so (task 0054).
+  if (!apiKey && !standInAllowed()) {
+    return { success: false, error: notSetUp(channel === "whatsapp" ? "WhatsApp" : "SMS", "TERMII_API_KEY") };
   }
 
   // Mock / Development mode
