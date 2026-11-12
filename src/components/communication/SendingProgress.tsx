@@ -36,7 +36,9 @@ export function SendingProgress({ state, onRetry, onDismiss }: { state: PumpStat
         className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn-line bg-warn-bg p-4 text-sm text-warn-fg"
       >
         <p>
-          Sending is paused at {state.done} of {state.total}: the server could not be reached. Nothing is lost; the rest are still waiting.
+          {state.reason === "elsewhere"
+            ? `Sending is paused at ${state.done} of ${state.total}: another screen is sending the rest. Nothing is lost; choose Try again to check on it.`
+            : `Sending is paused at ${state.done} of ${state.total}: the server could not be reached. Nothing is lost; the rest are still waiting.`}
         </p>
         <button
           type="button"
