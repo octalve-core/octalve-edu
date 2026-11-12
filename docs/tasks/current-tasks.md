@@ -650,3 +650,15 @@
 - [x] Tests: see the build record in the task file (new specs: cron-auth, dispatch-due, dispatch-drain, dispatch-enqueue-no-redis, cron-dispatch API; the existing communication specs unchanged and green)
 - [ ] **For the maintainer:** set `CRON_SECRET` (16 or more random characters) for Production in Vercel and redeploy; choose the schedule (daily until changed: messages leave once a day); the Resend and Termii accounts and variables (task 0054)
 - [ ] Not done: a note on the Broadcast screen about when messages leave; the "Queued" info tip (now unblocked, its words must say when messages leave); an index on `(status, createdAt)`; `after()` for a faster path; removing BullMQ and ioredis; a worker host (option B); a real send through Resend or Termii (no key exists); mutation passes (deferred to the end of PHASE 2)
+
+
+## TASK-0058: The Communication screen sends a broadcast's messages in batches of ten, with progress, and carries on where it was cut off
+
+[Task file](0058-broadcast-in-batches.md). The maintainer's idea (2026-11-12), built the same way as AlEemaan's task 0063 on this app's own queue; built on `claude/octalve-broadcast-batches`. No migration.
+
+- [x] `POST /communication/queue/next` sends the next batch of ten of the school's due messages and answers counts only (`claimed`, `sent`, `failed`, `retrying`, `remaining`, `firstError`); `GET /communication/queue` answers how many are due. Both: ADMIN and CAMPUS_ADMIN, school session, not a support view. It is the cron's drain (claim, back-off, lease, audit rows, RLS) limited to one school and ten rows
+- [x] The Communication screen sends the rest of a broadcast in the background (`useQueuePump`), shows "Sending messages: 40 of 200" with a progress bar, pauses with Try again when the server cannot be reached, and carries on when the screen is opened with messages still due. Nothing is kept in the browser
+- [x] Tests: 77 passed on lane 1, then 86 passed with the phone project added after one wording change (the new route-guard entries, 4 integration, the API and 3 end-to-end specs, with the existing communication, cron and drain specs); see the task file
+- [ ] Not run: the new specs against the unfixed code (the integration spec imports a module that did not exist); the whole suite; mutation passes (deferred)
+- [ ] Known: the pause after five calls that claimed nothing shows the "server could not be reached" line (it should say another screen is sending). Not fixed here
+- [ ] **For the maintainer:** unchanged from TASK-0057: promote `dev` to `master` and `prod` when you choose (`CRON_SECRET` is already set for Production); the Resend and Termii keys

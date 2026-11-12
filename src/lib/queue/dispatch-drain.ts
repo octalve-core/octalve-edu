@@ -109,17 +109,32 @@ type Row = NotificationDispatch;
 
 /// The rows of one school that are due now, oldest first. The query keeps only the rows that could be due (a RETRYING row must have waited at least the first back-off, a PROCESSING row the
 /// lease) and `isDue` makes the exact decision, since the back-off grows with the attempts.
+const candidatesWhere = (tenantId: string, now: Date, policy: DuePolicy) => ({
+  tenantId,
+  OR: [
+    { status: NotificationDispatchStatus.QUEUED },
+    { status: NotificationDispatchStatus.RETRYING, updatedAt: { lte: new Date(now.getTime() - policy.retryBaseMs) } },
+    { status: NotificationDispatchStatus.PROCESSING, updatedAt: { lte: new Date(now.getTime() - policy.leaseMs) } },
+  ],
+});
+
+/// How many messages of one school are due to be sent now (task 0058): what the Communication screen asks, to carry on with a broadcast that was cut off. A message that failed and is waiting
+/// out its back-off is not due yet, so it is not counted (the screen would otherwise wait for something that cannot be sent now).
+export async function countDueRows(tenantId: string, now: Date = new Date(), policy: DuePolicy = DEFAULT_DUE_POLICY): Promise<number> {
+  const candidates = await forTenant(trustedTenantId(tenantId)).transaction((tx) =>
+    tx.notificationDispatch.findMany({
+      where: candidatesWhere(tenantId, now, policy),
+      select: { status: true, attempts: true, updatedAt: true },
+      take: 5000,
+    }),
+  );
+  return candidates.filter((row) => isDue(row, now, policy)).length;
+}
+
 async function readDue(tenantId: string, take: number, now: Date, policy: DuePolicy): Promise<{ rows: Row[]; more: boolean }> {
   const candidates = await forTenant(trustedTenantId(tenantId)).transaction((tx) =>
     tx.notificationDispatch.findMany({
-      where: {
-        tenantId,
-        OR: [
-          { status: NotificationDispatchStatus.QUEUED },
-          { status: NotificationDispatchStatus.RETRYING, updatedAt: { lte: new Date(now.getTime() - policy.retryBaseMs) } },
-          { status: NotificationDispatchStatus.PROCESSING, updatedAt: { lte: new Date(now.getTime() - policy.leaseMs) } },
-        ],
-      },
+      where: candidatesWhere(tenantId, now, policy),
       orderBy: { createdAt: "asc" },
       take: take * 3 + 1,
     }),

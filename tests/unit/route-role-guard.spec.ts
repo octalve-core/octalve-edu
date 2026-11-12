@@ -185,6 +185,8 @@ elsewhere(
   "POST v1/schools/[code]/communication/broadcast/route.ts",
   "POST v1/schools/[code]/communication/dispatches/[id]/retry/route.ts",
   "GET v1/schools/[code]/communication/dispatches/route.ts",
+  "GET v1/schools/[code]/communication/queue/route.ts",
+  "POST v1/schools/[code]/communication/queue/next/route.ts",
   "GET v1/schools/[code]/communication/templates/[id]/route.ts",
   "GET v1/schools/[code]/communication/templates/route.ts",
 );

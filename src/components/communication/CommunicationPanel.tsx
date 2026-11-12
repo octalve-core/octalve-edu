@@ -5,6 +5,8 @@ import { FileTextIcon, MailIcon, SendIcon } from "@/components/ui/icons";
 import { BroadcastComposer } from "./BroadcastComposer";
 import { TemplatesManager } from "./TemplatesManager";
 import { DispatchLogsView } from "./DispatchLogsView";
+import { SendingProgress } from "./SendingProgress";
+import { useQueuePump } from "./useQueuePump";
 
 interface CampusOption {
   id: string;
@@ -27,6 +29,8 @@ type TabKey = "broadcast" | "templates" | "logs";
 
 export function CommunicationPanel({ schoolCode, campuses, classArms }: CommunicationPanelProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("broadcast");
+  // messages that are due (a broadcast just queued, or one that was cut off) are sent in the background, whichever tab is open
+  const pump = useQueuePump(schoolCode);
 
   const tabs: Array<{ key: TabKey; label: string; icon: typeof SendIcon }> = [
     { key: "broadcast", label: "Broadcast Composer", icon: SendIcon },
@@ -63,6 +67,8 @@ export function CommunicationPanel({ schoolCode, campuses, classArms }: Communic
         </nav>
       </div>
 
+      <SendingProgress state={pump.state} onRetry={() => void pump.resume()} onDismiss={pump.dismiss} />
+
       {/* Tab Panels */}
       <div role="tabpanel" id={`panel-${activeTab}`} aria-labelledby={`tab-${activeTab}`} className="focus:outline-none">
         {activeTab === "broadcast" && (
@@ -71,6 +77,7 @@ export function CommunicationPanel({ schoolCode, campuses, classArms }: Communic
             campuses={campuses}
             classArms={classArms}
             onBroadcastSent={() => setActiveTab("logs")}
+            onQueued={pump.begin}
           />
         )}
 
