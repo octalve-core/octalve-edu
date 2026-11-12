@@ -50,6 +50,8 @@ Make a test whose sign-in did not produce a session fail at the sign-in, with a 
 
 **Regression.** The whole unit, integration and API projects on lane 1 (the lane's database already on the baseline migration; the three browser-spec runs of the post-squash check, task 0052, were using lanes 2 and 3 at the same time): **3,634 passed, 0 failed, no retries** (15.1 minutes): setup 1, unit 1,217, integration 695, API 1,721. That is the proof for D2 and D3: the 88 spec files that call the helper all still get a real token.
 
+**Browser specs that call the helper.** Two of the 46 e2e files import it and call `cookieHeader`: `tests/e2e/users.spec.ts` and `tests/e2e/question-bank-questions.spec.ts` (the other 44 and the `https` project do not). Run on this branch, lane 1, desktop and phone projects: **41 passed, 0 failed** (2.7 minutes). (My first commit message said no browser spec imports the helper; that was wrong, found with `grep` right after, and the message was corrected before the PR.)
+
 **Static gates:** `tsc --noEmit` clean; `eslint` clean on the two files; Prettier `--check` clean on the changed files; `verify_catalogs` clean.
 
 **What it does and does not prove.** A failed sign-in in any spec now stops at the sign-in with a message that names the cause; if the 401 of task 0046's regression comes back, the failure will say that the login did not give a token. It does not say WHY the login failed, and it does not show that the original failure was a failed login: that cause stays unproven (nothing was logged at the time). `loginAs` still returns `token: null` without throwing, on purpose (some specs test failed sign-ins).
