@@ -3,7 +3,9 @@ import { forTenant } from "../tenant/for-tenant";
 import { trustedTenantId } from "../tenant/verified-tenant";
 import { getNotificationDispatchQueue, type NotificationDispatchJobData } from "../queue/definitions";
 import { enqueueBulkNotificationDispatches, type EnqueueDispatchParams } from "../queue/dispatch-service";
-import { ensureSystemTemplates } from "./templates";
+import { readSchoolTimeZone } from "../school-settings/read";
+import { ensureSystemTemplates, interpolateTokens } from "./templates";
+import { joinNames, messageDate } from "./tags";
 import type { CreateBroadcastInput, CreateTemplateInput, QueryDispatchesInput, QueryTemplatesInput, UpdateTemplateInput } from "./http";
 
 export interface TemplateListItem {
@@ -271,6 +273,8 @@ interface TargetRecipient {
   address: string;
   userId?: string | null;
   name: string;
+  /// A guardian's children, for the `{{student_name}}` and `{{class_arm}}` tags (task 0056); absent for staff.
+  guardian?: { children: Array<{ name: string; classArm: string | null }> };
 }
 
 /**
@@ -284,12 +288,17 @@ export async function createBroadcast(
   const verifiedTenant = trustedTenantId(tenantId);
 
   // 1. Resolve recipients under tenant RLS context
-  const recipients = await forTenant(verifiedTenant).transaction(async (tx) => {
+  const { recipients, schoolName, today } = await forTenant(verifiedTenant).transaction(async (tx) => {
     const list: TargetRecipient[] = [];
+    // the values of the tags that are the same for everyone: the school's name and today's date in the school's own time zone
+    const school = await tx.tenant.findUnique({ where: { id: tenantId }, select: { name: true } });
+    const zone = await readSchoolTimeZone(tx, tenantId);
 
     // A. Guardians
     if (input.audienceRole === "ALL" || input.audienceRole === "GUARDIAN") {
       let guardianRecords: Array<{ id: string; firstName: string; lastName: string; email: string | null; phone: string | null }> = [];
+      // with a class arm chosen, a guardian's tags name only the children in that arm
+      let armStudentIds: string[] | null = null;
 
       if (input.classArmId) {
         const enrolments = await tx.studentEnrollment.findMany({
@@ -297,6 +306,7 @@ export async function createBroadcast(
           select: { studentId: true },
         });
         const studentIds = enrolments.map((e) => e.studentId);
+        armStudentIds = studentIds;
         if (studentIds.length > 0) {
           const links = await tx.guardianLink.findMany({
             where: { tenantId, studentId: { in: studentIds }, status: "APPROVED" },
@@ -311,6 +321,45 @@ export async function createBroadcast(
         });
       }
 
+      // each guardian's children: approved links to pupils who are not archived, with the class each has in the ACTIVE session
+      const childrenOf = new Map<string, Array<{ name: string; classArm: string | null }>>();
+      const guardianIds = guardianRecords.map((g) => g.id);
+      if (guardianIds.length > 0) {
+        const childLinks = await tx.guardianLink.findMany({
+          where: {
+            tenantId,
+            guardianId: { in: guardianIds },
+            status: "APPROVED",
+            student: { archivedAt: null },
+            ...(armStudentIds ? { studentId: { in: armStudentIds } } : {}),
+          },
+          orderBy: { createdAt: "asc" },
+          select: {
+            guardianId: true,
+            student: {
+              select: {
+                firstName: true,
+                lastName: true,
+                enrollments: {
+                  where: { status: "ACTIVE", session: { status: "ACTIVE" } },
+                  select: { classArm: { select: { name: true, classGroup: { select: { name: true } } } } },
+                  take: 1,
+                },
+              },
+            },
+          },
+        });
+        for (const link of childLinks) {
+          const arm = link.student.enrollments[0]?.classArm;
+          const children = childrenOf.get(link.guardianId) ?? [];
+          children.push({
+            name: `${link.student.firstName} ${link.student.lastName}`.trim(),
+            classArm: arm ? `${arm.classGroup.name} ${arm.name}` : null,
+          });
+          childrenOf.set(link.guardianId, children);
+        }
+      }
+
       for (const g of guardianRecords) {
         const address =
           input.channel === NotificationChannel.EMAIL
@@ -323,6 +372,7 @@ export async function createBroadcast(
           list.push({
             address: address.trim(),
             name: `${g.firstName} ${g.lastName}`.trim(),
+            guardian: { children: childrenOf.get(g.id) ?? [] },
           });
         }
       }
@@ -356,7 +406,7 @@ export async function createBroadcast(
       }
     }
 
-    return list;
+    return { recipients: list, schoolName: school?.name ?? "School", today: messageDate(new Date(), zone) };
   });
 
   // De-duplicate by address
@@ -372,15 +422,31 @@ export async function createBroadcast(
     return { count: 0, channel: input.channel };
   }
 
-  // 2. Prepare dispatch jobs
+  // 2. Prepare dispatch jobs. The tags are filled in here, one message per recipient (tags.ts says which exist for whom; the input check has refused any other): the school's name and
+  // today's date for everyone, and for a guardian their children's names and classes ("your child" and "their class" for a guardian with none). Values are HTML-escaped for EMAIL.
+  const fill = (text: string, target: TargetRecipient) =>
+    interpolateTokens(
+      text,
+      {
+        school_name: schoolName,
+        date: today,
+        ...(target.guardian
+          ? {
+              student_name: joinNames(target.guardian.children.map((child) => child.name)) || "your child",
+              class_arm: joinNames(target.guardian.children.flatMap((child) => (child.classArm ? [child.classArm] : []))) || "their class",
+            }
+          : {}),
+      },
+      input.channel,
+    );
   const dispatches: EnqueueDispatchParams[] = uniqueRecipients.map((target) => ({
     tenantId,
     channel: input.channel,
     recipientAddress: target.address,
     recipientUserId: target.userId,
     templateCode: "BROADCAST_ANNOUNCEMENT",
-    subject: input.subject || "School Announcement",
-    body: input.body,
+    subject: fill(input.subject || "School Announcement", target),
+    body: fill(input.body, target),
     metadata: {
       broadcast: true,
       audienceRole: input.audienceRole,

@@ -38,7 +38,9 @@ export function CommunicationPanel({ schoolCode, campuses, classArms }: Communic
     <div className="space-y-6">
       {/* Navigation Tabs */}
       <div className="border-b border-line">
-        <nav role="tablist" aria-label="Communication navigation" className="-mb-px flex space-x-2 sm:space-x-4">
+        {/* On a phone the three tabs side by side were 15 px wider than the screen, so the whole page scrolled sideways (and Chrome widened its layout viewport to fit). Tighter padding makes them
+            fit at 412 px; overflow-x-auto keeps a narrower screen scrolling inside the strip, not the page. */}
+        <nav role="tablist" aria-label="Communication navigation" className="-mb-px flex space-x-1 overflow-x-auto sm:space-x-4">
           {tabs.map(({ key, label, icon: Icon }) => {
             const isCurrent = activeTab === key;
             return (
@@ -49,7 +51,7 @@ export function CommunicationPanel({ schoolCode, campuses, classArms }: Communic
                 aria-controls={`panel-${key}`}
                 aria-selected={isCurrent}
                 onClick={() => setActiveTab(key)}
-                className={`flex items-center gap-2 border-b-2 px-3.5 py-3 text-sm font-semibold transition-all ${
+                className={`flex items-center gap-2 border-b-2 px-2 py-3 text-sm font-semibold transition-all sm:px-3.5 ${
                   isCurrent ? "border-brand-strong text-brand-fg" : "border-transparent text-fg-muted hover:border-line hover:text-fg"
                 }`}
               >

@@ -64,7 +64,8 @@ test.describe("Communication UI Console & Accessibility", () => {
     await expect(messageInput).toBeVisible();
     await messageInput.fill("Dear Guardian, school will close at 1:00 PM today.");
 
-    // Verify token insertion button works
+    // Verify token insertion button works. {{student_name}} is a guardian tag (task 0056: the default audience, the whole community, includes staff, who have no pupil, so it is not offered there)
+    await page.getByLabel("Target Group").selectOption("GUARDIAN");
     const tokenButton = page.getByRole("button", { name: "+ {{student_name}}" });
     await expect(tokenButton).toBeVisible();
     await tokenButton.click({ force: true });

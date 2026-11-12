@@ -31,8 +31,8 @@ const URGENCY_PRESETS = [
 ];
 
 export function QuickBroadcastTool({ schoolCode }: QuickBroadcastToolProps) {
-  const [channel, setChannel] = useState<"SMS" | "WHATSAPP" | "EMAIL" | "IN_APP">("SMS");
-  const [audienceRole, setAudienceRole] = useState<"ALL" | "GUARDIAN" | "STAFF" | "STUDENT">("GUARDIAN");
+  const [channel, setChannel] = useState<"SMS" | "WHATSAPP" | "EMAIL">("SMS");
+  const [audienceRole, setAudienceRole] = useState<"ALL" | "GUARDIAN" | "STAFF">("GUARDIAN");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
 
@@ -70,7 +70,7 @@ export function QuickBroadcastTool({ schoolCode }: QuickBroadcastToolProps) {
       const res = await sendJson(`/api/v1/schools/${schoolCode}/communication/broadcast`, "POST", payload);
 
       if (!res.ok) {
-        setError(res.message || "Failed to dispatch broadcast.");
+        setError(res.details?.[0]?.message || res.message || "Failed to dispatch broadcast.");
         setSubmitting(false);
         return;
       }
@@ -151,7 +151,6 @@ export function QuickBroadcastTool({ schoolCode }: QuickBroadcastToolProps) {
             { value: "SMS", label: "SMS Message" },
             { value: "WHATSAPP", label: "WhatsApp" },
             { value: "EMAIL", label: "Email" },
-            { value: "IN_APP", label: "In-App Notice" },
           ]}
           onChange={(e) => setChannel(e.target.value as typeof channel)}
         />
@@ -163,7 +162,6 @@ export function QuickBroadcastTool({ schoolCode }: QuickBroadcastToolProps) {
             { value: "GUARDIAN", label: "Guardians & Parents" },
             { value: "STAFF", label: "Teachers & Staff" },
             { value: "ALL", label: "Entire School Community" },
-            { value: "STUDENT", label: "Students" },
           ]}
           onChange={(e) => setAudienceRole(e.target.value as typeof audienceRole)}
         />
