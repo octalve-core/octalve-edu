@@ -73,7 +73,6 @@ model Result {
   @@index([tenantId, periodId])
   @@index([tenantId, studentId, periodId])
   @@index([tenantId, subjectId, periodId])
-  @@index([verificationToken])
 }
 
 /// Append-only audit record tracking every state transition and post-lock score adjustment.

@@ -39,9 +39,11 @@ Architecture) for the full stack table and rationale.
 docker compose up -d     # local Postgres (5433) + Redis (6380) — see docker-compose.yml comments
 cp .env.example .env      # fill in secrets
 pnpm install
-pnpm prisma migrate dev
+pnpm prisma migrate deploy   # applies the committed migrations; NOT `migrate dev` (see below)
 pnpm dev
 ```
+
+Use `migrate deploy`, not `migrate dev`. Five tables (`ProgramCertificate`, `PromotionBatch`, `PromotionRecord`, `PromotionReversal`, `ReportRemark`) carry composite foreign keys on `(tenantId, id)` in the migrations and, on purpose, no Prisma relations, so `migrate dev` would offer a migration that DROPS fourteen foreign keys, and another that creates an index which already exists (`Result_verificationToken_key` is a partial unique index, which Prisma cannot read) and would fail. `tests/integration/schema-matches-migrations.spec.ts` allows exactly those and fails on any other difference between the schema and the migrations. A new migration is written by hand (or from `prisma migrate diff --script`, with those foreign keys removed from it).
 
 ## Tests
 

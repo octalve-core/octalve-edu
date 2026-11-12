@@ -670,3 +670,13 @@
 
 - [x] The paused state has a reason (`unreachable` or `elsewhere`) and the line says which; the test written first failed on the unfixed build (4 passed, 1 failed); 9 passed, 0 failed on the fixed build (desktop and phone)
 - [ ] Not done: the whole suite; mutation passes (deferred)
+
+
+## TASK-0060: A test fails when the Prisma schema and the migrations differ in any way Prisma cannot say; the README's `migrate dev` was a trap
+
+[Task file](0060-schema-matches-migrations.md). Found with `prisma migrate diff` while checking AlEemaan's task 0066 (AlEemaan's task 0068 is the same guard); built on `claude/octalve-schema-matches-migrations`. **No migration.**
+
+- [x] The diff holds fourteen composite foreign keys the schema models no relation for (on purpose), `Result_verificationToken_key` (a partial unique index Prisma cannot read) and one real inconsistency: the schema's `@@index([verificationToken])`, which the database never had (removed). A first reading ("the database has no index on the token") was wrong and is corrected in the task file; the migration written for it was withdrawn before any commit
+- [x] New integration spec `schema-matches-migrations.spec.ts` allowing exactly those two things; it failed on the unfixed schema (naming the index) and passes on the fixed one (2 passed with the setup)
+- [x] The README says `pnpm prisma migrate deploy` and why (`migrate dev` would drop the fourteen keys and write a migration that fails)
+- [ ] Not done: the whole suite; mutation passes (deferred)
