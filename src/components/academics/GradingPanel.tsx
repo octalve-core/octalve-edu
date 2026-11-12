@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/Button";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { SelectField } from "@/components/ui/SelectField";
 import { PlusIcon } from "@/components/ui/icons";
 import type { Reply } from "@/components/auth/postJson";
@@ -40,9 +41,12 @@ export function GradingPanel({ schoolCode, readOnly = false }: { schoolCode: str
       <LiveNotice notice={notice} />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 id="grading-heading" className="text-lg font-semibold tracking-tight text-fg">
-            Grade scales
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 id="grading-heading" className="text-lg font-semibold tracking-tight text-fg">
+              Grade scales
+            </h2>
+            <InfoTip tip="academics.scales" />
+          </div>
           <p className="mt-1 text-sm text-fg-muted">
             A score on a boundary belongs to the higher band, and 100 belongs to the top one. The first scale you create becomes the
             default.

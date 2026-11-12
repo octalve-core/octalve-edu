@@ -1,5 +1,7 @@
 import { useId, type ReactNode, type SelectHTMLAttributes } from "react";
 import { ChevronDownIcon } from "./icons";
+import { InfoTip } from "./InfoTip";
+import type { InfoTipKey } from "./info-tips";
 
 export type SelectOption = { value: string; label: string };
 
@@ -11,12 +13,14 @@ export type SelectFieldProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "id
   error?: string | null;
   /// Visually hide the label (it stays the accessible name) — for a filter bar where the select's first option says it all.
   hideLabel?: boolean;
+  /// An info icon beside the label (task 0055): a sibling of the label, never inside it, so the field's accessible name is the label alone. Ignored with `hideLabel`.
+  info?: InfoTipKey;
   children?: ReactNode;
 };
 
 /// A labelled native <select>, wired like TextField: a real <label htmlFor>, hint/error linked by aria-describedby, aria-invalid on
 /// error. Native on purpose — it brings the platform's keyboard handling, typeahead and (on phones) its picker for free.
-export function SelectField({ label, id, options, hint, error, hideLabel = false, className = "", ...rest }: SelectFieldProps) {
+export function SelectField({ label, id, options, hint, error, hideLabel = false, info, className = "", ...rest }: SelectFieldProps) {
   const autoId = useId();
   const selectId = id ?? autoId;
   const hintId = `${selectId}-hint`;
@@ -25,9 +29,21 @@ export function SelectField({ label, id, options, hint, error, hideLabel = false
 
   return (
     <div>
-      <label htmlFor={selectId} className={hideLabel ? "sr-only" : "mb-1.5 block text-xs font-semibold tracking-wide text-fg-2 uppercase"}>
-        {label}
-      </label>
+      {info && !hideLabel ? (
+        <div className="mb-1.5 flex items-center gap-1.5">
+          <label htmlFor={selectId} className="block text-xs font-semibold tracking-wide text-fg-2 uppercase">
+            {label}
+          </label>
+          <InfoTip tip={info} />
+        </div>
+      ) : (
+        <label
+          htmlFor={selectId}
+          className={hideLabel ? "sr-only" : "mb-1.5 block text-xs font-semibold tracking-wide text-fg-2 uppercase"}
+        >
+          {label}
+        </label>
+      )}
       <div className="relative">
         <select
           id={selectId}

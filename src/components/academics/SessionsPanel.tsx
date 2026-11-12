@@ -5,6 +5,7 @@ import { flushSync } from "react-dom";
 import type { SchoolType } from "@prisma/client";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { SelectField } from "@/components/ui/SelectField";
 import { ArrowLeftIcon, PlusIcon } from "@/components/ui/icons";
 import { sendJson, type Reply } from "@/components/auth/postJson";
@@ -119,9 +120,12 @@ export function SessionsPanel({
       <LiveNotice notice={notice} />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 id="sessions-heading" className="text-lg font-semibold tracking-tight text-fg">
-            Sessions
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 id="sessions-heading" className="text-lg font-semibold tracking-tight text-fg">
+              Sessions
+            </h2>
+            <InfoTip tip="academics.sessions" />
+          </div>
           <p className="mt-1 text-sm text-fg-muted">Each session is a school year with its {words.many}. Only one is open at a time.</p>
         </div>
         {!readOnly && (
