@@ -578,3 +578,12 @@
 - [x] Found: a plain concatenation fails (enum values); my first file lost four carriage returns (text-mode read) and my first comparison could not see it (caught by `source-hygiene`); the `integration` project was not in earlier regressions and `rls.spec.ts` was red on `dev` since tasks 0036 and 0040 (fixed, four lines)
 - [x] `question-bank-schema.spec.ts` no longer reads a migration file: two tests ported to the catalog (mutation-checked 3 of 3), two about historical file content removed
 - [ ] Open for the maintainer: reset `octalve_edu`, `octalve_edu_test` and lanes 6 to 8 (`prisma migrate reset` / drop); the old remote database in HANDOVER section 3 if it still exists
+
+## TASK-0051: A failed sign-in in a test says so, instead of showing up later as a 401
+
+[Task file](0051-cookie-header-guard.md). The one unexplained failure left from task 0046's regression (`program-completion.spec.ts:104`, a 401 that passed alone straight afterwards); built on `claude/octalve-login-token-guard`. Test support only: no application code, no migration.
+
+- [x] `cookieHeader` (`tests/support/http.ts`) throws when it is given `null`, `undefined` or `""`, naming the cause (the sign-in set no session cookie); before, `token!` turned `null` into the cookie `...=null` and the first protected call answered 401
+- [x] `tests/unit/cookie-header-guard.spec.ts`, 3 tests; mutation-checked alone (the condition removed: 1 failed, 2 passed; restored: 3 passed)
+- [x] Unit, integration and API projects on lane 1: 3,634 passed, 0 failed (138 calls of the helper in 88 spec files all still get a real token)
+- [ ] Not found: why that one login failed (nothing was logged); `loginAs` still returns a null token without throwing, on purpose
