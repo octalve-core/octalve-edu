@@ -587,3 +587,13 @@
 - [x] `tests/unit/cookie-header-guard.spec.ts`, 3 tests; mutation-checked alone (the condition removed: 1 failed, 2 passed; restored: 3 passed)
 - [x] Unit, integration and API projects on lane 1: 3,634 passed, 0 failed (138 calls of the helper in 88 spec files all still get a real token)
 - [ ] Not found: why that one login failed (nothing was logged); `loginAs` still returns a null token without throwing, on purpose
+
+## TASK-0052: The one baseline, checked further: adopting it on a database that has data, and the browser projects
+
+[Task file](0052-baseline-adoption-verified.md). The maintainer's "and we need to resolve the weak spots" (2026-11-12), after the baseline of task 0050; built on `claude/verify-after-squash`. Documentation only: no code, no schema, no migration.
+
+- [x] The adoption path (`prisma migrate resolve --applied`), tried on local throwaway databases: from a database made from either old history, and from the October shape brought up first; `status` up to date, `deploy` no pending migrations, schema equal to a fresh baseline database's (13 CHECK lines differ only in AND bracketing), data kept
+- [x] Negative control: `migrate deploy` without adopting fails, changes nothing, but leaves a failed row that blocks later runs (`P3009`); the same adoption steps recover it; the variant that keeps the old rows also works
+- [x] The `https` project and the 46 e2e files on the baseline: desktop run 384 passed, 9 skipped, 0 failed; phone run 342 passed, 43 skipped, 0 failed (skips are viewport conditions in the specs)
+- [ ] Not done: any hosted database, the old remote database of HANDOVER section 3, data in tenant tables; the maintainer decides whether that database is dropped or adopted
+
