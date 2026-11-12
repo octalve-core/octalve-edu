@@ -46,6 +46,9 @@ Replace the 50 migrations that exist on `dev` (task 0049 had already merged the 
 - AlEemaan (its own repository and history, its task 0051).
 - Any hosted database.
 - Looking at the old remote database (HANDOVER section 3).
+- Adopting the baseline on a database that has data (the `migrate resolve --applied` path above is untried).
+
+> **Existing databases (added after the merge):** **A database that already holds the old history and has data to keep** (HANDOVER section 3 describes one at `db.prisma.io`, 31 migrations applied in October; whether it still exists was not checked) cannot take `migrate deploy` any more: drop and recreate it, or bring it up to the baseline's schema first (apply the old migrations it lacks, from git: `git show 8406b25:prisma/migrations/<name>/migration.sql`, and for the six of task 0049 `e8178a3`), empty `_prisma_migrations`, and run `prisma migrate resolve --applied 20260927053552_baseline` (records it as applied without running it). **That path was not tried.**
 
 ## 6. Build record and tests
 
