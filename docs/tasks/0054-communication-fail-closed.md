@@ -51,6 +51,8 @@ Three ways to make queued messages leave; the choice depends on where a long-run
 
 Recommendation: **B** if a place to run a process exists (it is what was built and tested); otherwise **A**. Say which, and where B may run.
 
+**Decided (2026-11-12):** the maintainer answered "go with your recommendation" after asking what each option meant. Nothing says a second host exists and the maintainer works on Vercel, so this was read as **A**, and it is built in [task 0057](0057-dispatch-drain-by-cron.md): the database row is the queue, a secret-protected route a scheduler calls sends the due rows, and queuing no longer needs Redis. The schedule shipped is DAILY (the only one safe on every Vercel plan); the maintainer must set `CRON_SECRET` and may change the schedule. If a worker host does exist, say so (task 0057, D0).
+
 ## 6. Not in this task
 
 - Sending real mail: no key exists to try it with. **Not tested against Resend or Termii**, and not claimed.
