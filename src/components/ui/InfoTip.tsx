@@ -8,7 +8,7 @@ import { INFO_TIPS, type InfoTipKey } from "./info-tips";
 //  - It is always a SIBLING of what it explains, never inside it, so the accessible name of a heading, a label or a button (which every test and the walkthrough find things by) is unchanged.
 //  - Its own name is the fixed "More information", NOT "More about: <topic>": Playwright matches names by substring, so a name that held the topic ("Show", "Date", "Subjects") would
 //    collide with the label or button it sits beside in every existing `getByLabel` and `getByRole("button")`. A test finds an icon by its `data-info-tip` key.
-//  - It is 16px and inline; its 44px touch target is an invisible extension, not padding; the popover is absolutely positioned and takes no space. Nothing around it moves.
+//  - It is 16px and inline; its touch target is 24px (WCAG 2.2 AA, 2.5.8), an invisible extension, not padding, and NO larger: a bigger invisible area sits on top of a control placed 4 to 6px away (a label above an input, chips below a label) and steals the taps meant for that control, which a browser test found (task 0056); the popover is absolutely positioned and takes no space. Nothing around it moves.
 //  - Design tokens only (light, dark, contrast); no animation; hidden in print.
 // Opens on hover, on keyboard focus, and on click or tap (a phone has no hover); closes on Escape, on a click elsewhere, on blur and when the pointer leaves; one is open at a time.
 
@@ -141,7 +141,7 @@ export function InfoTip({ tip, className = "" }: { tip: InfoTipKey; className?: 
           else show();
           lastPointer.current = "";
         }}
-        className="relative inline-flex h-4 w-4 items-center justify-center rounded-full text-fg-muted transition-colors after:absolute after:-inset-3.5 after:content-[''] hover:text-fg focus-visible:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        className="relative inline-flex h-4 w-4 items-center justify-center rounded-full text-fg-muted transition-colors after:absolute after:-inset-1 after:content-[''] hover:text-fg focus-visible:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         <InfoIcon width={16} height={16} />
       </button>

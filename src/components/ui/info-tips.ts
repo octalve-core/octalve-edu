@@ -17,6 +17,12 @@ export const INFO_TIPS = {
   "promotion.passmark":
     "A pupil whose average over the session's published results reaches this mark moves up, or graduates from the last class. Below it, or with no published result, the pupil repeats.",
 
+  // Communication
+  "communication.channel":
+    "Email uses the email address on file and SMS or WhatsApp the phone number on file. A person with none for that channel is left out.",
+  "communication.tags":
+    "A tag is replaced with the real value in each message: the school's name and today's date for everyone, and for guardians their children's names and classes.",
+
   // People
   "students.show":
     "Choose which students the list shows. An archived student is no longer current, but the record is kept and Restore, on the student's page, brings them back.",

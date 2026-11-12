@@ -7,8 +7,10 @@ import { SelectField } from "@/components/ui/SelectField";
 import { TextField } from "@/components/ui/TextField";
 import { Alert } from "@/components/ui/Alert";
 import { Dialog } from "@/components/ui/Dialog";
-import { InfoIcon, MailIcon, MessageSquareIcon, SendIcon } from "@/components/ui/icons";
+import { InfoTip } from "@/components/ui/InfoTip";
+import { MailIcon, MessageSquareIcon, SendIcon } from "@/components/ui/icons";
 import { sendJson } from "@/components/auth/postJson";
+import { tagsFor } from "@/lib/communication/tags";
 
 interface CampusOption {
   id: string;
@@ -28,12 +30,13 @@ interface BroadcastComposerProps {
   onBroadcastSent?: () => void;
 }
 
-const COMMON_TOKENS = [
-  { token: "{{student_name}}", label: "Student Name", sample: "Tariq Nasir" },
-  { token: "{{class_arm}}", label: "Class Arm", sample: "Primary 4 Gold" },
-  { token: "{{school_name}}", label: "School Name", sample: "Octalve Academy" },
-  { token: "{{date}}", label: "Today's Date", sample: "16 Oct 2026" },
-];
+// What the preview shows in place of each tag. They are made-up samples (the preview has no recipient); the server fills in the real values per recipient (tags.ts, task 0056).
+const SAMPLES: Record<string, string> = {
+  student_name: "Tariq Nasir",
+  class_arm: "Primary 4 Gold",
+  school_name: "Octalve Academy",
+  date: "16 Oct 2026",
+};
 
 export function BroadcastComposer({ schoolCode, campuses, classArms, onBroadcastSent }: BroadcastComposerProps) {
   const [channel, setChannel] = useState<NotificationChannel>(NotificationChannel.EMAIL);
@@ -54,19 +57,22 @@ export function BroadcastComposer({ schoolCode, campuses, classArms, onBroadcast
   const charCount = body.length;
   const smsSegments = charCount === 0 ? 0 : Math.ceil(charCount / 160);
 
-  // Live preview with token interpolation
+  // Only the tags the server fills for this audience are offered (tags.ts): a chip is never offered that a recipient would receive as the text "{{...}}".
+  const tokens = tagsFor(audienceRole).map((tag) => ({ token: `{{${tag.token}}}`, label: tag.label, sample: SAMPLES[tag.token] }));
+
+  // Live preview with token interpolation, using the samples above
   const previewBody = useMemo(() => {
     let text = body;
-    for (const t of COMMON_TOKENS) {
-      text = text.replaceAll(t.token, t.sample);
+    for (const t of Object.entries(SAMPLES)) {
+      text = text.replaceAll(`{{${t[0]}}}`, t[1]);
     }
     return text;
   }, [body]);
 
   const previewSubject = useMemo(() => {
     let text = subject;
-    for (const t of COMMON_TOKENS) {
-      text = text.replaceAll(t.token, t.sample);
+    for (const t of Object.entries(SAMPLES)) {
+      text = text.replaceAll(`{{${t[0]}}}`, t[1]);
     }
     return text;
   }, [subject]);
@@ -95,7 +101,8 @@ export function BroadcastComposer({ schoolCode, campuses, classArms, onBroadcast
     setConfirmOpen(false);
 
     if (!res.ok) {
-      setError(res.message || "Failed to dispatch broadcast. Check inputs and try again.");
+      // a refusal carries its own reason in `details` (the tag, the channel or the audience that cannot work); the message is only "Some of the fields are not valid."
+      setError(res.details?.[0]?.message || res.message || "Failed to dispatch broadcast. Check inputs and try again.");
       return;
     }
 
@@ -132,13 +139,15 @@ export function BroadcastComposer({ schoolCode, campuses, classArms, onBroadcast
           <div className="mt-6 space-y-5">
             {/* Channel Selection Buttons */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-fg-muted">Delivery Channel</label>
-              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="flex items-center gap-1.5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-fg-muted">Delivery Channel</label>
+                <InfoTip tip="communication.channel" />
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {[
                   { ch: NotificationChannel.EMAIL, label: "Email", icon: MailIcon },
                   { ch: NotificationChannel.SMS, label: "SMS", icon: MessageSquareIcon },
                   { ch: NotificationChannel.WHATSAPP, label: "WhatsApp", icon: MessageSquareIcon },
-                  { ch: NotificationChannel.IN_APP, label: "In-App", icon: InfoIcon },
                 ].map(({ ch, label, icon: Icon }) => {
                   const selected = channel === ch;
                   return (
@@ -230,9 +239,12 @@ export function BroadcastComposer({ schoolCode, campuses, classArms, onBroadcast
 
             {/* Token Chips */}
             <div>
-              <span className="text-xs font-semibold text-fg-muted">Available Dynamic Tokens:</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-fg-muted">Available Dynamic Tokens:</span>
+                <InfoTip tip="communication.tags" />
+              </div>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {COMMON_TOKENS.map(({ token, label }) => (
+                {tokens.map(({ token, label }) => (
                   <button
                     key={token}
                     type="button"
@@ -307,6 +319,7 @@ export function BroadcastComposer({ schoolCode, campuses, classArms, onBroadcast
                 </div>
               </div>
             )}
+            <p className="mt-3 text-xs text-fg-muted">Sample values are shown here: each recipient gets their own.</p>
           </div>
 
           <div className="mt-6 rounded-xl border border-line/60 bg-surface-2/50 p-3.5 text-xs text-fg-muted">
