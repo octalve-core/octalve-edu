@@ -11,6 +11,23 @@ import {
 import { isValidEmail, sendEmail, sendBatchEmails } from "@/lib/communication/gateways/email";
 import { defaultNotificationDispatcher } from "@/lib/communication/gateways/dispatcher";
 
+// The tests below that exercise the in-memory stand-in run as a staging build with the dev tools on, the one way a build asks for it (task 0054). The suite declares itself production
+// (tests/support/env.ts), where a send with no provider key fails: that is tested in communication-fail-closed.spec.ts. Restored after the file, so no other test sees the change.
+const STAND_IN_ENV = { APP_ENV: "staging", DEV_TOOLS: "true", DEV_TOOLS_TOKEN: "stand-in-test-token" } as const;
+const savedEnv: Record<string, string | undefined> = {};
+test.beforeAll(() => {
+  for (const [key, value] of Object.entries(STAND_IN_ENV)) {
+    savedEnv[key] = process.env[key];
+    process.env[key] = value;
+  }
+});
+test.afterAll(() => {
+  for (const key of Object.keys(STAND_IN_ENV)) {
+    if (savedEnv[key] === undefined) delete process.env[key];
+    else process.env[key] = savedEnv[key];
+  }
+});
+
 test.describe("Phone Number Normalization & Validation (Termii)", () => {
   test("normalizeNigerianPhoneNumber converts local Nigerian formats to 234 prefix", () => {
     expect(normalizeNigerianPhoneNumber("08012345678")).toBe("2348012345678");

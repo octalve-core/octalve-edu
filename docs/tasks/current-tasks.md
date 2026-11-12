@@ -606,3 +606,13 @@
 - [x] The plan: port AlEemaan's harness (P0.1), the computed part of the matrix (P0.2), the rows by hand (P0.3), then chapters C01 to C09 for Solo and S01 to S04 for SaaS
 - [ ] Waiting for the maintainer: Solo first then SaaS as two deliverables; which names to use; the open campus-administrator approval decision; whether to link the video guide from the account menu
 
+## TASK-0054: The Communication senders fail closed, and nothing consumes the dispatch queue
+
+[Task file](0054-communication-fail-closed.md). The maintainer's "what's the current state of emailing?" and then "fix defect" (2026-11-12); built on `claude/email-fail-closed`. No migration. The same change as AlEemaan's task 0053.
+
+- [x] The defect: with no `RESEND_API_KEY` or `TERMII_API_KEY` the email, SMS and WhatsApp senders answered success from an in-memory stand-in in every environment; the hosted project has neither key
+- [x] The fix: `standInAllowed(env)` (tests and the dev tools only, never production); without a key and without the stand-in a send fails with a sentence that names the variable. The Broadcast screen already said "queued", which is true, so it is not changed
+- [x] Tests: 28 passed on the two communication unit specs, the whole unit project 1,234 passed, 0 failed; 3 of the new unit tests fail on the old gateways (14 pass)
+- [x] **Found: nothing consumes the queue.** `createNotificationDispatchWorker` and `defaultNotificationDispatcher` are never started or called outside the tests, so every broadcast and every automatic alert stays `QUEUED` for ever, with or without keys. Not built: the maintainer chooses (task file section 5: a cron route, a separate worker host, or sending in the request)
+- [ ] Not done: the worker; real delivery (no key exists to try it with); the maintainer's setup (a Resend account and verified domain, `RESEND_API_KEY`, `EMAIL_FROM`, `APP_URL`; `TERMII_API_KEY` and `TERMII_SENDER_ID`); mutation passes (deferred to the end of PHASE 2)
+
