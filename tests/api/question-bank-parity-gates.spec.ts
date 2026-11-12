@@ -13,15 +13,15 @@ import { guardianOf, member, pupil, type Person } from "../support/qbank-world";
 //   - nobody signed out reaches anything (401);
 //   - a person of ANOTHER school reaches nothing (the same 403 as any person who may not);
 //   - the kinds of route are the kinds the design names: TEACHING (administrators and teaching staff: building, closing, marking and printing forms, and reading their results),
-//     STAFF (the same and non-teaching staff, who review the bank: the list of forms, the print log, the reports), PUPIL (the pupil's portal), PUPIL OR GUARDIAN (the history, which a guardian may read as the school allows)
-//     and ADMINS (the question bank's reviewers and switches).
+//     STAFF (the same and non-teaching staff, who review the bank: the list of forms, the print log, the reports), PUPIL (the pupil's portal), PUPIL OR GUARDIAN (the history, which a guardian may read as the school allows),
+//     GUARDIAN (the list of a guardian's children), FOR YOU (the forms staff and guardians are asked to fill in) and ADMINS (the question bank's reviewers and switches).
 // "Let through" means the refusal at the door did not happen: the request then meets the handler, which answers a missing record, a bad body or a pupil without a record
 // as it likes (400 or 404). The public survey routes are not behind a sign-in and are held by forms-public-questionnaire.spec.ts.
 
 const SAAS = { baseUrl: SAAS_URL };
 const api: typeof rawApi = (path, opts = {}) => rawApi(path, { ...SAAS, ...opts });
 
-type Kind = "teaching" | "staff" | "pupil" | "pupilOrGuardian" | "admins";
+type Kind = "teaching" | "staff" | "pupil" | "pupilOrGuardian" | "family" | "guardian" | "forYou" | "admins";
 const ID = "cl0000000000000000000000x";
 
 /// "METHOD path under /api/v1/schools/[code]" -> the kind of route it is.
@@ -34,6 +34,7 @@ const ROUTES: Record<string, Kind> = {
   "POST forms/[id]/close": "teaching",
   "POST forms/[id]/print": "teaching",
   "GET forms/[id]/analytics": "teaching",
+  "GET forms/[id]/responses": "teaching",
   "GET forms/marking-queue": "teaching",
   "GET forms/[id]/marking-queue": "teaching",
   "GET forms/[id]/responses/[responseId]/marking": "teaching",
@@ -44,8 +45,16 @@ const ROUTES: Record<string, Kind> = {
   "PATCH forms/[id]/turn-ins": "teaching",
   "POST forms/[id]/turn-ins/batch": "teaching",
   "POST forms/[id]/turn-ins/sync": "teaching",
+  "POST forms/paper-work/[id]/close": "teaching",
   "GET forms/questionnaires": "teaching",
   "POST forms/questionnaires": "teaching",
+  "GET forms/questionnaires/[id]": "staff",
+  "PATCH forms/questionnaires/[id]": "teaching",
+  "POST forms/questionnaires/[id]/close": "teaching",
+  // "For you": the forms a person is asked to fill in (staff and guardians; a pupil has their own portal)
+  "GET forms/for-you": "forYou",
+  "GET forms/for-you/[id]": "forYou",
+  "POST forms/for-you/[id]/submit": "forYou",
   // the pupil's portal
   "GET portal/forms/paper-work": "pupil",
   "GET portal/forms/paper-work/[id]": "pupil",
@@ -60,7 +69,9 @@ const ROUTES: Record<string, Kind> = {
   "GET portal/forms/questionnaires/[id]": "pupil",
   "POST portal/forms/questionnaires/[id]/submit": "pupil",
   "GET portal/practice/options": "pupil",
+  "GET portal/practice/children": "guardian",
   "POST portal/practice/sessions": "pupil",
+  "GET portal/practice/sessions/[id]": "pupil",
   "POST portal/practice/sessions/[id]/answers": "pupil",
   "POST portal/practice/sessions/[id]/finish": "pupil",
   "GET portal/practice/sessions/[id]/print": "pupil",
@@ -68,6 +79,9 @@ const ROUTES: Record<string, Kind> = {
   "POST portal/practice/reports": "pupil",
   "GET portal/practice/history": "pupilOrGuardian",
   "PATCH portal/practice/history": "pupilOrGuardian",
+  // the progress record: a pupil their own, a guardian their children's
+  "GET portal/progress": "family",
+  "POST portal/progress/seen": "family",
   // the question bank: printing, reports, offers back
   "POST question-bank/print": "teaching",
   "GET question-bank/print-logs": "staff",
@@ -87,6 +101,9 @@ const ALLOWED: Record<Kind, Role[]> = {
   staff: [Role.ADMIN, Role.CAMPUS_ADMIN, Role.TEACHING_STAFF, Role.NON_TEACHING_STAFF],
   pupil: [Role.STUDENT, Role.ADMIN],
   pupilOrGuardian: [Role.STUDENT, Role.PARENT, Role.ADMIN],
+  family: [Role.STUDENT, Role.PARENT], // a pupil and a guardian only: the progress record has no administrator's preview
+  guardian: [Role.PARENT], // the pupils a guardian may look at: only a guardian asks (a pupil has their own record, an administrator names any pupil)
+  forYou: [Role.ADMIN, Role.CAMPUS_ADMIN, Role.TEACHING_STAFF, Role.NON_TEACHING_STAFF, Role.PARENT],
   admins: [Role.ADMIN, Role.CAMPUS_ADMIN],
 };
 

@@ -9,6 +9,7 @@ import { sendJson, type Reply } from "@/components/auth/postJson";
 import { FOCUS_RING } from "@/components/shell/nav";
 import { ConfirmDialog, ListState, LiveNotice, StatusPill, useDialog, type Notice } from "@/components/academics/parts";
 import { failureText, useApi } from "@/components/academics/useApi";
+import { StandingPanel } from "@/components/standing/StandingPanel";
 import { AddGuardianDialog, EditLinkDialog, RemoveGuardianDialog } from "./GuardianDialogs";
 import { ArchiveStudentDialog, EnrolDialog, StudentFormDialog, WithdrawDialog, enrolmentTone } from "./StudentDialogs";
 import {
@@ -29,12 +30,15 @@ export function StudentDetail({
   studentId,
   campuses,
   canEdit,
+  standing = null,
   fallbackName,
 }: {
   schoolCode: string;
   studentId: string;
   campuses: CampusOption[];
   canEdit: boolean;
+  /// Show the pupil's standing (suspension, expulsion): null for people who may not see it. `canDecide` is the school's administrator (expel, reinstate).
+  standing?: { canSuspend: boolean; canDecide: boolean } | null;
   fallbackName: string;
 }) {
   const root = `/api/v1/schools/${schoolCode}/people/students/${studentId}`;
@@ -136,6 +140,17 @@ export function StudentDetail({
                         <Button variant="ghost" aria-label={`Archive ${name}`} onClick={() => (setNotice(null), archiving.show(true))}>
                           Archive
                         </Button>
+                        {standing && (
+                          <StandingPanel
+                            schoolCode={schoolCode}
+                            path={`people/students/${studentId}/standing`}
+                            subject="student"
+                            name={name}
+                            canSuspend={standing.canSuspend}
+                            canDecide={standing.canDecide}
+                            onChanged={() => void reloadAll()}
+                          />
+                        )}
                       </>
                     )}
                     {student.archived && (

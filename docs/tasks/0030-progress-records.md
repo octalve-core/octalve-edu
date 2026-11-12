@@ -1,0 +1,27 @@
+# 0030: Progress records (logbooks) - the Octalve Edu port of AlEemaan's task 0044
+
+- **Period / Focus:** built 2026-11-09 (slices R1 to R4); the design is AlEemaan's `docs/tasks/0044-progress-records.md` (requested by the maintainer on 2026-11-03).
+- **Status:** R1 to R4 built on `claude/octalve-programs`, tests written, results in section 4. **R5 (translation while typing) is not built: it needs the maintainer to choose a provider and give credentials.** Waiting for the migration `20261122090000_progress_records` on the hosted databases.
+- **Priority:** Medium
+- **Assignee:** next AI / maintainer
+- **Target Branch / PR:** off `dev`, after tasks 0027 to 0029 land
+
+> **How to tick:** change `[ ]` to `[x]`.
+
+## 1. Objective
+A running log a teacher keeps for each person in a program (one row a day: what was done, from where to where, a rating, a note), verified before families see it, written by one person at a time, and shown to the pupil and the guardian (a summary by default). The first template is the Quran memorisation booklet (the 114 surahs by number, names in English and Arabic, only references stored, never the text); the second is a plain daily log. The same tool serves any program.
+
+## 2. What was built
+- [x] **R1 Templates and entries.** `ProgressTemplate` (immutable: the application's role can only insert and read it), `ProgressRecord` (one per person's place), `ProgressEntry` (a draft, handed in, or verified; `publishedValues` is what families see), `ProgressEntryRevision` (every save, append-only). Quick add, the week grid, the profile, the next range starting where the last ended, one row a day for tracks that say so.
+- [x] **R2 Verification and locks.** Verification is a program setting; the person who last edited an entry cannot verify it (four-eyes, switched off by the school's administrator only); "verify the week" is all or nothing; a verifier can return an entry with a comment; editing a verified entry hands it back in while families keep the last verified copy. A lock per entry with a heartbeat, a manual "Viewing" that releases after a delay, an expiry, and the version check as the safety net.
+- [x] **R3 Family views.** The Progress tab on the pupil's page (`/learn`) and the guardian's page (`/children`), fed by `GET /api/v1/schools/[code]/portal/progress` and `POST .../portal/progress/seen`. Only verified copies; a guardian sees the summary unless the program allows full entries; "seen" stands in for a signature. Three switches (progress records, what pupils see, what guardians see), each with the ceiling rule (school, campus, the program's own flag).
+- [x] **R4 Languages.** English, Arabic or both side by side, Hijri and Gregorian dates (calculated, with the program's adjustment of -2 to +2 days), Western or Arabic-Indic digits, and a printable booklet view. **The Arabic wording needs an Arabic reader before release.**
+- [ ] **R5 Translation while typing.** Not built. Needs a provider and credentials from the maintainer.
+
+## 3. Decisions made while porting
+- Octalve's family surfaces are `/learn` (pupil) and `/children` (guardian), so the portal tab of AlEemaan became a Progress tab on each, and the portal routes are tenant routes (`/api/v1/schools/[code]/portal/progress`).
+- A pupil who is expelled has no progress record to read (the portal answers as for anyone without a record); a suspended pupil can still read it.
+- The lock times (60 to 3600 seconds of inactivity, 0 to 300 seconds of release delay) are set through the program's settings API; the Settings tab shows the other options.
+
+## 4. Tests
+Unit: `progress-records` and `progress-display` (the rules, the Quran reference, the dates and digits). API: `progress-records` (set-up, who sees and writes, the version check, verification and four-eyes, the lock, the family view and the switches, the database's own checks). **Tested (2026-11-09, test lane 1, the final tree of this branch; order tsc, lint, build, tests).** tsc clean, eslint 0 errors, production build OK, Prettier clean on every file this branch changed that was clean on `dev`, catalogues 776 of 776. The whole suite (setup, unit, integration, API, browser on desktop and phone with Axe in both themes): 3,791 passed, 51 skipped, 2 failed. The 2: `mfa-login.spec.ts:254` (the eight concurrent challenges; the server log says "Too many database connections opened": two full runs and other sessions shared one Postgres, so this is the machine's connection limit, not the code; it passed when rerun alone) and the sign-out test in `sign-in.spec.ts` on desktop (a test-helper timing problem, fixed in the previous pull request's `signOut()`; the whole `sign-in.spec.ts` passes after it: 59 passed). The new specs and what the first runs found: the first full run of the unit, integration and API projects had 34 failures, all in the new specs and the lists they keep (the table lists of the RLS spec, the route table of the parity gate, the NUL sweep, people placed after the date of the sheet, a program admin not named in every program, payments answering 201, a pupil record linked twice); each was a mistake in a test or a list, not in the application, and was fixed in the specs. **Not run:** a failing-first run on an unfixed `dev` (the features are new, so the new tests fail on `dev` by having nothing to test), the walkthrough rows, mutation passes (deferred to the end of Phase 2), any run on a hosted database.

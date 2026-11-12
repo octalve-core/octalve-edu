@@ -37,8 +37,15 @@ const guardedRoutes = routeFiles().filter((route) => route.guarded && !SKIPPED.h
 let a: { id: string; code: string };
 let admin: string;
 let platform: string;
+let guardian: string;
+/// Routes only a guardian may call: withAuth tells anyone else so (403) BEFORE the scan for a NUL, so the sweep asks as a guardian.
+const GUARDIAN_ONLY = new Set([
+  "schools/[code]/portal/practice/children",
+  "schools/[code]/portal/progress", // a pupil or a guardian
+  "schools/[code]/portal/progress/seen",
+]);
 const fill = (rel: string, segment: string) => rel.replace("[code]", a.code).replace(/\[[^\]]+\]/g, segment);
-const cookieFor = (rel: string) => (rel.startsWith("platform/") ? platform : admin);
+const cookieFor = (rel: string) => (rel.startsWith("platform/") ? platform : GUARDIAN_ONLY.has(rel) ? guardian : admin);
 /// A GET has no body; any other method gets an empty one (the scan runs before the handler reads it).
 const call = (rel: string, method: string, url: string) =>
   api(url, { method, baseUrl: SAAS_URL, cookie: cookieFor(rel), ...(method === "GET" ? {} : { body: {} }) });
@@ -51,6 +58,9 @@ test.beforeAll(async () => {
   const adminUser = await createUser({ name: "Ada Admin" });
   await addMembership(adminUser.id, school.id, Role.ADMIN);
   admin = cookieHeader((await createSession(adminUser.id)).token);
+  const guardianUser = await createUser({ name: "Gail Guardian" });
+  await addMembership(guardianUser.id, school.id, Role.PARENT);
+  guardian = cookieHeader((await createSession(guardianUser.id)).token);
   const platformUser = await createUser({ name: "Plat Admin", platformAdmin: true });
   await enableMfa(platformUser.id);
   platform = cookieHeader((await createSession(platformUser.id)).token);

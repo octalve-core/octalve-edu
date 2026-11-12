@@ -12,6 +12,9 @@ const SCHOOL_ROOT = join(process.cwd(), "src", "app", "api", "v1", "schools", "[
 const AREAS = ["settings", "academics", "people", "attendance", "results"];
 
 /// "path under schools/[code]" -> why support must NOT reach it.
+const PROGRAM_PEOPLE =
+  "not a grantable area: the people of a program (names, birth dates, phone numbers, standing) are the school's own records, which a support view must not read";
+
 const OUT_OF_REACH: Record<string, string> = {
   "finance/fee-structures/route.ts": "finance is not a grantable area (ADR 0017)",
   "finance/invoices/route.ts": "finance is not a grantable area (ADR 0017)",
@@ -35,6 +38,81 @@ const OUT_OF_REACH: Record<string, string> = {
     "not a grantable area: the question bank is the school's own teaching material and its review, which a support view must not read",
   "question-bank/settings/route.ts":
     "not a grantable area: the question bank is the school's own teaching material and its review, which a support view must not read",
+  "people/students/[id]/standing/route.ts":
+    "not a grantable area: a pupil's standing and its history (suspension, expulsion, the reasons) is a disciplinary record, which a support view must not read",
+  "people/staff/[id]/standing/route.ts":
+    "not a grantable area: a staff member's standing and its history (suspension, expulsion, the reasons) is a disciplinary record, which a support view must not read",
+  "members/[userId]/standing/route.ts":
+    "not a grantable area: a user's standing and its history (suspension, expulsion, the reasons) is a disciplinary record, which a support view must not read",
+  "settings/standing/route.ts":
+    "not a grantable area: who may suspend where is the school's own disciplinary policy, which a support view must not read",
+  "programs/route.ts": "not a grantable area: a program is the school's own structure and its people, which a support view must not read",
+  "programs/[id]/route.ts":
+    "not a grantable area: a program is the school's own structure and its people, which a support view must not read",
+  "programs/[id]/admins/route.ts": "not a grantable area: the school's own staff list, which a support view must not read",
+  "programs/[id]/people/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/people/candidates/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/people/classes/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/people/class/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/people/[personId]/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/people/[personId]/move/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/people/[personId]/place/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/people/[personId]/standing/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/staff/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/staff/candidates/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/staff/[staffId]/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/staff/[staffId]/groups/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/settings/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/attendance/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/attendance/sessions/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/attendance/summary/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/attendance/people/[personId]/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/assessments/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/assessments/[aid]/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/assessments/[aid]/scores/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/assessments/[aid]/history/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/assessments/results/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/fees/generate/route.ts": "finance is not a grantable area (ADR 0017): a program's fees are its own money",
+  "programs/[id]/fees/invoices/[invoiceId]/discounts/route.ts":
+    "finance is not a grantable area (ADR 0017): a program's fees are its own money",
+  "programs/[id]/fees/invoices/[invoiceId]/payments/route.ts":
+    "finance is not a grantable area (ADR 0017): a program's fees are its own money",
+  "programs/[id]/fees/invoices/[invoiceId]/route.ts": "finance is not a grantable area (ADR 0017): a program's fees are its own money",
+  "programs/[id]/fees/invoices/route.ts": "finance is not a grantable area (ADR 0017): a program's fees are its own money",
+  "programs/[id]/fees/items/[itemId]/add-to-open/route.ts":
+    "finance is not a grantable area (ADR 0017): a program's fees are its own money",
+  "programs/[id]/fees/items/[itemId]/route.ts": "finance is not a grantable area (ADR 0017): a program's fees are its own money",
+  "programs/[id]/fees/items/route.ts": "finance is not a grantable area (ADR 0017): a program's fees are its own money",
+  "programs/[id]/fees/report/route.ts": "finance is not a grantable area (ADR 0017): a program's fees are its own money",
+  "programs/[id]/completion/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/completion/places/[personId]/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/completion/places/[personId]/reopen/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/certificates/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/certificates/[certId]/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/progress/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/progress/people/[personId]/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/progress/people/[personId]/entries/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/progress/people/[personId]/verify-week/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/progress/people/[personId]/week/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/progress/people/[personId]/entries/[entryId]/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/progress/people/[personId]/entries/[entryId]/history/route.ts": PROGRAM_PEOPLE,
+  "programs/[id]/progress/people/[personId]/entries/[entryId]/lock/route.ts": PROGRAM_PEOPLE,
+  "portal/progress/seen/route.ts":
+    "a state-changing handler declares no area (support is read-only); it is the pupil's or the guardian's own acknowledgement, which a support view must not make",
+  "settings/programs-progress/route.ts":
+    "not a grantable area: whether programs keep progress records, and who sees them, is the school's own policy",
+  "settings/programs-progress-student/route.ts":
+    "not a grantable area: whether programs keep progress records, and who sees them, is the school's own policy",
+  "settings/programs-progress-guardian/route.ts":
+    "not a grantable area: whether programs keep progress records, and who sees them, is the school's own policy",
+  "settings/programs-fees/route.ts": "finance is not a grantable area (ADR 0017): whether programs charge fees is the school's own policy",
+  "settings/programs-assessments/route.ts":
+    "not a grantable area: whether the school runs assessments in programs is its own policy, which a support view must not read",
+  "settings/programs-attendance/route.ts":
+    "not a grantable area: whether the school runs attendance in programs is its own policy, which a support view must not read",
+  "settings/programs/route.ts":
+    "not a grantable area: whether the school runs programs is its own policy, which a support view must not read",
+  "settings/part-payment/route.ts": "finance is not a grantable area (ADR 0017): the part-payment rule is fee configuration",
   "question-bank/items/[id]/images/[imageId]/route.ts":
     "not a grantable area: a question's picture is part of the school's own teaching material, which a support view must not read",
 };

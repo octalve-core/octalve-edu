@@ -24,10 +24,10 @@ const QuestionInput = z.object({
 
 const CreateBody = z.object({
   title: z.string().trim().min(1).max(200),
-  instructions: z.string().max(5000).optional(),
-  opensAt: z.string().optional(),
-  closesAt: z.string().optional(),
-  maxDurationMinutes: z.number().int().min(1).max(1440).optional(),
+  instructions: z.string().max(5000).optional().nullable(),
+  opensAt: z.string().optional().nullable(),
+  closesAt: z.string().optional().nullable(),
+  maxDurationMinutes: z.number().int().min(1).max(1440).optional().nullable(),
   classGroupIds: z.array(z.string()).optional(),
   questions: z.array(QuestionInput).min(1),
 });

@@ -150,7 +150,7 @@ const find = (tx: Tx, tenantId: string, userId: string) =>
 /// True when `tenantId` has MORE than one active administrator — and holds a row lock on all of them for the rest of the
 /// transaction. Two administrators demoting each other at the same instant would each see "the other is still an admin"
 /// without the lock; with it the second waits for the first to commit, re-reads, and finds itself the last.
-async function hasAnotherActiveAdmin(tx: Tx, tenantId: string): Promise<boolean> {
+export async function hasAnotherActiveAdmin(tx: Tx, tenantId: string): Promise<boolean> {
   const admins = await tx.$queryRaw<{ id: string }[]>`
     SELECT id FROM "TenantMembership" WHERE "tenantId" = ${tenantId} AND role = 'ADMIN' AND "deactivatedAt" IS NULL FOR UPDATE`;
   return admins.length > 1;

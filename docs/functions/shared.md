@@ -81,7 +81,23 @@ The Content-Security-Policy, as pure functions.
 
 | File | Description |
 | --- | --- |
-| `csp.ts` | Wired up by `src/proxy.ts`: `generateNonce()` (16 random bytes, base64), `buildCsp({ nonce, dev, https })` and `API_CSP`. Page policy: `default-src 'self'`; scripts `'self'`, the nonce and `'strict-dynamic'` (plus `'unsafe-eval'` in dev); styles `'self'` and the nonce; images `'self' data: blob:`; `connect-src 'self'` (plus `ws:` and `wss:` in dev); no objects or framing; `upgrade-insecure-requests` only when `https`. `API_CSP` (`default-src 'none'; frame-ancestors 'none'`) is applied to `/api/*` by `next.config.ts`. |
+| `csp.ts` | Wired up by `src/proxy.ts`: `generateNonce()` (16 random bytes, base64), `buildCsp({ nonce, dev, https })` and `API_CSP`. Page policy: `default-src 'self'`; scripts `'self'`, the nonce and `'strict-dynamic'` (plus `'unsafe-eval'` in dev); styles `'self'` and the nonce; images `'self' data: blob:`; `connect-src 'self'` (plus `ws:` and `wss:` in dev); no objects or framing; `upgrade-insecure-requests` only when `https`. `API_CSP` (`default-src 'none'; frame-ancestors 'none'`) is applied to `/api/*` by `next.config.ts`. `buildCsp` also takes `mediaOrigin` (null for every page except `/video-guide`): when set it adds exactly that origin to `connect-src` and a `media-src 'self' <origin>`, so a video hosted elsewhere can load on that one page; nothing else in the policy changes. |
+
+## `src/lib/video-guide/`
+
+Where the video guide's files are served from.
+
+| File | Description |
+| --- | --- |
+| `media-base.ts` | `videoGuideMedia(raw)` and `DEFAULT_VIDEO_GUIDE_BASE` (`/media/video-guide`). The deployment setting `NEXT_PUBLIC_VIDEO_GUIDE_BASE_URL` is empty (the default, files in `public/media/video-guide`), a path on this site, or an https address on another host; it returns `{ base, origin }` (the folder with no trailing slash, and the other host's origin or null). Anything that could widen the page policy or change what an address means (http, `//host`, sign-in details, a query or fragment, `..`, spaces, a backslash, no scheme) is ignored and the default is used. Used by the video guide page for its file addresses and by `proxy.ts` to allow that one host on `/video-guide` only. |
+
+## `src/lib/build/`
+
+The build's own settings.
+
+| File | Description |
+| --- | --- |
+| `dist-dir.ts` | `distDirFrom(value)`: the folder `next build` writes to, from `NEXT_DIST_DIR` (for example `.next-walk`, so a walkthrough can be recorded against a build that `next dev` or another build cannot overwrite). Unset or empty is undefined and Next keeps `.next`; only a plain folder name is accepted, anything else (a path, `..`, spaces) throws a sentence naming the setting. Used by `next.config.ts`. |
 
 ## `src/lib/queue/`
 
@@ -136,6 +152,7 @@ Small shared modules: brand words, the database client, the dev-tools gate, role
 | `relative-time.ts` | `relativeTime(iso, now, locale)`: "3 days ago" style text from `Intl.RelativeTimeFormat` (units year down to minute; under a minute it says "just now"; an unparseable date gives an empty string). Pure, the clock is a parameter; used by `SessionsPanel`. |
 | `roles.ts` | `ROLE_LABELS`: display names for the six `Role` values (`ADMIN` is "Administrator", `CAMPUS_ADMIN` "Campus administrator", then teaching staff, non-teaching staff, student, parent). The enum values are identifiers and must not be shown to people. |
 | `theme.ts` | `THEME_COOKIE` (`theme`), type `Theme` (`dark` or `light`), `parseTheme` (anything but `light` is `dark`) and `THEME_MAX_AGE_SECONDS` (one year). The theme is a plain cookie so the server renders the right one on the first paint, with no inline script. |
+| `shell-prefs.ts` | The sidebar's two remembered choices, as cookies read on the server like the theme: `SIDEBAR_COOKIE` (`sidebar`: `"collapsed"` or anything else = expanded), `SIDEBAR_SECTIONS_COOKIE` (`sidebar-sections`: the folded section ids, comma-separated), `SHELL_PREFS_MAX_AGE_SECONDS` (one year), `parseSidebarCollapsed`, `serializeSidebarCollapsed`, `parseFoldedSections(value, known)` (only known ids, once each, in the order of `known`) and `serializeFoldedSections`. Not secrets and not authentication; a hand-edited value can only select a state that exists. |
 
 ## `src/` (top-level files)
 
@@ -143,4 +160,4 @@ The Next.js proxy (the former middleware).
 
 | File | Description |
 | --- | --- |
-| `proxy.ts` | `proxy(request)` (Next 16's name for middleware): per page request mints a nonce, builds the policy with `buildCsp` and sets it on the request headers, so Next stamps the nonce on its scripts, and on the response; `CSP_REPORT_ONLY=true` sends it as report-only. A path with broken percent-encoding is answered 400 `Bad request` (uncacheable, plain text) before anything else, for pages and for `/api/*` (`malformed-path.ts`); an API request otherwise passes through untouched (its policy is static, `next.config.ts`). The matcher covers an API path only when it contains a percent sign (`/api/(.*%.*)`), the only kind that can be badly encoded: every other API request stays out of the proxy, because a request that goes through it is buffered by Next until its body ends, which would stop the routes' own size cap from answering a body that never ends (task 0021). It also covers pages except `_next/static`, `_next/image`, `favicon.ico` and prefetches. It makes no access decision: guards live in pages and route handlers. |
+| `proxy.ts` | `proxy(request)` (Next 16's name for middleware): per page request mints a nonce, builds the policy with `buildCsp` and sets it on the request headers, so Next stamps the nonce on its scripts, and on the response; `CSP_REPORT_ONLY=true` sends it as report-only. A path with broken percent-encoding is answered 400 `Bad request` (uncacheable, plain text) before anything else, for pages and for `/api/*` (`malformed-path.ts`); an API request otherwise passes through untouched (its policy is static, `next.config.ts`). The matcher covers an API path only when it contains a percent sign (`/api/(.*%.*)`), the only kind that can be badly encoded: every other API request stays out of the proxy, because a request that goes through it is buffered by Next until its body ends, which would stop the routes' own size cap from answering a body that never ends (task 0021). It also covers pages except `_next/static`, `_next/image`, `favicon.ico` and prefetches. It makes no access decision: guards live in pages and route handlers. For `/video-guide` it passes the media origin from `NEXT_PUBLIC_VIDEO_GUIDE_BASE_URL` (`videoGuideMedia`) to `buildCsp`, so a video hosted elsewhere loads there and on no other page. |

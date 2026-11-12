@@ -64,8 +64,17 @@ function visibleTo(tenant: TenantCtx): Prisma.AssessmentSchemeWhereInput {
 const findVisible = (tx: Tx, tenant: TenantCtx, id: string) =>
   tx.assessmentScheme.findFirst({ where: { id, tenantId: tenant.tenantId, ...visibleTo(tenant) }, include: SCHEME_INCLUDE });
 
+const schemeLockKey = (tenantId: string) => `assessment-scheme:${tenantId}`;
+
+/// The exclusive lock every scheme edit takes before it writes.
 async function lockSchemes(tx: Tx, tenantId: string) {
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`assessment-scheme:${tenantId}`}::text))`;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${schemeLockKey(tenantId)}::text))`;
+}
+
+/// The SHARED form of the same lock, for a save of results (task 0032): any number of saves hold it together, a save waits for an edit that is in progress and an edit waits for the saves
+/// in progress, so the scheme a save checks its marks against is the scheme it then locks. Held to the end of the transaction.
+export async function shareSchemeLock(tx: Tx, tenantId: string) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock_shared(hashtext(${schemeLockKey(tenantId)}::text))`;
 }
 
 export type SchemeInputComponents = readonly { name: unknown; maxScore: unknown }[];

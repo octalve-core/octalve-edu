@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { ok, fail, noStore } from "@/lib/api/envelope";
 import { getClientIp, reserveAttempt } from "@/lib/auth/rate-limit";
 import { verifyPublicCertificate } from "@/lib/certificates/service";
+import { verifyProgramCertificate } from "@/lib/programs/certificate-verify";
 
 type Ctx = { params: Promise<{ token: string }> };
 
@@ -28,7 +29,8 @@ async function handle(req: NextRequest, ctx: Ctx) {
     return fail("Invalid verification token format.", 400, "INVALID_TOKEN");
   }
 
-  const certificate = await verifyPublicCertificate(token);
+  // The school's vocational certificates first, then the certificates of completion of a program (the code alone tells them apart).
+  const certificate = (await verifyPublicCertificate(token)) ?? (await verifyProgramCertificate(token));
   if (!certificate) {
     return fail("No valid or issued certificate found for this verification token.", 404, "NOT_FOUND");
   }

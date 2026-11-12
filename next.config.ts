@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { distDirFrom } from "./src/lib/build/dist-dir";
 import { API_CSP } from "./src/lib/security/csp";
 
 // Baseline response headers for every route (domain-implementation-plan.md
@@ -20,7 +21,11 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
 ];
 
+// NEXT_DIST_DIR gives a production build its own folder (src/lib/build/dist-dir.ts); unset, nothing changes.
+const distDir = distDirFrom(process.env.NEXT_DIST_DIR);
+
 const nextConfig: NextConfig = {
+  ...(distDir ? { distDir } : {}),
   poweredByHeader: false,
   // `forbidden()` / `forbidden.tsx`: a real HTTP 403 for "you are signed in but this school is not yours"
   // (domain-implementation-plan.md §0.5.2). Still flagged experimental in Next 16; the only thing it gates is the

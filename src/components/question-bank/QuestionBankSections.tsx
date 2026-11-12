@@ -2,7 +2,10 @@
 
 import { useRef, useState, type KeyboardEvent } from "react";
 import { BankApiProvider } from "@/components/question-bank/BankApi";
+import { PrintLogPanel } from "@/components/question-bank/PrintLogPanel";
 import { QuestionsPanel } from "@/components/question-bank/QuestionsPanel";
+import { MyReportsPanel } from "@/components/question-bank/MyReportsPanel";
+import { ReportsPanel } from "@/components/question-bank/ReportsPanel";
 import { ReviewersPanel } from "@/components/question-bank/ReviewersPanel";
 import { SettingsPanel } from "@/components/question-bank/SettingsPanel";
 
@@ -16,7 +19,7 @@ export type BankPanelProps = {
 };
 
 // The Question bank page's sections behind one tab list: the same ARIA tabs pattern as the other settings screens (Left/Right/Home/End move between tabs, only the active
-// section is mounted). Browse, My questions and the Review queue are for staff; Reviewers and Settings for administrators. Presentation only: the question bank APIs decide who may do what.
+// section is mounted). Browse and My questions are for staff; the Review queue, Reports and Print log for reviewers; Reviewers and Settings for administrators. Presentation only: the question bank APIs decide who may do what.
 export type BankSectionsProps = BankPanelProps & {
   isAdmin: boolean;
   canReview: boolean;
@@ -28,7 +31,14 @@ export function QuestionBankSections({ isAdmin, canReview, writeCampuses, wholeS
   const sections = [
     { id: "browse", label: "Browse" },
     { id: "mine", label: "My questions" },
-    ...(canReview ? [{ id: "queue", label: "Review queue" }] : []),
+    { id: "myreports", label: "My reports" },
+    ...(canReview
+      ? [
+          { id: "queue", label: "Review queue" },
+          { id: "reports", label: "Reports" },
+          { id: "prints", label: "Print log" },
+        ]
+      : []),
     ...(isAdmin
       ? [
           { id: "reviewers", label: "Reviewers" },
@@ -92,6 +102,9 @@ export function QuestionBankSections({ isAdmin, canReview, writeCampuses, wholeS
           {(active === "browse" || active === "mine" || active === "queue") && (
             <QuestionsPanel key={active} view={active} writeCampuses={writeCampuses} wholeSchool={wholeSchool} />
           )}
+          {active === "reports" && <ReportsPanel writeCampuses={writeCampuses} wholeSchool={wholeSchool} />}
+          {active === "myreports" && <MyReportsPanel />}
+          {active === "prints" && <PrintLogPanel />}
           {active === "reviewers" && <ReviewersPanel {...props} />}
           {active === "settings" && <SettingsPanel {...props} />}
         </div>

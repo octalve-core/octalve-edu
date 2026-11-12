@@ -8,7 +8,7 @@ import { TextField } from "@/components/ui/TextField";
 import { SelectField } from "@/components/ui/SelectField";
 import { Alert } from "@/components/ui/Alert";
 import { ArrowLeftIcon, CheckCircleIcon, PrinterIcon } from "@/components/ui/icons";
-import { formatNaira } from "@/lib/finance/rules";
+import { formatNaira } from "@/lib/finance/format";
 import { PaystackMockModal } from "./PaystackMockModal";
 
 export interface InvoiceDetailData {
@@ -56,10 +56,16 @@ export interface InvoiceDetailData {
   }>;
 }
 
+/// What the school's rule says about paying this invoice in parts (task 0029): the sentence, the smallest part in naira and whether the invoice is marked "pay in full".
+export type PartPaymentInfo = { text: string; minimum: string; payInFull: boolean };
+
 interface InvoiceDetailViewProps {
   schoolCode: string;
   invoice: InvoiceDetailData;
   canManageFinance: boolean;
+  /// May mark the invoice "pay in full" (the school's administrator only; the API checks again).
+  canChangeRules?: boolean;
+  partPayment?: PartPaymentInfo;
   onRefresh?: () => void;
   tenantName?: string;
 }
@@ -68,10 +74,14 @@ export function InvoiceDetailView({
   schoolCode,
   invoice: initialInvoice,
   canManageFinance,
+  canChangeRules = false,
+  partPayment: initialPartPayment,
   onRefresh,
   tenantName = "School of Record",
 }: InvoiceDetailViewProps) {
   const [invoice, setInvoice] = useState<InvoiceDetailData>(initialInvoice);
+  const [partPayment, setPartPayment] = useState<PartPaymentInfo | undefined>(initialPartPayment);
+  const [savingPayInFull, setSavingPayInFull] = useState(false);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   // Paystack online payment modal state
@@ -115,11 +125,39 @@ export function InvoiceDetailView({
         if (json.data?.invoice) {
           setInvoice(json.data.invoice);
         }
+        if (json.data?.partPayment) setPartPayment(json.data.partPayment);
       }
     } catch {
       // Fallback to caller-provided refresh
     }
     onRefresh?.();
+  };
+
+  // Mark the invoice "pay in full", or allow parts again (the school's administrator). The API refuses anyone else and says why.
+  const handleTogglePayInFull = async () => {
+    if (!partPayment) return;
+    setSavingPayInFull(true);
+    setNotification(null);
+    try {
+      const res = await fetch(`/api/v1/schools/${schoolCode}/finance/invoices/${invoice.id}/pay-in-full`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payInFull: !partPayment.payInFull }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setNotification({ type: "error", message: json?.error?.message ?? "That didn't work. Please try again in a moment." });
+      } else {
+        setNotification({
+          type: "success",
+          message: partPayment.payInFull ? "Part payments are allowed again on this invoice." : "This invoice now has to be paid in full.",
+        });
+        await refreshInvoice();
+      }
+    } catch {
+      setNotification({ type: "error", message: "Can't reach the server. Check your internet connection and try again." });
+    }
+    setSavingPayInFull(false);
   };
 
   // 1. Initialize Online Paystack Payment
@@ -300,10 +338,10 @@ export function InvoiceDetailView({
   const studentFullName = [invoice.student.firstName, invoice.student.middleName, invoice.student.lastName].filter(Boolean).join(" ");
 
   const statusBadgeStyle = {
-    PAID: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
-    PARTIALLY_PAID: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
-    UNPAID: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20",
-    WAIVED: "bg-slate-500/10 text-slate-700 dark:text-slate-400 border-slate-500/20",
+    PAID: "bg-ok-bg text-ok-fg border-ok-line",
+    PARTIALLY_PAID: "bg-warn-bg text-warn-fg border-warn-line",
+    UNPAID: "bg-danger-bg text-danger-fg border-danger-line",
+    WAIVED: "bg-surface-2 text-fg-muted border-line",
   }[invoice.status];
 
   return (
@@ -311,7 +349,7 @@ export function InvoiceDetailView({
       {/* Action Navigation & Print Trigger (Hidden when printed) */}
       <div className="flex flex-wrap items-center justify-between gap-4 print:hidden">
         <Link
-          href={`/schools/${schoolCode}/finance/invoices`}
+          href={`/schools/${schoolCode}/finance`}
           className="inline-flex items-center gap-2 text-sm font-medium text-fg-muted hover:text-fg transition-colors"
         >
           <ArrowLeftIcon className="h-4 w-4" />
@@ -339,7 +377,7 @@ export function InvoiceDetailView({
             <Button
               type="button"
               variant="primary"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+
               onClick={handleStartOnlinePayment}
             >
               Pay with Paystack
@@ -353,6 +391,20 @@ export function InvoiceDetailView({
         <div className="print:hidden">
           <Alert variant={notification.type === "error" ? "error" : "success"}>{notification.message}</Alert>
         </div>
+      )}
+
+      {/* How this invoice may be paid (the school's rule on parts) */}
+      {partPayment && !isFullySettled && !isWaived && (
+        <section aria-label="How this invoice may be paid" className="rounded-xl border border-line bg-surface p-4 text-sm print:hidden">
+          <p className="text-fg">{partPayment.text}</p>
+          {canChangeRules && (
+            <div className="mt-3">
+              <Button type="button" variant="secondary" disabled={savingPayInFull} onClick={() => void handleTogglePayInFull()}>
+                {partPayment.payInFull ? "Allow part payments on this invoice" : "Require payment in full on this invoice"}
+              </Button>
+            </div>
+          )}
+        </section>
       )}
 
       {/* Main Printable Container */}
@@ -405,16 +457,12 @@ export function InvoiceDetailView({
 
           <div className="rounded-xl bg-field p-4 border border-line/60">
             <p className="text-xs font-medium text-fg-muted">Total Paid</p>
-            <p className="mt-1 text-xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400">{formatNaira(amountPaidNum)}</p>
+            <p className="mt-1 text-xl font-bold tracking-tight text-ok-fg">{formatNaira(amountPaidNum)}</p>
           </div>
 
           <div className="rounded-xl bg-field p-4 border border-line/60">
             <p className="text-xs font-medium text-fg-muted">Remaining Balance</p>
-            <p
-              className={`mt-1 text-xl font-bold tracking-tight ${
-                remainingBalance > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
-              }`}
-            >
+            <p className={`mt-1 text-xl font-bold tracking-tight ${remainingBalance > 0 ? "text-danger-text" : "text-ok-fg"}`}>
               {formatNaira(remainingBalance)}
             </p>
           </div>
@@ -476,9 +524,7 @@ export function InvoiceDetailView({
                       <td className="py-3 px-4 font-medium text-fg">{discount.reason}</td>
                       <td className="py-3 px-4 text-xs font-mono text-fg-muted">{discount.mode}</td>
                       <td className="py-3 px-4 text-xs text-fg-muted">{new Date(discount.createdAt).toLocaleDateString()}</td>
-                      <td className="py-3 px-4 text-right font-mono text-emerald-600 dark:text-emerald-400">
-                        -{formatNaira(discount.amount)}
-                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-ok-fg">-{formatNaira(discount.amount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -521,9 +567,7 @@ export function InvoiceDetailView({
                         <td className="py-3 px-4">
                           <span
                             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold ${
-                              isSuccess
-                                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                                : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                              isSuccess ? "bg-ok-bg text-ok-fg" : "bg-warn-bg text-warn-fg"
                             }`}
                           >
                             {isSuccess && <CheckCircleIcon className="h-3 w-3" />}
@@ -564,6 +608,7 @@ export function InvoiceDetailView({
         description="Choose the amount you want to pay towards this invoice."
       >
         <form onSubmit={handleProceedToPaystack} className="space-y-4 pt-2">
+          {partPayment && <p className="text-xs text-fg-muted">{partPayment.text}</p>}
           <div className="rounded-xl bg-field p-3 border border-line text-xs space-y-1">
             <div className="flex justify-between text-fg-muted">
               <span>Total Invoice Amount:</span>
@@ -571,7 +616,7 @@ export function InvoiceDetailView({
             </div>
             <div className="flex justify-between text-fg-muted">
               <span>Amount Already Settled:</span>
-              <span className="font-mono text-emerald-600">{formatNaira(amountPaidNum)}</span>
+              <span className="font-mono text-ok-fg">{formatNaira(amountPaidNum)}</span>
             </div>
             <div className="flex justify-between font-semibold text-fg pt-1 border-t border-line">
               <span>Outstanding Balance:</span>
@@ -598,7 +643,7 @@ export function InvoiceDetailView({
             <Button
               type="submit"
               variant="primary"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+
               disabled={isInitializingPayment}
             >
               {isInitializingPayment ? "Initializing..." : "Proceed to Paystack"}
@@ -615,6 +660,7 @@ export function InvoiceDetailView({
         description="Record cash, POS, or bank transfer payments received at the bursary."
       >
         <form onSubmit={handleSubmitManualPayment} className="space-y-4 pt-2">
+          {partPayment && <p className="text-xs text-fg-muted">{partPayment.text}</p>}
           <TextField
             label="Amount Paid (₦)"
             type="number"

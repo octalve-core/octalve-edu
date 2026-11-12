@@ -1,6 +1,6 @@
 # Octalve Edu — Development Progress Tracker
 
-Last Updated: 2026-10-20
+Last Updated: 2026-11-03
 
 Companion to `docs/development-history/domain-implementation-plan.md` (the step-by-step build
 plan), `docs/development-history/phases/*.md` (one detailed doc per completed phase), and
@@ -398,6 +398,9 @@ Record: `docs/tasks/0020-results-approver-scopes.md` (register row 24) and `docs
 ## Invoice numbers under concurrency (2026-10-21) - merged into `dev` as PR #58 (`be0ae1a`)
 Record: `docs/tasks/0022-invoice-numbers-under-concurrency.md` (register row ISS-0030). `generateInvoicesForPeriod` took each number from a count of the school's invoices, so two bill runs at the same moment took the same number and one failed on the unique index. It now takes a per-school advisory lock first (one bill run per school at a time; a second run for the same term finds the first one's invoices) and takes the next free number, passing over one already used. The format and the existing numbers do not change; no migration. `tests/integration/invoice-numbers.spec.ts` (3 tests). Verification: see the PR.
 
+## The Forms and question-bank screens (2026-11-03) - task 0025, merged into `dev` as PR #86 (`8115519`)
+Record: `docs/tasks/0025-forms-screens.md` (section 5 has what ran and what was not run), `docs/HANDOVER.md` section 6.06. The Forms module and the question bank's reports, printing and offer-back had an API on `dev` and no screens. Built and tested: the staff Forms page and a form's page (practice sets, questionnaires, paper work, marking, the roll call, "For you"), the pupil's My work and the guardian's My children, the public questionnaire page, "Report a problem" with the reviewers' Reports and every member of staff's "My reports", Print and the Print log, "Offer to the question bank" and "Print this quiz" from an LMS quiz card, and a Video guide link with a configurable video address. No migration. Not run: the whole suite, a failing-first run on an unfixed `dev`, mutation passes (deferred to the end of Phase 2).
+
 ## Next action
 1. Merge the reader branch; the maintainer runs `20261030090000_results_approval_scopes` on the hosted database BEFORE the results code is deployed there (the three details of ADR 0018 were confirmed on 2026-10-23: the ADR is Accepted).
 2. Slices 2 to 4 of task 0020 (settings API, settings screen, AlEemaan).
@@ -405,3 +408,6 @@ Record: `docs/tasks/0022-invoice-numbers-under-concurrency.md` (register row ISS
 4. The maintainer runs `20261029090000_certificate_verification_token` on the hosted database before the certificate code is deployed there.
 5. The review items tracked outside the repository (it is public), each on its own branch off `dev` with a failing test first; then screens for certificates and results entry, the question-bank parity design, the `/video-guide` pages, a responsiveness audit; Task 0033 (walkthrough video and PDF) runs LAST.
 6. Read `docs/HANDOVER.md` section 6 "Start here" and section 7 (how to work here) before anything else.
+
+## The sidebar in sections (2026-11-03) - task 0026
+Record: `docs/tasks/0026-sidebar-sections.md` (section 7 has what ran and what was not run), `docs/HANDOVER.md` section 6.07. The desktop sidebar was one flat list. It is now in foldable sections (Administration, Learning; the Platform link alone at the end), the whole sidebar folds to a rail of icons with a round arrow on its right edge and opens over the page while an icon is hovered or focused (hovering the arrow does nothing, a finger never opens it), the school switcher keeps its height in the rail so nothing jumps, the signed-in person is pinned at the foot, and the phone's More sheet has the same headings. The two choices (folded to a rail; which sections are folded) are cookies read in the `(app)` layout, like the theme. No migration. Merged into `dev` as PR #88 (`e5549fc`, 2026-11-03). The same change in AlEemaan is its task 0042.

@@ -2,12 +2,12 @@ import Link from "next/link";
 import { FOCUS_RING } from "@/components/shell/nav";
 import { SECTIONS, type SectionKey } from "./model";
 
-/// The four parts of Academic setup, as real links (the address says which one you are on, so reload and the back button work).
-export function SectionNav({ schoolCode, current }: { schoolCode: string; current: SectionKey }) {
+/// The parts of Academic setup, as real links (the address says which one you are on, so reload and the back button work).
+export function SectionNav({ schoolCode, current, hide = [] }: { schoolCode: string; current: SectionKey; hide?: readonly SectionKey[] }) {
   return (
     <nav aria-label="Academic setup sections" className="mt-6 border-b border-line">
       <ul className="-mb-px flex gap-1 overflow-x-auto">
-        {SECTIONS.map((section) => {
+        {SECTIONS.filter((section) => !hide.includes(section.key)).map((section) => {
           const active = section.key === current;
           return (
             <li key={section.key} className="shrink-0">

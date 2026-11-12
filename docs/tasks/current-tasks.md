@@ -322,3 +322,88 @@
 ## TASK-0024: the question bank (parity with AlEemaan's task 0032)
 
 [Task file](0024-question-bank.md). Slice A (schema, migration, pure parts, database tests) is merged (PR #68). Slice B (reviewers and switches) is merged (PR #69). Slice C (the questions and their review: service and API) is merged (PR #70). Slice D (pictures) is merged (PR #71). Slice E (the screens: Browse, My questions, Review queue, a navigation entry for staff) is merged (PR #72). All five slices are on `dev` (2026-10-26); what remains is the walkthrough, the hosted migration and image store, and the slice that reads `bank.parents.view`.
+
+## TASK-0025: the Forms and question-bank screens (parity with AlEemaan's task 0041)
+
+[Task file](0025-forms-screens.md). The APIs of the Forms module and the question bank's reports, printing and offer-back were on `dev`; the screens were not. **All eight slices (O1 to O8) are built and tested (2026-11-03, lane 3; results in section 5 of the task file) and merged into `dev` as PR #86 (`8115519`).** The maintainer asked on 2026-11-02 for all the implementation first, then each slice tested in turn.
+
+- [x] O6 reports, print, print log and offer-back from an LMS quiz card: built and tested
+- [x] O7 a Video guide link in the profile menu, a configurable address for the video and its policy, `NEXT_DIST_DIR`: built and tested
+- [x] O1 staff forms and O2 form page / marking / roll call: built and tested (four routes added: questionnaire detail and update, questionnaire close, paper-work close, practice-set responses)
+- [x] O3 the pupil's forms (My work), O4 the pupil's practice and a guardian's page (My children), O5 the public questionnaire page: built and tested (service changes and one new route on the way, see the task file)
+- [x] O8 the five things the screens showed were missing (staff reporter's outcomes, one answer per practice set, carrying on a practice session, one answer per browser on a public link, "For you" for staff and guardians): built and tested
+- [x] PR #86 into `dev`, guarded merge (2026-11-03)
+- [ ] Octalve's walkthrough (its own run, after AlEemaan's)
+
+## TASK-0026: the sidebar in sections, collapsible to icons, with the person pinned at the foot (parity with AlEemaan's task 0042)
+
+[Task file](0026-sidebar-sections.md). Requested by the maintainer on 2026-11-03 for both repos. Built and tested 2026-11-03 (section 7 of the task file) and merged into `dev` as PR #88 (`e5549fc`).
+
+- [x] Sections that fold (Administration, Learning; Platform as a plain link last), remembered in a cookie; the section of the current page opens on arrival
+- [x] The whole sidebar folds to a rail of icons with a round arrow on its edge; it opens over the page while an icon is hovered or focused (hovering the arrow does nothing); the school switcher keeps its height in the rail
+- [x] The person stays pinned at the foot; the phone More sheet has the same headings
+- [x] Unit and e2e tests (both themes, open, rail and peek); component and function catalogs
+- [ ] Octalve's walkthrough must include the shell rows (its own run, after AlEemaan's)
+
+## TASK-0027: Programs, learning that is not a normal class (parity with AlEemaan's task 0043)
+
+[Task file](0027-programs.md). Requested by the maintainer on 2026-11-03 for AlEemaan; the Octalve port was designed 2026-11-04 and built 2026-11-09 on `claude/octalve-programs` (P1 on `claude/octalve-screens`). Needs the migrations `20261116090000_programs_structure`, `20261117090000_standing_participant_subject`, `20261117100000_program_people`, `20261118090000_program_attendance`, `20261119090000_program_assessments`, `20261120090000_program_fees`, `20261121090000_program_completion`, in that order, on the hosted databases (the maintainer runs them).
+
+- [x] P0 The generic tenant-and-campus settings table (`TenantSetting`, shared with 0028 and 0029)
+- [x] P1 Structure - [x] P2 People - [x] P3 Staff and attendance - [x] P3b Assessments - [x] P4 Fees (manual payments only: the gateway `pay` route and its webhook are NOT ported) - [x] P5 Completion and certificates (with the public check through `/api/v1/verify-certificate/[token]`)
+- [x] Tests: unit, API, integration (RLS and the append-only tables), the route-area and route-role guards, browser (desktop and phone, both themes, Axe). Results in the task file, section 8
+- [ ] Settle the overlap with Phase 5 (vocational cohorts, higher-ed credit units)
+- [ ] Walkthrough rows (not run)
+
+## TASK-0028: Standing, suspension, expulsion and termination on the school's own records (parity with AlEemaan's task 0045)
+
+[Task file](0028-standing.md). Requested by the maintainer on 2026-11-03 for AlEemaan; designed 2026-11-04, built 2026-11-08 (S1 to S3 API, merged as PR #92) and 2026-11-09 (the screens, the refusal of an expelled pupil at sign-in and the Settings switch, on `claude/octalve-screens`). Needs the migrations `20261115090000_standing` and, for programs, `20261117090000_standing_participant_subject`.
+
+- [x] S1 Pupils - [x] S2 Staff and the sign-in lift - [x] S3 The campus switch (API and the Settings panel) - [x] Standing screens (a pupil's and a member of staff's page) - [x] An expelled pupil is refused at sign-in with the generic wrong-password sentence (the maintainer's decision)
+- [x] Tests: unit, API, integration, browser (`finance-standing-screens`)
+- [ ] A notice to the guardian of a suspended child (optional, not built)
+
+## TASK-0029: Part payment "if allowed" (parity with AlEemaan's task 0046)
+
+[Task file](0029-part-payment.md). Requested by the maintainer on 2026-11-03 for AlEemaan; designed 2026-11-04, F1 built 2026-11-08 (PR #92), F2 built 2026-11-09 on `claude/octalve-screens`. Only an `ADMIN` sets the rule (ADR 0016: a campus administrator does not configure fees). Needs the migration `20261114090000_tenant_settings_part_payment`.
+
+- [x] F1 Column, rule, settings, enforcement in both payment paths, with the row lock that closed a double-take race the payment paths had
+- [x] F2 The Finance page (`/schools/[code]/finance`: Invoices, Fee structure, the payment rules, the record-payment dialog, the invoice detail)
+- [ ] The invoice screens for a pupil or a guardian (not built)
+
+## TASK-0030: Progress records (logbooks), the port of AlEemaan's task 0044
+
+[Task file](0030-progress-records.md). Requested by the maintainer on 2026-11-03 for AlEemaan; built 2026-11-09 on `claude/octalve-programs` (slices R1 to R4). Needs the migration `20261122090000_progress_records`.
+
+- [x] R1 Templates (the Quran memorisation booklet and a plain daily log), records, entries by day - [x] R2 Versions, verification with four eyes, the lock on an entry, the week grid and "verify the week" - [x] R3 The pupil's and the guardian's view (verified copy only, "seen" as a record of a week), the three switches - [x] R4 Arabic and English, Gregorian and Hijri, the digits, the print sheet
+- [ ] R5 Translation while typing: **blocked, the maintainer must choose a provider and give credentials**
+- [ ] The Arabic wording needs an Arabic reader
+
+
+## TASK-0031: Promotion and the Results screens (the port of AlEemaan's tasks 0025, 0037 and the results screens)
+
+[Task file](0031-promotion-and-result-sheets.md). Requested by the maintainer on 2026-11-09 ("start", then "implement all in one go then test one by one"); designed and built 2026-11-09 on `claude/octalve-promotion`. Needs the migration `20261123090000_promotion`.
+
+- [x] Promotion: two append-only tables, the pure rules, the service (every refusal before the first write, a roll under a row lock, a pupil already placed is left alone), four routes, the Promotion section of Academic setup (preview, overrides with reasons, confirmation, history)
+- [x] Results: the options, sheet and roster reads, and the page `/schools/[code]/results` (Marks, Review, Report cards), with a "Results" entry in the sidebar
+- [x] The report card shows the pupil's class and rank of the period's own session (it used to show the current class, which a promotion changes)
+- [x] Tests: unit, API (failing first for the report-card fix), integration (RLS), browser on desktop and phone in both themes
+- [ ] Open, the maintainer's: the migration; whether a campus administrator reaches Results (D7); the final-term check as a refusal (D8); streams; report remarks, the payment gate and PDF export; a bulk import; see the task file section 8
+
+## TASK-0032: A saved result is tied to the class's assessment scheme (the exam is one of its parts, and the first use locks the scheme)
+
+[Task file](0032-result-scheme-tie.md). Asked for by the maintainer on 2026-11-09 ("let's go with your recommendation", after the list of what task 0031 left unbuilt); built 2026-11-09 on `claude/octalve-result-scheme`. **No migration.**
+
+- [x] The save accepts only the scheme's parts (its components, then the exam) with the scheme's maxima and total; a refusal is a sentence that says what the scheme has; with no scheme in force the request stands as it was
+- [x] The first save under a scheme locks it (once, one audit row `ASSESSMENT_SCHEME_LOCKED`); the save takes the shared form of the scheme editor's lock; a change after that is a new version
+- [x] **A bug of task 0031 fixed:** the Marks sheet offered only the components, so a real scheme's exam mark could not be entered; the sheet answers `examMax` and `parts` and the screen enters them; the 0031 fixtures are schemes the app can make
+- [x] Tests: unit (17), API (12 new, failing first on unmodified `dev`: 9 fail there), the sheet spec and the Marks screen spec (the exam column is missing on `dev`), the full suite
+- [ ] Open, the maintainer's: whether the grade scale is locked by the first result too (it is not); whether a bare score stays refused for a scheme with parts; see the task file section 7
+
+## TASK-0033: The logo on the signed-out screens goes back to the start page
+
+[Task file](0033-logo-home-link.md). Asked for by the maintainer on 2026-11-10 ("make the logos go back to landing page", with a screenshot of the brand panel); built on `claude/octalve-logo-home-link`. The same change is made in AlEemaan (its task 0047).
+
+- [x] `AuthShell`: the logo in the brand panel and in the phone header is a link to `/`; the panel is `role="none"` with its decorative parts `aria-hidden` (a link cannot sit inside an `aria-hidden` region)
+- [x] A browser spec on desktop and phone: one visible logo link to `/`, reachable by keyboard with a visible focus ring, the way back from another screen, the decorative parts still hidden from assistive technology, Axe in both themes
+- [ ] Open, the maintainer's: `/` is a router (signed in to the dashboard, set-up unfinished to set-up, otherwise to sign-in), so the logo reloads the sign-in page when you are already on it; a real landing page at `/` is a product decision, not built
