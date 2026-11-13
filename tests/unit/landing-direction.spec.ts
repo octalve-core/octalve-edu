@@ -42,7 +42,16 @@ test.describe("given nothing, it says what the page always said", () => {
     const page = source("src/app/page.tsx");
     expect(page).toMatch(/<LandingPage\s*\/>/);
     const component = source("src/components/landing/LandingPage.tsx");
-    expect(component).toMatch(/copy = brand\.landing, name = brand\.name, labels = ENGLISH_LABELS/);
+    // the destructuring may be on one line or, when a prop is added, one prop to a line (Prettier decides)
+    expect(component).toMatch(/copy = brand\.landing,\s*name = brand\.name,\s*labels = ENGLISH_LABELS/);
+  });
+
+  test("the slot for a product's own sections is optional, drawn before the closing band, and draws nothing when it is not given (task 0061)", () => {
+    const component = source("src/components/landing/LandingPage.tsx");
+    expect(component).toMatch(/children\?: ReactNode;/);
+    // `{children}` sits between the last section of the page and the closing band; this product's page gives none
+    expect(component).toMatch(/\{children\}\s*<section aria-labelledby="landing-closing"/);
+    expect(source("src/app/page.tsx")).not.toMatch(/<LandingPage[^>]*>[\s\S]*<\/LandingPage>/);
   });
 
   test("the language and the direction are written only when given (an undefined attribute is not rendered)", () => {

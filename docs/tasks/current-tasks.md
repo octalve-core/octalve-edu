@@ -680,3 +680,11 @@
 - [x] New integration spec `schema-matches-migrations.spec.ts` allowing exactly those two things; it failed on the unfixed schema (naming the index) and passes on the fixed one (2 passed with the setup)
 - [x] The README says `pnpm prisma migrate deploy` and why (`migrate dev` would drop the fourteen keys and write a migration that fails)
 - [ ] Not done: the whole suite; mutation passes (deferred)
+
+## TASK-0061: The landing page component gets an optional slot for a product's own sections
+
+[Task file](0061-landing-children-slot.md). The same change as AlEemaan's task 0070, which uses it; the two products' `LandingPage.tsx` stay byte-identical (task 0044); built on `claude/landing-children-slot`. No migration, no visible change in Octalve Edu (its `/` gives no children).
+
+- [x] `children?: ReactNode`, drawn before the closing band; `cmp` identical with AlEemaan's copy
+- [x] `landing-direction.spec.ts` tolerates the signature's new line break and pins the slot
+- [ ] Not done: the whole suite; mutation passes (deferred)
