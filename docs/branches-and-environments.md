@@ -1,5 +1,7 @@
 # Branches & Environments
 
+> **Out of date (noted 2026-11-13).** This file was written on 2026-09-28, before any branch or deploy target existed, and names `main` as staging. The rule now is `dev` development, `master` staging, `prod` production (ADR 0015), and the project is deployed on Vercel. **The current, step-by-step process is [`DEPLOYMENT.md`](DEPLOYMENT.md).**
+
 The branch names below don't map to environments the way they
 conventionally would once they exist — written down now, before any of
 them do, so the convention doesn't have to be reverse-engineered from
