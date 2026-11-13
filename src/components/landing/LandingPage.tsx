@@ -61,6 +61,8 @@ export type LandingProps = {
   dir?: "ltr" | "rtl";
   /// The same page in the other language: a quiet link in the header, its label written in that language.
   switchTo?: { href: string; label: string; lang: string };
+  /// More sections of the page's own, drawn after the sections above and before the closing band (task 0070: one school's own sections that read data). Nothing is drawn when it is not given.
+  children?: ReactNode;
 };
 
 const RING = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
@@ -73,7 +75,15 @@ const COVERS_GRID_DEFAULT = "sm:grid-cols-2 lg:grid-cols-3";
 const COVERS_GRID: Record<number, string> = { 4: "sm:grid-cols-2" };
 const FRAME = "mx-auto w-full max-w-6xl px-4 sm:px-8";
 
-export function LandingPage({ copy = brand.landing, name = brand.name, labels = ENGLISH_LABELS, lang, dir, switchTo }: LandingProps = {}) {
+export function LandingPage({
+  copy = brand.landing,
+  name = brand.name,
+  labels = ENGLISH_LABELS,
+  lang,
+  dir,
+  switchTo,
+  children,
+}: LandingProps = {}) {
   return (
     <div lang={lang} dir={dir} className="min-h-screen bg-canvas text-fg">
       <header className="border-b border-line">
@@ -177,6 +187,8 @@ export function LandingPage({ copy = brand.landing, name = brand.name, labels = 
             </div>
           </section>
         )}
+
+        {children}
 
         <section aria-labelledby="landing-closing" className="relative overflow-hidden bg-brand-deep text-white">
           <div aria-hidden="true" className="brand-pattern pointer-events-none absolute inset-0" />

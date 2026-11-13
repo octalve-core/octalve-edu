@@ -681,6 +681,14 @@
 - [x] The README says `pnpm prisma migrate deploy` and why (`migrate dev` would drop the fourteen keys and write a migration that fails)
 - [ ] Not done: the whole suite; mutation passes (deferred)
 
+## TASK-0061: The landing page component gets an optional slot for a product's own sections
+
+[Task file](0061-landing-children-slot.md). The same change as AlEemaan's task 0070, which uses it; the two products' `LandingPage.tsx` stay byte-identical (task 0044); built on `claude/landing-children-slot`. No migration, no visible change in Octalve Edu (its `/` gives no children).
+
+- [x] `children?: ReactNode`, drawn before the closing band; `cmp` identical with AlEemaan's copy
+- [x] `landing-direction.spec.ts` tolerates the signature's new line break and pins the slot
+- [ ] Not done: the whole suite; mutation passes (deferred)
+
 ## TASK-0062: A deployment guide: how to release to production, step by step
 
 [Task file](0062-deployment-guide.md). Asked for by the maintainer on 2026-11-13; built on `claude/deployment-guide`. Documentation only: no code, no migration, no change to Vercel.
