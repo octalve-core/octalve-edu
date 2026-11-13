@@ -688,3 +688,12 @@
 - [x] `children?: ReactNode`, drawn before the closing band; `cmp` identical with AlEemaan's copy
 - [x] `landing-direction.spec.ts` tolerates the signature's new line break and pins the slot
 - [ ] Not done: the whole suite; mutation passes (deferred)
+
+## TASK-0062: A deployment guide: how to release to production, step by step
+
+[Task file](0062-deployment-guide.md). Asked for by the maintainer on 2026-11-13; built on `claude/deployment-guide`. Documentation only: no code, no migration, no change to Vercel.
+
+- [x] `docs/DEPLOYMENT.md`: how the three branches and Vercel are wired (checked, with how to check again), the decisions made by the maintainer, the one-time set-up, every release in order (staging first, migrations before code), rollback, symptoms and who does what
+- [x] Found while checking: Vercel's Production Branch is `master`, not `prod`, so a merge into `master` deploys to production; no branch protection and no CI workflow exist
+- [x] Open points for the maintainer, named in the guide: the app refuses to serve in production on an owner database role and the hosted provider may not allow `app_user` to be created (3.2), and **no script, route or document creates the first account on an empty SaaS database** (3.6)
+- [ ] Not done: changing Vercel or the databases (the maintainer's)
