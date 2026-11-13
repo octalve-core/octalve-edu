@@ -680,3 +680,12 @@
 - [x] New integration spec `schema-matches-migrations.spec.ts` allowing exactly those two things; it failed on the unfixed schema (naming the index) and passes on the fixed one (2 passed with the setup)
 - [x] The README says `pnpm prisma migrate deploy` and why (`migrate dev` would drop the fourteen keys and write a migration that fails)
 - [ ] Not done: the whole suite; mutation passes (deferred)
+
+## TASK-0062: A deployment guide: how to release to production, step by step
+
+[Task file](0062-deployment-guide.md). Asked for by the maintainer on 2026-11-13; built on `claude/deployment-guide`. Documentation only: no code, no migration, no change to Vercel.
+
+- [x] `docs/DEPLOYMENT.md`: how the three branches and Vercel are wired (checked, with how to check again), the decisions made by the maintainer, the one-time set-up, every release in order (staging first, migrations before code), rollback, symptoms and who does what
+- [x] Found while checking: Vercel's Production Branch is `master`, not `prod`, so a merge into `master` deploys to production; no branch protection and no CI workflow exist
+- [x] Open points for the maintainer, named in the guide: the app refuses to serve in production on an owner database role and the hosted provider may not allow `app_user` to be created (3.2), and **no script, route or document creates the first account on an empty SaaS database** (3.6)
+- [ ] Not done: changing Vercel or the databases (the maintainer's)
