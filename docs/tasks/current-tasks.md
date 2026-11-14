@@ -663,6 +663,7 @@
 - [x] Tests: 77 passed on lane 1, then 86 passed with the phone project added after one wording change (the new route-guard entries, 4 integration, the API and 3 end-to-end specs, with the existing communication, cron and drain specs); see the task file
 - [ ] Not run: the new specs against the unfixed code (the integration spec imports a module that did not exist); the whole suite; mutation passes (deferred)
 - [x] The pause after five calls that claimed nothing used to show the "server could not be reached" line; fixed in [task 0059](0059-pump-pause-wording.md)
+- [x] 2026-11-14: the support-area guard (`tests/unit/route-area-guard.spec.ts`) failed on `dev` because `GET .../communication/queue` was on neither the area list nor the out-of-reach list; it is on the out-of-reach list now (the route was already refused to a support view: nothing changes at run time; task file section 7)
 - [ ] **For the maintainer:** unchanged from TASK-0057: promote `dev` to `master` and `prod` when you choose (`CRON_SECRET` is already set for Production); the Resend and Termii keys
 
 
