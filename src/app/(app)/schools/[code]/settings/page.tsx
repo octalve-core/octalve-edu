@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { forbidden } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { CampusesPanel } from "@/components/settings/CampusesPanel";
 import { DisciplineSettingsPanel } from "@/components/settings/DisciplineSettingsPanel";
 import { ProgramAssessmentsSettingsPanel } from "@/components/settings/ProgramAssessmentsSettingsPanel";
 import { ProgramProgressGuardianSettingsPanel } from "@/components/settings/ProgramProgressGuardianSettingsPanel";
@@ -44,6 +45,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ code:
       {/* A support view only reads: the whole form is switched off (a disabled fieldset disables every control inside it). The API refuses a write anyway. */}
       <fieldset disabled={Boolean(tenant.support)} className="min-w-0">
         <SchoolSettingsPanel schoolCode={tenant.tenantCode} />
+        <CampusesPanel schoolCode={tenant.tenantCode} />
       </fieldset>
       {/* The discipline switch is not a grantable support area (a disciplinary policy): a support view does not see it. */}
       {!tenant.support && <DisciplineSettingsPanel schoolCode={tenant.tenantCode} hasMfa={hasMfa} />}

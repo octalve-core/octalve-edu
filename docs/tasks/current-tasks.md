@@ -699,3 +699,12 @@
 - [x] Found while checking: Vercel's Production Branch is `master`, not `prod`, so a merge into `master` deploys to production; no branch protection and no CI workflow exist
 - [x] Open points for the maintainer, named in the guide: the app refuses to serve in production on an owner database role and the hosted provider may not allow `app_user` to be created (3.2), and **no script, route or document creates the first account on an empty SaaS database** (3.6)
 - [ ] Not done: changing Vercel or the databases (the maintainer's)
+
+## TASK-0063: A screen to add a campus (found by the walkthrough, task 0053)
+
+[Task file](0063-campuses-screen.md). A flow-audit finding of Octalve's walkthrough (2026-11-14): `POST /api/v1/schools/[code]/campuses` was the only thing in the code that makes a campus, so a school started by the wizard or the platform (no campus) could never give a campus administrator their campus, and "Multi-Campus Mode" had nothing to switch. Built on `claude/octalve-campuses-screen`; no migration, no new route.
+
+- [x] The finding, checked in the code: nothing under `src/components` or `src/app` writes a campus except that route (`grep` for `/campuses` finds only the program-campuses panel; `tx.campus.create` appears once)
+- [x] `CampusesPanel` on the Settings page: the school's campuses in a list, "Campus name" and "Add campus"; the server's words for a blank name, a long or odd name and a name the school already has, beside the field; success reads "“Name” was added."; inside the page's disabled fieldset, so a support view cannot type
+- [x] `tests/e2e/campuses-screen.spec.ts` (4 tests, desktop and phone): adding by typing (name order, tidied, saved, audited, there after leaving), the refusals, the campus offered in a campus administrator's invitation, a campus administrator refused; axe and overflow in both themes. Failing first on the unfixed build: 6 failed, 3 passed (the 3 are the setup and the guard); on the fixed build 9 passed; the seven neighbouring Settings specs: 115 passed, 0 failed
+- [ ] Not done, the maintainer's: rename or archive a campus (a route pair and an `archivedAt` column: a migration); "Multi-Campus Mode" is saved, audited and read by nothing (task file, section 5); not run: the whole suite (no route, library or schema changed), mutation passes (deferred)
