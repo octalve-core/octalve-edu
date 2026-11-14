@@ -45,13 +45,19 @@ export function SlotEditModal({
 
   if (!isOpen) return null;
 
+  // What is chosen: the person's choice, else the slot's own value, else the first of the list. The lists load beside the form, so a choice that was blank when the form opened (nothing to pick
+  // yet) must not stay blank once they arrive: the select shows its first option, and that is what is sent.
+  const armId = classArmId || (classArms[0]?.id ?? "");
+  const subjectValue = subjectId || (subjects[0]?.id ?? "");
+  const teacherId = staffRecordId || (teachers[0]?.id ?? "");
+
   // Real-time live clash preview
   const candidate = {
     id: initialSlot?.id,
     dayOfWeek,
-    classArmId,
-    subjectId,
-    staffRecordId,
+    classArmId: armId,
+    subjectId: subjectValue,
+    staffRecordId: teacherId,
     startTime,
     endTime,
     room: room.trim() || null,
@@ -89,9 +95,9 @@ export function SlotEditModal({
     setError(null);
 
     const payload = {
-      classArmId,
-      subjectId,
-      staffRecordId,
+      classArmId: armId,
+      subjectId: subjectValue,
+      staffRecordId: teacherId,
       dayOfWeek,
       startTime,
       endTime,
@@ -147,10 +153,17 @@ export function SlotEditModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={`${formId}-title`}
+    >
       <div className="w-full max-w-lg rounded-2xl border border-line bg-surface p-6 shadow-2xl">
         <div className="flex items-center justify-between border-b border-line pb-4">
-          <h2 className="text-lg font-semibold text-fg">{initialSlot ? "Edit Timetable Slot" : "Schedule New Lesson Slot"}</h2>
+          <h2 id={`${formId}-title`} className="text-lg font-semibold text-fg">
+            {initialSlot ? "Edit Timetable Slot" : "Schedule New Lesson Slot"}
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -176,8 +189,11 @@ export function SlotEditModal({
         <form id={formId} onSubmit={handleSave} className="mt-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-fg-muted">Day of Week</label>
+              <label htmlFor={`${formId}-day`} className="block text-xs font-medium text-fg-muted">
+                Day of Week
+              </label>
               <select
+                id={`${formId}-day`}
                 value={dayOfWeek}
                 onChange={(e) => setDayOfWeek(Number(e.target.value))}
                 className="mt-1 w-full rounded-xl border border-line bg-field px-3 py-2 text-sm text-fg"
@@ -191,9 +207,12 @@ export function SlotEditModal({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-fg-muted">Class Arm</label>
+              <label htmlFor={`${formId}-arm`} className="block text-xs font-medium text-fg-muted">
+                Class Arm
+              </label>
               <select
-                value={classArmId}
+                id={`${formId}-arm`}
+                value={armId}
                 onChange={(e) => setClassArmId(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-line bg-field px-3 py-2 text-sm text-fg"
                 required
@@ -209,9 +228,12 @@ export function SlotEditModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-fg-muted">Subject</label>
+              <label htmlFor={`${formId}-subject`} className="block text-xs font-medium text-fg-muted">
+                Subject
+              </label>
               <select
-                value={subjectId}
+                id={`${formId}-subject`}
+                value={subjectValue}
                 onChange={(e) => setSubjectId(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-line bg-field px-3 py-2 text-sm text-fg"
                 required
@@ -225,9 +247,12 @@ export function SlotEditModal({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-fg-muted">Teacher</label>
+              <label htmlFor={`${formId}-teacher`} className="block text-xs font-medium text-fg-muted">
+                Teacher
+              </label>
               <select
-                value={staffRecordId}
+                id={`${formId}-teacher`}
+                value={teacherId}
                 onChange={(e) => setStaffRecordId(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-line bg-field px-3 py-2 text-sm text-fg"
                 required
@@ -243,8 +268,11 @@ export function SlotEditModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-fg-muted">Start Time (HH:MM)</label>
+              <label htmlFor={`${formId}-start`} className="block text-xs font-medium text-fg-muted">
+                Start Time (HH:MM)
+              </label>
               <input
+                id={`${formId}-start`}
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
@@ -253,8 +281,11 @@ export function SlotEditModal({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-fg-muted">End Time (HH:MM)</label>
+              <label htmlFor={`${formId}-end`} className="block text-xs font-medium text-fg-muted">
+                End Time (HH:MM)
+              </label>
               <input
+                id={`${formId}-end`}
                 type="time"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
@@ -266,8 +297,11 @@ export function SlotEditModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-fg-muted">Period # (optional)</label>
+              <label htmlFor={`${formId}-period`} className="block text-xs font-medium text-fg-muted">
+                Period # (optional)
+              </label>
               <input
+                id={`${formId}-period`}
                 type="number"
                 min={1}
                 max={20}
@@ -278,8 +312,11 @@ export function SlotEditModal({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-fg-muted">Room / Venue (optional)</label>
+              <label htmlFor={`${formId}-room`} className="block text-xs font-medium text-fg-muted">
+                Room / Venue (optional)
+              </label>
               <input
+                id={`${formId}-room`}
                 type="text"
                 maxLength={50}
                 value={room}

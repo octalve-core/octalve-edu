@@ -69,14 +69,31 @@ export function TimetableCanvas({ schoolCode, slots, classArms, subjects, teache
     setModalOpen(true);
   };
 
+  /// What a lesson card does when it can be edited: it is a button for the mouse and for the keyboard alike (it was a div that only a click could use), named by what it is. Read-only: nothing.
+  const slotAction = (slot: TimetableSlotDto) =>
+    readOnly
+      ? {}
+      : {
+          role: "button" as const,
+          tabIndex: 0,
+          "aria-label": `Edit ${slot.subjectName}, ${slot.classGroupName} ${slot.classArmName}, ${slot.teacherName}, ${slot.startTime} to ${slot.endTime}`,
+          onClick: () => handleEdit(slot),
+          onKeyDown: (event: React.KeyboardEvent) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              handleEdit(slot);
+            }
+          },
+        };
+
   return (
     <div className="space-y-6">
       {/* Top Filter and Controls Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-surface p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
           <div>
-            <label className="sr-only">Filter by Class Arm</label>
             <select
+              aria-label="Filter by Class Arm"
               value={selectedArmId}
               onChange={(e) => setSelectedArmId(e.target.value)}
               className="rounded-xl border border-line bg-field px-3 py-2 text-xs font-medium text-fg"
@@ -91,8 +108,8 @@ export function TimetableCanvas({ schoolCode, slots, classArms, subjects, teache
           </div>
 
           <div>
-            <label className="sr-only">Filter by Teacher</label>
             <select
+              aria-label="Filter by Teacher"
               value={selectedTeacherId}
               onChange={(e) => setSelectedTeacherId(e.target.value)}
               className="rounded-xl border border-line bg-field px-3 py-2 text-xs font-medium text-fg"
@@ -184,7 +201,7 @@ export function TimetableCanvas({ schoolCode, slots, classArms, subjects, teache
                         return (
                           <div
                             key={slot.id}
-                            onClick={() => handleEdit(slot)}
+                            {...slotAction(slot)}
                             className={`group relative rounded-xl border p-3 text-left transition ${
                               hasClash
                                 ? "border-danger-line bg-danger-bg/60 text-danger-fg shadow-xs"
@@ -257,7 +274,7 @@ export function TimetableCanvas({ schoolCode, slots, classArms, subjects, teache
                       return (
                         <div
                           key={slot.id}
-                          onClick={() => handleEdit(slot)}
+                          {...slotAction(slot)}
                           className={`rounded-xl border p-4 text-left transition ${
                             hasClash
                               ? "border-danger-line bg-danger-bg text-danger-fg"
@@ -299,19 +316,23 @@ export function TimetableCanvas({ schoolCode, slots, classArms, subjects, teache
         </div>
       )}
 
-      {/* Edit / Create Modal */}
-      <SlotEditModal
-        schoolCode={schoolCode}
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSaved={onRefresh}
-        initialSlot={editingSlot}
-        initialDay={selectedDay}
-        existingSlots={slots}
-        classArms={classArms}
-        subjects={subjects}
-        teachers={teachers}
-      />
+      {/* Edit / Create Modal. It is drawn only while it is open and keyed by what it edits: the form takes its starting values when it is drawn, so a form that stayed mounted showed the
+          values of the first time it was drawn (a slot to edit opened with the defaults of a new one). */}
+      {modalOpen && (
+        <SlotEditModal
+          key={editingSlot?.id ?? `new-${selectedDay ?? 0}`}
+          schoolCode={schoolCode}
+          isOpen
+          onClose={() => setModalOpen(false)}
+          onSaved={onRefresh}
+          initialSlot={editingSlot}
+          initialDay={selectedDay}
+          existingSlots={slots}
+          classArms={classArms}
+          subjects={subjects}
+          teachers={teachers}
+        />
+      )}
     </div>
   );
 }

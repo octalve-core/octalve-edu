@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Role, AnnouncementStatus } from "@prisma/client";
 import type { AnnouncementDto } from "@/lib/announcements/service";
 
@@ -34,6 +34,7 @@ export function AnnouncementComposerModal({
   campusRequired = false,
   classArms,
 }: AnnouncementComposerModalProps) {
+  const uid = useId();
   const [title, setTitle] = useState(initialAnnouncement?.title ?? "");
   const [body, setBody] = useState(initialAnnouncement?.body ?? "");
   const [targetRoles, setTargetRoles] = useState<Role[]>(initialAnnouncement?.targetRoles ?? []);
@@ -122,10 +123,17 @@ export function AnnouncementComposerModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={`${uid}-title`}
+    >
       <div className="w-full max-w-lg rounded-2xl border border-line bg-surface p-6 shadow-2xl">
         <div className="flex items-center justify-between border-b border-line pb-4">
-          <h2 className="text-lg font-semibold text-fg">{initialAnnouncement ? "Edit Announcement" : "Create Broadcast Notice"}</h2>
+          <h2 id={`${uid}-title`} className="text-lg font-semibold text-fg">
+            {initialAnnouncement ? "Edit Announcement" : "Create Broadcast Notice"}
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -140,8 +148,11 @@ export function AnnouncementComposerModal({
 
         <form onSubmit={handleSave} className="mt-4 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-fg-muted">Announcement Title</label>
+            <label htmlFor={`${uid}-title-field`} className="block text-xs font-medium text-fg-muted">
+              Announcement Title
+            </label>
             <input
+              id={`${uid}-title-field`}
               type="text"
               required
               maxLength={200}
@@ -153,8 +164,11 @@ export function AnnouncementComposerModal({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-fg-muted">Notice Content</label>
+            <label htmlFor={`${uid}-body`} className="block text-xs font-medium text-fg-muted">
+              Notice Content
+            </label>
             <textarea
+              id={`${uid}-body`}
               required
               rows={4}
               value={body}
@@ -165,14 +179,17 @@ export function AnnouncementComposerModal({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-fg-muted mb-1.5">Target Audience Roles (Empty = School-wide Broadcast)</label>
-            <div className="flex flex-wrap gap-2">
+            <p id={`${uid}-roles`} className="block text-xs font-medium text-fg-muted mb-1.5">
+              Target Audience Roles (Empty = School-wide Broadcast)
+            </p>
+            <div role="group" aria-labelledby={`${uid}-roles`} className="flex flex-wrap gap-2">
               {TARGETABLE_ROLES.map(({ role, label }) => {
                 const checked = targetRoles.includes(role);
                 return (
                   <button
                     key={role}
                     type="button"
+                    aria-pressed={checked}
                     onClick={() => toggleRole(role)}
                     className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
                       checked ? "bg-brand-strong text-white shadow-xs" : "border border-line bg-field text-fg-muted hover:text-fg"
@@ -187,8 +204,11 @@ export function AnnouncementComposerModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-fg-muted">Campus{campusRequired ? "" : " (Optional)"}</label>
+              <label htmlFor={`${uid}-campus`} className="block text-xs font-medium text-fg-muted">
+                Campus{campusRequired ? "" : " (Optional)"}
+              </label>
               <select
+                id={`${uid}-campus`}
                 value={campusId}
                 onChange={(e) => setCampusId(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-line bg-field px-3 py-2 text-sm text-fg"
@@ -203,8 +223,11 @@ export function AnnouncementComposerModal({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-fg-muted">Class Arm (Optional)</label>
+              <label htmlFor={`${uid}-arm`} className="block text-xs font-medium text-fg-muted">
+                Class Arm (Optional)
+              </label>
               <select
+                id={`${uid}-arm`}
                 value={classArmId}
                 onChange={(e) => setClassArmId(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-line bg-field px-3 py-2 text-sm text-fg"
@@ -221,8 +244,11 @@ export function AnnouncementComposerModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-fg-muted">Status</label>
+              <label htmlFor={`${uid}-status`} className="block text-xs font-medium text-fg-muted">
+                Status
+              </label>
               <select
+                id={`${uid}-status`}
                 value={status}
                 onChange={(e) => setStatus(e.target.value as AnnouncementStatus)}
                 className="mt-1 w-full rounded-xl border border-line bg-field px-3 py-2 text-sm text-fg"
@@ -234,8 +260,11 @@ export function AnnouncementComposerModal({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-fg-muted">Expires On (Optional)</label>
+              <label htmlFor={`${uid}-expires`} className="block text-xs font-medium text-fg-muted">
+                Expires On (Optional)
+              </label>
               <input
+                id={`${uid}-expires`}
                 type="date"
                 value={expiresAt}
                 onChange={(e) => setExpiresAt(e.target.value)}
@@ -247,12 +276,12 @@ export function AnnouncementComposerModal({
           <div className="flex items-center gap-2 pt-1">
             <input
               type="checkbox"
-              id="isPinnedCheck"
+              id={`${uid}-pinned`}
               checked={isPinned}
               onChange={(e) => setIsPinned(e.target.checked)}
               className="h-4 w-4 rounded border-line"
             />
-            <label htmlFor="isPinnedCheck" className="text-xs font-medium text-fg">
+            <label htmlFor={`${uid}-pinned`} className="text-xs font-medium text-fg">
               Pin to top of school feed
             </label>
           </div>
