@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Walkthrough Report Generator
+ * Walkthrough Report Generator (Octalve Edu)
  *
  * Compiles:
  * 1. walkthrough.vtt - WebVTT subtitles with step captions and exact millisecond timestamps
@@ -43,24 +43,23 @@ function formatDisplayTime(ms) {
 async function findRecordedVideo(rawDir) {
   if (!fs.existsSync(rawDir)) return null;
 
+  // Playwright records one file per tab: the first tab (the whole walkthrough) is by far the largest; a typed-address tab (Walk.typedAddress) has a short recording of its own.
   function findWebm(dir) {
+    const found = [];
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        const found = findWebm(full);
-        if (found) return found;
-      } else if (entry.isFile() && entry.name.endsWith(".webm")) {
-        return full;
-      }
+      if (entry.isDirectory()) found.push(...findWebm(full));
+      else if (entry.isFile() && entry.name.endsWith(".webm")) found.push(full);
     }
-    return null;
+    return found;
   }
 
-  return findWebm(rawDir);
+  const recordings = findWebm(rawDir).sort((a, b) => fs.statSync(b).size - fs.statSync(a).size);
+  return recordings[0] ?? null;
 }
 
 export async function generateReports() {
-  console.log("Generating walkthrough reports & deliverables...");
+  console.log("Generating walkthrough reports & deliverables for Octalve Edu...");
 
   if (!fs.existsSync(TIMELINE_FILE)) {
     throw new Error(`Timeline file not found: ${TIMELINE_FILE}. Run the walkthrough suite first.`);
@@ -134,7 +133,7 @@ export async function generateReports() {
     <html lang="en">
     <head>
       <meta charset="UTF-8">
-      <title>End-to-End Product Walkthrough Report</title>
+      <title>Octalve Edu Product Walkthrough Report</title>
       <style>
         @page { size: A4 portrait; margin: 16mm 14mm; }
         body {
@@ -230,12 +229,12 @@ export async function generateReports() {
     </head>
     <body>
       <div class="cover page-break">
-        <h1>Product Walkthrough Report</h1>
+        <h1>Octalve Edu Walkthrough Report</h1>
         <div class="subtitle">Complete Continuous End-to-End Product Verification</div>
         <div class="meta-box">
           <div class="meta-item">
-            <div class="label">Date</div>
-            <div class="val">${new Date().toISOString().split("T")[0]}</div>
+            <div class="label">Project</div>
+            <div class="val">Octalve Edu</div>
           </div>
           <div class="meta-item">
             <div class="label">Total Steps</div>

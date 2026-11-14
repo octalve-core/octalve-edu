@@ -604,7 +604,9 @@
 - [x] The state found: Octalve's first walkthrough version (never run) has the right wizard fields but does not type the setup token, branches on what it sees, and its runner defaults to the wrong database role, gives no `DIRECT_URL` and has no safety check; it is replaced, not extended
 - [x] What differs from AlEemaan: two deployment modes (Solo with the wizard, SaaS with the platform superadministrator), schools in the address, seven kinds of person, 36 pages and 294 API routes, tenants, support access, custom domains
 - [x] The plan: port AlEemaan's harness (P0.1), the computed part of the matrix (P0.2), the rows by hand (P0.3), then chapters C01 to C09 for Solo and S01 to S04 for SaaS
-- [ ] Waiting for the maintainer: Solo first then SaaS as two deliverables; which names to use; the open campus-administrator approval decision; whether to link the video guide from the account menu
+- [x] **2026-11-14, the maintainer: "Start" (Octalve's walkthrough).** P0.1 (AlEemaan's harness ported: runner with the migrator and the runtime role `app_user`, Solo and SaaS databases, eight roles, the nav read from `navFor`) and P0.2 (the computed matrix: 36 pages, 297 API routes, 25 with no screen) are built on `claude/octalve-walkthrough-harness`; chapter C01 (Solo, 7 steps) passed a recon from an empty database (support project 56 passed, 2 fixme on purpose); section 7 of the task file
+- [x] Decided or corrected: campus-administrator approval kept as it is (2026-11-12; HANDOVER 6.24 updated), the account menu has linked `/video-guide` since 2026-11-02 (nothing to add), the output is `out/walkthrough/` directly, Solo first then SaaS taken as recommended
+- [ ] Next: C02 and the chapters after it with their rows (P0.3), then SaaS (S01 to S04), then the passes and the strict run; not yet run: a resumed recon, SaaS mode, dark and phone passes, the report step
 
 ## TASK-0054: The Communication senders fail closed, and nothing consumes the dispatch queue
 

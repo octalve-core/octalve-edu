@@ -137,13 +137,15 @@ export const OVERLAY_STYLES = `
 export function getOverlayInitScript(): string {
   return `
     (() => {
+      // This runs at document start (addInitScript), when there is no <head> or <body> yet: mount once the document has been parsed, or the script throws on every page load.
+      const mount = () => {
       if (document.getElementById('walkthrough-overlay-root')) return;
 
-      // Inject Styles
-      const style = document.createElement('style');
-      style.id = 'walkthrough-overlay-styles';
-      style.textContent = ${JSON.stringify(OVERLAY_STYLES)};
-      document.head.appendChild(style);
+      // Inject Styles. The app's content security policy refuses an inline <style> element without its nonce (and a recording must not weaken the policy to draw a caption), so the rules go
+      // in a constructed stylesheet, which the policy does not govern; the elements below are given classes, never a style attribute.
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(${JSON.stringify(OVERLAY_STYLES)});
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
 
       // Inject Overlay Card
       const root = document.createElement('div');
@@ -170,6 +172,9 @@ export function getOverlayInitScript(): string {
         </svg>
       \`;
       document.body.appendChild(cursor);
+      };
+      if (document.body) mount();
+      else document.addEventListener('DOMContentLoaded', mount, { once: true });
     })();
   `;
 }
