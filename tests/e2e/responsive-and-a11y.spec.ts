@@ -73,17 +73,22 @@ async function expectComfortableTapTargets(page: Page, what: string, isMobile: b
       const style = getComputedStyle(el);
       return r.width > 0 && r.height > 0 && style.visibility !== "hidden" && !el.closest(".sr-only");
     };
-    return Array.from(document.querySelectorAll("button, a[href], input:not([type=hidden]), select, textarea"))
-      .filter(visible)
-      .map((el) => {
-        const r = el.getBoundingClientRect();
-        return {
-          el: `${el.tagName.toLowerCase()}[${el.getAttribute("aria-label") ?? el.getAttribute("name") ?? el.textContent?.trim().slice(0, 20)}]`,
-          w: Math.round(r.width),
-          h: Math.round(r.height),
-        };
-      })
-      .filter((t) => t.w < 44 || t.h < 44);
+    return (
+      Array.from(document.querySelectorAll("button, a[href], input:not([type=hidden]), select, textarea"))
+        .filter(visible)
+        // An info icon (task 0055, the button named "More information") is 16px with a 24px touch target, the WCAG 2.2 AA floor (2.5.8), by the maintainer's decision: a bigger invisible area would
+        // sit on top of a control placed 4 to 6px away. Its own size, and that its touch area overlaps nothing, are checked in info-tips.spec.ts; the 44px rule here is for every other control.
+        .filter((el) => el.getAttribute("aria-label") !== "More information")
+        .map((el) => {
+          const r = el.getBoundingClientRect();
+          return {
+            el: `${el.tagName.toLowerCase()}[${el.getAttribute("aria-label") ?? el.getAttribute("name") ?? el.textContent?.trim().slice(0, 20)}]`,
+            w: Math.round(r.width),
+            h: Math.round(r.height),
+          };
+        })
+        .filter((t) => t.w < 44 || t.h < 44)
+    );
   });
   expect(tooSmall, `controls smaller than 44x44 CSS px on ${what}`).toEqual([]);
 }
