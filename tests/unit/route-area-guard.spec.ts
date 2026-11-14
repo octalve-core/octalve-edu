@@ -26,6 +26,8 @@ const OUT_OF_REACH: Record<string, string> = {
   "support-grants/route.ts": "the school's own control over who may look: a support view must never read or change it",
   "people/students/export/route.ts": "a bulk download of every student's details is an export, not a view",
   "communication/dispatches/route.ts": "not a grantable area: messages are the school's own communications to its families",
+  "communication/queue/route.ts":
+    "not a grantable area: how many of the school's messages are waiting to be sent is the school's own communications business (task 0058)",
   "communication/templates/[id]/route.ts": "not a grantable area: message templates are the school's own words",
   "communication/templates/route.ts": "not a grantable area: message templates are the school's own words",
   "question-bank/items/[id]/route.ts":
