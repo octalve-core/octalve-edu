@@ -1,0 +1,131 @@
+[
+  {
+    "id": "RTE-01",
+    "area": "Start",
+    "feature": "The site address on an empty Solo install sends a visitor to the setup wizard",
+    "route": "/",
+    "roles": [
+      "Visitor"
+    ],
+    "kind": "positive",
+    "proof": "The first and only page load of the recording: the address lands on First-run setup",
+    "source": [
+      "src/app/page.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "SHL-04",
+    "area": "Shell",
+    "feature": "The theme is chosen with the toggle",
+    "route": "/setup",
+    "roles": [
+      "Visitor",
+      "School administrator",
+      "Teacher"
+    ],
+    "kind": "positive",
+    "proof": "Press the theme toggle on the very first screen: the page changes theme (the app starts dark and does not follow the system setting)",
+    "source": [
+      "src/components/ui/ThemeToggle.tsx",
+      "src/components/ui/ThemeProvider.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "SET-01",
+    "area": "Setup",
+    "feature": "The wizard creates the school and its first administrator, then disables itself",
+    "route": "/setup",
+    "roles": [
+      "Visitor"
+    ],
+    "kind": "positive",
+    "proof": "Type school name, administrator name, email, setup token, password and its confirmation with key presses; press Complete setup; see 'Setup complete' and continue to sign in",
+    "source": [
+      "src/app/setup/SetupWizardForm.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "SET-03",
+    "area": "Setup",
+    "feature": "A wrong setup token is refused",
+    "route": "/setup",
+    "roles": [
+      "Visitor"
+    ],
+    "kind": "negative",
+    "proof": "Submit with a wrong token: the page says so in a sentence (no status code) and nothing is created",
+    "source": [
+      "src/app/setup/SetupWizardForm.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "LOG-01",
+    "area": "Sign in",
+    "feature": "A person signs in with email and password and lands in their school",
+    "route": "/login",
+    "roles": [
+      "School administrator",
+      "Campus administrator",
+      "Teacher",
+      "Non-teaching staff"
+    ],
+    "kind": "positive",
+    "proof": "Type email and password and press Sign in: a person with one school goes straight into it (the dashboard redirects), one with several chooses on the dashboard",
+    "source": [
+      "src/app/login/LoginForm.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "LOG-02",
+    "area": "Sign in",
+    "feature": "A wrong password is refused in one sentence",
+    "route": "/login",
+    "roles": [
+      "Visitor"
+    ],
+    "kind": "negative",
+    "proof": "Type a wrong password: a sentence that does not say whether the account exists, not a status code",
+    "source": [
+      "src/app/login/LoginForm.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "LOG-04",
+    "area": "Sign in",
+    "feature": "Sign out from the account menu",
+    "route": "/dashboard",
+    "roles": [
+      "School administrator",
+      "Campus administrator",
+      "Teacher",
+      "Non-teaching staff"
+    ],
+    "kind": "positive",
+    "proof": "Open the account menu, press Sign out; land on the sign-in page",
+    "source": [
+      "src/components/shell/ProfileMenu.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "LOG-05",
+    "area": "Sign in",
+    "feature": "After signing out, the Back button does not show a school page",
+    "route": "/login",
+    "roles": [
+      "Visitor"
+    ],
+    "kind": "negative",
+    "proof": "Sign out, press Back: the school page's content is not shown again",
+    "source": [
+      "src/app/login/LoginForm.tsx"
+    ],
+    "status": "planned"
+  }
+]
