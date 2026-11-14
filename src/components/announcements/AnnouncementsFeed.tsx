@@ -24,7 +24,8 @@ export function AnnouncementsFeed({ schoolCode, userRole, userId, campusId = nul
     (userRole === Role.CAMPUS_ADMIN && campusId !== null && item.campusId === campusId);
 
   const { reply, loading, error, reload } = useApi(`/api/v1/schools/${schoolCode}/announcements`);
-  const { reply: classesReply } = useApi(canAuthor ? `/api/v1/schools/${schoolCode}/academics/classes` : null);
+  // The class choices of a notice are the class groups' arms (task 0064: this asked for a route that does not exist and read the wrong shape, so the choice was always empty).
+  const { reply: classesReply } = useApi(canAuthor ? `/api/v1/schools/${schoolCode}/academics/class-groups?limit=100` : null);
 
   const [composerOpen, setComposerOpen] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<AnnouncementDto | null>(null);
@@ -35,7 +36,7 @@ export function AnnouncementsFeed({ schoolCode, userRole, userId, campusId = nul
 
   const classArms = useMemo(() => {
     const list: { id: string; name: string }[] = [];
-    const groups = (classesReply?.data?.groups as { name: string; arms: { id: string; name: string }[] }[] | undefined) ?? [];
+    const groups = (classesReply?.data?.classGroups as { name: string; arms: { id: string; name: string }[] }[] | undefined) ?? [];
     for (const group of groups) {
       for (const arm of group.arms || []) {
         list.push({ id: arm.id, name: `${group.name} ${arm.name}` });
@@ -169,10 +170,12 @@ export function AnnouncementsFeed({ schoolCode, userRole, userId, campusId = nul
         </div>
       )}
 
-      {canAuthor && (
+      {/* Drawn only while it is open and keyed by the notice it edits: the form takes its starting values when it is drawn (task 0064). */}
+      {canAuthor && composerOpen && (
         <AnnouncementComposerModal
+          key={editingAnnouncement?.id ?? "new"}
           schoolCode={schoolCode}
-          isOpen={composerOpen}
+          isOpen
           onClose={() => setComposerOpen(false)}
           onSaved={() => reload()}
           initialAnnouncement={editingAnnouncement}

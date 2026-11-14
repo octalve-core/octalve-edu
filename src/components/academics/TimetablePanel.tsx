@@ -17,9 +17,10 @@ export function TimetablePanel({ schoolCode, readOnly = false }: TimetablePanelP
     error: timetableError,
     reload,
   } = useApi(`/api/v1/schools/${schoolCode}/timetable`);
-  const { reply: classesReply } = useApi(`/api/v1/schools/${schoolCode}/academics/classes`);
-  const { reply: subjectsReply } = useApi(`/api/v1/schools/${schoolCode}/academics/subjects`);
-  const { reply: staffReply } = useApi(`/api/v1/schools/${schoolCode}/people/staff`);
+  // The class arms come from the class groups (each group carries its live arms), the teachers from the school's teaching staff records; the routes' own ceiling is 100 a page (task 0064).
+  const { reply: classesReply } = useApi(`/api/v1/schools/${schoolCode}/academics/class-groups?limit=100`);
+  const { reply: subjectsReply } = useApi(`/api/v1/schools/${schoolCode}/academics/subjects?limit=100`);
+  const { reply: staffReply } = useApi(`/api/v1/schools/${schoolCode}/people/staff?category=TEACHING&limit=100`);
 
   const slots = useMemo<TimetableSlotDto[]>(() => {
     return (timetableReply?.data?.slots as TimetableSlotDto[] | undefined) ?? [];
@@ -27,7 +28,7 @@ export function TimetablePanel({ schoolCode, readOnly = false }: TimetablePanelP
 
   const classArms = useMemo(() => {
     const list: { id: string; name: string }[] = [];
-    const groups = (classesReply?.data?.groups as { name: string; arms: { id: string; name: string }[] }[] | undefined) ?? [];
+    const groups = (classesReply?.data?.classGroups as { name: string; arms: { id: string; name: string }[] }[] | undefined) ?? [];
     for (const group of groups) {
       for (const arm of group.arms || []) {
         list.push({ id: arm.id, name: `${group.name} ${arm.name}` });
@@ -41,11 +42,8 @@ export function TimetablePanel({ schoolCode, readOnly = false }: TimetablePanelP
   }, [subjectsReply]);
 
   const teachers = useMemo(() => {
-    const items = (staffReply?.data?.items as { id: string; user?: { name?: string; email?: string } }[] | undefined) ?? [];
-    return items.map((s) => ({
-      id: s.id,
-      name: s.user?.name || s.user?.email || "Teacher",
-    }));
+    const items = (staffReply?.data?.staff as { id: string; firstName: string; lastName: string }[] | undefined) ?? [];
+    return items.map((s) => ({ id: s.id, name: `${s.firstName} ${s.lastName}`.trim() || "Teacher" }));
   }, [staffReply]);
 
   if (timetableLoading) {
