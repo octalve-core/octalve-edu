@@ -1,9 +1,11 @@
 import { expect, type Page } from "@playwright/test";
 import type { Walk } from "../support/walk";
 import { PASSWORD, cast, school, setupToken } from "../cast";
+import { inbox, openInbox, signIn, unlockInbox } from "./shared";
 
 // C01 Start and sign in, Solo mode (task 0053, task 0033 section 6.6): a visitor on an empty install is sent to the first-run setup, is refused with a wrong token, sets up the school and its first
-// administrator, signs in, is refused with a wrong password, signs in, and signs out. The first page load happened before this chapter (Walk.goto); everything after it is a click or a key press.
+// administrator, signs in, is refused with a wrong password, signs in, signs out and presses Back, signs in again and unlocks the dev inbox. It ends signed in as the school administrator with the inbox
+// unlocked, the state a resumed run (resume.ts) starts every chapter from. The first page load happened before this chapter (Walk.goto); everything after it is a click or a key press.
 
 const chapter = "C01 Start and sign in";
 
@@ -124,6 +126,37 @@ export async function c01Start(walk: Walk, page: Page, theme: "light" | "dark"):
       await expect(page).toHaveURL(/\/login$/);
       await page.goBack();
       await expect(page.getByRole("heading", { level: 1, name: /^Welcome, Amina/ })).toHaveCount(0);
+    },
+  );
+
+  await walk.step(
+    {
+      id: 8,
+      chapter,
+      role: "School administrator",
+      title: "Sign in again",
+      caption: "Back in, as the school administrator: every chapter that follows starts from here.",
+      covers: ["LOG-01"],
+    },
+    async () => {
+      await signIn(walk, page, cast.schoolAdmin);
+    },
+  );
+
+  await walk.step(
+    {
+      id: 9,
+      chapter,
+      role: "School administrator",
+      title: "Open the dev email inbox",
+      caption:
+        "Stand-in for a mailbox: the school's emails land in a local inbox, unlocked with this run's token. Nothing is sent outside this machine.",
+      covers: ["SHL-06"],
+    },
+    async () => {
+      await openInbox(walk, page);
+      await unlockInbox(walk, page);
+      await expect(inbox(page).getByText(/No messages yet/)).toBeVisible();
     },
   );
 }

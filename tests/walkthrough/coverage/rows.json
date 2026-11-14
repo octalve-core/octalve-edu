@@ -127,5 +127,264 @@
       "src/app/login/LoginForm.tsx"
     ],
     "status": "planned"
+  },
+  {
+    "id": "DSH-01",
+    "area": "Overview",
+    "feature": "The overview names the school, the person's role and the campuses (or says there are none)",
+    "route": "/schools/[code]",
+    "roles": [
+      "School administrator",
+      "Campus administrator",
+      "Teacher",
+      "Non-teaching staff"
+    ],
+    "kind": "positive",
+    "proof": "Sign in: the greeting, the school's name, 'You're signed in as <role>', and the campuses list (an administrator sees all; a campus administrator the one they run); with no campus the page says so",
+    "source": [
+      "src/app/(app)/schools/[code]/page.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "STG-01",
+    "area": "Settings",
+    "feature": "Settings opens from the sidebar for the school administrator",
+    "route": "/schools/[code]/settings",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Press Settings in the sidebar: the page opens with its Campuses section and its configuration",
+    "source": [
+      "src/app/(app)/schools/[code]/settings/page.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "STG-02",
+    "area": "Settings",
+    "feature": "A campus is added by typing its name; it is listed and the overview lists it",
+    "route": "/schools/[code]/settings",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Type a name, press Add campus: 'Name was added.' and the list (name order); leave and come back: the overview lists both",
+    "source": [
+      "src/components/settings/CampusesPanel.tsx",
+      "src/app/api/v1/schools/[code]/campuses/route.ts"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "STG-03",
+    "area": "Settings",
+    "feature": "A campus name the school already has is refused beside the field",
+    "route": "/schools/[code]/settings",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "negative",
+    "proof": "Type the same name again: the server's sentence beside the field, the field marked invalid, and no second campus",
+    "source": [
+      "src/components/settings/CampusesPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "STG-04",
+    "area": "Settings",
+    "feature": "Changes are staged and counted, and Discard puts everything back",
+    "route": "/schools/[code]/settings",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Choose a time zone and flip a switch: '2 unsaved changes'; press Discard: both are as they were and nothing was saved",
+    "source": [
+      "src/components/settings/SchoolSettingsPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "STG-05",
+    "area": "Settings",
+    "feature": "Saving needs the password again, and a wrong one is refused",
+    "route": "/schools/[code]/settings",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "negative",
+    "proof": "Review & Save Changes opens the step-up dialog with the changes listed; a wrong password gives an alert and the dialog stays",
+    "source": [
+      "src/components/settings/StepUpModal.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "STG-06",
+    "area": "Settings",
+    "feature": "A confirmed change is saved, listed in the audit history and still there after leaving the page",
+    "route": "/schools/[code]/settings",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Confirm with the right password: the success sentence; the Audit History tab lists each change with who made it and 'Step-up Verified'; leave and come back: the values stay",
+    "source": [
+      "src/components/settings/SettingsAuditLog.tsx",
+      "src/components/settings/SchoolSettingsPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "USR-01",
+    "area": "Users",
+    "feature": "Users lists the people with a role and the open invitations",
+    "route": "/schools/[code]/users",
+    "roles": [
+      "School administrator",
+      "Campus administrator"
+    ],
+    "kind": "positive",
+    "proof": "Open Users: the People list with each person's role, campus and status, and the invitations still open",
+    "source": [
+      "src/components/users/UsersPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "USR-02",
+    "area": "Users",
+    "feature": "An invitation is an email address, a role and a campus",
+    "route": "/schools/[code]/users",
+    "roles": [
+      "School administrator",
+      "Campus administrator"
+    ],
+    "kind": "positive",
+    "proof": "Invite someone: address, role, campus, Send invitation; the notice and the pending row",
+    "source": [
+      "src/components/users/InviteDialog.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "USR-03",
+    "area": "Users",
+    "feature": "Revoking an open invitation ends its link",
+    "route": "/schools/[code]/users",
+    "roles": [
+      "School administrator",
+      "Campus administrator"
+    ],
+    "kind": "negative",
+    "proof": "Revoke the invitation sent to a mistyped address: the notice, and the row is gone",
+    "source": [
+      "src/components/users/InvitationsList.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "INV-01",
+    "area": "Users",
+    "feature": "An invited person opens the link, chooses a name and a password, and joins",
+    "route": "/accept-invite",
+    "roles": [
+      "Campus administrator",
+      "Teacher",
+      "Non-teaching staff"
+    ],
+    "kind": "positive",
+    "proof": "Follow the link in the dev inbox: the school and role are shown; name, password and confirmation by key presses; Create account and join; Continue to sign in",
+    "source": [
+      "src/components/auth/AcceptInviteForm.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "INV-02",
+    "area": "Users",
+    "feature": "A revoked invitation's link is refused and says what to do",
+    "route": "/accept-invite",
+    "roles": [
+      "Visitor"
+    ],
+    "kind": "negative",
+    "proof": "Follow the link of a revoked invitation: 'Ask your school administrator to send a new invitation.'",
+    "source": [
+      "src/components/auth/AcceptInviteForm.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "SHL-01",
+    "area": "Shell",
+    "feature": "Every sidebar entry a role may use opens its page and is marked as the current one",
+    "route": "/schools/[code]",
+    "roles": [
+      "School administrator",
+      "Campus administrator",
+      "Teacher",
+      "Non-teaching staff"
+    ],
+    "kind": "positive",
+    "proof": "Press each entry in turn: the page's heading, and aria-current on the entry; the sidebar has exactly those entries and Overview",
+    "source": [
+      "src/components/shell/SidebarNav.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "SHL-02",
+    "area": "Shell",
+    "feature": "An entry a role may not use is not offered",
+    "route": "/schools/[code]",
+    "roles": [
+      "Campus administrator",
+      "Teacher",
+      "Non-teaching staff"
+    ],
+    "kind": "negative",
+    "proof": "A campus administrator has no Settings; a teacher has no Finance, Users or Settings",
+    "source": [
+      "src/components/shell/nav.ts"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "SHL-06",
+    "area": "Shell",
+    "feature": "The dev email inbox is a stand-in mailbox unlocked with the run's token",
+    "route": "/login",
+    "roles": [
+      "Visitor",
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Press the envelope: the inbox asks for the dev tools token, unlocks, and lists the school's emails",
+    "source": [
+      "src/components/dev/DevEmailInbox.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "SHL-07",
+    "area": "Shell",
+    "feature": "The account menu says who is signed in and links Profile and the video guide",
+    "route": "/schools/[code]",
+    "roles": [
+      "School administrator",
+      "Campus administrator",
+      "Teacher",
+      "Non-teaching staff"
+    ],
+    "kind": "positive",
+    "proof": "Open the account menu: the person's address, Profile, Video guide and Sign out",
+    "source": [
+      "src/components/shell/ProfileMenu.tsx"
+    ],
+    "status": "planned"
   }
 ]
