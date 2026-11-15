@@ -10,6 +10,7 @@ import {
   cleanPhone,
   RELATIONSHIPS,
 } from "@/lib/people/rules";
+import { ACCOUNT_SELECT, toPersonAccount, type PersonAccount } from "@/lib/people/person-account";
 import { auditPeople, invalid, refuse, refuseAndRollBack, rollingBack, type PeopleResult } from "@/lib/people/results";
 import { studentsVisibleTo } from "@/lib/people/students";
 
@@ -33,6 +34,8 @@ export type GuardianView = {
   archived: boolean;
   /// How many students are linked to them now (revoked links do not count).
   studentCount: number;
+  /// The sign-in account linked to this record, if any (task 0065): what the portal's "My children" reads.
+  account: PersonAccount;
 };
 export type GuardianLinkView = {
   id: string;
@@ -65,6 +68,8 @@ const GUARDIAN_SELECT = {
   address: true,
   occupation: true,
   archivedAt: true,
+  userId: true,
+  membership: { select: ACCOUNT_SELECT },
   _count: { select: { links: { where: LIVE } } },
 } satisfies Prisma.GuardianRecordSelect;
 type GuardianRow = Prisma.GuardianRecordGetPayload<{ select: typeof GUARDIAN_SELECT }>;
@@ -79,6 +84,7 @@ const toGuardian = (row: GuardianRow): GuardianView => ({
   occupation: row.occupation ?? null,
   archived: row.archivedAt !== null,
   studentCount: row._count.links,
+  account: toPersonAccount("guardian", row.userId, row.membership),
 });
 
 const LINK_INCLUDE = { guardian: { select: GUARDIAN_SELECT } } satisfies Prisma.GuardianLinkInclude;
@@ -93,7 +99,7 @@ const toLink = (row: LinkRow): GuardianLinkView => ({
 });
 
 /// Which guardians this member may see: an ADMIN all; anyone else those linked (live) to a student they may see (campus scope of the STUDENT decides).
-const guardiansVisibleTo = (tenant: TenantCtx): Prisma.GuardianRecordWhereInput =>
+export const guardiansVisibleTo = (tenant: TenantCtx): Prisma.GuardianRecordWhereInput =>
   tenant.role === "ADMIN" ? {} : { links: { some: { ...LIVE, student: studentsVisibleTo(tenant) } } };
 
 const findVisibleStudent = (tx: Tx, tenant: TenantCtx, id: string) =>

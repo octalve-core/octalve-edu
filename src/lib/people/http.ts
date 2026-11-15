@@ -104,14 +104,25 @@ export function peopleFailure(reason: PeopleFailure, detail?: Record<string, unk
         { path: "body.guardianId", message: "Already linked to this student." },
       ]);
     case "ACCOUNT_TAKEN":
-      return fail("That person already has another staff record.", 409, "ACCOUNT_TAKEN", [
-        { path: "body.userId", message: "Already linked to another record." },
-      ]);
+      return fail(
+        detail?.kind === "student"
+          ? "That account is already linked to another student."
+          : detail?.kind === "guardian"
+            ? "That account is already linked to another guardian."
+            : "That person already has another staff record.",
+        409,
+        "ACCOUNT_TAKEN",
+        [{ path: "body.userId", message: "Already linked to another record." }],
+      );
     case "ACCOUNT_MISMATCH":
       return fail(
         detail?.field === "category"
           ? "A staff record with a sign-in account keeps its category. Unlink the account first."
-          : "Choose an active member of this school whose role fits this record (teaching staff for a teacher, non-teaching staff otherwise).",
+          : detail?.kind === "student"
+            ? "Choose an active member of this school who signs in as a student."
+            : detail?.kind === "guardian"
+              ? "Choose an active member of this school who signs in as a parent."
+              : "Choose an active member of this school whose role fits this record (teaching staff for a teacher, non-teaching staff otherwise).",
         409,
         "ACCOUNT_MISMATCH",
         detail?.field === "category" ? undefined : [{ path: "body.userId", message: "Choose a member whose role fits this record." }],

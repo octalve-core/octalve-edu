@@ -10,6 +10,9 @@ import { FOCUS_RING } from "@/components/shell/nav";
 import { ConfirmDialog, ListState, LiveNotice, StatusPill, useDialog, type Notice } from "@/components/academics/parts";
 import { failureText, useApi } from "@/components/academics/useApi";
 import { StandingPanel } from "@/components/standing/StandingPanel";
+import { Alert } from "@/components/ui/Alert";
+import { ROLE_LABELS } from "@/lib/roles";
+import { LinkAccountDialog, UnlinkAccountDialog, type AccountKind } from "./AccountDialogs";
 import { AddGuardianDialog, EditLinkDialog, RemoveGuardianDialog } from "./GuardianDialogs";
 import { ArchiveStudentDialog, EnrolDialog, StudentFormDialog, WithdrawDialog, enrolmentTone } from "./StudentDialogs";
 import {
@@ -60,6 +63,9 @@ export function StudentDetail({
   const addingGuardian = useDialog<true>();
   const editingLink = useDialog<GuardianLinkView>();
   const removing = useDialog<GuardianLinkView>();
+  // The sign-in account of the pupil or of a guardian (task 0065): which record, so one pair of dialogs serves both.
+  const linking = useDialog<{ kind: AccountKind; id: string; name: string }>();
+  const unlinking = useDialog<{ kind: AccountKind; id: string; name: string }>();
 
   const [duplicateToRestore, setDuplicateToRestore] = useState<string | null>(null);
 
@@ -219,6 +225,61 @@ export function StudentDetail({
               )}
             </section>
 
+            <section aria-labelledby="pupil-signin-heading" className="space-y-3">
+              <h2 id="pupil-signin-heading" className="text-lg font-semibold tracking-tight text-fg">
+                Sign-in
+              </h2>
+              <div className="rounded-2xl border border-line bg-surface p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 space-y-1 text-sm text-fg-2">
+                    {student.account.state === "linked" ? (
+                      <p>
+                        Signs in as <strong className="text-fg">{student.account.name ?? "an unnamed account"}</strong>
+                        {student.account.email ? ` (${student.account.email})` : ""} · {ROLE_LABELS[student.account.role]}
+                      </p>
+                    ) : (
+                      <p>
+                        No sign-in yet, so there is nothing for {name} in the pupil&apos;s portal. Invite them on the Users page as a
+                        student, then link the account here.
+                      </p>
+                    )}
+                  </div>
+                  {canEdit && live && (
+                    <div className="flex flex-wrap gap-2">
+                      {student.account.state === "linked" ? (
+                        <Button
+                          variant="ghost"
+                          aria-label={`Unlink ${name}'s account`}
+                          onClick={() => (setNotice(null), unlinking.show({ kind: "student", id: student.id, name }))}
+                        >
+                          Unlink account
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="secondary"
+                          aria-label={`Link ${name} to an account`}
+                          onClick={() => (setNotice(null), linking.show({ kind: "student", id: student.id, name }))}
+                        >
+                          Link account…
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {student.account.state === "linked" && student.account.deactivated && (
+                  <Alert variant="info" announce={false} className="mt-4">
+                    This person&apos;s access was switched off on the Users page, so they can&apos;t sign in.
+                  </Alert>
+                )}
+                {student.account.state === "linked" && student.account.roleDiffers && (
+                  <Alert variant="info" announce={false} className="mt-4">
+                    Their account&apos;s role ({ROLE_LABELS[student.account.role]}) is no longer a student&apos;s, so the pupil&apos;s
+                    portal will not open for them. The Users page changes roles.
+                  </Alert>
+                )}
+              </div>
+            </section>
+
             <section aria-labelledby="guardians-heading" className="space-y-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
@@ -254,6 +315,11 @@ export function StudentDetail({
                           {link.guardian.phone ? ` · ${link.guardian.phone}` : ""}
                           {link.guardian.email ? ` · ${link.guardian.email}` : ""}
                         </p>
+                        <p className="mt-0.5 text-xs text-fg-muted">
+                          {link.guardian.account.state === "linked"
+                            ? `Signs in as ${link.guardian.account.name ?? "an unnamed account"}${link.guardian.account.email ? ` (${link.guardian.account.email})` : ""}${link.guardian.account.deactivated ? ", access switched off" : ""}`
+                            : "No sign-in yet"}
+                        </p>
                       </div>
                       {canEdit && live && (
                         <div className="flex flex-wrap gap-2">
@@ -264,6 +330,37 @@ export function StudentDetail({
                           >
                             Edit
                           </Button>
+                          {link.guardian.account.state === "linked" ? (
+                            <Button
+                              variant="ghost"
+                              aria-label={`Unlink ${link.guardian.firstName} ${link.guardian.lastName}'s account`}
+                              onClick={() => (
+                                setNotice(null),
+                                unlinking.show({
+                                  kind: "guardian",
+                                  id: link.guardian.id,
+                                  name: `${link.guardian.firstName} ${link.guardian.lastName}`,
+                                })
+                              )}
+                            >
+                              Unlink account
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="secondary"
+                              aria-label={`Link ${link.guardian.firstName} ${link.guardian.lastName} to an account`}
+                              onClick={() => (
+                                setNotice(null),
+                                linking.show({
+                                  kind: "guardian",
+                                  id: link.guardian.id,
+                                  name: `${link.guardian.firstName} ${link.guardian.lastName}`,
+                                })
+                              )}
+                            >
+                              Link account…
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             aria-label={`Remove ${link.guardian.firstName} ${link.guardian.lastName}`}
@@ -355,6 +452,30 @@ export function StudentDetail({
                 student={student}
                 link={removing.value}
                 onDone={done(removing.hide, "Guardian removed.")}
+              />
+            )}
+            {linking.n > 0 && linking.value && (
+              <LinkAccountDialog
+                key={`linking-${linking.n}`}
+                open={linking.open}
+                onClose={linking.hide}
+                schoolCode={schoolCode}
+                kind={linking.value.kind}
+                recordId={linking.value.id}
+                recordName={linking.value.name}
+                onDone={done(linking.hide, "Account linked.")}
+              />
+            )}
+            {unlinking.n > 0 && unlinking.value && (
+              <UnlinkAccountDialog
+                key={`unlinking-${unlinking.n}`}
+                open={unlinking.open}
+                onClose={unlinking.hide}
+                schoolCode={schoolCode}
+                kind={unlinking.value.kind}
+                recordId={unlinking.value.id}
+                recordName={unlinking.value.name}
+                onDone={done(unlinking.hide, "Account unlinked.")}
               />
             )}
             {duplicateToRestore && (
