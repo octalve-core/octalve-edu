@@ -42,6 +42,14 @@ const SAMPLES: Record<string, string> = {
   date: "16 Oct 2026",
 };
 
+/// What the person is told when a broadcast has no one to go to: how many people in the audience have no address for the channel, and what to do about it.
+function nobodyMessage(channel: NotificationChannel, withoutAddress: number): string {
+  if (withoutAddress === 0) return "Nothing was sent: nobody is in this audience.";
+  const what = channel === NotificationChannel.EMAIL ? "email address" : "phone number";
+  const many = withoutAddress !== 1;
+  return `Nothing was sent. ${withoutAddress} ${many ? "people" : "person"} in this audience ${many ? "have" : "has"} no ${what} on record. Add it to their record, or choose another channel.`;
+}
+
 export function BroadcastComposer({
   schoolCode,
   campuses,
@@ -61,6 +69,7 @@ export function BroadcastComposer({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [nobody, setNobody] = useState<string | null>(null);
 
   const bodyId = useId();
 
@@ -96,6 +105,7 @@ export function BroadcastComposer({
     setSending(true);
     setError(null);
     setSuccess(null);
+    setNobody(null);
 
     const payload = {
       channel,
@@ -117,8 +127,13 @@ export function BroadcastComposer({
       return;
     }
 
-    const data = res.data as { count?: number; channel?: NotificationChannel } | undefined;
+    const data = res.data as { count?: number; channel?: NotificationChannel; withoutAddress?: number } | undefined;
     const count = data?.count ?? 0;
+    if (count === 0) {
+      // nobody to send to (task 0069): say so and why, keep what was written, and stay here: nothing was queued, so there is nothing to follow in the log
+      setNobody(nobodyMessage(channel, data?.withoutAddress ?? 0));
+      return;
+    }
     setSuccess(`Broadcast queued successfully for ${count} recipient${count === 1 ? "" : "s"} via ${channel}.`);
     setBody("");
     setSubject("");
@@ -135,6 +150,11 @@ export function BroadcastComposer({
         </Alert>
       )}
 
+      {nobody && (
+        <Alert variant="warning">
+          <span>{nobody}</span>
+        </Alert>
+      )}
       {error && (
         <Alert variant="error">
           <span>{error}</span>

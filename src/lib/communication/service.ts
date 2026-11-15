@@ -303,12 +303,14 @@ export async function createBroadcast(
   tenantId: string,
   _authorUserId: string,
   input: CreateBroadcastInput,
-): Promise<{ count: number; channel: NotificationChannel }> {
+): Promise<{ count: number; channel: NotificationChannel; withoutAddress: number }> {
   const verifiedTenant = trustedTenantId(tenantId);
 
   // 1. Resolve recipients under tenant RLS context
-  const { recipients, schoolName, today } = await forTenant(verifiedTenant).transaction(async (tx) => {
+  const { recipients, withoutAddress, schoolName, today } = await forTenant(verifiedTenant).transaction(async (tx) => {
     const list: TargetRecipient[] = [];
+    // the people in the audience with no address for the channel (task 0069), each once: a guardian of two children in the chosen class is one person
+    const missing = new Set<string>();
     // the values of the tags that are the same for everyone: the school's name and today's date in the school's own time zone
     const school = await tx.tenant.findUnique({ where: { id: tenantId }, select: { name: true } });
     const zone = await readSchoolTimeZone(tx, tenantId);
@@ -409,6 +411,8 @@ export async function createBroadcast(
             campusIds: [...(campusesOf.get(g.id) ?? [])],
             guardian: { children: childrenOf.get(g.id) ?? [] },
           });
+        } else {
+          missing.add(`guardian:${g.id}`);
         }
       }
     }
@@ -438,11 +442,13 @@ export async function createBroadcast(
             name: `${s.firstName} ${s.lastName}`.trim(),
             campusIds: s.campusId ? [s.campusId] : [],
           });
+        } else {
+          missing.add(`staff:${s.id}`);
         }
       }
     }
 
-    return { recipients: list, schoolName: school?.name ?? "School", today: messageDate(new Date(), zone) };
+    return { recipients: list, withoutAddress: missing.size, schoolName: school?.name ?? "School", today: messageDate(new Date(), zone) };
   });
 
   // De-duplicate by address
@@ -456,7 +462,7 @@ export async function createBroadcast(
   const uniqueRecipients = Array.from(uniqueMap.values());
 
   if (uniqueRecipients.length === 0) {
-    return { count: 0, channel: input.channel };
+    return { count: 0, channel: input.channel, withoutAddress };
   }
 
   // 2. Prepare dispatch jobs. The tags are filled in here, one message per recipient (tags.ts says which exist for whom; the input check has refused any other): the school's name and
@@ -498,5 +504,5 @@ export async function createBroadcast(
   // 3. Queue in BullMQ
   await enqueueBulkNotificationDispatches(dispatches);
 
-  return { count: dispatches.length, channel: input.channel };
+  return { count: dispatches.length, channel: input.channel, withoutAddress };
 }
