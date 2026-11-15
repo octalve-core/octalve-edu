@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { CheckboxField } from "@/components/ui/CheckboxField";
@@ -88,8 +88,15 @@ function FormBody({
   ];
   const [campusId, setCampusId] = useState(places[0]?.value ?? "");
   const [problems, setProblems] = useState<string[]>([]);
+  const problemsRef = useRef<HTMLDivElement>(null);
   const [pending, setPending] = useState(false);
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
+
+  // The list of reasons is at the head of a form that scrolls (the dialog is taller than the window) and Save is at its foot: without this a refused save looks like nothing happened.
+  // `nearest` moves nothing when the list is already in view. Focus stays on the button that was pressed; the list announces itself (role="alert").
+  useEffect(() => {
+    if (problems.length > 0) problemsRef.current?.scrollIntoView({ block: "nearest" });
+  }, [problems]);
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -121,13 +128,15 @@ function FormBody({
     <div className="space-y-5">
       <form onSubmit={save} className="space-y-4" noValidate>
         {problems.length > 0 && (
-          <Alert variant="error">
-            <ul className="list-disc pl-5">
-              {problems.map((p) => (
-                <li key={p}>{p}</li>
-              ))}
-            </ul>
-          </Alert>
+          <div ref={problemsRef}>
+            <Alert variant="error">
+              <ul className="list-disc pl-5">
+                {problems.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+            </Alert>
+          </div>
         )}
         {!saved && places.length > 1 && (
           <SelectField label="Written for" value={campusId} onChange={(e) => setCampusId(e.target.value)} options={places} />
