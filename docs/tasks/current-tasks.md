@@ -780,3 +780,12 @@
 - [x] Fixed: `reasonOf(reply, fallback)` in `postJson.ts` (the composer's inline expression becomes a call to it); the template routes say "Give the template a name of at least 2 characters.", "Keep the template name to 100 characters or fewer." and "Keep the subject to 255 characters or fewer."; "The message was sent." / "The message was not sent." for one message, totals above 1 read as before (29 lines added, 10 changed in five files)
 - [x] `tests/api/communication-template-reasons.spec.ts` (5) and `tests/e2e/communication-wording.spec.ts` (3, desktop and phone): failing first on the unfixed code (API 4 failed, browser 6 failed); on the fixed build unit 1267, api 43, browser 37 passed
 - [ ] Not done: six other components still read `res.message ||` directly and were not checked one by one; not run: integration and https, the whole responsive spec, mutation passes (deferred)
+
+## TASK-0071: A refused question form shows its reasons where the person is looking (found by the walkthrough's question-bank chapter, task 0053)
+
+[Task file](0071-question-form-refusal-in-view.md). Found by reading C11's screenshot of an empty question form being refused (2026-11-15): the dialog was scrolled to its foot (Save is there) and the list of reasons is at its head, out of sight, so nothing visibly happened. Built on `claude/octalve-question-form-refusal`; no route, schema, wording or migration change.
+
+- [x] The finding, checked in the code and in the screenshot: `QuestionForm.tsx` renders the problems as an `Alert` at the top of a long dialog form and does nothing else; the dialog is the scrolling box
+- [x] Fixed: the alert sits in a wrapper with a ref and an effect scrolls it into view (`block: "nearest"`) when the list of problems changes; focus stays where it is (one file, 17 lines added, 8 changed)
+- [x] `tests/e2e/question-form-refusal.spec.ts` (2 tests, desktop and phone): the list is in the viewport after a refused save (failing first: viewport ratio 0 on both), and a control that axe and overflow pass in both themes with the refusal showing
+- [ ] Not done: other long dialog forms with the same shape were not checked one by one; not run: integration and https, the whole responsive spec, mutation passes (deferred)
