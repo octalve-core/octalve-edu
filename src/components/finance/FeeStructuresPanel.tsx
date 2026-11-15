@@ -19,7 +19,7 @@ export interface FeeItem {
 interface FeeStructuresPanelProps {
   schoolCode: string;
   feeStructures: FeeItem[];
-  periods: { id: string; label: string }[];
+  periods: { id: string; label: string; isCurrent: boolean }[];
   classGroups: { id: string; name: string }[];
   canManageFinance: boolean;
   onRefresh?: () => void;
@@ -35,7 +35,8 @@ export function FeeStructuresPanel({
 }: FeeStructuresPanelProps) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const targetClassId = useId(); // ties the "Target Class" label to its field (task 0066)
-  const [selectedPeriod, setSelectedPeriod] = useState<string>(periods[0]?.id || "");
+  // opens on the CURRENT term, not the newest: a school that copied its year has next year's term first (task 0067)
+  const [selectedPeriod, setSelectedPeriod] = useState<string>((periods.find((p) => p.isCurrent) ?? periods[0])?.id || "");
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [classGroupId, setClassGroupId] = useState<string>("");
