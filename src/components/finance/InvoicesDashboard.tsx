@@ -29,7 +29,7 @@ export interface InvoiceListItem {
 interface InvoicesDashboardProps {
   schoolCode: string;
   invoices: InvoiceListItem[];
-  periods: { id: string; label: string }[];
+  periods: { id: string; label: string; isCurrent: boolean }[];
   canManageFinance: boolean;
   onRefresh?: () => void;
 }
@@ -40,7 +40,9 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
   const [searchQuery, setSearchQuery] = useState("");
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
   const generateId = useId(); // ties each label of the generator to its field (task 0066)
-  const [generatePeriodId, setGeneratePeriodId] = useState(periods[0]?.id || "");
+  // the generator opens on the CURRENT term, not the newest (task 0067)
+  const [generatePeriodId, setGeneratePeriodId] = useState((periods.find((p) => p.isCurrent) ?? periods[0])?.id || "");
+  const periodLabels = useMemo(() => new Map(periods.map((p) => [p.id, p.label])), [periods]);
   const [generateDueDate, setGenerateDueDate] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateMessage, setGenerateMessage] = useState<string | null>(null);
@@ -239,7 +241,7 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
                       </p>
                       <p className="font-mono text-xs text-fg-muted">{inv.student.admissionNo}</p>
                     </td>
-                    <td className="px-4 py-4 text-fg-muted">{inv.period.label}</td>
+                    <td className="px-4 py-4 text-fg-muted">{periodLabels.get(inv.period.id) ?? inv.period.label}</td>
                     <td className="px-4 py-4 text-right font-medium text-fg">{formatNaira(inv.totalAmount)}</td>
                     <td className="px-4 py-4 text-right text-ok-fg font-medium">{formatNaira(inv.amountPaid)}</td>
                     <td className="px-4 py-4 text-center">{statusBadge(inv.status)}</td>

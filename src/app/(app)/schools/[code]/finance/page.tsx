@@ -25,11 +25,14 @@ export default async function FinancePage({ params }: { params: Promise<{ code: 
     queryInvoices(tenant.tenantId, requester, { pageSize: 100 }),
     queryFeeStructures(tenant.tenantId),
     tenant.run(async (tx) => ({
-      periods: await tx.academicPeriod.findMany({
-        where: { tenantId: tenant.tenantId, archivedAt: null },
-        select: { id: true, label: true },
-        orderBy: [{ startDate: "desc" }],
-      }),
+      // A term is offered with its session ("Term 1 · 2026/2027"): a school that copied its year has two terms with the same name (task 0067).
+      periods: (
+        await tx.academicPeriod.findMany({
+          where: { tenantId: tenant.tenantId, archivedAt: null },
+          select: { id: true, label: true, isCurrent: true, session: { select: { label: true } } },
+          orderBy: [{ startDate: "desc" }],
+        })
+      ).map((period) => ({ id: period.id, label: `${period.label} · ${period.session.label}`, isCurrent: period.isCurrent })),
       classGroups: await tx.classGroup.findMany({
         where: { tenantId: tenant.tenantId },
         select: { id: true, name: true },

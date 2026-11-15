@@ -30,7 +30,7 @@ export function FinanceSections({
   schoolCode: string;
   invoices: InvoiceListItem[];
   feeStructures: FeeItem[];
-  periods: { id: string; label: string }[];
+  periods: { id: string; label: string; isCurrent: boolean }[];
   classGroups: { id: string; name: string }[];
   /// May record payments, apply discounts, generate invoices and set fee structures (the API checks again).
   canManageFinance: boolean;
