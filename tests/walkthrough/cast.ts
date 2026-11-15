@@ -26,3 +26,39 @@ export const school = {
   campuses: { north: "North Campus", south: "South Campus" },
   timeZone: { from: "UTC", to: "Africa/Lagos" },
 };
+
+/// What C04 sets up: the school year and its first term, a class with one arm, three subjects (one is archived again), an assessment scheme and a grade scale. A date is typed the way the browser's
+/// date field takes it (month, day and year as digits), and the "wrong" last day is before the first day, to show the refusal.
+export const academics = {
+  session: { name: "2026/2027", firstDay: "09072026", lastDay: "07232027", wrongLastDay: "09012026", copy: "2027/2028" },
+  term: { name: "Term 1", firstDay: "09072026", lastDay: "12182026", shown: "7 Sep 2026 – 18 Dec 2026" },
+  group: { name: "JSS 1", arm: "A", capacity: "40" },
+  maths: { name: "Mathematics", code: "mth", shownCode: "MTH" },
+  english: { name: "English Language" },
+  drawing: { name: "Drawing" },
+  scheme: { name: "Standard", exam: "60", component: "CA 1", tooSmall: "30", right: "40" },
+  scale: "Standard A–F",
+};
+
+/// The family of C05 and C06: a pupil and her brother, their father and mother, and the sign-in accounts of the pupil and the father (made on the Users page, linked on the pupil's page).
+export const family = {
+  pupil: {
+    first: "Sade",
+    last: "Okoro",
+    name: "Sade Okoro",
+    dobTyped: "03022014",
+    account: { name: "Sade Okoro", email: "sade.okoro@walkthrough.test" },
+  },
+  brother: { first: "Bisi", last: "Okoro", name: "Bisi Okoro", dobTyped: "02022016" },
+  father: {
+    first: "Gbenga",
+    last: "Okoro",
+    name: "Gbenga Okoro",
+    phone: "08031234567",
+    tooShortPhone: "12",
+    account: { name: "Gbenga Okoro", email: "gbenga.okoro@walkthrough.test" },
+  },
+  mother: { first: "Mary", last: "Okoro", name: "Mary Okoro" },
+  // the teacher's staff record (C05) carries the address the teacher signed up with in C03, and is linked to that account
+  teacherRecord: { first: "Chidi", last: "Okafor", name: "Chidi Okafor" },
+};
