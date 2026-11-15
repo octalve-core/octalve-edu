@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { TextField } from "@/components/ui/TextField";
@@ -34,6 +34,7 @@ export function FeeStructuresPanel({
   onRefresh,
 }: FeeStructuresPanelProps) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const targetClassId = useId(); // ties the "Target Class" label to its field (task 0066)
   const [selectedPeriod, setSelectedPeriod] = useState<string>(periods[0]?.id || "");
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
@@ -175,8 +176,11 @@ export function FeeStructuresPanel({
           />
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-fg">Target Class (Optional)</label>
+            <label htmlFor={targetClassId} className="text-sm font-medium text-fg">
+              Target Class (Optional)
+            </label>
             <select
+              id={targetClassId}
               className="w-full min-h-11 rounded-lg border border-line-strong bg-field px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
               value={classGroupId}
               onChange={(e) => setClassGroupId(e.target.value)}
