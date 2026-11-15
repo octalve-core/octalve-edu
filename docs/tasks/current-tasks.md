@@ -733,3 +733,13 @@
 - [x] `tests/api/people-accounts.spec.ts` (10 tests) and `tests/e2e/people-accounts-screens.spec.ts` (3 tests, desktop and phone): failing first on the unfixed build (10 and 6 failed, the setup passed); on the final tree unit 1267, api 138 and e2e 103 passed (the e2e run includes the whole responsive spec). One neighbour test, which pins the student view's exact keys, was changed on purpose to include `account`
 - [x] Found on the way: the shared Playwright browser cache lost this repository's browser mid-run (another project's install removes revisions its link list does not name); reinstalled and registered from both checkouts
 - [ ] Not done, the maintainer's: an invitation that carries the record and links it when accepted (a migration), and a code a guardian claims their child with; not run: the `https` and `integration` projects and the whole suite (no TLS, cookie or schema behaviour changed), mutation passes (deferred)
+
+## TASK-0066: Three finance fields are named for a screen reader and can be clicked by their label (found by reading the source for the walkthrough's finance chapter, task 0053)
+
+[Task file](0066-finance-form-labels.md). The "Batch Generate Term Invoices" dialog (Academic Period, Due Date) and the fee schedule form's Target Class drew a `<label>` that was not tied to its control, so a screen reader announced an unnamed field (the same class as task 0064). Built on `claude/octalve-finance-labels`; no route, library, schema or migration change.
+
+- [x] The finding, checked in the code: a scan of every `<label>` under `src` for one with no `htmlFor` and no control inside it found seven: three are reachable fields (the ones fixed), one is the "Delivery Channel" label over a row of buttons (a group name, left as it is), and three belong to `CertificatesConsole`, which nothing mounts
+- [x] Fixed: `useId()`, `htmlFor` and `id` in `InvoicesDashboard.tsx` and `FeeStructuresPanel.tsx` (16 lines added, 5 changed, no visible change)
+- [x] `tests/e2e/finance-form-labels.spec.ts` (desktop and phone): every field found by its label, a click on the words focuses it, a fee is made and invoices are generated through them, axe and overflow in both themes with each dialog open. Failing first on the unfixed build (2 failed, the setup passed: `getByLabel('Target Class (Optional)')` not found); on the fixed build unit 1267 and the browser run of the new spec, the Finance and standing specs and the whole responsive spec 73 passed
+- [ ] Not done, the maintainer's: `CertificatesConsole.tsx` is mounted nowhere and seeded with invented certificates (remove or finish it); not run: the api, integration and https projects (nothing of theirs changed), mutation passes (deferred)
+

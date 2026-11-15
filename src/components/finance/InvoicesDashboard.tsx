@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useId, useState, useMemo } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -39,6 +39,7 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
   const [selectedPeriod, setSelectedPeriod] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
+  const generateId = useId(); // ties each label of the generator to its field (task 0066)
   const [generatePeriodId, setGeneratePeriodId] = useState(periods[0]?.id || "");
   const [generateDueDate, setGenerateDueDate] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -266,8 +267,11 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
           )}
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-fg">Academic Period</label>
+            <label htmlFor={`${generateId}-period`} className="text-sm font-medium text-fg">
+              Academic Period
+            </label>
             <select
+              id={`${generateId}-period`}
               className="w-full min-h-11 rounded-lg border border-line-strong bg-field px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
               value={generatePeriodId}
               onChange={(e) => setGeneratePeriodId(e.target.value)}
@@ -282,8 +286,11 @@ export function InvoicesDashboard({ schoolCode, invoices, periods, canManageFina
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-fg">Due Date (Optional)</label>
+            <label htmlFor={`${generateId}-due`} className="text-sm font-medium text-fg">
+              Due Date (Optional)
+            </label>
             <input
+              id={`${generateId}-due`}
               type="date"
               className="w-full min-h-11 rounded-lg border border-line-strong bg-field px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
               value={generateDueDate}
