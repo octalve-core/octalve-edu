@@ -69,3 +69,13 @@ export const marks = {
   english: { ca: "25", exam: "40" },
   returnReason: "The exam mark looks wrong",
 };
+
+/// What C09 bills: two fees (one for JSS 1 only, one for every class), the due date of the invoices (typed as digits), a part payment, a discount, and the school's rule on the smallest part.
+export const finance = {
+  tuition: { name: "Tuition", amount: "75000" },
+  levy: { name: "Development Levy", amount: "15000" },
+  dueDate: "12012026",
+  part: "30000",
+  discount: { amount: "10000", reason: "Staff child waiver" },
+  rule: { smallestPart: "2000", shown: "Part payments are allowed, at least ₦2,000." },
+};

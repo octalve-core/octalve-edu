@@ -1142,5 +1142,127 @@
       "src/components/results/ReviewPanel.tsx"
     ],
     "status": "planned"
+  },
+  {
+    "id": "FIN-01",
+    "area": "Finance",
+    "feature": "Finance has three tabs: Invoices, Fee structures and Payment rules",
+    "route": "/schools/[code]/finance",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Open Finance from the sidebar: the three tabs are listed and Invoices is selected",
+    "source": [
+      "src/app/(app)/schools/[code]/finance/page.tsx",
+      "src/components/finance/FinanceSections.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FIN-02",
+    "area": "Finance",
+    "feature": "A fee is a name, an amount and optionally one class; a fee with no class is charged to every pupil",
+    "route": "/schools/[code]/finance",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Fee structures: an empty list says so; Add Fee Schedule with a name, an amount and a class: the row says the class only; one with no class says All Classes",
+    "source": [
+      "src/components/finance/FeeStructuresPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FIN-03",
+    "area": "Finance",
+    "feature": "The term's invoices are generated for every enrolled pupil from the fees that apply to them",
+    "route": "/schools/[code]/finance",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Generate Term Invoices: choose the term and a due date: the dialog says one new invoice was generated and the pupil's row reads Unpaid",
+    "source": [
+      "src/components/finance/InvoicesDashboard.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FIN-04",
+    "area": "Finance",
+    "feature": "An invoice's page says how it may be paid; the administrator requires payment in full on it and allows parts again",
+    "route": "/schools/[code]/finance/invoices/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Open the invoice (View & Pay): 'Part payments are allowed'; Require payment in full: the notice and the region say so; Allow part payments: the button to require it is back",
+    "source": [
+      "src/app/(app)/schools/[code]/finance/invoices/[id]/page.tsx",
+      "src/components/finance/InvoiceDetailView.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FIN-05",
+    "area": "Finance",
+    "feature": "A part payment received at the bursary is recorded with its channel and a receipt is issued; the invoice becomes partly paid",
+    "route": "/schools/[code]/finance/invoices/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Record Payment: an amount and the Cash channel, Record Payment & Issue Receipt: the status reads PARTIALLY PAID and the payment ledger is on the page",
+    "source": [
+      "src/components/finance/InvoiceDetailView.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FIN-06",
+    "area": "Finance",
+    "feature": "A discount with an amount and a reason is applied to an invoice and listed on it",
+    "route": "/schools/[code]/finance/invoices/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Apply Discount: an amount and a reason: the discounts and waivers list shows the reason",
+    "source": [
+      "src/components/finance/InvoiceDetailView.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FIN-07",
+    "area": "Finance",
+    "feature": "The school's rule on the smallest part is changed with the administrator's password, and the page then says it",
+    "route": "/schools/[code]/finance",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Payment rules: Smallest part an amount, 2000, Save the rule: the dialog asks for the account password; confirm: 'The school's rule saved.' and the rule's sentence names the amount",
+    "source": [
+      "src/components/finance/PaymentRulesPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FIN-08",
+    "area": "Finance",
+    "feature": "A campus administrator reads the school's rule and has no button to change it",
+    "route": "/schools/[code]/finance",
+    "roles": [
+      "Campus administrator"
+    ],
+    "kind": "negative",
+    "proof": "Sign in as the campus administrator: Payment rules says only the school's administrator changes a rule and offers no Save the rule button",
+    "source": [
+      "src/components/finance/PaymentRulesPanel.tsx"
+    ],
+    "status": "planned"
   }
 ]
