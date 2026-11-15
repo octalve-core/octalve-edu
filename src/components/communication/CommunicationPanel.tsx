@@ -23,11 +23,13 @@ interface CommunicationPanelProps {
   schoolCode: string;
   campuses: CampusOption[];
   classArms: ClassArmOption[];
+  /// A campus administrator addresses their own campus only (task 0068): the composer offers no "All Campuses" and opens on their campus.
+  ownCampusOnly?: boolean;
 }
 
 type TabKey = "broadcast" | "templates" | "logs";
 
-export function CommunicationPanel({ schoolCode, campuses, classArms }: CommunicationPanelProps) {
+export function CommunicationPanel({ schoolCode, campuses, classArms, ownCampusOnly = false }: CommunicationPanelProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("broadcast");
   // messages that are due (a broadcast just queued, or one that was cut off) are sent in the background, whichever tab is open
   const pump = useQueuePump(schoolCode);
@@ -76,6 +78,7 @@ export function CommunicationPanel({ schoolCode, campuses, classArms }: Communic
             schoolCode={schoolCode}
             campuses={campuses}
             classArms={classArms}
+            ownCampusOnly={ownCampusOnly}
             onBroadcastSent={() => setActiveTab("logs")}
             onQueued={pump.begin}
           />

@@ -32,6 +32,8 @@ export default async function CommunicationPage({ params }: { params: Promise<{ 
         where: {
           tenantId: tenant.tenantId,
           archivedAt: null,
+          // a campus administrator may address the classes of their own campus only (task 0068): another campus's arm would be refused, so it is not offered
+          ...(tenant.role === "CAMPUS_ADMIN" ? { classGroup: { campusId: tenant.campusId ?? "none" } } : {}),
         },
         select: {
           id: true,
@@ -50,7 +52,12 @@ export default async function CommunicationPage({ params }: { params: Promise<{ 
         description={`Multi-channel messaging engine for ${tenant.tenantName} — broadcast announcements, notification templates, and delivery diagnostics.`}
       />
       <fieldset disabled={Boolean(tenant.support)} className="min-w-0">
-        <CommunicationPanel schoolCode={tenant.tenantCode} campuses={campuses} classArms={classArms} />
+        <CommunicationPanel
+          schoolCode={tenant.tenantCode}
+          campuses={campuses}
+          classArms={classArms}
+          ownCampusOnly={tenant.role === "CAMPUS_ADMIN"}
+        />
       </fieldset>
     </div>
   );
