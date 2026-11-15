@@ -52,6 +52,8 @@ export function SendingProgress({ state, onRetry, onDismiss }: { state: PumpStat
   }
 
   const notSent = state.failed + state.retrying;
+  // a broadcast to one person (task 0070): "The message was sent", not "All 1 messages were sent"
+  const one = state.total === 1;
   return (
     <div
       role="status"
@@ -62,8 +64,12 @@ export function SendingProgress({ state, onRetry, onDismiss }: { state: PumpStat
     >
       <p>
         {notSent > 0
-          ? `All ${state.total} messages were handled: ${state.sent} sent, ${notSent} not sent.${state.firstError ? ` ${state.firstError}` : ""} Messages that did not go are tried again by the scheduled run (three attempts in all); the details are in Delivery Logs & Diagnostics.`
-          : `All ${state.total} messages were sent.`}
+          ? one
+            ? `The message was not sent.${state.firstError ? ` ${state.firstError}` : ""} It is tried again by the scheduled run (three attempts in all); the details are in Delivery Logs & Diagnostics.`
+            : `All ${state.total} messages were handled: ${state.sent} sent, ${notSent} not sent.${state.firstError ? ` ${state.firstError}` : ""} Messages that did not go are tried again by the scheduled run (three attempts in all); the details are in Delivery Logs & Diagnostics.`
+          : one
+            ? "The message was sent."
+            : `All ${state.total} messages were sent.`}
       </p>
       <button
         type="button"

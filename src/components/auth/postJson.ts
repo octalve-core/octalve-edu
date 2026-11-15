@@ -53,6 +53,10 @@ export function getJson(path: string, signal?: AbortSignal): Promise<Reply> {
 export const problemFor = (reply: Reply, field: string): string | undefined =>
   reply.details?.find((d) => d.path === `body.${field}`)?.message;
 
+/// What to tell the person about a refused request (task 0070): the first field-level reason if the route gave one (a 400's `details`), else the route's own message, else `fallback`. A validating route's
+/// own message is only "Some of the fields are not valid.": the reason is in `details`.
+export const reasonOf = (reply: Reply, fallback: string): string => reply.details?.[0]?.message || reply.message || fallback;
+
 export const NETWORK_ERROR = "Can't reach the server. Check your internet connection and try again.";
 export const GENERIC_ERROR = "That didn't work. Please try again in a moment.";
 export const RATE_LIMITED = "Too many attempts. Please wait a few minutes and try again.";
