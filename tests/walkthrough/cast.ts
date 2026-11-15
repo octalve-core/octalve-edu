@@ -62,3 +62,10 @@ export const family = {
   // the teacher's staff record (C05) carries the address the teacher signed up with in C03, and is linked to that account
   teacherRecord: { first: "Chidi", last: "Okafor", name: "Chidi Okafor" },
 };
+
+/// The marks of C08: Mathematics (CA 1 out of 40, the exam out of 60: the scheme of C04), a mark typed too high on purpose, and English; and the reason a mark is returned with.
+export const marks = {
+  maths: { ca: "30", exam: "45.5", total: "75.5", examTooHigh: "75" },
+  english: { ca: "25", exam: "40" },
+  returnReason: "The exam mark looks wrong",
+};

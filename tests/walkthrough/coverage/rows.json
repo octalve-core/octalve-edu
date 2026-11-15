@@ -891,5 +891,256 @@
       "src/app/(app)/schools/[code]/children/page.tsx"
     ],
     "status": "planned"
+  },
+  {
+    "id": "TCH-01",
+    "area": "People",
+    "feature": "A teacher's page lists the subjects they teach, each for a class; the form says what is missing",
+    "route": "/schools/[code]/people/staff/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Add a subject on the teacher's page: the empty form asks for a subject and a class; with both chosen the notice says Added and the list names the subject and the class",
+    "source": [
+      "src/components/people/StaffDetail.tsx",
+      "src/components/people/StaffDialogs.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "TCH-02",
+    "area": "People",
+    "feature": "A staff record with subjects assigned cannot be archived: the refusal says to remove them first",
+    "route": "/schools/[code]/people/staff/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "negative",
+    "proof": "Archive the teacher: 'Subjects are still assigned to this person. Remove those first.'; cancel: the record is unchanged",
+    "source": [
+      "src/components/people/StaffDetail.tsx",
+      "src/components/people/StaffDialogs.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "TIM-01",
+    "area": "Timetable",
+    "feature": "A lesson is scheduled from the school's own class arm, subject and teacher",
+    "route": "/schools/[code]/academics",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Timetable, Schedule Slot: choose the class arm, subject and teacher, type a room: the lesson is a card on the week, named by what it is",
+    "source": [
+      "src/components/timetable/SlotEditModal.tsx",
+      "src/components/timetable/TimetableCanvas.tsx",
+      "src/components/academics/TimetablePanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "TIM-02",
+    "area": "Timetable",
+    "feature": "A lesson opens with its own values and a change shows on its card at once",
+    "route": "/schools/[code]/academics",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Press the lesson's card: the form holds its room; change it and Update Slot: the card shows the new room",
+    "source": [
+      "src/components/timetable/SlotEditModal.tsx",
+      "src/components/timetable/TimetableCanvas.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "ATT-01",
+    "area": "Attendance",
+    "feature": "The daily roll lists the pupils enrolled in a class arm; Mark All Present, one pupil set by hand, and it is saved",
+    "route": "/schools/[code]/academics",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Attendance: the pupil is listed with their admission number; Mark All Present, set Late, Save Roll Call: 'Attendance saved for'",
+    "source": [
+      "src/components/academics/AttendancePanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "ATT-02",
+    "area": "Attendance",
+    "feature": "A teacher is offered only the class arms they teach, and takes the roll of their arm",
+    "route": "/schools/[code]/academics",
+    "roles": [
+      "Teacher"
+    ],
+    "kind": "positive",
+    "proof": "Sign in as the teacher: Attendance offers only the one class arm assigned to them; Mark All Present and Save Roll Call: 'Attendance saved for'",
+    "source": [
+      "src/components/academics/AttendancePanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "ACA-14",
+    "area": "Academics",
+    "feature": "A teacher can read the setup sections and finds no button that writes",
+    "route": "/schools/[code]/academics",
+    "roles": [
+      "Teacher"
+    ],
+    "kind": "negative",
+    "proof": "As the teacher open Sessions & terms: the session is listed and there is no New session button",
+    "source": [
+      "src/components/academics/SessionsPanel.tsx",
+      "src/components/academics/SectionNav.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "RES-01",
+    "area": "Results",
+    "feature": "The marks sheet has one column for each part of the school's scheme, for the class the teacher teaches",
+    "route": "/schools/[code]/results",
+    "roles": [
+      "Teacher"
+    ],
+    "kind": "positive",
+    "proof": "Sign in as the teacher: Results opens Enter marks; choose the subject: the sheet lists the pupil with columns for the scheme's component and exam and says Not entered",
+    "source": [
+      "src/app/(app)/schools/[code]/results/page.tsx",
+      "src/components/results/MarksPanel.tsx",
+      "src/components/results/ResultsNav.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "RES-02",
+    "area": "Results",
+    "feature": "A half-filled row and a mark above its part's maximum say why and stop the save; a typed row shows its total",
+    "route": "/schools/[code]/results",
+    "roles": [
+      "Teacher"
+    ],
+    "kind": "negative",
+    "proof": "Type only the component: 'Fill every part, or leave this pupil blank.'; type an exam above 60: 'At most 60.'; Save marks stays disabled; a valid exam shows the running total; Save marks leaves a Draft",
+    "source": [
+      "src/components/results/MarksPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "RES-03",
+    "area": "Results",
+    "feature": "Saved marks are sent for review: they become Submitted and the row can no longer be typed into",
+    "route": "/schools/[code]/results",
+    "roles": [
+      "Teacher"
+    ],
+    "kind": "positive",
+    "proof": "Send 1 saved for review: the notice says so, the row reads Submitted and its fields are disabled; the same for a second subject",
+    "source": [
+      "src/components/results/MarksPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "RES-04",
+    "area": "Results",
+    "feature": "The administrator approves marks on the Review tab",
+    "route": "/schools/[code]/results",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Review: Approve is disabled until a mark is selected; select one: '1 of 2 selected'; Approve: '1 mark moved to approved.'",
+    "source": [
+      "src/components/results/ReviewPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "RES-05",
+    "area": "Results",
+    "feature": "Returning a mark needs a reason: the dialog will not send without one, and the mark goes back to draft",
+    "route": "/schools/[code]/results",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "negative",
+    "proof": "Select a mark, Return to author: the Return button is disabled until a reason is typed; with the reason: '1 mark moved to draft.'",
+    "source": [
+      "src/components/results/ReviewPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "RES-06",
+    "area": "Results",
+    "feature": "An approved mark is published from the Approved filter",
+    "route": "/schools/[code]/results",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Choose the Approved status, select the mark, Publish: '1 mark moved to published.'",
+    "source": [
+      "src/components/results/ReviewPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "RES-07",
+    "area": "Results",
+    "feature": "A report card shows the published mark with its total and the pupil's class",
+    "route": "/schools/[code]/results",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Cards: the class list counts published subjects per pupil; open the card: the term, the subject, the mark out of 100 and the class are there; Back to the class returns to the list",
+    "source": [
+      "src/components/results/CardsPanel.tsx",
+      "src/components/results/ReportCard.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "RES-08",
+    "area": "Results",
+    "feature": "A member of the non-teaching staff has no Marks tab, opens on Review and has no Approve button",
+    "route": "/schools/[code]/results",
+    "roles": [
+      "Non-teaching staff"
+    ],
+    "kind": "negative",
+    "proof": "Sign in as the non-teaching staff member: Results has no Marks link, Review is the current page, and no Approve button is drawn",
+    "source": [
+      "src/components/results/ResultsNav.tsx",
+      "src/components/results/ReviewPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "RES-09",
+    "area": "Results",
+    "feature": "A campus administrator sees the Marks, Review and Cards tabs but has no Approve button without the approval permission",
+    "route": "/schools/[code]/results",
+    "roles": [
+      "Campus administrator"
+    ],
+    "kind": "negative",
+    "proof": "Sign in as the campus administrator: three tabs are offered; Review has no Approve button",
+    "source": [
+      "src/components/results/ResultsNav.tsx",
+      "src/components/results/ReviewPanel.tsx"
+    ],
+    "status": "planned"
   }
 ]
