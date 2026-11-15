@@ -1264,5 +1264,150 @@
       "src/components/finance/PaymentRulesPanel.tsx"
     ],
     "status": "planned"
+  },
+  {
+    "id": "COM-01",
+    "area": "Communication",
+    "feature": "The broadcast composer: channel, audience, a personalised tag added by its chip, Clear, and a confirmation that says who the message goes to",
+    "route": "/schools/[code]/communication",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Write an email to the staff, add the school-name tag with its chip, press Clear (subject and text empty), write it again; Dispatch Broadcast shows 'Audience: STAFF (All Campuses)'; Confirm & Send moves to the delivery log",
+    "source": [
+      "src/components/communication/BroadcastComposer.tsx",
+      "src/components/communication/CommunicationPanel.tsx",
+      "src/app/(app)/schools/[code]/communication/page.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "COM-02",
+    "area": "Communication",
+    "feature": "A broadcast that reaches nobody says nothing was sent and why, keeps what was written and stays on the composer",
+    "route": "/schools/[code]/communication",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "negative",
+    "proof": "Send an email to the parents, who have phone numbers and no email addresses: a warning says 'Nothing was sent. 2 people in this audience have no email address on record.', no 'queued successfully', the composer tab stays and the text is kept",
+    "source": [
+      "src/components/communication/BroadcastComposer.tsx",
+      "src/lib/communication/service.ts"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "COM-03",
+    "area": "Communication",
+    "feature": "A text message to the parents has no subject, takes the pupil's name by its chip, and is sent to the phone numbers on record",
+    "route": "/schools/[code]/communication",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Choose SMS (the subject field goes), write the text, add the pupil-name tag with its chip; the confirmation says 'Channel: SMS'; Confirm & Send moves to the delivery log and no warning is shown",
+    "source": [
+      "src/components/communication/BroadcastComposer.tsx",
+      "src/lib/communication/tags.ts"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "COM-04",
+    "area": "Communication",
+    "feature": "The delivery log lists every message with its status, channel and recipient, is narrowed by status, channel and a recipient search, and opens one message",
+    "route": "/schools/[code]/communication",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Filter by SENT, by the SMS channel (the staff email goes), search 'chidi' (the phone number goes), search a stranger (the empty-list sentence), open one message: its recipient and subject are shown",
+    "source": [
+      "src/components/communication/DispatchLogsView.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "COM-05",
+    "area": "Communication",
+    "feature": "The message templates are listed by channel and searched, previewed with sample values, and customised (name and wording)",
+    "route": "/schools/[code]/communication",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Choose EMAIL and search 'absence' (the other templates go), open Preview, then Customize, rename the template and save: the success line and the new name on the card",
+    "source": [
+      "src/components/communication/TemplatesManager.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "COM-06",
+    "area": "Communication",
+    "feature": "A template name that is too short is refused and the dialog keeps what was typed",
+    "route": "/schools/[code]/communication",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "negative",
+    "proof": "Customize a template, type a one-letter name and save: an alert is shown, the dialog stays open with the typed name; Cancel leaves the template as it was",
+    "source": [
+      "src/components/communication/TemplatesManager.tsx",
+      "src/lib/communication/http.ts"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "COM-07",
+    "area": "Communication",
+    "feature": "A teacher is offered no Communication, and its address shows the page for someone with no access",
+    "route": "/schools/[code]/communication",
+    "roles": [
+      "Teacher"
+    ],
+    "kind": "negative",
+    "proof": "Sign in as the teacher: the sidebar has no Communication; typing the address in a new tab shows 'You don't have access to this school'",
+    "source": [
+      "src/components/shell/nav.ts",
+      "src/app/(app)/schools/[code]/communication/page.tsx",
+      "src/app/(app)/forbidden.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "COM-08",
+    "area": "Communication",
+    "feature": "A campus administrator is offered their own campus and its classes only, reaches that campus's staff, and the delivery log hides messages about people of the whole school",
+    "route": "/schools/[code]/communication",
+    "roles": [
+      "Campus administrator"
+    ],
+    "kind": "negative",
+    "proof": "Sign in as the campus administrator: Campus Scope lists their campus only and Class Arm only 'All Classes'; an email to the staff says 'Audience: STAFF (Campus: North Campus)' and is logged; the parents' phone number (messages the school sent about pupils of no campus) is not in the log",
+    "source": [
+      "src/components/communication/BroadcastComposer.tsx",
+      "src/app/(app)/schools/[code]/communication/page.tsx",
+      "src/lib/communication/service.ts"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "COM-09",
+    "area": "Communication",
+    "feature": "A campus administrator cannot write to the parents of pupils who belong to the whole school: the audience is empty and the page says so",
+    "route": "/schools/[code]/communication",
+    "roles": [
+      "Campus administrator"
+    ],
+    "kind": "negative",
+    "proof": "As the campus administrator send an SMS to Parents / Guardians: 'Nothing was sent: nobody is in this audience.'",
+    "source": [
+      "src/components/communication/BroadcastComposer.tsx",
+      "src/lib/communication/service.ts"
+    ],
+    "status": "planned"
   }
 ]
