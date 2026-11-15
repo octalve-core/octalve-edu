@@ -179,13 +179,30 @@ export async function createTemplate(tenantId: string, input: CreateTemplateInpu
   });
 }
 
+/// Whose messages a caller may read or retry (task 0068): the whole school's (the school's administrator) or one campus's (a campus administrator). A campus administrator with no campus has no messages.
+export type DispatchScope = { kind: "school" } | { kind: "campus"; campusId: string | null };
+
+/// Anyone who is not the school's administrator is held to a campus: the routes admit an administrator and a campus administrator only, and this fails closed for any other role added later.
+export const dispatchScopeOf = (tenant: { role: string; campusId: string | null }): DispatchScope =>
+  tenant.role === "ADMIN" ? { kind: "school" } : { kind: "campus", campusId: tenant.campusId };
+
+/// The rows of a scope. A message carries the campuses of the people it is about in `metadata.campusIds` (broadcasts and the three events); one without it (made before task 0068) belongs to no campus,
+/// so a campus administrator does not see it. The school's administrator sees every row.
+const inScope = (scope: DispatchScope): Prisma.NotificationDispatchWhereInput =>
+  scope.kind === "school"
+    ? {}
+    : scope.campusId === null
+      ? { id: { in: [] } }
+      : { metadata: { path: ["campusIds"], array_contains: [scope.campusId] } };
+
 /**
- * Query dispatches with status / channel filters and pagination.
+ * Query dispatches with status / channel filters and pagination, within the caller's scope.
  */
-export async function listDispatches(tenantId: string, query: QueryDispatchesInput): Promise<PaginatedDispatches> {
+export async function listDispatches(tenantId: string, query: QueryDispatchesInput, scope: DispatchScope): Promise<PaginatedDispatches> {
   return forTenant(trustedTenantId(tenantId)).transaction(async (tx) => {
     const where: Prisma.NotificationDispatchWhereInput = {
       tenantId,
+      ...inScope(scope),
       ...(query.status ? { status: query.status } : {}),
       ...(query.channel ? { channel: query.channel } : {}),
       ...(query.recipient ? { recipientAddress: { contains: query.recipient, mode: "insensitive" } } : {}),
@@ -228,13 +245,13 @@ export async function listDispatches(tenantId: string, query: QueryDispatchesInp
 }
 
 /**
- * Retries a failed notification dispatch.
+ * Retries a failed notification dispatch of the caller's scope: a message outside it answers as an unknown id does.
  */
-export async function retryDispatch(tenantId: string, dispatchId: string): Promise<boolean> {
+export async function retryDispatch(tenantId: string, dispatchId: string, scope: DispatchScope): Promise<boolean> {
   const verifiedTenant = trustedTenantId(tenantId);
   return forTenant(verifiedTenant).transaction(async (tx) => {
-    const dispatch = await tx.notificationDispatch.findUnique({
-      where: { tenantId_id: { tenantId, id: dispatchId } },
+    const dispatch = await tx.notificationDispatch.findFirst({
+      where: { tenantId, id: dispatchId, ...inScope(scope) },
     });
 
     if (!dispatch || dispatch.status !== NotificationDispatchStatus.FAILED) {
@@ -273,6 +290,8 @@ interface TargetRecipient {
   address: string;
   userId?: string | null;
   name: string;
+  /// The campuses of the people the message is about (task 0068): a guardian's children in scope, or the member of staff's own campus. Empty for people of the whole school.
+  campusIds: string[];
   /// A guardian's children, for the `{{student_name}}` and `{{class_arm}}` tags (task 0056); absent for staff.
   guardian?: { children: Array<{ name: string; classArm: string | null }> };
 }
@@ -309,20 +328,31 @@ export async function createBroadcast(
         armStudentIds = studentIds;
         if (studentIds.length > 0) {
           const links = await tx.guardianLink.findMany({
-            where: { tenantId, studentId: { in: studentIds }, status: "APPROVED" },
+            where: {
+              tenantId,
+              studentId: { in: studentIds },
+              status: "APPROVED",
+              ...(input.campusId ? { student: { campusId: input.campusId } } : {}),
+            },
             include: { guardian: true },
           });
           guardianRecords = links.map((l) => l.guardian);
         }
       } else {
         guardianRecords = await tx.guardianRecord.findMany({
-          where: { tenantId, archivedAt: null },
+          // with a campus chosen: the guardians of at least one live pupil of that campus (the campus choice used to be read for staff only)
+          where: {
+            tenantId,
+            archivedAt: null,
+            ...(input.campusId ? { links: { some: { status: "APPROVED", student: { campusId: input.campusId, archivedAt: null } } } } : {}),
+          },
           select: { id: true, firstName: true, lastName: true, email: true, phone: true },
         });
       }
 
       // each guardian's children: approved links to pupils who are not archived, with the class each has in the ACTIVE session
       const childrenOf = new Map<string, Array<{ name: string; classArm: string | null }>>();
+      const campusesOf = new Map<string, Set<string>>();
       const guardianIds = guardianRecords.map((g) => g.id);
       if (guardianIds.length > 0) {
         const childLinks = await tx.guardianLink.findMany({
@@ -330,7 +360,8 @@ export async function createBroadcast(
             tenantId,
             guardianId: { in: guardianIds },
             status: "APPROVED",
-            student: { archivedAt: null },
+            // with a campus chosen, a guardian's tags and campuses name only the children on that campus (as with a class arm), so a campus administrator's text never carries another campus's pupil
+            student: { archivedAt: null, ...(input.campusId ? { campusId: input.campusId } : {}) },
             ...(armStudentIds ? { studentId: { in: armStudentIds } } : {}),
           },
           orderBy: { createdAt: "asc" },
@@ -340,6 +371,7 @@ export async function createBroadcast(
               select: {
                 firstName: true,
                 lastName: true,
+                campusId: true,
                 enrollments: {
                   where: { status: "ACTIVE", session: { status: "ACTIVE" } },
                   select: { classArm: { select: { name: true, classGroup: { select: { name: true } } } } },
@@ -357,6 +389,8 @@ export async function createBroadcast(
             classArm: arm ? `${arm.classGroup.name} ${arm.name}` : null,
           });
           childrenOf.set(link.guardianId, children);
+          if (link.student.campusId)
+            campusesOf.set(link.guardianId, (campusesOf.get(link.guardianId) ?? new Set()).add(link.student.campusId));
         }
       }
 
@@ -372,6 +406,7 @@ export async function createBroadcast(
           list.push({
             address: address.trim(),
             name: `${g.firstName} ${g.lastName}`.trim(),
+            campusIds: [...(campusesOf.get(g.id) ?? [])],
             guardian: { children: childrenOf.get(g.id) ?? [] },
           });
         }
@@ -401,6 +436,7 @@ export async function createBroadcast(
             address: address.trim(),
             userId: s.userId,
             name: `${s.firstName} ${s.lastName}`.trim(),
+            campusIds: s.campusId ? [s.campusId] : [],
           });
         }
       }
@@ -412,9 +448,10 @@ export async function createBroadcast(
   // De-duplicate by address
   const uniqueMap = new Map<string, TargetRecipient>();
   for (const r of recipients) {
-    if (!uniqueMap.has(r.address)) {
-      uniqueMap.set(r.address, r);
-    }
+    const first = uniqueMap.get(r.address);
+    if (!first) uniqueMap.set(r.address, { ...r, campusIds: [...r.campusIds] });
+    // one address shared by two people (a phone both parents use): one message, belonging to every campus either is on
+    else first.campusIds = [...new Set([...first.campusIds, ...r.campusIds])];
   }
   const uniqueRecipients = Array.from(uniqueMap.values());
 
@@ -452,6 +489,7 @@ export async function createBroadcast(
       audienceRole: input.audienceRole,
       campusId: input.campusId,
       classArmId: input.classArmId,
+      campusIds: target.campusIds,
       recipientName: target.name,
     },
     priority: input.channel === NotificationChannel.SMS ? 1 : 5,

@@ -181,10 +181,12 @@ elsewhere(
   "GET v1/schools/[code]/timetable/route.ts",
 );
 elsewhere(
-  "lib/communication/service.ts: communications are school-wide or filtered by audience target; campus-level isolation handled in dispatch service",
-  "POST v1/schools/[code]/communication/broadcast/route.ts",
+  "lib/communication/service.ts (task 0068): `dispatchScopeOf` and `inScope` limit the delivery log and its retry to the messages that carry the caller's campus (`metadata.campusIds`); a campus administrator sees and retries no other (tests/api/communication-campus.spec.ts). The broadcast route calls `announcementAudience`, so it is not on this list",
   "POST v1/schools/[code]/communication/dispatches/[id]/retry/route.ts",
   "GET v1/schools/[code]/communication/dispatches/route.ts",
+);
+elsewhere(
+  "school-wide by design and naming no person: the templates are the school's own words (read-only to a campus administrator), and the queue routes answer counts and a reason, never an address (tests/api/communication-queue.spec.ts)",
   "GET v1/schools/[code]/communication/queue/route.ts",
   "POST v1/schools/[code]/communication/queue/next/route.ts",
   "GET v1/schools/[code]/communication/templates/[id]/route.ts",

@@ -27,6 +27,8 @@ interface BroadcastComposerProps {
   schoolCode: string;
   campuses: CampusOption[];
   classArms: ClassArmOption[];
+  /// A campus administrator addresses their own campus only (task 0068): no "All Campuses", and the choice opens on their campus.
+  ownCampusOnly?: boolean;
   onBroadcastSent?: () => void;
   /// The broadcast was queued for `total` people: the panel sends it in the background and shows the progress.
   onQueued?: (progress: { total: number; done: number; sent: number; failed: number; retrying: number }) => void;
@@ -40,10 +42,17 @@ const SAMPLES: Record<string, string> = {
   date: "16 Oct 2026",
 };
 
-export function BroadcastComposer({ schoolCode, campuses, classArms, onBroadcastSent, onQueued }: BroadcastComposerProps) {
+export function BroadcastComposer({
+  schoolCode,
+  campuses,
+  classArms,
+  ownCampusOnly = false,
+  onBroadcastSent,
+  onQueued,
+}: BroadcastComposerProps) {
   const [channel, setChannel] = useState<NotificationChannel>(NotificationChannel.EMAIL);
   const [audienceRole, setAudienceRole] = useState<"ALL" | "GUARDIAN" | "STAFF">("ALL");
-  const [campusId, setCampusId] = useState<string>("");
+  const [campusId, setCampusId] = useState<string>(ownCampusOnly ? (campuses[0]?.id ?? "") : "");
   const [classArmId, setClassArmId] = useState<string>("");
   const [subject, setSubject] = useState<string>("");
   const [body, setBody] = useState<string>("");
@@ -189,7 +198,10 @@ export function BroadcastComposer({ schoolCode, campuses, classArms, onBroadcast
               <SelectField
                 label="Campus Scope"
                 value={campusId}
-                options={[{ value: "", label: "All Campuses" }, ...campuses.map((c) => ({ value: c.id, label: c.name }))]}
+                options={[
+                  ...(ownCampusOnly ? [] : [{ value: "", label: "All Campuses" }]),
+                  ...campuses.map((c) => ({ value: c.id, label: c.name })),
+                ]}
                 onChange={(e) => setCampusId(e.target.value)}
               />
 

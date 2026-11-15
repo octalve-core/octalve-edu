@@ -24,6 +24,9 @@ export interface InvoiceIssuedTriggerParams {
   actorUserId: string;
 }
 
+/// The campus a message about this pupil belongs to (task 0068): a campus administrator's delivery log shows only the messages that carry their campus. A pupil of the whole school has none.
+const campusIdsOf = (student: { campusId: string | null }): string[] => (student.campusId ? [student.campusId] : []);
+
 /**
  * Dispatches attendance absence notifications to primary guardians for absent students.
  */
@@ -90,6 +93,7 @@ export async function triggerAttendanceAbsenceAlerts(tx: Tx, params: AttendanceA
           classArmId,
           date: dateStr,
           triggeredBy: actorUserId,
+          campusIds: campusIdsOf(student),
         },
       });
       dispatched++;
@@ -132,6 +136,7 @@ export async function triggerAttendanceAbsenceAlerts(tx: Tx, params: AttendanceA
           classArmId,
           date: dateStr,
           triggeredBy: actorUserId,
+          campusIds: campusIdsOf(student),
         },
       });
       dispatched++;
@@ -225,6 +230,7 @@ export async function triggerResultsPublishedAlerts(tx: Tx, params: ResultsPubli
           periodId: sampleResult.periodId,
           magicLinkId: magicLink.id,
           triggeredBy: actorUserId,
+          campusIds: campusIdsOf(student),
         },
       });
       dispatched++;
@@ -266,6 +272,7 @@ export async function triggerResultsPublishedAlerts(tx: Tx, params: ResultsPubli
           periodId: sampleResult.periodId,
           magicLinkId: magicLink.id,
           triggeredBy: actorUserId,
+          campusIds: campusIdsOf(student),
         },
       });
       dispatched++;
@@ -356,6 +363,7 @@ export async function triggerInvoiceIssuedAlerts(tx: Tx, params: InvoiceIssuedTr
           invoiceId: invoice.id,
           magicLinkId: magicLink.id,
           triggeredBy: actorUserId,
+          campusIds: campusIdsOf(student),
         },
       });
       dispatched++;
@@ -399,6 +407,7 @@ export async function triggerInvoiceIssuedAlerts(tx: Tx, params: InvoiceIssuedTr
           invoiceId: invoice.id,
           magicLinkId: magicLink.id,
           triggeredBy: actorUserId,
+          campusIds: campusIdsOf(student),
         },
       });
       dispatched++;
