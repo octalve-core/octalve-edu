@@ -79,3 +79,12 @@ export const finance = {
   discount: { amount: "10000", reason: "Staff child waiver" },
   rule: { smallestPart: "2000", shown: "Part payments are allowed, at least ₦2,000." },
 };
+
+/// What C10 sends: an email to the staff, an email to the parents (whose email addresses the school never recorded: nobody can be reached), a text message to the parents with a personalised tag
+/// appended by its chip, and the template the administrator customises (its name as the school's templates are seeded, and the name the administrator gives it). `short` is a name too short to keep.
+export const messages = {
+  staff: { subject: "Staff meeting on Friday", body: "The staff meeting is on Friday after school. Please bring your registers." },
+  parents: { subject: "Open day on Saturday", body: "Our open day is on Saturday. All parents are welcome." },
+  sms: { body: "School closes early on Friday for" },
+  template: { seeded: "Attendance Absence Notice (Email)", name: "Absence notice to parents (Email)", short: "A" },
+};
