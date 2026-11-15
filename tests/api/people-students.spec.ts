@@ -163,8 +163,11 @@ test.describe("creating and changing a student", () => {
       enrolment: null,
     });
     expect(made.json.data.student.admissionNo).toMatch(/^\d{4}\/\d{4,}$/);
+    // A new pupil has no sign-in account yet (task 0065: the view carries `account`, and a person's id, name and address only once it is linked).
+    expect(made.json.data.student.account).toEqual({ state: "none" });
     expect(Object.keys(made.json.data.student).sort()).toEqual(
       [
+        "account",
         "admissionNo",
         "archived",
         "campusId",

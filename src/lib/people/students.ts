@@ -13,6 +13,7 @@ import {
   cleanPersonName,
   formatAdmissionNo,
 } from "@/lib/people/rules";
+import { ACCOUNT_SELECT, toPersonAccount, type PersonAccount } from "@/lib/people/person-account";
 import { auditPeople, invalid, refuse, refuseAndRollBack, rollingBack, type PeopleResult } from "@/lib/people/results";
 
 // Students and their enrolment (plan "Build design — Phase 1.2", decisions P2–P4 and P7).
@@ -48,6 +49,8 @@ export type StudentView = {
   archived: boolean;
   /// The enrolment in the session the list was asked about (`sessionId`), if any; always null from calls that name no session.
   enrolment: EnrolmentView | null;
+  /// The sign-in account linked to this record, if any (task 0065): what the portal's "My work" reads.
+  account: PersonAccount;
 };
 
 const ENROLMENT_INCLUDE = {
@@ -67,7 +70,10 @@ const toEnrolment = (row: EnrolmentRow): EnrolmentView => ({
   enrolledAt: row.enrolledAt.toISOString(),
 });
 
-const STUDENT_INCLUDE = { campus: { select: { name: true } } } satisfies Prisma.StudentRecordInclude;
+const STUDENT_INCLUDE = {
+  campus: { select: { name: true } },
+  membership: { select: ACCOUNT_SELECT },
+} satisfies Prisma.StudentRecordInclude;
 type StudentRow = Prisma.StudentRecordGetPayload<{ include: typeof STUDENT_INCLUDE }>;
 
 export const toStudent = (row: StudentRow, enrolment: EnrolmentView | null = null): StudentView => ({
@@ -82,6 +88,7 @@ export const toStudent = (row: StudentRow, enrolment: EnrolmentView | null = nul
   admissionNo: row.admissionNo,
   archived: row.archivedAt !== null,
   enrolment,
+  account: toPersonAccount("student", row.userId, row.membership),
 });
 
 /// Which students this member may see (decision P2): an ADMIN every campus's; anyone else the school-wide ones and their own campus's.
