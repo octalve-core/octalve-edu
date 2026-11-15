@@ -15,17 +15,26 @@ export const createTemplateSchema = z.object({
     .min(2)
     .max(64)
     .regex(/^[A-Z0-9_]+$/, "Code must be uppercase alphanumeric with underscores"),
-  name: z.string().trim().min(2).max(100),
+  name: z
+    .string()
+    .trim()
+    .min(2, "Give the template a name of at least 2 characters.")
+    .max(100, "Keep the template name to 100 characters or fewer."),
   channel: z.nativeEnum(NotificationChannel),
-  subjectTemplate: z.string().trim().max(255).optional(),
+  subjectTemplate: z.string().trim().max(255, "Keep the subject to 255 characters or fewer.").optional(),
   bodyTemplate: z.string().trim().min(1, "Template body cannot be empty"),
   variables: z.array(z.string().trim()).optional().default([]),
 });
 export type CreateTemplateInput = z.infer<typeof createTemplateSchema>;
 
 export const updateTemplateSchema = z.object({
-  name: z.string().trim().min(2).max(100).optional(),
-  subjectTemplate: z.string().trim().max(255).nullable().optional(),
+  name: z
+    .string()
+    .trim()
+    .min(2, "Give the template a name of at least 2 characters.")
+    .max(100, "Keep the template name to 100 characters or fewer.")
+    .optional(),
+  subjectTemplate: z.string().trim().max(255, "Keep the subject to 255 characters or fewer.").nullable().optional(),
   bodyTemplate: z.string().trim().min(1, "Template body cannot be empty").optional(),
 });
 export type UpdateTemplateInput = z.infer<typeof updateTemplateSchema>;

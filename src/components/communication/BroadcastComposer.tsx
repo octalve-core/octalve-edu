@@ -9,7 +9,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Dialog } from "@/components/ui/Dialog";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { MailIcon, MessageSquareIcon, SendIcon } from "@/components/ui/icons";
-import { sendJson } from "@/components/auth/postJson";
+import { reasonOf, sendJson } from "@/components/auth/postJson";
 import { tagsFor } from "@/lib/communication/tags";
 
 interface CampusOption {
@@ -123,7 +123,7 @@ export function BroadcastComposer({
 
     if (!res.ok) {
       // a refusal carries its own reason in `details` (the tag, the channel or the audience that cannot work); the message is only "Some of the fields are not valid."
-      setError(res.details?.[0]?.message || res.message || "Failed to dispatch broadcast. Check inputs and try again.");
+      setError(reasonOf(res, "Failed to dispatch broadcast. Check inputs and try again."));
       return;
     }
 

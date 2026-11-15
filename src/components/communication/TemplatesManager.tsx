@@ -8,7 +8,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { TextField } from "@/components/ui/TextField";
 import { EyeIcon, PencilIcon } from "@/components/ui/icons";
 import { useApi } from "@/components/academics/useApi";
-import { sendJson } from "@/components/auth/postJson";
+import { reasonOf, sendJson } from "@/components/auth/postJson";
 import type { TemplateListItem } from "@/lib/communication/service";
 
 interface TemplatesManagerProps {
@@ -78,7 +78,7 @@ export function TemplatesManager({ schoolCode }: TemplatesManagerProps) {
     setSaving(false);
 
     if (!res.ok) {
-      setSaveError(res.message || "Failed to update template.");
+      setSaveError(reasonOf(res, "Failed to update template."));
       return;
     }
 
