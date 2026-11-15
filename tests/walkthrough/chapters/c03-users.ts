@@ -1,49 +1,13 @@
 import { expect, type Page } from "@playwright/test";
 import type { Walk } from "../support/walk";
-import { PASSWORD, cast, school } from "../cast";
-import { followInvitation, inbox, mainNav, openInbox, signIn, signOut } from "./shared";
+import { cast, school } from "../cast";
+import { accept, followInvitation, inbox, inviteAt, mainNav, openInbox, pendingFor, send, signIn, signOut, startInvite } from "./shared";
 
 // C03 Users and sign-ins (task 0053, task 0033 section 6.6): the school administrator opens Users, invites a campus administrator, a teacher and a member of the non-teaching staff, invites one
 // address that was mistyped and revokes it. The people accept through the dev inbox, and the chapter then signs in as each of them and visits every page the person's sidebar offers, so that what each
 // kind of person can and cannot reach is shown, not claimed. It ends signed in as the school administrator again (the state every chapter starts from).
 
 const chapter = "C03 Users and sign-ins";
-
-const pendingFor = (page: Page, email: string) => page.getByRole("button", { name: `Revoke the invitation to ${email}` });
-
-const inviteDialog = (page: Page) => page.getByRole("dialog", { name: "Invite someone" });
-
-/// Opens the invitation dialog and fills in the address and the role; the campus is chosen (or not) by the caller, then `send` finishes it.
-async function startInvite(walk: Walk, page: Page, email: string, role: string): Promise<void> {
-  await walk.click(page.getByRole("button", { name: "Invite someone" }));
-  await walk.type(inviteDialog(page).getByLabel("Email address"), email);
-  await walk.selectOption(inviteDialog(page).getByLabel("Role", { exact: true }), role);
-}
-
-async function send(walk: Walk, page: Page, email: string): Promise<void> {
-  await walk.click(inviteDialog(page).getByRole("button", { name: "Send invitation" }));
-  await expect(page.getByText(`Invitation sent to ${email}. The link works for 7 days.`)).toBeVisible();
-  await expect(pendingFor(page, email)).toBeVisible();
-}
-
-/// A person who belongs to one campus: the address, the role and the campus.
-async function inviteAt(walk: Walk, page: Page, email: string, role: string, campus: string): Promise<void> {
-  await startInvite(walk, page, email, role);
-  await walk.selectOption(inviteDialog(page).getByLabel("Campus", { exact: true }), campus);
-  await send(walk, page, email);
-}
-
-async function accept(walk: Walk, page: Page, person: { name: string; email: string }, roleText: string): Promise<void> {
-  await openInbox(walk, page);
-  await followInvitation(walk, page, person.email);
-  await expect(page.getByText(roleText).first()).toBeVisible();
-  await walk.type(page.getByLabel("Your name"), person.name);
-  await walk.type(page.getByLabel("Password", { exact: true }), PASSWORD);
-  await walk.type(page.getByLabel("Confirm password"), PASSWORD);
-  await walk.click(page.getByRole("button", { name: "Create account and join" }));
-  await walk.click(page.getByRole("button", { name: "Continue to sign in" }));
-  await expect(page).toHaveURL(/\/login$/);
-}
 
 // Each page a person reaches from the sidebar: the entry's name and the heading of the page it opens.
 const PAGE_HEADINGS: Record<string, string> = {

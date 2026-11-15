@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import type { Walk } from "../support/walk";
 import { PASSWORD, devToolsToken } from "../cast";
 
@@ -47,4 +47,52 @@ export async function followInvitation(walk: Walk, page: Page, email: string): P
   await walk.click(inbox(page).getByRole("button", { name: new RegExp(`${email}.*invited`) }));
   await expect(inbox(page).getByText(`To ${email}`)).toBeVisible();
   await walk.click(inbox(page).getByRole("link", { name: /\/accept-invite#token=/ }));
+}
+
+/// The page's own dialog, the notice a save leaves ("Saved ..."), a row of a list by its words, and a field of a form by its label: the same four in every setup screen.
+export const dialogOf = (page: Page) => page.getByRole("dialog");
+export const notice = (page: Page) =>
+  page
+    .getByRole("status")
+    .filter({ hasText: /\S/ })
+    .filter({ hasNotText: /^Loading/ });
+export const item = (page: Page, text: string | RegExp) => page.getByRole("listitem").filter({ hasText: text });
+export const field = (scope: Locator, label: string) => scope.getByLabel(label, { exact: true });
+
+// The invitation round every chapter that brings a new person in repeats: the dialog on the Users page (an address, a role, optionally a campus), and the person's side of it (the link in the dev inbox,
+// a name and a password).
+export const pendingFor = (page: Page, email: string) => page.getByRole("button", { name: `Revoke the invitation to ${email}` });
+
+export const inviteDialog = (page: Page) => page.getByRole("dialog", { name: "Invite someone" });
+
+/// Opens the invitation dialog and fills in the address and the role; the campus is chosen (or not) by the caller, then `send` finishes it.
+export async function startInvite(walk: Walk, page: Page, email: string, role: string): Promise<void> {
+  await walk.click(page.getByRole("button", { name: "Invite someone" }));
+  await walk.type(inviteDialog(page).getByLabel("Email address"), email);
+  await walk.selectOption(inviteDialog(page).getByLabel("Role", { exact: true }), role);
+}
+
+export async function send(walk: Walk, page: Page, email: string): Promise<void> {
+  await walk.click(inviteDialog(page).getByRole("button", { name: "Send invitation" }));
+  await expect(page.getByText(`Invitation sent to ${email}. The link works for 7 days.`)).toBeVisible();
+  await expect(pendingFor(page, email)).toBeVisible();
+}
+
+/// A person who belongs to one campus: the address, the role and the campus.
+export async function inviteAt(walk: Walk, page: Page, email: string, role: string, campus: string): Promise<void> {
+  await startInvite(walk, page, email, role);
+  await walk.selectOption(inviteDialog(page).getByLabel("Campus", { exact: true }), campus);
+  await send(walk, page, email);
+}
+
+export async function accept(walk: Walk, page: Page, person: { name: string; email: string }, roleText: string): Promise<void> {
+  await openInbox(walk, page);
+  await followInvitation(walk, page, person.email);
+  await expect(page.getByText(roleText).first()).toBeVisible();
+  await walk.type(page.getByLabel("Your name"), person.name);
+  await walk.type(page.getByLabel("Password", { exact: true }), PASSWORD);
+  await walk.type(page.getByLabel("Confirm password"), PASSWORD);
+  await walk.click(page.getByRole("button", { name: "Create account and join" }));
+  await walk.click(page.getByRole("button", { name: "Continue to sign in" }));
+  await expect(page).toHaveURL(/\/login$/);
 }

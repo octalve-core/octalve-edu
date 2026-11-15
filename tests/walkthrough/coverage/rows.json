@@ -386,5 +386,510 @@
       "src/components/shell/ProfileMenu.tsx"
     ],
     "status": "planned"
+  },
+  {
+    "id": "ACA-01",
+    "area": "Academics",
+    "feature": "Academic setup has eight sections, as links; a new school's sessions list is empty and says so",
+    "route": "/schools/[code]/academics",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Open Academics from the sidebar: the eight section links are listed in order; Sessions & terms opens its list, which says 'No sessions yet.'",
+    "source": [
+      "src/app/(app)/schools/[code]/academics/page.tsx",
+      "src/components/academics/SectionNav.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "ACA-02",
+    "area": "Academics",
+    "feature": "A session is created with a name and its first and last day",
+    "route": "/schools/[code]/academics",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "New session: type the name and both days (as digits), Create session: the notice says it was saved and the row reads Planned and Whole school",
+    "source": [
+      "src/components/academics/SessionDialogs.tsx",
+      "src/components/academics/SessionsPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "ACA-03",
+    "area": "Academics",
+    "feature": "An empty session form, and a last day before the first day, are refused in words beside the field",
+    "route": "/schools/[code]/academics",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "negative",
+    "proof": "Press Create session on the empty form: both fields say what is missing; type a last day before the first: 'The end must be after the start.'; nothing is saved",
+    "source": [
+      "src/components/academics/SessionDialogs.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "ACA-04",
+    "area": "Academics",
+    "feature": "A planned session is opened and becomes the Active one",
+    "route": "/schools/[code]/academics",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Press Open on the session and confirm: the notice says it is now open and the row reads Active",
+    "source": [
+      "src/components/academics/SessionDialogs.tsx",
+      "src/components/academics/SessionsPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "ACA-05",
+    "area": "Academics",
+    "feature": "A term is added to a session and made the current term",
+    "route": "/schools/[code]/academics",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Open the session's terms, Add a term with a name and both days, then Make it the current term: the row shows the days and Current, and the session lists '1 term'",
+    "source": [
+      "src/components/academics/SessionDialogs.tsx",
+      "src/components/academics/SessionsPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "ACA-06",
+    "area": "Academics",
+    "feature": "A session is copied for next year after a preview, and a second copy of the same year is refused",
+    "route": "/schools/[code]/academics",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Copy to next year: Create is disabled until Preview; the preview shows the new name and 'No clashes.'; Create makes a planned session; copying again is refused at the preview with the reason",
+    "source": [
+      "src/components/academics/SessionDialogs.tsx",
+      "src/components/academics/SessionsPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "ACA-07",
+    "area": "Academics",
+    "feature": "A class and one arm of it are created; the same arm twice is refused",
+    "route": "/schools/[code]/academics",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "New class (the empty form is refused first), Add an arm with a capacity: the notice names the arm; adding the same name again says 'That name is already used here.'",
+    "source": [
+      "src/components/academics/ClassDialogs.tsx",
+      "src/components/academics/ClassesPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "ACA-08",
+    "area": "Academics",
+    "feature": "Subjects are created (the short code is shown in capitals) and one nobody studies is archived",
+    "route": "/schools/[code]/academics",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "New subject with a name and a short code: the row shows the code in capitals; create a third and archive it: it leaves the list",
+    "source": [
+      "src/components/academics/ClassDialogs.tsx",
+      "src/components/academics/ClassesPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "ACA-09",
+    "area": "Academics",
+    "feature": "A class chooses the subjects it studies",
+    "route": "/schools/[code]/academics",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Subjects of the class: tick two subjects and Save subjects; the notice says the class's subjects were saved",
+    "source": [
+      "src/components/academics/ClassDialogs.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "ACA-10",
+    "area": "Academics",
+    "feature": "A subject a class studies, and a class with arms, cannot be archived: the refusal says why",
+    "route": "/schools/[code]/academics",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "negative",
+    "proof": "Archive the subject a class studies: 'A class still studies this subject'; archive the class that has an arm: 'This class still has arms'; nothing is archived",
+    "source": [
+      "src/components/academics/ClassDialogs.tsx",
+      "src/components/academics/ClassesPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "ACA-11",
+    "area": "Academics",
+    "feature": "An assessment scheme is created from components and an exam mark, and becomes the school's default",
+    "route": "/schools/[code]/academics",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "New scheme: a name, the exam mark and one component whose maximum makes the total 100; the card reads School default and Not used yet",
+    "source": [
+      "src/components/academics/AssessmentDialogs.tsx",
+      "src/components/academics/AssessmentPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "ACA-12",
+    "area": "Academics",
+    "feature": "A scheme whose parts do not add up to 100 is refused, and the form shows by how much as it is typed",
+    "route": "/schools/[code]/academics",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "negative",
+    "proof": "With exam 60 and a component of 30 the form says they add up to 90 of 100; Create scheme is refused at the exam mark in words; correcting the component to 40 says 'that matches'",
+    "source": [
+      "src/components/academics/AssessmentDialogs.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "ACA-13",
+    "area": "Academics",
+    "feature": "A grade scale is filled in with one click and saved as the default; the default has no Archive button",
+    "route": "/schools/[code]/academics",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "New scale: the empty form is refused, type a name, Fill in a standard A-F scale, Create scale: the card reads Default, lists six bands and offers no Archive",
+    "source": [
+      "src/components/academics/GradingDialogs.tsx",
+      "src/components/academics/GradingPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PPL-01",
+    "area": "People",
+    "feature": "People has two lists, Students and Staff; a new school's pupil list is empty and says how to start",
+    "route": "/schools/[code]/people",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Open People from the sidebar: the two section links are listed; Students says 'No students yet. Add the first one, or import a file.'",
+    "source": [
+      "src/app/(app)/schools/[code]/people/page.tsx",
+      "src/components/people/SectionNav.tsx",
+      "src/components/people/StudentsPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PPL-02",
+    "area": "People",
+    "feature": "A pupil is registered with a name and a date of birth and gets the next admission number",
+    "route": "/schools/[code]/people",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Add student: type the names and the date of birth: the notice names the pupil and the admission number, and the list counts them",
+    "source": [
+      "src/components/people/StudentDialogs.tsx",
+      "src/components/people/StudentsPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PPL-03",
+    "area": "People",
+    "feature": "An empty pupil form is refused in words beside each field",
+    "route": "/schools/[code]/people",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "negative",
+    "proof": "Press Add student on the empty form: first name, last name and date of birth each say what is missing and nothing is saved",
+    "source": [
+      "src/components/people/StudentDialogs.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PPL-04",
+    "area": "People",
+    "feature": "The same name and date of birth, in other capital letters, is refused as a pupil that already exists",
+    "route": "/schools/[code]/people",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "negative",
+    "proof": "Add the same pupil in lower and upper case: the form says the pupil already exists and the count does not change",
+    "source": [
+      "src/components/people/StudentDialogs.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PPL-05",
+    "area": "People",
+    "feature": "The pupil list is searched by name or number and filtered by class, including 'Not in a class yet'",
+    "route": "/schools/[code]/people",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Type part of a name: one pupil is left; type nonsense: 'No student matches these filters.'; choose 'Not in a class yet': both new pupils are listed",
+    "source": [
+      "src/components/people/StudentsPanel.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PPL-06",
+    "area": "People",
+    "feature": "A pupil is enrolled in a class arm for the open session; a class has to be chosen",
+    "route": "/schools/[code]/people/students/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "On the pupil's page press Enrol in a class: without a choice it says 'Choose a class.'; with one the notice says Enrolled and the page lists the class and the session",
+    "source": [
+      "src/app/(app)/schools/[code]/people/students/[id]/page.tsx",
+      "src/components/people/StudentDetail.tsx",
+      "src/components/people/StudentDialogs.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PPL-07",
+    "area": "People",
+    "feature": "The first guardian added is the primary contact; a phone number that is too short is refused with the rule in words",
+    "route": "/schools/[code]/people/students/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Add guardian: the dialog says the first becomes the primary contact; a two-digit phone is refused; a valid one saves and the row reads Primary contact and the relationship with the number",
+    "source": [
+      "src/components/people/GuardianDialogs.tsx",
+      "src/components/people/StudentDetail.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PPL-08",
+    "area": "People",
+    "feature": "A second guardian is not the primary contact; removing a guardian asks first and says whose guardian they stop being",
+    "route": "/schools/[code]/people/students/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Add the mother: the father keeps Primary contact; Remove her: the dialog names the pupil; confirm: the row is gone",
+    "source": [
+      "src/components/people/GuardianDialogs.tsx",
+      "src/components/people/StudentDetail.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PPL-09",
+    "area": "People",
+    "feature": "A parent of two pupils is picked from the register, not typed twice, and the parent's form says the record is shared",
+    "route": "/schools/[code]/people/students/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "On the brother's page Add guardian, choose an existing one, search and pick the father: he is the brother's primary contact; Edit him: the dialog says the record is shared with their other child",
+    "source": [
+      "src/components/people/GuardianDialogs.tsx",
+      "src/components/people/StudentDetail.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PPL-10",
+    "area": "People",
+    "feature": "A pupil is archived and restored",
+    "route": "/schools/[code]/people/students/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Archive the pupil: the heading shows Archived; Restore: the notice says Restored and Archive is offered again",
+    "source": [
+      "src/components/people/StudentDetail.tsx",
+      "src/components/people/StudentDialogs.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PPL-11",
+    "area": "People",
+    "feature": "A staff record is added; the form says what is missing and refuses a wrong email address",
+    "route": "/schools/[code]/people",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Staff, Add staff member: the empty form says what is missing, 'nope' is refused as an email; a valid one and a campus save: the row reads No sign-in, Teaching and the campus",
+    "source": [
+      "src/components/people/StaffPanel.tsx",
+      "src/components/people/StaffDialogs.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PPL-12",
+    "area": "People",
+    "feature": "A staff record is linked to an existing account whose role fits; one has to be chosen",
+    "route": "/schools/[code]/people/staff/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "On the record press Link to an existing account: without a choice it says 'Choose who this record is.'; choose the teacher's account: the notice says Account linked and the page says Can sign in",
+    "source": [
+      "src/app/(app)/schools/[code]/people/staff/[id]/page.tsx",
+      "src/components/people/StaffDetail.tsx",
+      "src/components/people/StaffDialogs.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PAC-01",
+    "area": "Portal accounts",
+    "feature": "A pupil who signs in before their account is linked to a pupil's record finds nothing, and the portal says the profile is not found",
+    "route": "/schools/[code]/learn",
+    "roles": [
+      "Pupil"
+    ],
+    "kind": "negative",
+    "proof": "Sign in as the invited pupil: My work, Practice says 'Student profile not found.'; the sidebar has no Finance",
+    "source": [
+      "src/app/(app)/schools/[code]/learn/page.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PAC-02",
+    "area": "Portal accounts",
+    "feature": "A guardian who signs in before their account is linked to a guardian's record sees no child",
+    "route": "/schools/[code]/children",
+    "roles": [
+      "Guardian"
+    ],
+    "kind": "negative",
+    "proof": "Sign in as the invited father: My children says 'No pupil is linked to your account yet.'",
+    "source": [
+      "src/app/(app)/schools/[code]/children/page.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PAC-03",
+    "area": "Portal accounts",
+    "feature": "The administrator links a pupil's sign-in account on the pupil's page; only accounts that sign in as a student are offered, and one has to be chosen",
+    "route": "/schools/[code]/people/students/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Sign-in section: 'No sign-in yet' says what the pupil lacks; Link opens a dialog that says the account signs in as a student; pressing Link account unchosen says 'Choose who this is.'; choosing the account links it and the section names it",
+    "source": [
+      "src/components/people/AccountDialogs.tsx",
+      "src/components/people/StudentDetail.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PAC-04",
+    "area": "Portal accounts",
+    "feature": "The administrator links a guardian's sign-in account on the guardian's row",
+    "route": "/schools/[code]/people/students/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "On the father's row press Link: the dialog says the account signs in as a parent; choose the account: the row says who he signs in as",
+    "source": [
+      "src/components/people/AccountDialogs.tsx",
+      "src/components/people/StudentDetail.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PAC-05",
+    "area": "Portal accounts",
+    "feature": "Unlinking a pupil's account asks first and says what follows; the account is not switched off and the pupil can be linked again",
+    "route": "/schools/[code]/people/students/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Unlink: the dialog says the pupil will find nothing in the portal until linked again; confirm: 'Account unlinked.' and 'No sign-in yet'; link again: the section names the account",
+    "source": [
+      "src/components/people/AccountDialogs.tsx",
+      "src/components/people/StudentDetail.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PAC-06",
+    "area": "Portal accounts",
+    "feature": "After the link the pupil's portal answers for them",
+    "route": "/schools/[code]/learn",
+    "roles": [
+      "Pupil"
+    ],
+    "kind": "positive",
+    "proof": "Sign in as the pupil again: My work, Practice no longer says the profile is not found (it says practice is not ready or is closed, which depends on the question bank)",
+    "source": [
+      "src/app/(app)/schools/[code]/learn/page.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PAC-07",
+    "area": "Portal accounts",
+    "feature": "After the link a guardian's page lists every pupil linked to them, by name and admission number",
+    "route": "/schools/[code]/children",
+    "roles": [
+      "Guardian"
+    ],
+    "kind": "positive",
+    "proof": "Sign in as the father again: My children offers both of his children by name and admission number, no longer says no pupil is linked, and says in a sentence that the school keeps guardians' practice view off",
+    "source": [
+      "src/app/(app)/schools/[code]/children/page.tsx"
+    ],
+    "status": "planned"
   }
 ]
