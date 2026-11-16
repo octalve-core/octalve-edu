@@ -135,3 +135,15 @@ export const forms = {
     visitor: { chose: "On the radio", wrote: "Please put out more chairs for the parents." },
   },
 };
+
+/// What C13 sets: a piece of paper work for JSS 1 that opened and closed in September (typed into the browser's date-and-time field: the date's digits, then the time's and its AM, so that a paper handed in now is late), and the
+/// note the teacher keeps beside the pupil's name on the roll call.
+export const paperWork = {
+  title: "Holiday assignment",
+  instructions: "Hand in your workbook with every exercise done.",
+  klass: "JSS 1",
+  opens: { date: "09012026", time: "0900AM" },
+  closes: { date: "09102026", time: "0900AM", shown: "10 Sept 2026" },
+  past: "The closing time has already passed. Choose a later one, or give an earlier opening time.",
+  note: "Handed in with her workbook",
+};

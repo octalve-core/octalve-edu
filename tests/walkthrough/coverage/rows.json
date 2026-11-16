@@ -1715,5 +1715,118 @@
       "src/components/forms/FormsList.tsx"
     ],
     "status": "planned"
+  },
+  {
+    "id": "FRM-11",
+    "area": "Forms",
+    "feature": "Empty paper work is refused and the form lists what is missing",
+    "route": "/schools/[code]/forms",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "negative",
+    "proof": "Paper work tab says 'No paper work yet.'; New paper work, then Create paper work with nothing filled in: an alert lists 'Give it a title.' and 'Choose at least one class for the paper work.'",
+    "source": [
+      "src/components/forms/FormBuilderDialog.tsx",
+      "src/components/forms/FormsList.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-12",
+    "area": "Forms",
+    "feature": "Paper work is made for a class with an opening and a closing time, a closing time that has passed with no opening time is refused, and it is listed",
+    "route": "/schools/[code]/forms",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Fill the title, instructions, class JSS 1 and a closing time that has passed: Create paper work is refused ('The closing time has already passed. Choose a later one, or give an earlier opening time.'); add an earlier opening time and Create paper work: 'Paper work created.' and the list shows the opening and closing times and the class",
+    "source": [
+      "src/components/forms/FormBuilderDialog.tsx",
+      "src/components/forms/FormsList.tsx",
+      "src/lib/forms/paper-work.ts",
+      "src/lib/forms/paper-work-messages.ts"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-13",
+    "area": "Forms",
+    "feature": "A piece of paper work opens on its own page with a roll call of the class's pupils",
+    "route": "/schools/[code]/forms/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Open the paper work: the tabs are Overview and Roll call; the roll call lists the pupil and says '0 of N handed in'",
+    "source": [
+      "src/components/forms/FormPage.tsx",
+      "src/components/forms/RollCall.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-14",
+    "area": "Forms",
+    "feature": "A pupil is marked as handed in with a note, and a paper handed in after the closing time is recorded as late",
+    "route": "/schools/[code]/forms/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "On the roll call choose Handed in for the pupil and write a note; Save changes (1): '1 change saved.', the pupil's status reads Late and the summary says '1 of N handed in · 1 late'",
+    "source": [
+      "src/components/forms/RollCall.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-15",
+    "area": "Forms",
+    "feature": "A pupil finds her paper work in her own list with its state and the teacher's note",
+    "route": "/schools/[code]/learn",
+    "roles": [
+      "Pupil"
+    ],
+    "kind": "positive",
+    "proof": "Sign in as the pupil and open My work: the Forms tabs are Practice sets, Questionnaires and Paper work; Paper work lists the item as 'Handed in late' with the note and no Request marking button",
+    "source": [
+      "src/components/learn/LearnSections.tsx",
+      "src/components/learn/PupilFormsTab.tsx",
+      "src/components/learn/PupilPaperWork.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-16",
+    "area": "Forms",
+    "feature": "A pupil finds the practice set of her class open, and no questionnaire that was addressed to staff",
+    "route": "/schools/[code]/learn",
+    "roles": [
+      "Pupil"
+    ],
+    "kind": "negative",
+    "proof": "Practice sets lists the JSS 1 practice set as Not started with its question count and time limit; Questionnaires says 'No questionnaires are waiting for you.'",
+    "source": [
+      "src/components/learn/PupilPracticeSets.tsx",
+      "src/components/learn/PupilQuestionnaires.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-17",
+    "area": "Forms",
+    "feature": "The paper work list says how many pupils have handed it in",
+    "route": "/schools/[code]/forms",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "After the roll call is saved, the Paper work list shows the item with '1 of 1 handed in'",
+    "source": [
+      "src/components/forms/FormsList.tsx"
+    ],
+    "status": "planned"
   }
 ]
