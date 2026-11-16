@@ -260,4 +260,30 @@ test.describe("Questionnaires Pure Domain Rules (Task 0032 Slice 7)", () => {
     expect(q2Stats.totalAnswers).toBe(2);
     expect(q2Stats.textResponses).toEqual(["More library books please", "Great teachers"]);
   });
+
+  // Task 0074: a rating has five fixed values, so its results are counts (as a choice's are), not a list of the numbers people gave.
+  test("aggregateQuestionnaireAnalytics counts a rating over its five values and lists no text for it", () => {
+    const analytics = aggregateQuestionnaireAnalytics({
+      formId: "form-456",
+      title: "Staff survey",
+      isAnonymous: false,
+      status: FormStatus.PUBLISHED,
+      questions: [{ id: "r1", prompt: "How was the term?", questionType: BankQuestionType.RATING, options: [], sortOrder: 0 }],
+      answers: [
+        { formQuestionId: "r1", value: 4 },
+        { formQuestionId: "r1", value: 4 },
+        { formQuestionId: "r1", value: 5 },
+      ],
+    });
+    const rating = analytics.questions[0];
+    expect(rating.totalAnswers).toBe(3);
+    expect(rating.textResponses).toBeUndefined();
+    expect(rating.optionCounts).toEqual([
+      { optionId: "1", label: "1", count: 0, percentage: 0 },
+      { optionId: "2", label: "2", count: 0, percentage: 0 },
+      { optionId: "3", label: "3", count: 0, percentage: 0 },
+      { optionId: "4", label: "4", count: 2, percentage: 66.7 },
+      { optionId: "5", label: "5", count: 1, percentage: 33.3 },
+    ]);
+  });
 });

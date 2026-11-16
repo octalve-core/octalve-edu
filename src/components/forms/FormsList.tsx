@@ -134,6 +134,7 @@ export function FormsList({ kind, classGroups }: { kind: FormKindKey; classGroup
                   <PublicLinkBox
                     shareToken={form.shareToken}
                     published={form.status === "PUBLISHED"}
+                    closed={form.status === "CLOSED"}
                     onCopied={() => setNotice({ variant: "success", text: "Link copied." })}
                   />
                 )}

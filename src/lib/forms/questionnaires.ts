@@ -323,10 +323,12 @@ export function aggregateQuestionnaireAnalytics(params: {
       const qAnswers = answersByQuestion.get(q.id) ?? [];
       const totalAnswers = qAnswers.length;
 
+      // A rating has five fixed values, so it is counted like a choice and not listed like a written answer (task 0074): thirty ratings are five counts, not thirty numbers.
       if (
         q.questionType === BankQuestionType.SINGLE ||
         q.questionType === BankQuestionType.TRUE_FALSE ||
-        q.questionType === BankQuestionType.MULTI
+        q.questionType === BankQuestionType.MULTI ||
+        q.questionType === BankQuestionType.RATING
       ) {
         // Collect defined options
         let optionsList: Array<{ id: string; text: string }> = [];
@@ -335,6 +337,8 @@ export function aggregateQuestionnaireAnalytics(params: {
             { id: "true", text: "True" },
             { id: "false", text: "False" },
           ];
+        } else if (q.questionType === BankQuestionType.RATING) {
+          optionsList = [1, 2, 3, 4, 5].map((n) => ({ id: String(n), text: String(n) }));
         } else if (Array.isArray(q.options)) {
           optionsList = q.options as Array<{ id: string; text: string }>;
         }

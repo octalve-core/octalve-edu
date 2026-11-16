@@ -113,6 +113,7 @@ export function FormOverview({
         <PublicLinkBox
           shareToken={summary?.shareToken}
           published={detail.status === "PUBLISHED"}
+          closed={detail.status === "CLOSED"}
           onCopied={() => setNotice({ variant: "success", text: "Link copied." })}
         />
       )}

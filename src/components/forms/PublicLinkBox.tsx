@@ -4,15 +4,18 @@ import { Button } from "@/components/ui/Button";
 import { useFormsApi } from "@/components/forms/FormsApi";
 import { CopyIcon } from "@/components/ui/icons";
 
-/// The link of a public questionnaire with a button to copy it, and the weakness of a public form in words. The link works once the questionnaire is published. It carries the school's code as well
-/// as the token (`/q/<code>/<token>`): the public API is addressed by school, and a token of another school's questionnaire is "not found".
+/// The link of a public questionnaire with a button to copy it, and the weakness of a public form in words. The link works once the questionnaire is published, and stops when it is closed: a closed
+/// questionnaire's box says so (task 0074), because nothing publishes a closed questionnaire again. It carries the school's code as well as the token (`/q/<code>/<token>`): the public API is
+/// addressed by school, and a token of another school's questionnaire is "not found".
 export function PublicLinkBox({
   shareToken,
   published,
+  closed = false,
   onCopied,
 }: {
   shareToken: string | null | undefined;
   published: boolean;
+  closed?: boolean;
   onCopied: () => void;
 }) {
   const { schoolCode } = useFormsApi();
@@ -37,7 +40,9 @@ export function PublicLinkBox({
           </Button>
         </div>
       ) : (
-        <p className="text-fg-muted">The link works once the questionnaire is published.</p>
+        <p className="text-fg-muted">
+          {closed ? "This questionnaire is closed. Its link no longer opens." : "The link works once the questionnaire is published."}
+        </p>
       )}
       <p className="text-xs text-fg-muted">
         A public link cannot tell who is answering. Each browser is asked to answer once, but anyone can clear that and answer again.
