@@ -1828,5 +1828,133 @@
       "src/components/forms/FormsList.tsx"
     ],
     "status": "planned"
+  },
+  {
+    "id": "FRM-18",
+    "area": "Forms",
+    "feature": "A practice set with a short-answer question is written with its model answer, and its page gets a Marking tab",
+    "route": "/schools/[code]/forms",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "New practice set with a one-correct-answer question and a Short answer question (Correct answer, Points); Create practice set; open it: the tabs are Overview, Questions, Results and Marking",
+    "source": [
+      "src/components/forms/FormBuilderDialog.tsx",
+      "src/components/forms/QuestionEditor.tsx",
+      "src/components/forms/FormPage.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-19",
+    "area": "Forms",
+    "feature": "A pupil starts a practice set with a time limit: the time left is shown, and an empty attempt is refused",
+    "route": "/schools/[code]/learn",
+    "roles": [
+      "Pupil"
+    ],
+    "kind": "negative",
+    "proof": "My work, Practice sets, Start: the attempt shows 'Time left'; Submit with nothing answered: 'Answer at least one question.'",
+    "source": [
+      "src/components/learn/PupilPracticeSets.tsx",
+      "src/components/learn/PracticeSetAttempt.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-20",
+    "area": "Forms",
+    "feature": "A practice set whose questions all have one right answer is marked at once, and the pupil sees the score and each answer's mark",
+    "route": "/schools/[code]/learn",
+    "roles": [
+      "Pupil"
+    ],
+    "kind": "positive",
+    "proof": "Answer both questions and Submit: 'Your score: 3 of 3', each answer says 'Correct' with its score",
+    "source": [
+      "src/components/learn/PracticeSetAttempt.tsx",
+      "src/components/learn/PracticeSetResult.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-21",
+    "area": "Forms",
+    "feature": "A practice set with a hand-marked answer gives the pupil a score so far, and withholds the key of the answer that waits",
+    "route": "/schools/[code]/learn",
+    "roles": [
+      "Pupil"
+    ],
+    "kind": "negative",
+    "proof": "The first practice set is listed Finished; start the second (no time limit, no timer), answer and Submit: 'Score so far: 1 of 3', 'Your teacher still has to mark 1 answer', the short answer says it waits for the teacher and shows no correct answer",
+    "source": [
+      "src/components/learn/PracticeSetResult.tsx",
+      "src/components/learn/PupilPracticeSets.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-22",
+    "area": "Forms",
+    "feature": "An attempt with a hand-marked answer waits in Marking; saving with no score, or a score above the question's points, is refused",
+    "route": "/schools/[code]/forms",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "negative",
+    "proof": "Forms, Marking: the pupil's attempt is Waiting, 'Score so far: 1 of 3', '1 still to mark'; Mark: the machine's mark and the model answer are shown; Save marks: 'Give at least one answer a score.'; a score of 5: 'The score for question 2 is from 0 to 2.'",
+    "source": [
+      "src/components/forms/MarkingQueue.tsx",
+      "src/components/forms/MarkingDialog.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-23",
+    "area": "Forms",
+    "feature": "A hand-marked answer is given a score and feedback; the attempt is marked and leaves the waiting queue",
+    "route": "/schools/[code]/forms",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Give 2 of 2 and feedback, Save marks: 'Marks saved: 3 of 3.' and 'Nothing is waiting for marking.'; Show Marked lists the attempt with 'Score: 3 of 3' and a Review button",
+    "source": [
+      "src/components/forms/MarkingDialog.tsx",
+      "src/components/forms/MarkingQueue.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-24",
+    "area": "Forms",
+    "feature": "After marking, the pupil sees the final score and the teacher's feedback",
+    "route": "/schools/[code]/learn",
+    "roles": [
+      "Pupil"
+    ],
+    "kind": "positive",
+    "proof": "My work, Practice sets, See result: 'Your score: 3 of 3', the short answer shows 'Score: 2 of 2' and 'Your teacher says:' with the feedback",
+    "source": [
+      "src/components/learn/PracticeSetResult.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-25",
+    "area": "Forms",
+    "feature": "A practice set's Results tab lists who answered, whether they finished and their score",
+    "route": "/schools/[code]/forms/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "The list says '1 response'; open the practice set, Results: '1 finished · 0 in progress' and the pupil's row says Finished with the score",
+    "source": [
+      "src/components/forms/PracticeResults.tsx",
+      "src/components/forms/FormsList.tsx"
+    ],
+    "status": "planned"
   }
 ]

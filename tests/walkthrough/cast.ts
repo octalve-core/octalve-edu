@@ -147,3 +147,22 @@ export const paperWork = {
   past: "The closing time has already passed. Choose a later one, or give an earlier opening time.",
   note: "Handed in with her workbook",
 };
+
+/// What C14 writes and answers: a second practice set for JSS 1 with one question the machine marks and one short answer a teacher marks by hand (with its model answer), what the pupil answers
+/// in it and in C12's practice set, a score above the question's points (refused), and the score and feedback the administrator gives.
+export const marking = {
+  set: {
+    title: "Nigeria quiz",
+    klass: "JSS 1",
+    single: {
+      prompt: "Which of these is the largest city in Nigeria?",
+      options: ["Lagos", "Kano", "Ibadan"],
+      correct: "Option A is correct",
+    },
+    short: { prompt: "What is the capital city of Nigeria?", model: "Abuja", points: "2" },
+  },
+  pupil: { multiplication: "54", truth: "True", city: "Lagos", capital: "Abuja" },
+  tooMany: "5",
+  score: "2",
+  feedback: "Well done, Sade.",
+};
