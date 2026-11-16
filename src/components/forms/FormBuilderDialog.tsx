@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { CheckboxField } from "@/components/ui/CheckboxField";
@@ -71,6 +71,13 @@ function Body({
   const [roles, setRoles] = useState<string[]>([]);
   const [problems, setProblems] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
+  const problemsRef = useRef<HTMLDivElement>(null);
+
+  // The list of reasons is at the head of a form that scrolls (the dialog is taller than the window) and the save button is at its foot: without this a refused save looks like nothing happened
+  // (task 0073, as task 0071 for the question form). `nearest` moves nothing when the list is already in view. Focus stays on the button that was pressed; the list announces itself (role="alert").
+  useEffect(() => {
+    if (problems.length > 0) problemsRef.current?.scrollIntoView({ block: "nearest" });
+  }, [problems]);
 
   const noun = KIND_NOUN[kind];
   const asks = kind !== "PAPER_WORK";
@@ -142,13 +149,15 @@ function Body({
   return (
     <form onSubmit={save} className="space-y-5" noValidate>
       {problems.length > 0 && (
-        <Alert variant="error">
-          <ul className="list-disc pl-5">
-            {problems.map((p) => (
-              <li key={p}>{p}</li>
-            ))}
-          </ul>
-        </Alert>
+        <div ref={problemsRef}>
+          <Alert variant="error">
+            <ul className="list-disc pl-5">
+              {problems.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          </Alert>
+        </div>
       )}
       <TextField label="Title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} />
       <TextAreaField
