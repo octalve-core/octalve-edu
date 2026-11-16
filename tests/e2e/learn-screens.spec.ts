@@ -694,18 +694,19 @@ test.describe("the public questionnaire page", () => {
     page,
   }) => {
     const w = await world();
-    // a questionnaire whose window has ended says so; one the school closed by hand is not offered at all (the link no longer names anything)
+    // a questionnaire whose window has ended says so; one the school closed by hand is not offered at all (the link no longer names anything), and the sentence is the same for a link that never
+    // matched anything: it says the questionnaire is not open for answers and that the link may be incomplete, and never which of those it is (task 0072)
     const ended = await survey(w, { closesAt: new Date(Date.now() - 60_000) });
     await page.goto(ended.url);
     await expect(main(page)).toContainText("This questionnaire is closed.");
     const closed = await survey(w, { status: "CLOSED" });
     await page.goto(closed.url);
-    await expect(main(page)).toContainText("This link doesn't match a questionnaire.");
+    await expect(main(page)).toContainText("This questionnaire isn't open for answers.");
     await page.goto(`/q/${school.code}/${"0".repeat(32)}`);
-    await expect(main(page)).toContainText("This link doesn't match a questionnaire.");
+    await expect(main(page)).toContainText("This questionnaire isn't open for answers.");
     const open = await survey(w);
     await page.goto(`/q/someone-elses-school/${open.token}`);
-    await expect(main(page)).toContainText("This link doesn't match a questionnaire.");
+    await expect(main(page)).toContainText("This questionnaire isn't open for answers.");
     await expect(page.locator("body")).not.toContainText(`${tag} Lunch survey`);
   });
 });
