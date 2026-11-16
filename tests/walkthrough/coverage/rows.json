@@ -1409,5 +1409,149 @@
       "src/lib/communication/service.ts"
     ],
     "status": "planned"
+  },
+  {
+    "id": "QBK-01",
+    "area": "Question bank",
+    "feature": "A teacher finds Browse, My questions and My reports, and none of the sections for reviewers and administrators",
+    "route": "/schools/[code]/question-bank",
+    "roles": [
+      "Teacher"
+    ],
+    "kind": "negative",
+    "proof": "Sign in as the teacher and open Question bank: the section tabs are Browse, My questions and My reports; Browse is selected",
+    "source": [
+      "src/components/question-bank/QuestionBankSections.tsx",
+      "src/app/(app)/schools/[code]/question-bank/page.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "QBK-02",
+    "area": "Question bank",
+    "feature": "An empty question form is refused and lists what is missing",
+    "route": "/schools/[code]/question-bank",
+    "roles": [
+      "Teacher"
+    ],
+    "kind": "negative",
+    "proof": "Write a question and press Save as a draft with nothing filled in: an alert lists the problems and nothing is saved",
+    "source": [
+      "src/components/question-bank/QuestionForm.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "QBK-03",
+    "area": "Question bank",
+    "feature": "A question with one correct answer is written with its options, explanation, points, difficulty, topic, subject and class, and saved as a draft",
+    "route": "/schools/[code]/question-bank",
+    "roles": [
+      "Teacher"
+    ],
+    "kind": "positive",
+    "proof": "Fill the form (four options, Option 2 marked correct, explanation, points, difficulty, topic, subject, the class as a tag) and Save as a draft: 'Saved as a draft', and My questions lists it as 'Draft · One correct answer'",
+    "source": [
+      "src/components/question-bank/QuestionForm.tsx",
+      "src/components/question-bank/QuestionsPanel.tsx",
+      "src/components/question-bank/TagInput.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "QBK-04",
+    "area": "Question bank",
+    "feature": "A true-or-false question and a short-answer question (with several accepted answers) are written and saved as drafts",
+    "route": "/schools/[code]/question-bank",
+    "roles": [
+      "Teacher"
+    ],
+    "kind": "positive",
+    "proof": "Choose Kind of question True or false, mark False and save; choose Short answer, give two accepted answers (Add another accepted answer) and save: My questions lists 'Draft · True or false' and 'Draft · Short answer'",
+    "source": [
+      "src/components/question-bank/QuestionForm.tsx",
+      "src/components/question-bank/model.ts"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "QBK-05",
+    "area": "Question bank",
+    "feature": "A draft is changed and sent for review, and then shows as waiting for review",
+    "route": "/schools/[code]/question-bank",
+    "roles": [
+      "Teacher"
+    ],
+    "kind": "positive",
+    "proof": "Open a draft, Edit, change the points, Save changes ('Saved.'); Send for review: 'Sent for review. A reviewer will look at it.' and the list says 'Waiting for review'",
+    "source": [
+      "src/components/question-bank/QuestionDetail.tsx",
+      "src/components/question-bank/QuestionForm.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "QBK-06",
+    "area": "Question bank",
+    "feature": "The reviewer finds the questions waiting in the Review queue and approves one, confirming its subject and classes",
+    "route": "/schools/[code]/question-bank",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Open the Review queue: the three waiting questions are listed; open one, Approve: 'Approve this question' asks for the subject (already filled) and classes; Approve takes it off the queue",
+    "source": [
+      "src/components/question-bank/QuestionsPanel.tsx",
+      "src/components/question-bank/DecisionDialogs.tsx",
+      "src/components/question-bank/QuestionDetail.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "QBK-07",
+    "area": "Question bank",
+    "feature": "A question is sent back with a reason, and a reviewer cannot send one back without a reason",
+    "route": "/schools/[code]/question-bank",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "negative",
+    "proof": "Open a waiting question, Send back, press Send back with no reason: 'Give a reason.'; type a reason and Send back: the question leaves the queue",
+    "source": [
+      "src/components/question-bank/DecisionDialogs.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "QBK-08",
+    "area": "Question bank",
+    "feature": "The writer sees each question in the state the reviewer left it, narrows the list by state, and reads the reason a question was sent back",
+    "route": "/schools/[code]/question-bank",
+    "roles": [
+      "Teacher"
+    ],
+    "kind": "positive",
+    "proof": "My questions: Approved, Sent back and Waiting for review; State 'Sent back' shows only that one; opening it shows the reviewer's reason",
+    "source": [
+      "src/components/question-bank/QuestionsPanel.tsx",
+      "src/components/question-bank/QuestionDetail.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "QBK-09",
+    "area": "Question bank",
+    "feature": "The school's administrator is offered every section: Review queue, Reports, Print log, Reviewers and Settings as well as the writer's three",
+    "route": "/schools/[code]/question-bank",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Sign in as the school administrator and open Question bank: the tabs are Browse, My questions, My reports, Review queue, Reports, Print log, Reviewers and Settings",
+    "source": [
+      "src/components/question-bank/QuestionBankSections.tsx",
+      "src/app/(app)/schools/[code]/question-bank/page.tsx"
+    ],
+    "status": "planned"
   }
 ]
