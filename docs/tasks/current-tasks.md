@@ -818,3 +818,12 @@
 - [x] F2: a closed public questionnaire's link box said "The link works once the questionnaire is published."; `PublicLinkBox` takes `closed` and says "This questionnaire is closed. Its link no longer opens."
 - [x] Tests, failing first: unit 1 failed (`["4", "4", "5"]` received), browser 4 failed; fixed build: unit 1268, api 31 (three specs), browser 25 passed
 - [ ] Not done: an average for ratings (not asked for); not run: the rest of api, integration and https, the rest of the browser suite, mutation passes (deferred)
+
+## TASK-0075: The Forms list does not call "paper work" "paper works" (found by the walkthrough's paper-work chapter, task 0053)
+
+[Task file](0075-paper-work-plural.md). Found by C13's first screenshot (2026-11-16): the Paper work tab's heading read "Paper works" and its empty state "No paper works yet." Built on `claude/octalve-paper-work-plural`; no route, schema or migration change.
+
+- [x] The finding: `FormsList.tsx` built the plural by adding an "s" to the kind's name, which is wrong for "paper work"
+- [x] Fixed: `KIND_NOUNS` (the name for more than one) in `components/forms/model.ts`, used for the heading, the empty state and the load-failure sentence (two files, 11 lines)
+- [x] `tests/e2e/forms-list-wording.spec.ts` (4 tests, desktop and phone): failing first (4 failed, "Paper works" received), fixed build 29 passed with `forms-screens.spec.ts`, unit 1268
+- [ ] Not done: not run: api, integration and https, the rest of the browser suite, mutation passes (deferred)
