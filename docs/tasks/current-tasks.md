@@ -790,3 +790,12 @@
 - [x] Fixed: the alert sits in a wrapper with a ref and an effect scrolls it into view (`block: "nearest"`) when the list of problems changes; focus stays where it is (one file, 17 lines added, 8 changed)
 - [x] `tests/e2e/question-form-refusal.spec.ts` (2 tests, desktop and phone): the list is in the viewport after a refused save (failing first: viewport ratio 0 on both), and a control that axe and overflow pass in both themes with the refusal showing
 - [ ] Not done: other long dialog forms with the same shape were not checked one by one; not run: integration and https, the whole responsive spec, mutation passes (deferred)
+
+## TASK-0072: A public questionnaire's link that no longer opens says something true (found by the walkthrough's forms chapter, task 0053)
+
+[Task file](0072-public-link-closed-wording.md). Found by C12 (2026-11-16): the school closed its public questionnaire and a visitor with the correct link read "This link doesn't match a questionnaire. Check that you copied all of it." Built on `claude/octalve-public-link-closed`; one line in `PublicQuestionnaire.tsx`; no API, schema or migration change.
+
+- [x] The finding: the API answers 404 alike for a link that matches nothing, another school's code, a draft and a questionnaire closed by hand (on purpose, pinned by `forms-public-questionnaire.spec.ts`); the page said the link was wrong for all four
+- [x] Fixed: the 404 sentence is "This questionnaire isn't open for answers. It may have been closed, or the link may be incomplete: check that you copied all of it." (true of all four, says which of them none); the API is unchanged
+- [x] Test: `learn-screens.spec.ts` expects the new sentence (failing first, desktop and phone: 2 failed; fixed: 5 passed), unit 1267 and the API spec 12 passed
+- [ ] Not done: the rest of the browser suite, integration and https, mutation passes (deferred)

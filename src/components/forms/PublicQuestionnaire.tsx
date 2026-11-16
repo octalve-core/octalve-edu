@@ -16,7 +16,10 @@ type Loaded = { title: string; instructions: string | null; isAnonymous: boolean
 function sentenceFor(reply: Reply, fallback: string): string {
   if (reply.status === 0) return NETWORK_ERROR;
   if (reply.status === 429) return reply.message ?? "Too many requests. Please wait a few minutes and try again.";
-  if (reply.status === 404) return "This link doesn't match a questionnaire. Check that you copied all of it.";
+  // The API answers 404 alike for a link that matches nothing, a school code that is not the school's, a draft and a questionnaire the school closed, so that a link says nothing about what it is not
+  // (task 0072): the sentence is true of all four and does not say which it is.
+  if (reply.status === 404)
+    return "This questionnaire isn't open for answers. It may have been closed, or the link may be incomplete: check that you copied all of it.";
   if (reply.code === "NOT_YET_OPEN") return "This questionnaire has not opened yet.";
   if (reply.code === "CLOSED" || reply.code === "NOT_PUBLISHED") return "This questionnaire is closed.";
   if (reply.code === "RESTRICTED" || reply.code === "FORBIDDEN") return "This questionnaire is not open to the public.";
