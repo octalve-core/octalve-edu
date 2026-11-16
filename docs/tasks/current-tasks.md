@@ -799,3 +799,12 @@
 - [x] Fixed: the 404 sentence is "This questionnaire isn't open for answers. It may have been closed, or the link may be incomplete: check that you copied all of it." (true of all four, says which of them none); the API is unchanged
 - [x] Test: `learn-screens.spec.ts` expects the new sentence (failing first, desktop and phone: 2 failed; fixed: 5 passed), unit 1267 and the API spec 12 passed
 - [ ] Not done: the rest of the browser suite, integration and https, mutation passes (deferred)
+
+## TASK-0073: A refused "New practice set" or "New questionnaire" form shows its reasons where the person is looking (found by the walkthrough's forms chapter, task 0053)
+
+[Task file](0073-forms-refusal-in-view.md). Found by reading C12's screenshot of an empty practice set being refused (2026-11-16): the same defect as task 0071 in the next long dialog form. Built on `claude/octalve-forms-refusal-in-view`; one component; no route, wording, schema or migration change.
+
+- [x] The finding, checked in the screenshot and the code: `FormBuilderDialog.tsx` renders the problems as an `Alert` at the head of a dialog taller than the window and the save button is at its foot
+- [x] Fixed as 0071 fixed the question form: a wrapper with a ref and an effect calling `scrollIntoView({ block: "nearest" })` when the problems change; focus stays where it is
+- [x] `tests/e2e/forms-refusal.spec.ts` (3 tests, desktop and phone): the list is in the viewport for a practice set and a questionnaire (failing first: 4 failed, viewport ratio 0), and a control for axe and overflow in both themes; fixed build 27 passed with `forms-screens.spec.ts`, unit 1267
+- [ ] Not done: `FormEditDialog` (short, not changed) and the other long dialog forms were not checked one by one; not run: api, integration and https, the rest of the browser suite, mutation passes (deferred)
