@@ -827,3 +827,12 @@
 - [x] Fixed: `KIND_NOUNS` (the name for more than one) in `components/forms/model.ts`, used for the heading, the empty state and the load-failure sentence (two files, 11 lines)
 - [x] `tests/e2e/forms-list-wording.spec.ts` (4 tests, desktop and phone): failing first (4 failed, "Paper works" received), fixed build 29 passed with `forms-screens.spec.ts`, unit 1268
 - [ ] Not done: not run: api, integration and https, the rest of the browser suite, mutation passes (deferred)
+
+## TASK-0076: Paper work whose closing time has already passed is refused unless it is given an earlier opening time (found by the walkthrough's paper-work chapter, task 0053)
+
+[Task file](0076-paper-work-past-closing.md). Found by C13's step 115 (2026-11-16): paper work made with a closing time of 10 September and no opening time was listed "Opens 16 Nov 2026 · Closes 10 Sept 2026". Built on `claude/octalve-paper-work-past-close`; no schema or migration change.
+
+- [x] The finding: the service gives paper work with no opening time `opensAt = now`, and the validator compared the two times only when both were typed, so it saved paper work that closed before it opened
+- [x] Fixed: `validatePaperWorkInput(input, now)` refuses it with "The closing time has already passed. Choose a later one, or give an earlier opening time." (`PAST_CLOSING`, a constant in `lib/forms/paper-work-messages.ts`), and the builder says it before sending; an earlier opening time still records paper work whose time has gone
+- [x] Tests, failing first: unit 1 failed (`Received: true`), browser 4 failed; fixed build: unit 1269, api 92 (two specs), browser 33 passed
+- [ ] Not done: an API test of the 400 on its own; not run: the rest of api, integration and https, the rest of the browser suite, mutation passes (deferred)

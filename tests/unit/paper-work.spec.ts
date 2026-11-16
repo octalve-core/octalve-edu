@@ -9,6 +9,20 @@ import {
 } from "../../src/lib/forms/paper-work";
 
 test.describe("Paper Work Domain Logic (Task 0032 Slice 8)", () => {
+  // Task 0076: paper work that is not given an opening time opens when it is made, so a closing time that has already passed would close it before it opened.
+  test("validatePaperWorkInput refuses a closing time that has passed unless an earlier opening time is given", () => {
+    const now = new Date("2026-11-16T12:00:00Z");
+    const base = { title: "Holiday assignment", classGroupIds: ["class-1"] };
+    const past = validatePaperWorkInput({ ...base, closesAt: "2026-09-10T09:00:00Z" }, now);
+    expect(past.valid).toBe(false);
+    expect(past.errors).toEqual(["The closing time has already passed. Choose a later one, or give an earlier opening time."]);
+    // an opening time before it makes it a paper whose time has gone, which a teacher may record
+    expect(validatePaperWorkInput({ ...base, opensAt: "2026-09-01T09:00:00Z", closesAt: "2026-09-10T09:00:00Z" }, now).valid).toBe(true);
+    // a closing time ahead, or none, is as before
+    expect(validatePaperWorkInput({ ...base, closesAt: "2026-12-01T09:00:00Z" }, now).valid).toBe(true);
+    expect(validatePaperWorkInput(base, now).valid).toBe(true);
+  });
+
   test("validatePaperWorkInput enforces title, classGroupIds, duration, and scheduling bounds", () => {
     // Missing title
     expect(
