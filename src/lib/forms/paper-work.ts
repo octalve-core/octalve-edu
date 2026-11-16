@@ -1,4 +1,5 @@
 import { FormStatus, TurnInStatus } from "@prisma/client";
+import { PAST_CLOSING } from "@/lib/forms/paper-work-messages";
 
 export interface PaperWorkInput {
   title: string;
@@ -17,7 +18,7 @@ export interface PaperWorkValidationResult {
 /**
  * Validates paper work creation or update input.
  */
-export function validatePaperWorkInput(input: PaperWorkInput): PaperWorkValidationResult {
+export function validatePaperWorkInput(input: PaperWorkInput, now: Date = new Date()): PaperWorkValidationResult {
   const errors: string[] = [];
 
   const title = input.title?.trim();
@@ -54,6 +55,12 @@ export function validatePaperWorkInput(input: PaperWorkInput): PaperWorkValidati
 
   if (opensAtDate && closesAtDate && closesAtDate <= opensAtDate) {
     errors.push("closesAt must be later than opensAt.");
+  }
+
+  // Paper work with no opening time opens when it is made (the service), so a closing time that has already passed would close it before it opened (task 0076). Giving an earlier opening
+  // time is how a teacher records paper work whose time has gone.
+  if (!opensAtDate && closesAtDate && closesAtDate <= now) {
+    errors.push(PAST_CLOSING);
   }
 
   if (input.maxDurationMinutes !== undefined && input.maxDurationMinutes !== null) {

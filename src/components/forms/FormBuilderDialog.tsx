@@ -11,6 +11,7 @@ import { sendJson } from "@/components/auth/postJson";
 import { say } from "@/components/question-bank/say";
 import { KIND_PATH, useFormsApi } from "@/components/forms/FormsApi";
 import { QuestionEditor } from "@/components/forms/QuestionEditor";
+import { PAST_CLOSING } from "@/lib/forms/paper-work-messages";
 import {
   KIND_NOUN,
   ROLE_CHOICES,
@@ -98,6 +99,7 @@ function Body({
     const until = instantOf(closes);
     if ((opens && !from) || (closes && !until)) found.push("Check the dates: one of them is not a date.");
     else if (from && until && new Date(until) <= new Date(from)) found.push("It must close after it opens.");
+    else if (kind === "PAPER_WORK" && !from && until && new Date(until) <= new Date()) found.push(PAST_CLOSING);
     if (asks) {
       if (questions.length === 0) found.push("Add at least one question.");
       for (const [i, q] of questions.entries()) {
