@@ -130,7 +130,7 @@ export async function c04Academics(walk: Walk, page: Page): Promise<void> {
       await walk.click(page.getByRole("button", { name: `Copy ${session.name} to next year` }));
       await expect(dialogOf(page).getByRole("button", { name: "Create session" })).toBeDisabled();
       await walk.click(dialogOf(page).getByRole("button", { name: "Preview" }));
-      await expect(dialogOf(page).getByText(session.copy)).toBeVisible();
+      await expect(dialogOf(page).getByText(session.copy, { exact: true })).toBeVisible();
       await expect(dialogOf(page).getByText("No clashes.")).toBeVisible();
       await walk.click(dialogOf(page).getByRole("button", { name: "Create session" }));
       await expect(notice(page)).toContainText(`${session.copy} was created as a planned session.`);

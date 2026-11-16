@@ -108,3 +108,30 @@ export const questions = {
   short: { prompt: "What is the capital city of Nigeria?", accepted: ["Abuja", "abuja"], subject: "Geography", klass: "JSS 1" },
   reason: "This is too easy for JSS 1. Ask about a shape with more sides.",
 };
+
+/// What C12 writes on the Forms page: a practice set (two questions: one correct answer and true or false), a questionnaire for staff (a rating and a long answer, addressed to teachers and to the
+/// non-teaching staff, not anonymous, with the answer a member of the non-teaching staff gives) and a public questionnaire anyone with the link answers (anonymous, one choice and one long answer), with the visitor's answers.
+export const forms = {
+  practice: {
+    title: "Multiplication practice",
+    instructions: "Answer every question. Take your time.",
+    minutes: "15",
+    klass: "JSS 1",
+    single: { prompt: "What is nine times six?", options: ["52", "54", "56", "64"], correct: "Option B is correct", points: "2" },
+    truth: { prompt: "A triangle has three sides.", points: "1" },
+  },
+  staffSurvey: {
+    title: "The term in your words",
+    instructions: "Please answer before the term ends.",
+    rating: "How was the term for you?",
+    text: "What should the school do better next term?",
+    answer: { rating: "4", wrote: "More time to plan together." },
+  },
+  openDay: {
+    title: "Open day feedback",
+    instructions: "Tell us what you thought of the open day.",
+    single: { prompt: "How did you hear about the open day?", options: ["From a friend", "On the radio", "At the school gate"] },
+    text: { prompt: "Is there anything more you would like to tell us?" },
+    visitor: { chose: "On the radio", wrote: "Please put out more chairs for the parents." },
+  },
+};

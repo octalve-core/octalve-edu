@@ -1553,5 +1553,167 @@
       "src/app/(app)/schools/[code]/question-bank/page.tsx"
     ],
     "status": "planned"
+  },
+  {
+    "id": "FRM-01",
+    "area": "Forms",
+    "feature": "The school administrator finds the five sections of Forms, and a school with no forms says so",
+    "route": "/schools/[code]/forms",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Open Forms: the tabs are Practice sets, Questionnaires, Paper work, Marking and For you; Practice sets is selected and says 'No practice sets yet.'",
+    "source": [
+      "src/components/forms/FormsSections.tsx",
+      "src/app/(app)/schools/[code]/forms/page.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-02",
+    "area": "Forms",
+    "feature": "An empty practice set is refused and the form lists what is missing",
+    "route": "/schools/[code]/forms",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "negative",
+    "proof": "New practice set, then Create practice set with nothing filled in: an alert lists 'Give it a title.' and 'Write the question for question 1.' and nothing is saved",
+    "source": [
+      "src/components/forms/FormBuilderDialog.tsx",
+      "src/components/forms/model.ts"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-03",
+    "area": "Forms",
+    "feature": "A practice set of two questions is written for a class, with a time limit, and listed",
+    "route": "/schools/[code]/forms",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Fill the title, instructions, class, time limit, a one-correct-answer question with four options and points, and a true-or-false question; Create practice set: 'Practice set created.' and the list shows '2 questions', '15 min limit' and '0 responses'",
+    "source": [
+      "src/components/forms/FormBuilderDialog.tsx",
+      "src/components/forms/QuestionEditor.tsx",
+      "src/components/forms/FormsList.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-04",
+    "area": "Forms",
+    "feature": "A questionnaire for staff roles is saved as a draft and then published",
+    "route": "/schools/[code]/forms",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "New questionnaire addressed to Teachers and Non-teaching staff with a rating and a long answer; Save as draft: 'Questionnaire saved as a draft.', listed as Draft and Members; Publish: 'Questionnaire published.' and the button becomes Close",
+    "source": [
+      "src/components/forms/FormBuilderDialog.tsx",
+      "src/components/forms/FormsList.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-05",
+    "area": "Forms",
+    "feature": "A public anonymous questionnaire shows its link only once it is published, and says what a public link cannot do",
+    "route": "/schools/[code]/forms",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Choose Anyone with the link and Anonymous: the form says a public link cannot tell who answers and that nobody will see who gave which answer; after saving the box says 'The link works once the questionnaire is published.'; after Publish it shows the /q/ link",
+    "source": [
+      "src/components/forms/FormBuilderDialog.tsx",
+      "src/components/forms/PublicLinkBox.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-06",
+    "area": "Forms",
+    "feature": "A visitor answers a public questionnaire from its link, an empty answer is refused, and the same browser is told it has answered",
+    "route": "/q/[code]/[token]",
+    "roles": [
+      "Visitor"
+    ],
+    "kind": "positive",
+    "proof": "Open the link in a new tab: Send with nothing chosen says 'Answer at least one question.'; choose an option, write an answer and Send: 'Thank you. Your answers were sent.'; opening the link again says it has already been answered from this browser",
+    "source": [
+      "src/components/forms/PublicQuestionnaire.tsx",
+      "src/app/q/[code]/[token]/page.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-07",
+    "area": "Forms",
+    "feature": "The results of an anonymous questionnaire hold the breakdown back until enough people have answered",
+    "route": "/schools/[code]/forms/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "negative",
+    "proof": "Open the questionnaire and its Results tab: '1 answered · anonymous: names are not recorded' and 'It appears once N people have answered.'; the visitor's written answer is not shown",
+    "source": [
+      "src/components/forms/QuestionnaireResults.tsx",
+      "src/components/forms/FormPage.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-08",
+    "area": "Forms",
+    "feature": "Closing a questionnaire asks first, and its public link then says it is closed",
+    "route": "/schools/[code]/forms/[id]",
+    "roles": [
+      "School administrator",
+      "Visitor"
+    ],
+    "kind": "positive",
+    "proof": "Close opens 'Close this questionnaire?'; Keep it open leaves it published; Close it: 'Questionnaire closed.'; the link then says 'This questionnaire is closed.'",
+    "source": [
+      "src/components/forms/FormOverview.tsx",
+      "src/components/forms/PublicQuestionnaire.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-09",
+    "area": "Forms",
+    "feature": "A member of the non-teaching staff is offered only For you, finds the staff questionnaire, answers it and sees it marked answered",
+    "route": "/schools/[code]/forms",
+    "roles": [
+      "Non-teaching staff"
+    ],
+    "kind": "positive",
+    "proof": "Open Forms as the non-teaching staff member: no section tabs, the heading For you, the staff questionnaire and not the public one; Answer, rate, write and send: the item shows Answered",
+    "source": [
+      "src/components/forms/ForYouPanel.tsx",
+      "src/app/(app)/schools/[code]/forms/page.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "FRM-10",
+    "area": "Forms",
+    "feature": "The results of a questionnaire that is not anonymous show at once: how many answered and the written answers",
+    "route": "/schools/[code]/forms/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "After a member of staff answers, the list says '1 response'; open the questionnaire and its Results tab: '1 answered', no notice that the breakdown is held back, and the written answer is listed",
+    "source": [
+      "src/components/forms/QuestionnaireResults.tsx",
+      "src/components/forms/FormsList.tsx"
+    ],
+    "status": "planned"
   }
 ]
