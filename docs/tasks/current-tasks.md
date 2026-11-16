@@ -808,3 +808,12 @@
 - [x] Fixed as 0071 fixed the question form: a wrapper with a ref and an effect calling `scrollIntoView({ block: "nearest" })` when the problems change; focus stays where it is
 - [x] `tests/e2e/forms-refusal.spec.ts` (3 tests, desktop and phone): the list is in the viewport for a practice set and a questionnaire (failing first: 4 failed, viewport ratio 0), and a control for axe and overflow in both themes; fixed build 27 passed with `forms-screens.spec.ts`, unit 1267
 - [ ] Not done: `FormEditDialog` (short, not changed) and the other long dialog forms were not checked one by one; not run: api, integration and https, the rest of the browser suite, mutation passes (deferred)
+
+## TASK-0074: A questionnaire's rating answers are counted, and a closed questionnaire's link box says it is closed (found by the walkthrough's forms chapter, task 0053)
+
+[Task file](0074-questionnaire-rating-counts-and-closed-link.md). Found by reading C12's screenshots (2026-11-16). Built on `claude/octalve-questionnaire-results-and-closed-link`; no route, schema or migration change.
+
+- [x] F1: the Results tab listed the answers to a "Rating (1 to 5)" question as raw numbers; `aggregateQuestionnaireAnalytics` now counts a rating over its five values, like a choice (withholding for a small anonymous sample is unchanged)
+- [x] F2: a closed public questionnaire's link box said "The link works once the questionnaire is published."; `PublicLinkBox` takes `closed` and says "This questionnaire is closed. Its link no longer opens."
+- [x] Tests, failing first: unit 1 failed (`["4", "4", "5"]` received), browser 4 failed; fixed build: unit 1268, api 31 (three specs), browser 25 passed
+- [ ] Not done: an average for ratings (not asked for); not run: the rest of api, integration and https, the rest of the browser suite, mutation passes (deferred)
