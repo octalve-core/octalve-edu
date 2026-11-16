@@ -11,7 +11,7 @@ import { KIND_PATH, useFormsApi } from "@/components/forms/FormsApi";
 import { FormBuilderDialog } from "@/components/forms/FormBuilderDialog";
 import { PublicLinkBox } from "@/components/forms/PublicLinkBox";
 import { StatusBadge } from "@/components/forms/StatusBadge";
-import { KIND_NOUN, classGroupIdsOf, plural, windowText, type FormKindKey, type ListedForm } from "@/components/forms/model";
+import { KIND_NOUN, KIND_NOUNS, classGroupIdsOf, plural, windowText, type FormKindKey, type ListedForm } from "@/components/forms/model";
 
 // The forms of one kind in the person's campus, with the two things a teacher does to each one here: publish a draft and close a published one. Presentation only - the API decides who may.
 
@@ -23,6 +23,7 @@ const upper = (word: string) => `${word[0]!.toUpperCase()}${word.slice(1)}`;
 export function FormsList({ kind, classGroups }: { kind: FormKindKey; classGroups: ClassGroup[] }) {
   const { api, schoolCode } = useFormsApi();
   const noun = KIND_NOUN[kind];
+  const nouns = KIND_NOUNS[kind];
   const [forms, setForms] = useState<ListedForm[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
@@ -35,7 +36,7 @@ export function FormsList({ kind, classGroups }: { kind: FormKindKey; classGroup
       const reply = await getJson(`${api}/${KIND_PATH[kind]}?status=ALL`, signal);
       if (signal?.aborted) return;
       if (!reply.ok) {
-        setFailed(say(reply, `The ${noun}s couldn't be loaded.`));
+        setFailed(say(reply, `The ${nouns} couldn't be loaded.`));
         return;
       }
       setFailed(null);
@@ -80,7 +81,7 @@ export function FormsList({ kind, classGroups }: { kind: FormKindKey; classGroup
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-fg">{upper(noun)}s</h2>
+        <h2 className="text-lg font-semibold text-fg">{upper(nouns)}</h2>
         <Button onClick={() => setBuilding(true)}>New {noun}</Button>
       </div>
 
@@ -91,7 +92,7 @@ export function FormsList({ kind, classGroups }: { kind: FormKindKey; classGroup
         <p className="text-sm text-fg-muted">Loading…</p>
       ) : forms !== null && forms.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-line-strong p-8 text-center text-sm text-fg-muted">
-          No {noun}s yet. Write the first one with “New {noun}”.
+          No {nouns} yet. Write the first one with “New {noun}”.
         </p>
       ) : (
         <ul className="space-y-3">

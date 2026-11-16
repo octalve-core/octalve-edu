@@ -11,6 +11,13 @@ export const KIND_NOUN: Record<FormKindKey, string> = {
   PAPER_WORK: "paper work",
 };
 
+/// The same names for more than one. "Paper work" is the whole of what a teacher sets, not a thing that has a plural, so it does not take an "s" (task 0075).
+export const KIND_NOUNS: Record<FormKindKey, string> = {
+  PRACTICE_SET: "practice sets",
+  QUESTIONNAIRE: "questionnaires",
+  PAPER_WORK: "paper work",
+};
+
 /// A practice set is marked by the machine, so it only has the kinds of question that have a right answer to compare with.
 export const PRACTICE_TYPES: QuestionType[] = ["SINGLE", "MULTI", "TRUE_FALSE", "SHORT"];
 /// A questionnaire asks; it has no right answer.
