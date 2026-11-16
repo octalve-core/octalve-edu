@@ -12,6 +12,7 @@ import { c07Teaching } from "./chapters/c07-teaching";
 import { c08Results } from "./chapters/c08-results";
 import { c09Finance } from "./chapters/c09-finance";
 import { c10Communication } from "./chapters/c10-communication";
+import { c11QuestionBank } from "./chapters/c11-question-bank";
 
 // The journey of one pass (task 0033). One browser context, one recording, chapters in the order the data is made (section 6.6). The pass is the project that runs it (desktop-light,
 // desktop-dark, phone); the chapters are the same in each. WALKTHROUGH_MODE=recon records a chapter that stops early as a finding and goes on; the default, strict, stops at the first failure.
@@ -48,6 +49,7 @@ test("the walkthrough", async ({ page }, testInfo) => {
   await chapter("C08 Results", () => c08Results(walk, page));
   await chapter("C09 Finance", () => c09Finance(walk, page));
   await chapter("C10 Communication", () => c10Communication(walk, page));
+  await chapter("C11 Question bank", () => c11QuestionBank(walk, page));
 
   walk.saveTimeline(path.join(passDir, "timeline.json"));
   walk.saveFindings(path.join(passDir, "evidence"));

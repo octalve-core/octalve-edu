@@ -88,3 +88,23 @@ export const messages = {
   sms: { body: "School closes early on Friday for" },
   template: { seeded: "Attendance Absence Notice (Email)", name: "Absence notice to parents (Email)", short: "A" },
 };
+
+/// What C11 writes: three questions of three kinds by the teacher (a one-correct-answer question with its explanation, points, difficulty, topic, subject and class; a true-or-false question; a short-
+/// answer question with two accepted answers), the points the teacher changes on the first, and the reason the reviewer gives for sending the true-or-false question back.
+export const questions = {
+  mcq: {
+    prompt: "What is seven times eight?",
+    options: ["54", "56", "58", "64"],
+    correctOption: 2,
+    explanation: "Seven times eight is fifty-six.",
+    points: "2",
+    editedPoints: "3",
+    difficulty: "2 of 5",
+    topic: "Multiplication",
+    subject: "Mathematics",
+    klass: "JSS 1",
+  },
+  truth: { prompt: "A triangle has four sides.", answer: "False", subject: "Mathematics", klass: "JSS 1" },
+  short: { prompt: "What is the capital city of Nigeria?", accepted: ["Abuja", "abuja"], subject: "Geography", klass: "JSS 1" },
+  reason: "This is too easy for JSS 1. Ask about a shape with more sides.",
+};
