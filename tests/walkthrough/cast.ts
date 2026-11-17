@@ -166,3 +166,15 @@ export const marking = {
   score: "2",
   feedback: "Well done, Sade.",
 };
+
+/// What C15 makes on the Programs page: a program that never ends, run on the North campus, with two level names; its groups (one at the top, one inside it, a second at the top that is renamed
+/// and archived); and the details the administrator edits.
+export const program = {
+  name: "Quran memorisation",
+  description: "Daily memorisation and revision after school.",
+  levels: ["Section", "Class"],
+  campus: "North Campus",
+  otherCampus: "South Campus",
+  groups: { top: "Hifz", inside: "Beginners", second: "Tajweed", renamed: "Tajweed revision" },
+  editedDescription: "Daily memorisation and revision after school, Monday to Thursday.",
+};

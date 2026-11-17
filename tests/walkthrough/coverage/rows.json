@@ -1956,5 +1956,113 @@
       "src/components/forms/FormsList.tsx"
     ],
     "status": "planned"
+  },
+  {
+    "id": "PRG-01",
+    "area": "Programs",
+    "feature": "The school administrator finds the Programs page with no program yet and a New program button",
+    "route": "/schools/[code]/programs",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Open Programs: 'No program has been made yet.' and the New program button",
+    "source": [
+      "src/app/(app)/schools/[code]/programs/page.tsx",
+      "src/components/programs/ProgramsList.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PRG-02",
+    "area": "Programs",
+    "feature": "A program with nothing filled in is refused, with the reasons beside the fields",
+    "route": "/schools/[code]/programs",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "negative",
+    "proof": "New program, then Make the program with nothing filled in: 'Give the program a name.' and 'Give the program at least one level name.'",
+    "source": [
+      "src/components/programs/ProgramsList.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PRG-03",
+    "area": "Programs",
+    "feature": "A program that never ends is made for one campus with two level names, as a draft, and its page opens",
+    "route": "/schools/[code]/programs",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Fill the name, description, campus North and Level 1 and 2; Make the program: the program's page opens with the name, the status Draft, 'Never ends · No dates' and the campus",
+    "source": [
+      "src/components/programs/ProgramsList.tsx",
+      "src/components/programs/ProgramView.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PRG-04",
+    "area": "Programs",
+    "feature": "Groups are added to the program at the top level and inside another group, and an empty group name is refused",
+    "route": "/schools/[code]/programs/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Structure tab: 'No groups yet.'; Add a section with no name: 'Give the group a name.'; add Hifz, then a group inside Hifz: the tree shows both",
+    "source": [
+      "src/components/programs/ProgramView.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PRG-05",
+    "area": "Programs",
+    "feature": "A group is renamed, moved, archived and restored",
+    "route": "/schools/[code]/programs/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Rename a second group, move it up, archive it (it leaves the tree for 'Archived groups (1)') and restore it: each change is said in words",
+    "source": [
+      "src/components/programs/ProgramView.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PRG-06",
+    "area": "Programs",
+    "feature": "A campus is added to a program and removed again",
+    "route": "/schools/[code]/programs/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Overview, Add a campus South Campus, Add: 'The campus was added.'; Remove South Campus: 'South Campus was removed.'",
+    "source": [
+      "src/components/programs/ProgramView.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PRG-07",
+    "area": "Programs",
+    "feature": "A draft program's details are edited and it is activated, the list shows it active with its groups, and the history records it",
+    "route": "/schools/[code]/programs/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Edit details, Save: 'The details are saved.'; Activate: 'The program is active.'; History lists 'Activated' first; All programs shows the program Active with its campus and '3 groups'",
+    "source": [
+      "src/components/programs/ProgramView.tsx",
+      "src/components/programs/ProgramsList.tsx"
+    ],
+    "status": "planned"
   }
 ]
