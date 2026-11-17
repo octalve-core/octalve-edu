@@ -12,7 +12,7 @@ import { TextAreaField } from "@/components/ui/TextAreaField";
 import { TextField } from "@/components/ui/TextField";
 import { AddPersonDialog } from "./AddPersonDialog";
 import { KIND_TEXT, PEOPLE_ACTION_TEXT, STATE_TEXT, STATE_TONE, type PeoplePage, type Person } from "./people-model";
-import { dayText, type CampusOption, type ProgramDetail } from "./model";
+import { dayText, when, type CampusOption, type ProgramDetail } from "./model";
 
 // The People tab of a program (task 0027, slice P2): who is in it, in which group and through which campus, what state their place is in (read from the school's own records, never copied),
 // and what the viewer may do about each. Presentation only: the API decides who sees whom and who may do what, and says why not.
@@ -393,7 +393,7 @@ function PersonDialog({
                     {PEOPLE_ACTION_TEXT[row.action] ?? row.action}
                     <span className="font-normal text-fg-muted">
                       {" "}
-                      · {row.by} · {new Date(row.at).toLocaleString()}
+                      · {row.by} · {when(row.at)}
                     </span>
                   </p>
                   {row.reason && <p className="mt-1 text-fg-muted">{row.reason}</p>}

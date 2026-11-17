@@ -839,3 +839,12 @@
 - [x] Fixed: `validatePaperWorkInput(input, now)` refuses it with "The closing time has already passed. Choose a later one, or give an earlier opening time." (`PAST_CLOSING`, a constant in `lib/forms/paper-work-messages.ts`), and the builder says it before sending; an earlier opening time still records paper work whose time has gone
 - [x] Tests, failing first: unit 1 failed (`Received: true`), browser 4 failed; fixed build: unit 1269, api 92 (two specs), browser 33 passed
 - [ ] Not done: an API test of the 400 on its own; not run: the rest of api, integration and https, the rest of the browser suite, mutation passes (deferred)
+
+## TASK-0077: A program person's history shows its dates in the browser's own format (found by the walkthrough's program-people chapter, task 0053)
+
+[Task file](0077-program-history-dates.md). Found by C16's step 141 (2026-11-17): the history dialog's rows read "11/17/2026, 2:24:00 PM" while the rest of the page reads "17 Nov 2026". `ProgramPeopleTab.tsx` called `toLocaleString()` with no locale; no other Programs component does. No schema or migration change.
+
+- [x] The finding: one bare `toLocaleString()` in `ProgramPeopleTab.tsx` (line 396), where the Attendance, Assessments and Fees tabs and the progress record use `when()` (`en-GB`)
+- [x] Fixed: the history prints `when(row.at)` (two lines)
+- [x] Test, failing first: `tests/unit/programs-date-format.spec.ts` (a source-level guard over `src/components/programs/`, and a test of its own detector): 1 failed, naming `ProgramPeopleTab.tsx:396`; fixed tree: unit 1271 passed
+- [ ] Not done: the same bare call in other modules is listed in the task file (finance invoice view 6, delivery logs 1, LMS 2, sessions 2, announcements 1); not run: api, integration and https, the browser suite, mutation passes (deferred)
