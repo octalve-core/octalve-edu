@@ -2064,5 +2064,111 @@
       "src/components/programs/ProgramsList.tsx"
     ],
     "status": "planned"
+  },
+  {
+    "id": "PRG-08",
+    "area": "Programs",
+    "feature": "A pupil is found in the school's records and added to a program group; a search of one letter is refused",
+    "route": "/schools/[code]/programs/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Add people, choose the group, search 'Sa': 'Type at least 2 letters of the name.'; search 'Sade', Add: 'Sade Okoro is added.' and the list shows her Taking part, as a pupil, in the group",
+    "source": [
+      "src/components/programs/AddPersonDialog.tsx",
+      "src/components/programs/ProgramPeopleTab.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PRG-09",
+    "area": "Programs",
+    "feature": "A member of staff and a guardian are found in the school's records and added to a program group",
+    "route": "/schools/[code]/programs/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Add people, choose Who a member of staff and then a guardian, find and Add: each is added and listed with its kind",
+    "source": [
+      "src/components/programs/AddPersonDialog.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PRG-10",
+    "area": "Programs",
+    "feature": "The pupils of a class are added to a program in one go, after a list of who would be added and who skipped",
+    "route": "/schools/[code]/programs/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Add people, a whole class, See who would be added: '1 to add, 1 skipped' and the pupil already in is skipped as 'already in the program'; Add 1 pupil: 'The class is added.'",
+    "source": [
+      "src/components/programs/AddPersonDialog.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PRG-11",
+    "area": "Programs",
+    "feature": "An adult, and a child with a birth date and a guardian, are typed into a program",
+    "route": "/schools/[code]/programs/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Add people, a new person: an adult with a phone; then a child with a birth date and a guardian: each is added and listed as an adult or a child",
+    "source": [
+      "src/components/programs/AddPersonDialog.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PRG-12",
+    "area": "Programs",
+    "feature": "A person is moved to another group, another is withdrawn (a reason of two letters refused) and re-enrolled",
+    "route": "/schools/[code]/programs/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Move: 'They are moved.'; Withdraw with 'no': 'Say why (at least 3 characters).', with a reason: 'Their place is ended.' and the list says Left; Re-enrol with a reason: 'They are back in the program.'",
+    "source": [
+      "src/components/programs/ProgramPeopleTab.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PRG-13",
+    "area": "Programs",
+    "feature": "A person is suspended with a reason and the suspension lifted, a person's details are edited, a place's history is read, and a pupil with a school record is not offered Suspend",
+    "route": "/schools/[code]/programs/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Suspend with a reason: 'The suspension is recorded.' and Suspended; Lift the suspension: 'The suspension is lifted.'; Edit the phone: 'The details are saved.'; History lists 'Details changed'; the pupil has no Suspend button",
+    "source": [
+      "src/components/programs/ProgramPeopleTab.tsx"
+    ],
+    "status": "planned"
+  },
+  {
+    "id": "PRG-14",
+    "area": "Programs",
+    "feature": "The People tab is narrowed by who is in it, by name and by group",
+    "route": "/schools/[code]/programs/[id]",
+    "roles": [
+      "School administrator"
+    ],
+    "kind": "positive",
+    "proof": "Who Pupils shows only pupils; a search by surname finds that family; Group narrows to one group",
+    "source": [
+      "src/components/programs/ProgramPeopleTab.tsx"
+    ],
+    "status": "planned"
   }
 ]

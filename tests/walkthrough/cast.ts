@@ -178,3 +178,15 @@ export const program = {
   groups: { top: "Hifz", inside: "Beginners", second: "Tajweed", renamed: "Tajweed revision" },
   editedDescription: "Daily memorisation and revision after school, Monday to Thursday.",
 };
+
+/// What C16 does on the program's People tab: who is added from the school's records (a pupil, a member of staff, a guardian), the class whose pupils are added in one go, the two people typed in (an adult and
+/// a child with a guardian), a person moved and withdrawn, a person suspended, one whose details are edited, and the reasons given.
+export const programPeople = {
+  group: "Hifz–Beginners",
+  other: "Tajweed revision",
+  tooShort: "S",
+  adult: { first: "Ruqayya", last: "Bello", phone: "08051112222", name: "Ruqayya Bello" },
+  child: { first: "Idris", last: "Bello", born: "03052018", guardian: "Ruqayya Bello", guardianPhone: "08051112222", name: "Idris Bello" },
+  reasons: { tooShort: "no", withdraw: "Moved away for the term", suspend: "Missed three weeks without notice" },
+  editedPhone: "08053334444",
+};
